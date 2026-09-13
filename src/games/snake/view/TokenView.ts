@@ -1,6 +1,6 @@
 import { Container, Graphics, Text, TextStyle } from "pixi.js";
 import { BitOp } from "../components/index.js";
-import { TerminalPalette, TerminalFont } from "./TerminalPalette.js";
+import { Palette, MonoFont } from "./Palette.js";
 
 export interface TokenRender {
   col: number;
@@ -17,7 +17,7 @@ const TOKEN_GLYPHS: Record<BitOp, string> = {
 
 const MAX_TOKEN_VISUALS = 4;
 const INSET = 2;
-const BORDER = 2;
+const RADIUS = 3;
 
 class TokenVisual {
   public readonly container: Container;
@@ -31,16 +31,21 @@ class TokenVisual {
     this.container = new Container();
     this.block = new Graphics();
     const size = this.cellSize - INSET * 2;
-    this.block.rect(INSET, INSET, size, size);
-    this.block.fill(TerminalPalette.ink);
-    this.block.rect(INSET, INSET, size, size);
-    this.block.stroke({ color: TerminalPalette.token, width: BORDER });
+    // Мягкое янтарное свечение.
+    this.block.roundRect(INSET - 2, INSET - 2, size + 4, size + 4, RADIUS + 1);
+    this.block.fill({ color: Palette.amber, alpha: 0.12 });
+    // Корпус.
+    this.block.roundRect(INSET, INSET, size, size, RADIUS);
+    this.block.fill(Palette.tokenBg);
+    // Внутренняя янтарная рамка.
+    this.block.roundRect(INSET + 1, INSET + 1, size - 2, size - 2, RADIUS - 1);
+    this.block.stroke({ color: Palette.amber, width: 2 });
     this.label = new Text({
       text: "",
       style: new TextStyle({
-        fontFamily: TerminalFont.FAMILY,
-        fontWeight: "bold",
-        fill: TerminalPalette.token,
+        fontFamily: MonoFont.FAMILY,
+        fontWeight: "700",
+        fill: Palette.amber,
       }),
     });
     this.label.anchor.set(0.5, 0.5);
@@ -65,7 +70,7 @@ class TokenVisual {
   }
 
   private buildStyle(glyph: string): TextStyle {
-    const size = this.cellSize - INSET * 2 - BORDER * 2;
+    const size = this.cellSize - INSET * 2 - 4;
     const maxTextWidth = size * 0.92;
     let fontSize = Math.floor(maxTextWidth / (0.6 * glyph.length));
     const cap = Math.floor(size * 0.72);
@@ -73,10 +78,10 @@ class TokenVisual {
       fontSize = cap;
     }
     return new TextStyle({
-      fontFamily: TerminalFont.FAMILY,
+      fontFamily: MonoFont.FAMILY,
       fontSize,
-      fontWeight: "bold",
-      fill: TerminalPalette.token,
+      fontWeight: "700",
+      fill: Palette.amber,
     });
   }
 
