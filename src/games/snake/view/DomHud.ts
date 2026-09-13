@@ -17,9 +17,9 @@ const CSS = `
 .sh-bitrow-label{width:64px;color:${paletteCss(Palette.gray)};font-size:11px;letter-spacing:2px;}
 .sh-bits{display:flex;gap:4px;}
 .sh-bc{width:26px;height:26px;background:#0E1319;border:1px solid #2A3542;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;}
-.sh-tgt{background:#0B0F14;border-color:#232C38;color:#8496A8;}
+.sh-tgt{background:#0E141B;border-color:#38455A;color:#B9C5D1;}
 .sh-ok{color:${paletteCss(Palette.green)};border-color:#2F6B42;box-shadow:0 0 6px rgba(91,224,122,.3);}
-.sh-no{color:#59636E;}
+.sh-no{color:#93A0AD;}
 .sh-match{margin-left:10px;font-size:12px;font-weight:700;color:${paletteCss(Palette.green)};}
 .sh-footer{display:flex;align-items:center;justify-content:center;gap:18px;padding-top:6px;border-top:1px solid #1A2028;font-size:11px;letter-spacing:1.5px;color:${paletteCss(Palette.gray)};}
 .sh-kbd{color:${paletteCss(Palette.amber)};font-weight:700;margin-right:4px;}

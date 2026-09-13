@@ -1,11 +1,10 @@
-// Новая палитра «Змейка: Битовый Лабиринт».
 export const Palette = {
   bg: 0x0a0d12,
   grid: 0x11151c,
   white: 0xf2f6fa,
   light: 0xc7d2dc,
-  gray: 0x5a6672,
-  tail: 0x4a5562, // ← чуть ярче
+  gray: 0x8a97a4, // ← ярче: метки, статус, подсказки, контур бита 0
+  tail: 0x4a5562,
   dark: 0x10151c,
   chrome: 0x1c232c,
   amber: 0xffb02e,
