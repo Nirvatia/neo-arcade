@@ -1,7 +1,10 @@
 <script lang="ts">
-  import "../app.css";
+	import '../app.css';
+	import ArcadeLayout from '$shared/ui/ArcadeLayout.svelte';
 
-  let { children } = $props();
+	let { children } = $props();
 </script>
 
-{@render children()}
+<ArcadeLayout>
+	{@render children()}
+</ArcadeLayout>

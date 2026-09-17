@@ -1,18 +1,36 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { SnakeGame } from "$games/snake/core/GameMain.js";
+	import { onMount } from 'svelte';
+	import { SnakeGame } from '$games/snake/core/GameMain.js';
+	import ArcadeShell from '$shared/ui/ArcadeShell.svelte';
 
-  let parent: HTMLDivElement;
+	let parent = $state<HTMLDivElement | undefined>(undefined);
 
-  onMount(() => {
-    const game = new SnakeGame();
-    void game.init(parent);
-    return () => {
-      game.destroy();
-    };
-  });
+	onMount(() => {
+		const container = parent;
+
+		if (!container) {
+			return;
+		}
+
+		const game = new SnakeGame();
+		void game.init(container);
+
+		return () => {
+			game.destroy();
+		};
+	});
 </script>
 
-<div class="flex min-h-screen items-center justify-center bg-black">
-  <div bind:this={parent}></div>
-</div>
+<ArcadeShell
+	title="Snake"
+	subtitle="Bit maze. Move carefully, collect bits, and reach the exit."
+	backHref="/"
+	backLabel="Back to arcade"
+>
+	<section
+		aria-label="Snake game area"
+		class="flex min-h-[70vh] items-center justify-center overflow-hidden rounded border border-arcade-line bg-black"
+	>
+		<div bind:this={parent}></div>
+	</section>
+</ArcadeShell>
