@@ -5,6 +5,7 @@ export interface LevelTuning {
 	movesPerSequence: number;
 	sequencesToOpenExit: number;
 	maxActiveTokens: number;
+	overdriveBits: number;
 }
 
 export const LevelConfig: readonly LevelTuning[] = [
@@ -14,7 +15,8 @@ export const LevelConfig: readonly LevelTuning[] = [
 		targetLength: 4,
 		movesPerSequence: 12,
 		sequencesToOpenExit: 1,
-		maxActiveTokens: 1
+		maxActiveTokens: 1,
+		overdriveBits: 2
 	},
 	{
 		level: 2,
@@ -22,7 +24,8 @@ export const LevelConfig: readonly LevelTuning[] = [
 		targetLength: 5,
 		movesPerSequence: 12,
 		sequencesToOpenExit: 1,
-		maxActiveTokens: 1
+		maxActiveTokens: 1,
+		overdriveBits: 2
 	},
 	{
 		level: 3,
@@ -30,7 +33,8 @@ export const LevelConfig: readonly LevelTuning[] = [
 		targetLength: 5,
 		movesPerSequence: 11,
 		sequencesToOpenExit: 1,
-		maxActiveTokens: 1
+		maxActiveTokens: 1,
+		overdriveBits: 2
 	},
 	{
 		level: 4,
@@ -38,7 +42,8 @@ export const LevelConfig: readonly LevelTuning[] = [
 		targetLength: 6,
 		movesPerSequence: 11,
 		sequencesToOpenExit: 2,
-		maxActiveTokens: 2
+		maxActiveTokens: 2,
+		overdriveBits: 3
 	},
 	{
 		level: 5,
@@ -46,7 +51,8 @@ export const LevelConfig: readonly LevelTuning[] = [
 		targetLength: 6,
 		movesPerSequence: 10,
 		sequencesToOpenExit: 2,
-		maxActiveTokens: 2
+		maxActiveTokens: 2,
+		overdriveBits: 3
 	},
 	{
 		level: 6,
@@ -54,7 +60,8 @@ export const LevelConfig: readonly LevelTuning[] = [
 		targetLength: 6,
 		movesPerSequence: 10,
 		sequencesToOpenExit: 2,
-		maxActiveTokens: 2
+		maxActiveTokens: 2,
+		overdriveBits: 3
 	},
 	{
 		level: 7,
@@ -62,6 +69,14 @@ export const LevelConfig: readonly LevelTuning[] = [
 		targetLength: 6,
 		movesPerSequence: 9,
 		sequencesToOpenExit: 2,
-		maxActiveTokens: 2
+		maxActiveTokens: 2,
+		overdriveBits: 3
 	}
 ];
+
+// Для уровней выше таблицы используется последняя строка.
+const LAST_TUNING = LevelConfig[LevelConfig.length - 1] as LevelTuning;
+
+export function getLevelTuning(level: number): LevelTuning {
+	return LevelConfig.find((tuning) => tuning.level === level) ?? LAST_TUNING;
+}

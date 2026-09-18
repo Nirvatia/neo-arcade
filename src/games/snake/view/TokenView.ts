@@ -9,10 +9,8 @@ export interface TokenRender {
 }
 
 const TOKEN_GLYPHS: Record<BitOp, string> = {
-	[BitOp.SHL]: '<<',
-	[BitOp.SHR]: '>>',
-	[BitOp.SHL3]: '<<<',
-	[BitOp.SHR3]: '>>>'
+	[BitOp.BOOST]: '<<',
+	[BitOp.UNDO]: '>>'
 };
 
 const MAX_TOKEN_VISUALS = 4;

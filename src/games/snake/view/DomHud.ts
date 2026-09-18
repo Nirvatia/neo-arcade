@@ -4,7 +4,7 @@ const STYLE_ID = 'snake-hud-style';
 const MAX_PIPS = 12;
 
 const CSS = `
-.snake-hud{box-sizing:border-box;display:flex;flex-direction:column;gap:7px;background:#0C1016;border:1px solid ${paletteCss(Palette.chrome)};border-bottom:none;padding:10px 14px;font-family:${MonoFont.FAMILY};color:${paletteCss(Palette.light)};}
+.snake-hud{box-sizing:border-box;display:flex;flex:none;flex-direction:column;gap:7px;background:#0C1016;border:1px solid ${paletteCss(Palette.chrome)};border-bottom:none;padding:10px 14px;font-family:${MonoFont.FAMILY};color:${paletteCss(Palette.light)};pointer-events:none;}
 .sh-row{display:flex;align-items:center;gap:18px;font-size:13px;letter-spacing:1px;white-space:nowrap;}
 .sh-hl{color:${paletteCss(Palette.gray)};font-size:11px;margin-right:6px;letter-spacing:2px;}
 .sh-status{font-size:11px;font-weight:700;letter-spacing:2px;}
@@ -13,6 +13,7 @@ const CSS = `
 .sh-pip{width:7px;height:14px;background:${paletteCss(Palette.chrome)};}
 .sh-pip.on{background:${paletteCss(Palette.light)};}
 .sh-moves-num{color:${paletteCss(Palette.white)};font-weight:700;}
+.sh-growth{font-weight:700;}
 .sh-bitrow{display:flex;align-items:center;gap:4px;}
 .sh-bitrow-label{width:64px;color:${paletteCss(Palette.gray)};font-size:11px;letter-spacing:2px;}
 .sh-bits{display:flex;gap:4px;}
@@ -21,8 +22,6 @@ const CSS = `
 .sh-ok{color:${paletteCss(Palette.green)};border-color:#2F6B42;box-shadow:0 0 6px rgba(91,224,122,.3);}
 .sh-no{color:#93A0AD;}
 .sh-match{margin-left:10px;font-size:12px;font-weight:700;color:${paletteCss(Palette.green)};}
-.sh-footer{display:flex;align-items:center;justify-content:center;gap:18px;padding-top:6px;border-top:1px solid #1A2028;font-size:11px;letter-spacing:1.5px;color:${paletteCss(Palette.gray)};}
-.sh-kbd{color:${paletteCss(Palette.amber)};font-weight:700;margin-right:4px;}
 `;
 
 export interface HudState {
@@ -33,6 +32,7 @@ export interface HudState {
 	activeBits: (0 | 1)[];
 	status: string;
 	statusColor: number;
+	nextGrowth: number;
 }
 
 export class DomHud {
@@ -42,12 +42,14 @@ export class DomHud {
 	private readonly statusSpan: HTMLSpanElement;
 	private readonly pips: HTMLSpanElement[] = [];
 	private readonly movesValue: HTMLSpanElement;
+	private readonly growthValue: HTMLSpanElement;
 	private readonly targetBox: HTMLDivElement;
 	private readonly regBox: HTMLDivElement;
 	private readonly matchSpan: HTMLSpanElement;
 	private lastLevel = '';
 	private lastScore = '';
 	private lastMoves = -1;
+	private lastGrowth = -1;
 	private lastStatusKey = '\u0000';
 	private lastTargetKey = '';
 	private lastRegKey = '';
@@ -87,10 +89,19 @@ export class DomHud {
 		const spacer = document.createElement('span');
 		spacer.className = 'sh-spacer';
 
+		// Бонус роста за следующую собранную последовательность.
+		const growthWrap = document.createElement('span');
+		const growthLabel = document.createElement('span');
+		growthLabel.className = 'sh-hl';
+		growthLabel.textContent = 'GROWTH';
+		this.growthValue = document.createElement('span');
+		this.growthValue.className = 'sh-growth';
+		growthWrap.appendChild(growthLabel);
+		growthWrap.appendChild(this.growthValue);
+
 		const movesLabel = document.createElement('span');
 		movesLabel.className = 'sh-hl';
 		movesLabel.textContent = 'MOVES';
-
 		const pipsBox = document.createElement('span');
 		pipsBox.className = 'sh-pips';
 		for (let i = 0; i < MAX_PIPS; i++) {
@@ -99,7 +110,6 @@ export class DomHud {
 			pipsBox.appendChild(pip);
 			this.pips.push(pip);
 		}
-
 		this.movesValue = document.createElement('span');
 		this.movesValue.className = 'sh-moves-num';
 
@@ -107,6 +117,7 @@ export class DomHud {
 		topRow.appendChild(scoreWrap);
 		topRow.appendChild(this.statusSpan);
 		topRow.appendChild(spacer);
+		topRow.appendChild(growthWrap);
 		topRow.appendChild(movesLabel);
 		topRow.appendChild(pipsBox);
 		topRow.appendChild(this.movesValue);
@@ -134,29 +145,10 @@ export class DomHud {
 		regRow.appendChild(this.regBox);
 		regRow.appendChild(this.matchSpan);
 
-		// Footer с клавиатурными подсказками — виден всегда.
-		const footer = document.createElement('div');
-		footer.className = 'sh-footer';
-		footer.appendChild(this.makeHint('ENTER', 'START'));
-		footer.appendChild(this.makeHint('SPACE', 'PAUSE'));
-		footer.appendChild(this.makeHint('M', 'MUTE'));
-		footer.appendChild(this.makeHint('↑↓←→', 'MOVE'));
-
 		this.root.appendChild(topRow);
 		this.root.appendChild(targetRow);
 		this.root.appendChild(regRow);
-		this.root.appendChild(footer);
 		parent.insertBefore(this.root, parent.firstChild);
-	}
-
-	private makeHint(key: string, action: string): HTMLSpanElement {
-		const span = document.createElement('span');
-		const kbd = document.createElement('span');
-		kbd.className = 'sh-kbd';
-		kbd.textContent = key;
-		span.appendChild(kbd);
-		span.appendChild(document.createTextNode(action));
-		return span;
 	}
 
 	public setWidth(width: number): void {
@@ -189,6 +181,12 @@ export class DomHud {
 			}
 			this.movesValue.textContent =
 				state.movesLeft < 10 ? '0' + state.movesLeft : String(state.movesLeft);
+		}
+		if (state.nextGrowth !== this.lastGrowth) {
+			this.lastGrowth = state.nextGrowth;
+			this.growthValue.textContent = '+' + state.nextGrowth;
+			this.growthValue.style.color =
+				state.nextGrowth > 1 ? paletteCss(Palette.green) : paletteCss(Palette.light);
 		}
 		const statusKey = state.status + '|' + state.statusColor;
 		if (statusKey !== this.lastStatusKey) {

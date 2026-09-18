@@ -7,6 +7,8 @@ export type SnakeEventMap = {
 	'collision:self': { entity: EntityId };
 	'collision:exit': { entity: EntityId };
 	'collision:bitop': { entity: EntityId; op: BitOp };
+	'snake:grow': { amount: number };
+	'snake:shrink': { amount: number };
 	'snake:grown': { entity: EntityId; newLength: number };
 	'snake:died': { entity: EntityId };
 	'food:spawned': { entity: EntityId };
@@ -20,7 +22,7 @@ export type SnakeEventMap = {
 		previous: DirectorStateType;
 		current: DirectorStateType;
 	};
-	'sequence:completed': {};
+	'sequence:completed': { streak: number; growth: number };
 	'sequence:failed': {};
 };
 
@@ -30,5 +32,4 @@ export const DirectorState = {
 	PAUSED: 'PAUSED',
 	GAME_OVER: 'GAME_OVER'
 } as const;
-
 export type DirectorStateType = (typeof DirectorState)[keyof typeof DirectorState];

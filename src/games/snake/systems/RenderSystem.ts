@@ -11,11 +11,13 @@ import { TokenView, type TokenRender } from '../view/TokenView.js';
 import { DomHud, type HudState } from '../view/DomHud.js';
 import { Palette, MonoFont } from '../view/Palette.js';
 import { Container, Graphics, Text, TextStyle } from 'pixi.js';
+import { MAX_STREAK_GROWTH } from './BitRegisterSystem.js';
 
 interface SequenceState {
 	targetBits: (0 | 1)[];
 	activeBits: (0 | 1)[];
 	movesLeft: number;
+	streak: number;
 }
 
 const OVERLAY_ALPHA = 0.85;
@@ -66,7 +68,6 @@ export class RenderSystem extends SystemBase {
 		this.hud = new DomHud(canvasParent);
 		this.overlay = new Graphics();
 		this.overlayLayer = new Container();
-
 		this.mainText = new Text({
 			text: '',
 			style: new TextStyle({
@@ -78,7 +79,6 @@ export class RenderSystem extends SystemBase {
 			})
 		});
 		this.mainText.anchor.set(0.5, 0.5);
-
 		this.subText = new Text({
 			text: '',
 			style: new TextStyle({
@@ -90,17 +90,14 @@ export class RenderSystem extends SystemBase {
 			})
 		});
 		this.subText.anchor.set(0.5, 0.5);
-
 		this.overlayLayer.addChild(this.mainText);
 		this.overlayLayer.addChild(this.subText);
-
 		this.stage.addChild(this.gridView.container);
 		this.stage.addChild(this.foodView.container);
 		this.stage.addChild(this.tokenView.container);
 		this.stage.addChild(this.snakeView.container);
 		this.stage.addChild(this.overlay);
 		this.stage.addChild(this.overlayLayer);
-
 		this.world.events.on('director:stateChanged', (payload) => {
 			this.state = payload.current;
 		});
@@ -143,7 +140,8 @@ export class RenderSystem extends SystemBase {
 			targetBits: sequenceState.targetBits,
 			activeBits: sequenceState.activeBits,
 			status: status.text,
-			statusColor: status.color
+			statusColor: status.color,
+			nextGrowth: Math.min(sequenceState.streak + 1, MAX_STREAK_GROWTH)
 		};
 		this.hud.update(hudState);
 	}
@@ -187,12 +185,10 @@ export class RenderSystem extends SystemBase {
 		this.overlayLayer.visible = true;
 		this.overlay.rect(0, 0, width, this.grid.rows * this.cellSize);
 		this.overlay.fill({ color: 0x04060a, alpha: OVERLAY_ALPHA });
-
 		if (this.lastOverlayState !== this.state) {
 			this.lastOverlayState = this.state;
 			this.rebuildOverlayContent();
 		}
-
 		const cx = width / 2;
 		const cy = (this.grid.rows * this.cellSize) / 2;
 		if (this.state === DirectorState.MENU) {
@@ -219,7 +215,6 @@ export class RenderSystem extends SystemBase {
 		}
 		this.hintKeys.length = 0;
 		this.hintActions.length = 0;
-
 		if (this.state === DirectorState.MENU) {
 			this.mainText.text = 'PRESS ENTER TO START';
 			(this.mainText.style as TextStyle).fill = Palette.amber;
@@ -242,7 +237,6 @@ export class RenderSystem extends SystemBase {
 			}
 			return;
 		}
-
 		if (this.state === DirectorState.PAUSED) {
 			this.mainText.text = 'PAUSED';
 			(this.mainText.style as TextStyle).fill = Palette.amber;
@@ -250,7 +244,6 @@ export class RenderSystem extends SystemBase {
 			this.subText.text = 'PRESS SPACE OR ENTER';
 			return;
 		}
-
 		if (this.state === DirectorState.GAME_OVER) {
 			this.mainText.text = 'GAME OVER';
 			(this.mainText.style as TextStyle).fill = Palette.coral;
@@ -302,6 +295,7 @@ export class RenderSystem extends SystemBase {
 		let targetBits: (0 | 1)[] = [];
 		let activeBits: (0 | 1)[] = [];
 		let movesLeft = 0;
+		let streak = 0;
 		const targets = this.world.query(['targetSequence']).entities;
 		const targetEntity = targets[0];
 		if (targetEntity !== undefined) {
@@ -309,6 +303,7 @@ export class RenderSystem extends SystemBase {
 			if (target !== undefined) {
 				targetBits = target.bits.slice();
 				movesLeft = target.movesLeft;
+				streak = target.streak;
 			}
 		}
 		const collectors = this.world.query(['bitCollector']).entities;
@@ -318,7 +313,7 @@ export class RenderSystem extends SystemBase {
 				activeBits = collector.collected.slice();
 			}
 		}
-		return { targetBits, activeBits, movesLeft };
+		return { targetBits, activeBits, movesLeft, streak };
 	}
 
 	private renderSnake(activeLength: number): void {

@@ -13,23 +13,38 @@ export class SpawnSystem extends SystemBase {
 	private readonly holder: GridHolder;
 	private readonly rng: SeededRNG;
 	private readonly targetFoodCount: number;
+	private suppressed = false;
 
 	constructor(world: World, holder: GridHolder, rng: SeededRNG, targetFoodCount: number) {
 		super(world);
 		this.holder = holder;
 		this.rng = rng;
 		this.targetFoodCount = targetFoodCount;
+		this.world.events.on('exit:opened', this.onExitOpened);
+		this.world.events.on('level:expanded', this.onLevelExpanded);
 	}
 
 	private get grid(): GridBitmask {
 		return this.holder.grid;
 	}
 
+	private onExitOpened = (): void => {
+		this.suppressed = true;
+	};
+
+	private onLevelExpanded = (): void => {
+		this.suppressed = false;
+	};
+
 	public update(_deltaMS: number): void {
 		this.refillFood();
 	}
 
 	public refillFood(): void {
+		if (this.suppressed) {
+			return;
+		}
+
 		let guard = 0;
 
 		while (this.grid.countFood() < this.targetFoodCount) {
