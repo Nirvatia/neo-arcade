@@ -7,6 +7,7 @@
     --color-arcade-dim: #606c7a;
     --color-arcade-dark: #222933;
     --color-arcade-yel: #ffd93b;
+     --color-arcade-red: #ff4b4b;
     --color-arcade-grn: #5be07a;
     --color-arcade-amb: #ff9e2c;
     --color-arcade-cyan: #4cc9e0;
@@ -87,4 +88,13 @@
 
 .crt-vig {
     background: radial-gradient(120% 100% at 50% 50%, transparent 65%, rgba(0, 0, 0, 0.85));
+}
+
+/* Игра: запрет скролла/зума/свайп-навигации браузера поверх канваса и контролов */
+canvas {
+	touch-action: none;
+	display: block;
+}
+* {
+	-webkit-tap-highlight-color: transparent;
 }
