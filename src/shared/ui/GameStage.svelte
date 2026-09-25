@@ -30,8 +30,7 @@
 	let portrait = $state(false);
 	let rotateDismissed = $state(false);
 
-	const coarse =
-		typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+	const coarse = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 	const showRotateHint = $derived(coarse && portrait && !rotateDismissed);
 
 	function fit() {
@@ -76,7 +75,8 @@
 </script>
 
 <main
-	class="relative flex h-dvh w-full touch-none items-center justify-center overflow-hidden bg-black select-none"
+	class="relative flex h-dvh w-full touch-none items-center justify-center overflow-hidden select-none"
+	style:background="var(--stage-bg, #000)"
 >
 	<!-- Игровая колонка: кнопка назад -> контент игры (масштабируется целиком) -->
 	<div
@@ -103,22 +103,64 @@
 			<div class="mx-auto flex w-full max-w-[640px] items-end justify-between px-4">
 				<div class="pointer-events-auto grid grid-cols-3 grid-rows-3 gap-1">
 					<span></span>
-					<button type="button" class="stage-btn" aria-label="Up"
-						onpointerdown={(e) => { e.preventDefault(); touch.direction?.('UP'); }}>▲</button>
+					<button
+						type="button"
+						class="stage-btn"
+						aria-label="Up"
+						onpointerdown={(e) => {
+							e.preventDefault();
+							touch.direction?.('UP');
+						}}>▲</button
+					>
 					<span></span>
-					<button type="button" class="stage-btn" aria-label="Left"
-						onpointerdown={(e) => { e.preventDefault(); touch.direction?.('LEFT'); }}>◄</button>
-					<button type="button" class="stage-btn" aria-label="Pause"
-						onpointerdown={(e) => { e.preventDefault(); touch.pause?.(); }}>❚❚</button>
-					<button type="button" class="stage-btn" aria-label="Right"
-						onpointerdown={(e) => { e.preventDefault(); touch.direction?.('RIGHT'); }}>►</button>
+					<button
+						type="button"
+						class="stage-btn"
+						aria-label="Left"
+						onpointerdown={(e) => {
+							e.preventDefault();
+							touch.direction?.('LEFT');
+						}}>◄</button
+					>
+					<button
+						type="button"
+						class="stage-btn"
+						aria-label="Pause"
+						onpointerdown={(e) => {
+							e.preventDefault();
+							touch.pause?.();
+						}}>❚❚</button
+					>
+					<button
+						type="button"
+						class="stage-btn"
+						aria-label="Right"
+						onpointerdown={(e) => {
+							e.preventDefault();
+							touch.direction?.('RIGHT');
+						}}>►</button
+					>
 					<span></span>
-					<button type="button" class="stage-btn" aria-label="Down"
-						onpointerdown={(e) => { e.preventDefault(); touch.direction?.('DOWN'); }}>▼</button>
+					<button
+						type="button"
+						class="stage-btn"
+						aria-label="Down"
+						onpointerdown={(e) => {
+							e.preventDefault();
+							touch.direction?.('DOWN');
+						}}>▼</button
+					>
 					<span></span>
 				</div>
-				<button type="button" class="stage-btn pointer-events-auto" aria-label="Mute"
-					onpointerdown={(e) => { e.preventDefault(); touch.mute?.(); }}>M</button>
+				<button
+					type="button"
+					class="stage-btn pointer-events-auto"
+					aria-label="Mute"
+					onpointerdown={(e) => {
+						e.preventDefault();
+						touch.mute?.();
+					}}>M</button
+				>
 			</div>
 		</div>
 	{/if}
