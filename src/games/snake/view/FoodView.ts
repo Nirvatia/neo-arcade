@@ -1,91 +1,90 @@
-import { Container, Graphics, Text, TextStyle } from 'pixi.js';
-import type { GridBitmask } from '../logic/GridBitmask.js';
-import { Palette, MonoFont } from './Palette.js';
-
-const INSET = 3;
-const RADIUS = 3;
-const FONT_SIZE = 14;
+import { Container, Graphics } from 'pixi.js';
+import type { World } from '../core/ecs/World.js';
+import type { BiomeManager, FoodRender } from '../biomes/index.js';
 
 export class FoodView {
 	public readonly container: Container;
 	private readonly graphics: Graphics;
-	private readonly digitLayer: Container;
-	private readonly texts: Text[] = [];
-	private readonly styleOne: TextStyle;
-	private readonly styleZero: TextStyle;
 	private readonly cellSize: number;
+	private readonly biomes: BiomeManager;
+	private world: World | null = null;
+	/** Последний угол движения по сущностям: добыча не «крутится» в простое. */
+	private lastAngles = new Map<number, number>();
 
-	constructor(cellSize: number) {
+	constructor(cellSize: number, biomes: BiomeManager) {
 		this.cellSize = cellSize;
+		this.biomes = biomes;
 		this.container = new Container();
 		this.graphics = new Graphics();
-		this.digitLayer = new Container();
-		this.styleOne = this.buildStyle(Palette.foodInk);
-		this.styleZero = this.buildStyle(Palette.cyan);
 		this.container.addChild(this.graphics);
-		this.container.addChild(this.digitLayer);
 	}
 
-	public render(grid: GridBitmask, timeMS: number): void {
-		this.graphics.clear();
-		const pulse = Math.sin(timeMS * 0.004) * 0.5 + 0.5;
-		let textIndex = 0;
-		for (let row = 0; row < grid.rows; row++) {
-			for (let col = 0; col < grid.cols; col++) {
-				if (!grid.isFood(col, row)) {
-					continue;
+	public setWorld(world: World): void {
+		this.world = world;
+	}
+
+	public render(timeMS: number): void {
+		const g = this.graphics;
+		g.clear();
+
+		if (this.world === null) {
+			return;
+		}
+
+		const foods: FoodRender[] = [];
+		const seen = new Set<number>();
+		const entities = this.world.query(['food', 'gridPosition']).entities;
+
+		for (const entityId of entities) {
+			const pos = this.world.getComponent(entityId, 'gridPosition');
+			const food = this.world.getComponent(entityId, 'food');
+			const wander = this.world.getComponent(entityId, 'foodWander');
+
+			if (pos === undefined || food === undefined) {
+				continue;
+			}
+
+			let x = pos.col * this.cellSize + this.cellSize / 2;
+			let y = pos.row * this.cellSize + this.cellSize / 2;
+
+			// По умолчанию — стабильное псевдослучайное направление.
+			let angle = this.lastAngles.get(entityId) ?? (entityId * 2.39996) % (Math.PI * 2);
+
+			if (wander !== undefined) {
+				x += wander.offsetX * this.cellSize;
+				y += wander.offsetY * this.cellSize;
+
+				// Пока добыча в переходе — смотрит на целевую клетку.
+				if (wander.progress < 1) {
+					const tx = wander.targetCol * this.cellSize + this.cellSize / 2;
+					const ty = wander.targetRow * this.cellSize + this.cellSize / 2;
+					if (Math.hypot(tx - x, ty - y) > 0.5) {
+						angle = Math.atan2(ty - y, tx - x);
+					}
 				}
-				const bit = grid.getFoodBit(col, row);
-				const x = col * this.cellSize + INSET;
-				const y = row * this.cellSize + INSET;
-				const size = this.cellSize - INSET * 2;
-				if (bit === 1) {
-					this.graphics.roundRect(x - 2, y - 2, size + 4, size + 4, RADIUS + 1);
-					this.graphics.fill({ color: Palette.cyan, alpha: 0.1 + pulse * 0.12 });
-					this.graphics.roundRect(x, y, size, size, RADIUS);
-					this.graphics.fill(Palette.cyan);
-					textIndex = this.placeDigit(textIndex, 1, x + size / 2, y + size / 2, this.styleOne);
-				} else {
-					this.graphics.roundRect(x - 2, y - 2, size + 4, size + 4, RADIUS + 1);
-					this.graphics.fill({ color: Palette.cyan, alpha: 0.05 + pulse * 0.07 });
-					this.graphics.roundRect(x, y, size, size, RADIUS);
-					this.graphics.fill(Palette.foodZeroBg);
-					this.graphics.roundRect(x + 1, y + 1, size - 2, size - 2, RADIUS - 1);
-					this.graphics.stroke({ color: Palette.cyan, width: 2 });
-					textIndex = this.placeDigit(textIndex, 0, x + size / 2, y + size / 2, this.styleZero);
+			}
+
+			this.lastAngles.set(entityId, angle);
+			seen.add(entityId);
+
+			foods.push({
+				x,
+				y,
+				bit: food.bit,
+				phase: wander !== undefined ? wander.phase : 0,
+				angle
+			});
+		}
+
+		// Кэш углов не должен расти бесконечно.
+		if (this.lastAngles.size > seen.size * 2 + 16) {
+			for (const key of Array.from(this.lastAngles.keys())) {
+				if (!seen.has(key)) {
+					this.lastAngles.delete(key);
 				}
 			}
 		}
-		for (let i = textIndex; i < this.texts.length; i++) {
-			const text = this.texts[i];
-			if (text !== undefined) {
-				text.visible = false;
-			}
-		}
-	}
 
-	private placeDigit(index: number, bit: 0 | 1, cx: number, cy: number, style: TextStyle): number {
-		let text = this.texts[index];
-		if (text === undefined) {
-			text = new Text({ text: '', style });
-			text.anchor.set(0.5, 0.5);
-			this.digitLayer.addChild(text);
-			this.texts.push(text);
-		}
-		text.style = style;
-		text.text = bit === 1 ? '1' : '0';
-		text.x = cx;
-		text.y = cy;
-		text.visible = true;
-		return index + 1;
-	}
-
-	private buildStyle(fill: number): TextStyle {
-		return new TextStyle({
-			fontFamily: MonoFont.FAMILY,
-			fontSize: FONT_SIZE,
-			fontWeight: '700',
-			fill
-		});
+		this.biomes.biome.renderFood(g, foods, timeMS, this.cellSize);
 	}
 }

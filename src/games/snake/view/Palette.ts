@@ -1,30 +1,42 @@
+// «Монолитный минимал»: монохромный мир, редкие акценты.
+// Свет не «эффект», а свойство самого объекта.
 export const Palette = {
-	bg: 0x0a0d12,
-	grid: 0x11151c,
-	white: 0xf2f6fa,
-	light: 0xc7d2dc,
-	gray: 0x8a97a4, // ← ярче: метки, статус, подсказки, контур бита 0
-	tail: 0x4a5562,
-	dark: 0x10151c,
-	chrome: 0x1c232c,
-	amber: 0xffb02e,
+	// Мир
+	bg: 0x050507,
+	grid: 0xf0f0f2, // рисуется с альфой ~0.06
+	wall: 0x1c1c26,
+	wallEdge: 0x30303c,
+	// Формы
+	form: 0xf0f0f2,
+	formDim: 0xc8c8d0,
+	tail: 0x3a3a46,
+	ghost: 0x2a2a32,
+	ink: 0x050507, // цифры на белых блоках
+	// Акценты
+	accent: 0x4cc9e0, // выход, комбо 2+, FINAL
+	warn: 0xff5c5c, // провал, GAME OVER
+	// Совместимость со старыми ссылками
+	white: 0xf0f0f2,
+	light: 0xc8c8d0,
+	gray: 0xa8a8b0,
+	dark: 0x050507,
+	chrome: 0x26262e,
+	amber: 0xf0f0f2,
 	cyan: 0x4cc9e0,
-	green: 0x5be07a,
+	green: 0x4cc9e0,
 	coral: 0xff5c5c,
-	ink: 0x0a0d12,
-	wallTop: 0x232c39,
-	wallBottom: 0x171e28,
-	wallBevel: 0x94a8be,
-	tokenBg: 0x171105,
-	foodZeroBg: 0x0a1418,
-	foodInk: 0x05222a,
-	headInk: 0x1a0505
+	wallTop: 0x1c1c26,
+	wallBottom: 0x1c1c26,
+	wallBevel: 0x30303c,
+	tokenBg: 0xf0f0f2,
+	foodZeroBg: 0x050507,
+	foodInk: 0x050507,
+	headInk: 0x050507
 } as const;
-
 export type PaletteType = typeof Palette;
 
 export const MonoFont = {
-	FAMILY: 'ui-monospace, "Cascadia Mono", "JetBrains Mono", Consolas, "Courier New", monospace'
+	FAMILY: '"JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace'
 } as const;
 
 export function paletteCss(color: number): string {

@@ -133,6 +133,7 @@ export class GridBitmask {
 	}
 
 		// Очистить всю еду на поле (фаза выхода).
+	// Очистить всю еду на поле (фаза выхода).
 	public clearAllFood(): void {
 		this.foodBits.fill(0);
 		this.foodExists.fill(0);

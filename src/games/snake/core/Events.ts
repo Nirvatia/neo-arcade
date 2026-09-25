@@ -24,12 +24,16 @@ export type SnakeEventMap = {
 	};
 	'sequence:completed': { streak: number; growth: number };
 	'sequence:failed': {};
+	'final:started': {};
+	'final:completed': {};
+		'game:endless': {};
 };
 
 export const DirectorState = {
 	MENU: 'MENU',
 	PLAYING: 'PLAYING',
 	PAUSED: 'PAUSED',
-	GAME_OVER: 'GAME_OVER'
+	GAME_OVER: 'GAME_OVER',
+	VICTORY: 'VICTORY'
 } as const;
 export type DirectorStateType = (typeof DirectorState)[keyof typeof DirectorState];

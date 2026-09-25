@@ -11,7 +11,6 @@ import { Direction } from '../components/index.js';
 import { GridConfig, GameplayConfig, getLevelTuning } from '../config/index.js';
 import { MovementSystem } from '../systems/MovementSystem.js';
 import { InputSystem } from '../systems/InputSystem.js';
-import { SnakeControlSystem } from '../systems/SnakeControlSystem.js';
 import { SpawnSystem } from '../systems/SpawnSystem.js';
 import { ScoreSystem } from '../systems/ScoreSystem.js';
 import { BitRegisterSystem } from '../systems/BitRegisterSystem.js';
@@ -20,11 +19,10 @@ import { LevelSystem } from '../systems/LevelSystem.js';
 import { RenderSystem } from '../systems/RenderSystem.js';
 import { PixiApp } from '../view/PixiApp.js';
 import { MusicPlayer } from '../audio/MusicPlayer.js';
-
+import { BIOME_REGISTRY, BiomeManager } from '../biomes/index.js';
+import { FoodWanderSystem } from '../systems/FoodWanderSystem.js';
 const MUSIC_SRC = '/assets/snake/music/theme.mp3';
-// Чистый чёрный совпадает с фоном страницы — никаких серых областей вне поля.
-const CANVAS_BACKGROUND = 0x000000;
-// Минимальная длина свайпа, чтобы отличить его от тапа.
+const CANVAS_BACKGROUND = 0x0a1008;
 const SWIPE_THRESHOLD_PX = 22;
 
 const KEY_TO_DIRECTION: Record<string, Direction> = {
@@ -63,7 +61,9 @@ export class SnakeGame implements GameModule {
 	private pointerStartY = 0;
 	private lastTapAt = 0;
 	private muted = false;
-
+	// Первый ресайз в ране — мгновенный (стартовый размер). Дальше — зум.
+	private firstResizeDone = false;
+	private biomeManager: BiomeManager | null = null;
 	public async init(canvasParent: HTMLDivElement): Promise<void> {
 		this.canvasParent = canvasParent;
 		this.pixiApp = new PixiApp();
@@ -71,6 +71,7 @@ export class SnakeGame implements GameModule {
 		const height = GridConfig.START_ROWS * GridConfig.CELL_SIZE;
 		await this.pixiApp.init(canvasParent, width, height, CANVAS_BACKGROUND);
 		this.pixiApp.addTickerCallback((deltaMS) => {
+			this.pixiApp.updateZoom(deltaMS);
 			if (this.gameLoop !== null) {
 				this.gameLoop.tick(deltaMS);
 			}
@@ -98,6 +99,7 @@ export class SnakeGame implements GameModule {
 		}
 		this.director = null;
 		this.inputSystem = null;
+		this.firstResizeDone = false;
 
 		const world = new World();
 		this.world = world;
@@ -126,16 +128,9 @@ export class SnakeGame implements GameModule {
 
 		const inputSystem = new InputSystem(world, snakeId, GameplayConfig.MAX_INPUT_QUEUE);
 		this.inputSystem = inputSystem;
-		const controlSystem = new SnakeControlSystem(world, snakeId);
 		const movementSystem = new MovementSystem(world, holder, snakeId, tuning.stepIntervalMS);
 		const bitRegisterSystem = new BitRegisterSystem(world, holder, rng, snakeId);
-		const bitTokenSystem = new BitTokenSystem(
-			world,
-			holder,
-			rng,
-			snakeId,
-			tuning.maxActiveTokens
-		);
+		const bitTokenSystem = new BitTokenSystem(world, holder, rng, snakeId, tuning.maxActiveTokens);
 		const levelSystem = new LevelSystem(
 			world,
 			holder,
@@ -151,15 +146,26 @@ export class SnakeGame implements GameModule {
 			world,
 			GameplayConfig.POINTS_PER_FOOD,
 			GameplayConfig.POINTS_PER_SEQUENCE,
-			GameplayConfig.PENALTY_SEQUENCE_FAILED
+			GameplayConfig.PENALTY_SEQUENCE_FAILED,
+			GameplayConfig.POINTS_FINAL_SEQUENCE
 		);
+
+		const biomeManager = new BiomeManager({
+			biomes: BIOME_REGISTRY,
+			levelsPerBiome: 3,
+			initialLevel: 1
+		});
+		this.biomeManager = biomeManager;
+		const foodWanderSystem = new FoodWanderSystem(world, holder, rng, snakeId);
+
 		const renderSystem = new RenderSystem(
 			world,
 			holder,
 			snakeId,
 			this.pixiApp.stage,
 			GridConfig.CELL_SIZE,
-			this.canvasParent
+			this.canvasParent,
+			biomeManager
 		);
 		this.renderSystem = renderSystem;
 
@@ -170,7 +176,6 @@ export class SnakeGame implements GameModule {
 		spawnSystem.refillFood();
 
 		world.addSystem(inputSystem);
-		world.addSystem(controlSystem);
 		world.addSystem(movementSystem);
 		world.addSystem(bitTokenSystem);
 		world.addSystem(bitRegisterSystem);
@@ -178,7 +183,7 @@ export class SnakeGame implements GameModule {
 		world.addSystem(spawnSystem);
 		world.addSystem(scoreSystem);
 		world.addSystem(renderSystem);
-
+		world.addSystem(foodWanderSystem);
 		const gameLoop = new GameLoop(world, GameplayConfig.MAX_DELTA_MS);
 		this.gameLoop = gameLoop;
 		const director = new Director(world, gameLoop);
@@ -186,7 +191,7 @@ export class SnakeGame implements GameModule {
 
 		this.bindWorldEvents(world);
 
-		// Канвас всегда соответствует текущему полю: критично при рестарте,
+		// Канвас всегда соответствует текущему полю. Критично при рестарте:
 		// прошлый забег мог оставить канвас расширенным («серая область»).
 		this.resizeCanvas();
 		world.update(0);
@@ -199,8 +204,27 @@ export class SnakeGame implements GameModule {
 			}
 		});
 		world.events.on('level:expanded', () => {
-			this.resizeCanvas();
+			if (this.holder === null) {
+				return;
+			}
+			const grid = this.holder.grid;
+			this.pixiApp.animateResize(
+				grid.cols * GridConfig.CELL_SIZE,
+				grid.rows * GridConfig.CELL_SIZE
+			);
 		});
+	}
+
+	private async waitForFonts(): Promise<void> {
+		if (typeof document === 'undefined' || !document.fonts) {
+			return;
+		}
+		try {
+			await document.fonts.load('16px "DSEG7 Classic"');
+			await document.fonts.ready;
+		} catch {
+			// Шрифт недоступен — используем моноширинный фолбэк.
+		}
 	}
 
 	private resizeCanvas(): void {
@@ -208,7 +232,17 @@ export class SnakeGame implements GameModule {
 			return;
 		}
 		const grid = this.holder.grid;
-		this.pixiApp.resize(grid.cols * GridConfig.CELL_SIZE, grid.rows * GridConfig.CELL_SIZE);
+		const width = grid.cols * GridConfig.CELL_SIZE;
+		const height = grid.rows * GridConfig.CELL_SIZE;
+		if (!this.firstResizeDone) {
+			this.firstResizeDone = true;
+			this.pixiApp.resize(
+				GridConfig.START_COLS * GridConfig.CELL_SIZE,
+				GridConfig.START_ROWS * GridConfig.CELL_SIZE
+			);
+			return;
+		}
+		this.pixiApp.animateResize(width, height);
 	}
 
 	private createSeed(): number {
@@ -264,7 +298,6 @@ export class SnakeGame implements GameModule {
 	private bindTouch(): void {
 		this.pointerDownHandler = (event: PointerEvent): void => {
 			this.unlockAudio();
-			// Обрабатываем только один палец.
 			if (this.activePointerId !== null) {
 				return;
 			}
@@ -309,6 +342,10 @@ export class SnakeGame implements GameModule {
 			this.onEnterPressed();
 			return;
 		}
+		if (state === DirectorState.VICTORY) {
+			this.startEndless();
+			return;
+		}
 		if (state === DirectorState.PAUSED) {
 			this.togglePause();
 			return;
@@ -316,7 +353,6 @@ export class SnakeGame implements GameModule {
 		if (state !== DirectorState.PLAYING) {
 			return;
 		}
-		// Двойной тап по верхней полосе — пауза (аналог пробела).
 		const rect = this.canvasParent.getBoundingClientRect();
 		const y = event.clientY - rect.top;
 		const now = Date.now();
@@ -328,7 +364,7 @@ export class SnakeGame implements GameModule {
 		this.lastTapAt = now;
 	}
 
-	// ================= ПУБЛИЧНЫЙ ТАЧ-ИНТЕРФЕЙС (для GameStage) =================
+	// ================ ПУБЛИЧНЫЙ ТАЧ-ИНТЕРФЕЙС (для GameStage) ================
 
 	public touchDirection(dir: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT'): void {
 		this.unlockAudio();
@@ -340,6 +376,10 @@ export class SnakeGame implements GameModule {
 		const state = this.getDirectorState();
 		if (state === DirectorState.MENU || state === DirectorState.GAME_OVER) {
 			this.onEnterPressed();
+			return;
+		}
+		if (state === DirectorState.VICTORY) {
+			this.startEndless();
 			return;
 		}
 		this.togglePause();
@@ -403,7 +443,19 @@ export class SnakeGame implements GameModule {
 		}
 		if (state === DirectorState.GAME_OVER) {
 			this.restart();
+			return;
 		}
+		if (state === DirectorState.VICTORY) {
+			this.startEndless();
+		}
+	}
+
+	private startEndless(): void {
+		if (this.world === null || this.director === null) {
+			return;
+		}
+		this.world.events.emit('game:endless', {});
+		this.director.transitionTo(DirectorState.PLAYING);
 	}
 
 	private restart(): void {
@@ -458,6 +510,12 @@ export class SnakeGame implements GameModule {
 		}
 		if (this.pixiApp !== undefined) {
 			this.pixiApp.destroy();
+		}
+
+		this.biomeManager = null;
+
+		if (typeof document !== 'undefined') {
+			document.documentElement.style.removeProperty('--stage-bg');
 		}
 	}
 }

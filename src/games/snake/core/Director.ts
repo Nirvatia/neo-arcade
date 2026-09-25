@@ -13,27 +13,33 @@ export class Director {
 		this.currentState = DirectorState.MENU;
 		this.world.events.on('collision:wall', this.onDeath);
 		this.world.events.on('collision:self', this.onDeath);
+		this.world.events.on('final:completed', this.onFinalCompleted);
 	}
 
 	private onDeath = (): void => {
 		this.transitionTo(DirectorState.GAME_OVER);
 	};
 
+	private onFinalCompleted = (): void => {
+		this.transitionTo(DirectorState.VICTORY);
+	};
+
 	public transitionTo(next: DirectorStateType): void {
 		const previous = this.currentState;
 		this.currentState = next;
-
 		if (next === DirectorState.PAUSED) {
 			this.gameLoop.pause();
 		}
 		if (next === DirectorState.GAME_OVER) {
 			this.gameLoop.stop();
 		}
+		if (next === DirectorState.VICTORY) {
+			this.gameLoop.stop();
+		}
 		if (next === DirectorState.PLAYING) {
 			this.gameLoop.start();
 			this.gameLoop.resume();
 		}
-
 		this.world.events.emit('director:stateChanged', {
 			previous,
 			current: next

@@ -3,13 +3,12 @@ import type { World } from '../core/ecs/World.js';
 import type { EntityId } from '../core/ecs/types.js';
 import type { Direction } from '../components/index.js';
 import { findHead } from '../logic/SnakeFactory.js';
+import { OPPOSITE } from '../logic/Directions.js';
 
 export class InputSystem extends SystemBase {
 	public readonly name = 'InputSystem';
-
 	private readonly snakeId: EntityId;
 	private readonly maxQueueSize: number;
-	private queue: Direction[] = [];
 
 	constructor(world: World, snakeId: EntityId, maxQueueSize: number) {
 		super(world);
@@ -17,25 +16,31 @@ export class InputSystem extends SystemBase {
 		this.maxQueueSize = maxQueueSize;
 	}
 
-	// Вызывается извне между тиками: клавиатура, свайпы, тесты.
 	public pressDirection(dir: Direction): void {
-		if (this.queue.length < this.maxQueueSize) {
-			this.queue.push(dir);
-		}
-	}
-
-	public update(_deltaMS: number): void {
-		if (this.queue.length === 0) {
+		let headId: EntityId;
+		try {
+			headId = findHead(this.world, this.snakeId);
+		} catch {
 			return;
 		}
-		const headId = findHead(this.world, this.snakeId);
 		const head = this.world.getComponent(headId, 'snakeHead');
 		if (head === undefined) {
 			return;
 		}
-		const next = this.queue.shift();
-		if (next !== undefined) {
-			head.bufferedDir = next;
+		const lastDir =
+			head.queue.length > 0 ? head.queue[head.queue.length - 1]! : head.dir;
+		if (dir === lastDir) {
+			return;
 		}
+		if (dir === OPPOSITE[lastDir]) {
+			return;
+		}
+		if (head.queue.length < this.maxQueueSize) {
+			head.queue.push(dir);
+		}
+	}
+
+	public update(_deltaMS: number): void {
+		// Очередь потребляется строго в момент логического шага в MovementSystem.step().
 	}
 }

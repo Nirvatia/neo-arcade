@@ -9,6 +9,8 @@ import { findHead } from '../logic/SnakeFactory.js';
 import { getLevelTuning } from '../config/index.js';
 
 const MAX_SPAWN_ATTEMPTS = 200;
+// Пауза после подбора токена: лечит «цикл бесконечных бустов».
+const TOKEN_RESPAWN_COOLDOWN_MS = 4000;
 
 export class BitTokenSystem extends SystemBase {
 	public readonly name = 'BitTokenSystem';
@@ -16,7 +18,8 @@ export class BitTokenSystem extends SystemBase {
 	private readonly rng: SeededRNG;
 	private readonly snakeId: EntityId;
 	private maxActiveTokens: number;
-	// Когда выход открыт, токены не нужны: поле очищается под фазу выхода.
+	private respawnCooldownMS = 0;
+	// В фазе выхода и в финале токены не нужны.
 	private suppressed = false;
 
 	constructor(
@@ -32,10 +35,16 @@ export class BitTokenSystem extends SystemBase {
 		this.snakeId = snakeId;
 		this.maxActiveTokens = maxActiveTokens;
 		this.world.events.on('exit:opened', this.onExitOpened);
+		this.world.events.on('final:started', this.onFinalStarted);
 		this.world.events.on('level:expanded', this.onLevelExpanded);
+		this.world.events.on('game:endless', this.onEndlessStarted);
 	}
 
 	private onExitOpened = (): void => {
+		this.suppressed = true;
+	};
+
+	private onFinalStarted = (): void => {
 		this.suppressed = true;
 	};
 
@@ -44,11 +53,18 @@ export class BitTokenSystem extends SystemBase {
 		this.maxActiveTokens = getLevelTuning(payload.level).maxActiveTokens;
 	};
 
+	private onEndlessStarted = (): void => {
+		this.suppressed = false;
+	};
+
 	private get grid(): GridBitmask {
 		return this.holder.grid;
 	}
 
-	public update(_deltaMS: number): void {
+	public update(deltaMS: number): void {
+		if (this.respawnCooldownMS > 0) {
+			this.respawnCooldownMS = this.respawnCooldownMS - deltaMS;
+		}
 		this.ensureTokens();
 		this.checkPickup();
 	}
@@ -59,6 +75,9 @@ export class BitTokenSystem extends SystemBase {
 		}
 		const tokens = this.world.query(['bitPowerUp']).entities;
 		if (tokens.length >= this.maxActiveTokens) {
+			return;
+		}
+		if (this.respawnCooldownMS > 0) {
 			return;
 		}
 		this.spawnToken();
@@ -96,7 +115,8 @@ export class BitTokenSystem extends SystemBase {
 	}
 
 	private randomOp(): BitOp {
-		if (this.rng.nextInt(2) === 0) {
+		// Буст реже отката: 30/70.
+		if (this.rng.nextInt(10) < 3) {
 			return BitOp.BOOST;
 		}
 		return BitOp.UNDO;
@@ -116,11 +136,18 @@ export class BitTokenSystem extends SystemBase {
 				continue;
 			}
 			if (tokenPos.col === headPos.col && tokenPos.row === headPos.row) {
+				const op = token.op;
+				// Сначала убираем токен из мира, потом применяем операцию.
+				// Иначе цепочка событий может завершить последовательность,
+				// открыть выход и очистить поле (clearFieldForExit удалит этот
+				// же токен), и повторный destroyEntity упадёт
+				// с ошибкой «entity is not alive».
+				this.world.destroyEntity(tokenId);
+				this.respawnCooldownMS = TOKEN_RESPAWN_COOLDOWN_MS;
 				this.world.events.emit('collision:bitop', {
 					entity: headId,
-					op: token.op
+					op
 				});
-				this.world.destroyEntity(tokenId);
 				return;
 			}
 		}

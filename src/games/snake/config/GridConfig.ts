@@ -1,6 +1,6 @@
 export const GridConfig = {
-	START_COLS: 24,
-	START_ROWS: 16,
+	START_COLS: 16,
+	START_ROWS: 12,
 	CELL_SIZE: 30,
 	GROWTH_COLS: 2,
 	GROWTH_ROWS: 1,
@@ -8,5 +8,4 @@ export const GridConfig = {
 	MAX_ROWS: 23,
 	BACKGROUND_COLOR: 0x05070d
 } as const;
-
 export type GridConfigType = typeof GridConfig;

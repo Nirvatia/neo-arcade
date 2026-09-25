@@ -3,25 +3,28 @@ import type { World } from '../core/ecs/World.js';
 
 export class ScoreSystem extends SystemBase {
 	public readonly name = 'ScoreSystem';
-
 	private readonly pointsPerFood: number;
 	private readonly pointsPerSequence: number;
 	private readonly penaltyPerFailure: number;
+	private readonly pointsFinalSequence: number;
 
 	constructor(
 		world: World,
 		pointsPerFood: number,
 		pointsPerSequence: number,
-		penaltyPerFailure: number
+		penaltyPerFailure: number,
+		pointsFinalSequence: number
 	) {
 		super(world);
 		this.pointsPerFood = pointsPerFood;
 		this.pointsPerSequence = pointsPerSequence;
 		this.penaltyPerFailure = penaltyPerFailure;
+		this.pointsFinalSequence = pointsFinalSequence;
 		this.world.events.on('collision:food', this.onFoodEaten);
 		this.world.events.on('score:add', this.onScoreAdd);
 		this.world.events.on('sequence:completed', this.onSequenceCompleted);
 		this.world.events.on('sequence:failed', this.onSequenceFailed);
+		this.world.events.on('final:completed', this.onFinalCompleted);
 	}
 
 	private onFoodEaten = (): void => {
@@ -40,6 +43,10 @@ export class ScoreSystem extends SystemBase {
 		this.addPoints(-this.penaltyPerFailure);
 	};
 
+	private onFinalCompleted = (): void => {
+		this.addPoints(this.pointsFinalSequence);
+	};
+
 	private addPoints(points: number): void {
 		const scoreEntities = this.world.query(['score']).entities;
 		if (scoreEntities.length === 0) {
@@ -49,7 +56,6 @@ export class ScoreSystem extends SystemBase {
 		const score = this.world.getComponent(scoreEntity, 'score');
 		if (score !== undefined) {
 			score.value = score.value + points;
-			// Не позволяем счету уйти в минус
 			if (score.value < 0) {
 				score.value = 0;
 			}

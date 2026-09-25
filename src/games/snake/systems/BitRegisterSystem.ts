@@ -4,7 +4,7 @@ import type { EntityId } from '../core/ecs/types.js';
 import type { GridHolder } from '../logic/GridHolder.js';
 import type { SeededRNG } from '../logic/SeededRNG.js';
 import { BitOp } from '../components/index.js';
-import { getLevelTuning } from '../config/index.js';
+import { GameplayConfig, getLevelTuning } from '../config/index.js';
 
 const FAILURE_TAIL_LOSS = 2;
 const MAX_TARGET_ATTEMPTS = 32;
@@ -24,6 +24,7 @@ export class BitRegisterSystem extends SystemBase {
 	private activeBits: (0 | 1)[] = [];
 	private movesLeft = 0;
 	private streak = 0;
+	private finalActive = false;
 
 	constructor(world: World, holder: GridHolder, rng: SeededRNG, snakeId: EntityId) {
 		super(world);
@@ -58,6 +59,8 @@ export class BitRegisterSystem extends SystemBase {
 			this.onBitOperation(payload.op);
 		});
 		this.world.events.on('level:expanded', this.onLevelExpanded);
+		this.world.events.on('final:started', this.onFinalStarted);
+		this.world.events.on('game:endless', this.onEndlessStarted);
 	}
 
 	public update(_deltaMS: number): void {
@@ -66,7 +69,30 @@ export class BitRegisterSystem extends SystemBase {
 	}
 
 	private onLevelExpanded = (payload: { level: number }): void => {
+		if (this.finalActive) {
+			return;
+		}
 		this.level = payload.level;
+		const tuning = getLevelTuning(this.level);
+		this.targetLength = tuning.targetLength;
+		this.movesPerSequence = tuning.movesPerSequence;
+		this.resetActive();
+		this.generateTarget();
+		this.pushStateToComponents();
+	};
+
+	private onFinalStarted = (): void => {
+		this.finalActive = true;
+		this.targetLength = GameplayConfig.FINAL_TARGET_LENGTH;
+		this.movesPerSequence = GameplayConfig.FINAL_MOVES_PER_SEQUENCE;
+		this.movesLeft = this.movesPerSequence;
+		this.resetActive();
+		this.generateTarget();
+		this.pushStateToComponents();
+	};
+
+	private onEndlessStarted = (): void => {
+		this.finalActive = false;
 		const tuning = getLevelTuning(this.level);
 		this.targetLength = tuning.targetLength;
 		this.movesPerSequence = tuning.movesPerSequence;
@@ -136,7 +162,11 @@ export class BitRegisterSystem extends SystemBase {
 		this.shiftIn(bit);
 		this.movesLeft = this.movesLeft - 1;
 		if (this.matchesTarget()) {
-			this.completeSequence();
+			if (this.finalActive) {
+				this.completeFinal();
+			} else {
+				this.completeSequence();
+			}
 			return;
 		}
 		if (this.movesLeft <= 0) {
@@ -145,6 +175,10 @@ export class BitRegisterSystem extends SystemBase {
 	}
 
 	private onBitOperation(op: BitOp): void {
+		// В финале операций нет — токены подавлены, это страховка.
+		if (this.finalActive) {
+			return;
+		}
 		if (op === BitOp.UNDO) {
 			// ОТКАТ: убираем последний съеденный бит и возвращаем потраченный ход.
 			this.shiftRight();
@@ -208,6 +242,11 @@ export class BitRegisterSystem extends SystemBase {
 		});
 		this.generateTarget();
 		this.pushStateToComponents();
+	}
+
+	private completeFinal(): void {
+		// Очки начислит ScoreSystem, состояние — Director.
+		this.world.events.emit('final:completed', {});
 	}
 
 	private failSequence(): void {

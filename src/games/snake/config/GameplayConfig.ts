@@ -8,7 +8,10 @@ export const GameplayConfig = {
 	POINTS_PER_SEQUENCE: 100,
 	POINTS_EXIT_OPENED: 50,
 	POINTS_LEVEL_ENTERED: 100,
-	PENALTY_SEQUENCE_FAILED: 25
+	PENALTY_SEQUENCE_FAILED: 25,
+	// Финал (Фаза 2)
+	FINAL_TARGET_LENGTH: 8,
+	FINAL_MOVES_PER_SEQUENCE: 14,
+	POINTS_FINAL_SEQUENCE: 1000
 } as const;
-
 export type GameplayConfigType = typeof GameplayConfig;

@@ -4,7 +4,7 @@ import type { EntityId } from '../core/ecs/types.js';
 import type { GridHolder } from '../logic/GridHolder.js';
 import type { GridBitmask } from '../logic/GridBitmask.js';
 import { findHead, getSnakeLength, getTail } from '../logic/SnakeFactory.js';
-import { DIR_VECTORS } from '../logic/Directions.js';
+import { DIR_VECTORS, OPPOSITE } from '../logic/Directions.js';
 import type { Direction } from '../components/index.js';
 import { GameplayConfig, getLevelTuning } from '../config/index.js';
 
@@ -54,6 +54,14 @@ export class MovementSystem extends SystemBase {
 			return;
 		}
 
+		// Потребляем очередь ввода строго в момент логического шага.
+		if (head.queue.length > 0) {
+			const next = head.queue.shift()!;
+			if (next !== OPPOSITE[head.dir]) {
+				head.dir = next;
+			}
+		}
+
 		const vec = DIR_VECTORS[head.dir];
 		const newCol = headPos.col + vec.dx;
 		const newRow = headPos.row + vec.dy;
@@ -62,15 +70,12 @@ export class MovementSystem extends SystemBase {
 			this.world.events.emit('collision:wall', { entity: headId });
 			return;
 		}
-
 		if (this.grid.isExit(newCol, newRow)) {
 			this.world.events.emit('collision:exit', { entity: headId });
 			return;
 		}
 
-		// Рост теперь приходит только от собранных последовательностей.
 		const grows = this.pendingGrowth > 0;
-
 		const eats = this.grid.isFood(newCol, newRow);
 		let eatenBit: 0 | 1 = 0;
 		if (eats) {
@@ -80,8 +85,8 @@ export class MovementSystem extends SystemBase {
 		if (this.grid.isOccupied(newCol, newRow)) {
 			const tailId = getTail(this.world, this.snakeId);
 			const tailPos = this.world.getComponent(tailId, 'gridPosition');
-			const isTailCell = tailPos !== undefined && tailPos.col === newCol && tailPos.row === newRow;
-			// Клетка хвоста проходима, только если в этот шаг змейка не растёт.
+			const isTailCell =
+				tailPos !== undefined && tailPos.col === newCol && tailPos.row === newRow;
 			if (grows || !isTailCell) {
 				this.world.events.emit('collision:self', { entity: headId });
 				return;
@@ -90,6 +95,14 @@ export class MovementSystem extends SystemBase {
 
 		if (eats) {
 			this.grid.clearFood(newCol, newRow);
+			const foodEntities = this.world.query(['food', 'gridPosition']).entities;
+			for (const entityId of foodEntities) {
+				const pos = this.world.getComponent(entityId, 'gridPosition');
+				if (pos !== undefined && pos.col === newCol && pos.row === newRow) {
+					this.world.destroyEntity(entityId);
+					break;
+				}
+			}
 			this.world.events.emit('collision:food', {
 				entity: headId,
 				bit: eatenBit
@@ -108,54 +121,51 @@ export class MovementSystem extends SystemBase {
 
 		if (grows) {
 			this.pendingGrowth = this.pendingGrowth - 1;
-		}
-
-		const tailId = getTail(this.world, this.snakeId);
-		const tailPos = this.world.getComponent(tailId, 'gridPosition');
-
-		const newHeadId = this.world.createEntity();
-		this.world.addComponent(newHeadId, 'gridPosition', {
-			col: newCol,
-			row: newRow
-		});
-		this.world.addComponent(newHeadId, 'snakeSegment', {
-			snakeId: this.snakeId,
-			order: 0,
-			bit: 0
-		});
-		this.world.addComponent(newHeadId, 'snakeHead', {
-			dir,
-			bufferedDir: null
-		});
-		this.world.removeComponent(oldHeadId, 'snakeHead');
-
-		const segments = this.world.query(['snakeSegment']).entities;
-		for (const entity of segments) {
-			if (entity === newHeadId) {
-				continue;
+			const newHeadId = this.world.createEntity();
+			this.world.addComponent(newHeadId, 'gridPosition', { col: newCol, row: newRow });
+			this.world.addComponent(newHeadId, 'snakeSegment', {
+				snakeId: this.snakeId,
+				order: 0,
+				bit: 0
+			});
+			this.world.addComponent(newHeadId, 'snakeHead', { dir, queue: [] });
+			this.world.removeComponent(oldHeadId, 'snakeHead');
+			const segments = this.world.query(['snakeSegment']).entities;
+			for (const entity of segments) {
+				if (entity === newHeadId) continue;
+				const segment = this.world.getComponent(entity, 'snakeSegment');
+				if (segment === undefined) continue;
+				if (segment.snakeId !== this.snakeId) continue;
+				segment.order = segment.order + 1;
 			}
-			const segment = this.world.getComponent(entity, 'snakeSegment');
-			if (segment === undefined) {
-				continue;
-			}
-			if (segment.snakeId !== this.snakeId) {
-				continue;
-			}
-			segment.order = segment.order + 1;
-		}
-
-		if (!grows) {
+			this.grid.setOccupied(newCol, newRow);
+		} else {
+			// Zero-allocation: переиспользуем сущность хвоста как новую голову.
+			const tailId = getTail(this.world, this.snakeId);
+			const tailPos = this.world.getComponent(tailId, 'gridPosition');
 			if (tailPos !== undefined) {
 				this.grid.clearOccupied(tailPos.col, tailPos.row);
+				tailPos.col = newCol;
+				tailPos.row = newRow;
 			}
-			this.world.destroyEntity(tailId);
+			this.grid.setOccupied(newCol, newRow);
+			this.world.removeComponent(oldHeadId, 'snakeHead');
+			this.world.addComponent(tailId, 'snakeHead', { dir, queue: [] });
+			const segments = this.world.query(['snakeSegment']).entities;
+			for (const entity of segments) {
+				const segment = this.world.getComponent(entity, 'snakeSegment');
+				if (segment === undefined) continue;
+				if (segment.snakeId !== this.snakeId) continue;
+				if (entity === tailId) {
+					segment.order = 0;
+				} else {
+					segment.order = segment.order + 1;
+				}
+			}
 		}
-
-		this.grid.setOccupied(newCol, newRow);
 		this.applyPendingShrink();
 	}
 
-	// Усадка за провал последовательности: снимаем хвосты, не уходя ниже минимальной длины.
 	private applyPendingShrink(): void {
 		while (this.pendingShrink > 0) {
 			if (getSnakeLength(this.world, this.snakeId) <= GameplayConfig.MIN_SNAKE_LENGTH) {
