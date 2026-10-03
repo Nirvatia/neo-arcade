@@ -1,8 +1,9 @@
 import type { Container, Graphics } from 'pixi.js';
-import type { GridBitmask } from '../logic/GridBitmask.js';
+import type { GridBitmask } from '../logic/grid/GridBitmask.js';
 import type { BitOp } from '../components/index.js';
 import type {
 	FoodRender,
+	ParticleRender,
 	SnakeChainPoint,
 	SnakeHeadRender,
 	SnakeZoneStyle
@@ -77,4 +78,12 @@ export interface AmbientLayer {
  */
 export interface OverlayRenderer {
 	render(g: Graphics, width: number, height: number, timeMS: number, cellSize: number): void;
+}
+
+/**
+ * Арт частиц биома.
+ * Биом рисует частицы в своём стиле (пузыри, искры, снег и т.д.).
+ */
+export interface ParticleRenderer {
+	render(g: Graphics, particles: ParticleRender[], timeMS: number, cellSize: number): void;
 }

@@ -6,12 +6,14 @@ export const Direction = {
 	LEFT: 'LEFT',
 	RIGHT: 'RIGHT'
 } as const;
+
 export type Direction = (typeof Direction)[keyof typeof Direction];
 
 export const BitOp = {
 	BOOST: '<<',
 	UNDO: '>>'
 } as const;
+
 export type BitOp = (typeof BitOp)[keyof typeof BitOp];
 
 export const CollidableKind = {
@@ -19,6 +21,7 @@ export const CollidableKind = {
 	PICKUP: 'PICKUP',
 	EXIT: 'EXIT'
 } as const;
+
 export type CollidableKind = (typeof CollidableKind)[keyof typeof CollidableKind];
 
 export interface GridPosition {
@@ -91,14 +94,43 @@ export interface BitCollector {
 }
 
 export interface FoodWander {
-	offsetX: number;
-	offsetY: number;
-	targetCol: number;
-	targetRow: number;
-	progress: number;
+	x: number;
+	y: number;
+	vx: number;
+	vy: number;
+	targetX: number;
+	targetY: number;
+	/**
+	 * 0 —wander,
+	 * 1 — flee.
+	 */
+	mode: 0 | 1;
 	timerMS: number;
 	phase: number;
 	startleCdMS: number;
+}
+
+export interface DeathAnimation {
+	active: boolean;
+	elapsedMS: number;
+	durationMS: number;
+	progress: number;
+}
+
+export interface SnakeMotionPoint {
+	x: number;
+	y: number;
+}
+
+export interface SnakeMotion {
+	points: SnakeMotionPoint[];
+	baseU: number;
+	segmentStartU: number;
+	hasSegment: boolean;
+	headU: number;
+	targetLengthCells: number;
+	visualLengthCells: number;
+	version: number;
 }
 
 export interface ComponentDataMap {
@@ -117,6 +149,8 @@ export interface ComponentDataMap {
 	targetSequence: TargetSequence;
 	bitCollector: BitCollector;
 	foodWander: FoodWander;
+	deathAnimation: DeathAnimation;
+	snakeMotion: SnakeMotion;
 }
 
 export type ComponentKey = keyof ComponentDataMap;

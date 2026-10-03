@@ -1,6 +1,6 @@
 import { Container, Graphics } from 'pixi.js';
-import type { GridBitmask } from '../logic/GridBitmask.js';
-import type { BiomeManager } from '../biomes/index.js';
+import type { GridBitmask } from '../../logic/grid/GridBitmask.js';
+import type { BiomeManager } from '../../biomes/index.js';
 
 export class GridView {
 	public readonly container: Container;

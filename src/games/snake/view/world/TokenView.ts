@@ -1,14 +1,13 @@
 import { Container } from 'pixi.js';
-import type { BitOp } from '../components/index.js';
-import type { BiomeManager } from '../biomes/index.js';
+import type { BitOp } from '../../components/index.js';
+import type { BiomeManager } from '../../biomes/index.js';
+import { RenderConfig } from '../../config/RenderConfig.js';
 
 export interface TokenRender {
 	col: number;
 	row: number;
 	op: BitOp;
 }
-
-const MAX_TOKEN_VISUALS = 4;
 
 class TokenVisual {
 	public readonly container: Container;
@@ -67,7 +66,7 @@ export class TokenView {
 	constructor(cellSize: number, biomes: BiomeManager) {
 		this.container = new Container();
 
-		for (let i = 0; i < MAX_TOKEN_VISUALS; i++) {
+		for (let i = 0; i < RenderConfig.MAX_TOKEN_VISUALS; i++) {
 			const visual = new TokenVisual(cellSize, biomes);
 			this.visuals.push(visual);
 			this.container.addChild(visual.container);

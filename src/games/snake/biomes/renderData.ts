@@ -64,3 +64,17 @@ export interface OverlayPalette {
 	warn: number;
 	success: number;
 }
+
+/**
+ * Данные частицы для биома.
+ * Координатор создаёт, обновляет физику, передаёт биому для рисования.
+ */
+export interface ParticleRender {
+	x: number;
+	y: number;
+	size: number;
+	/** 1 (только родилась) → 0 (умирает). */
+	life: number;
+	/** Подсказка цвета; биом вправе взять свою палитру. */
+	color: number;
+}

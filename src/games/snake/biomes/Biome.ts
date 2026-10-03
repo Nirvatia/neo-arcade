@@ -1,5 +1,5 @@
 import type { Container, Graphics } from 'pixi.js';
-import type { GridBitmask } from '../logic/GridBitmask.js';
+import type { GridBitmask } from '../logic/grid/GridBitmask.js';
 import type { BitOp } from '../components/index.js';
 import type {
 	FoodRender,
@@ -8,6 +8,7 @@ import type {
 	SnakeHeadRender,
 	SnakeZoneStyle
 } from './renderData.js';
+import type { ParticleRenderer } from './renderers.js';
 
 export interface BiomeTheme {
 	/** Фон страницы: любое CSS-значение (цвет, градиент). */
@@ -37,6 +38,9 @@ export interface Biome {
 	/** Палитра оверлейных экранов. Если не задана — используется фолбэк. */
 	readonly overlay: OverlayPalette;
 
+	/** Арт частиц. Каждый биом обязан предоставить свой стиль. */
+	readonly particleRenderer: ParticleRenderer;
+
 	/** Рисует статичный фон + стены. Вызывается при смене/расширении поля. */
 	renderField(g: Graphics, grid: GridBitmask, cellSize: number): void;
 
@@ -45,7 +49,7 @@ export interface Biome {
 
 	/** Рисует еду. Еда приходит уже с пиксельными координатами и фазой анимации. */
 	renderFood(g: Graphics, foods: FoodRender[], timeMS: number, cellSize: number): void;
-renderOverlay(g: Graphics, width: number, height: number, timeMS: number, cellSize: number): void;
+	renderOverlay(g: Graphics, width: number, height: number, timeMS: number, cellSize: number): void;
 	/**
 	 * Рисует змейку по готовой визуальной цепи.
 	 *
@@ -70,7 +74,13 @@ renderOverlay(g: Graphics, width: number, height: number, timeMS: number, cellSi
 	getAmbientContainer(): Container;
 
 	/** Обновление эмбиента. */
-	updateAmbient(deltaMS: number, timeMS: number, cellSize: number, cols: number, rows: number): void;
+	updateAmbient(
+		deltaMS: number,
+		timeMS: number,
+		cellSize: number,
+		cols: number,
+		rows: number
+	): void;
 
 	destroy(): void;
 }

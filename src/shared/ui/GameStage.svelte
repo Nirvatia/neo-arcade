@@ -1,7 +1,6 @@
 <!-- src/shared/ui/GameStage.svelte
      Универсальная обёртка игры: масштабирование, кнопка «меню», тач-контролы,
      подсказка поворота. Подключение в +page игры:
-
      <GameStage
        init={(el) => { game = new MyGame(); void game.init(el); return () => game.destroy(); }}
        touch={{ direction: game.pressDirection, pause: game.togglePause, mute: game.toggleMute }}
@@ -9,6 +8,7 @@
 -->
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import type { Snippet } from 'svelte';
 
 	export interface TouchHandlers {
 		direction?: (dir: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT') => void;
@@ -20,9 +20,17 @@
 		init: (container: HTMLDivElement) => (() => void) | void;
 		backHref?: string;
 		touch?: TouchHandlers;
+		hudTop?: Snippet;
+		hudBottom?: Snippet;
 	}
 
-	let { init, backHref = '/', touch = {} }: Props = $props();
+	let {
+		init,
+		backHref = '/',
+		touch = {},
+		hudTop,
+		hudBottom
+	}: Props = $props();
 
 	let container = $state<HTMLDivElement | undefined>(undefined);
 	let shell = $state<HTMLDivElement | undefined>(undefined);
@@ -30,15 +38,26 @@
 	let portrait = $state(false);
 	let rotateDismissed = $state(false);
 
-	const coarse = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+	const coarse =
+		typeof window !== 'undefined' &&
+		window.matchMedia('(pointer: coarse)').matches;
+
 	const showRotateHint = $derived(coarse && portrait && !rotateDismissed);
 
 	function fit() {
 		if (!shell) return;
+
 		const w = shell.offsetWidth;
 		const h = shell.offsetHeight;
+
 		if (w === 0 || h === 0) return;
-		const next = Math.min(1, (window.innerWidth - 16) / w, (window.innerHeight - 16) / h);
+
+		const next = Math.min(
+			1,
+			(window.innerWidth - 16) / w,
+			(window.innerHeight - 16) / h
+		);
+
 		scale = next > 0.99 ? 1 : next;
 	}
 
@@ -57,12 +76,16 @@
 
 	onMount(() => {
 		if (!container) return;
+
 		const dispose = init(container) ?? undefined;
 
 		const ro = new ResizeObserver(() => fit());
+
 		if (shell) ro.observe(shell);
+
 		window.addEventListener('resize', scheduleFit);
 		window.addEventListener('orientationchange', scheduleFit);
+
 		fit();
 
 		return () => {
@@ -78,7 +101,7 @@
 	class="relative flex h-dvh w-full touch-none items-center justify-center overflow-hidden select-none"
 	style:background="var(--stage-bg, #000)"
 >
-	<!-- Игровая колонка: кнопка назад -> контент игры (масштабируется целиком) -->
+	<!-- Игровая колонка: кнопка назад -> HUD -> контент игры -> HUD -->
 	<div
 		bind:this={shell}
 		class="flex flex-col items-start"
@@ -91,7 +114,16 @@
 		>
 			◄ MENU
 		</a>
+
+		{#if hudTop}
+			{@render hudTop()}
+		{/if}
+
 		<div bind:this={container} class="flex flex-col"></div>
+
+		{#if hudBottom}
+			{@render hudBottom()}
+		{/if}
 	</div>
 
 	<!-- Тач-контролы: вне масштабируемой колонки, всегда крупные -->
@@ -152,6 +184,7 @@
 					>
 					<span></span>
 				</div>
+
 				<button
 					type="button"
 					class="stage-btn pointer-events-auto"
@@ -199,6 +232,7 @@
 		-webkit-tap-highlight-color: transparent;
 		cursor: pointer;
 	}
+
 	.stage-btn:active {
 		border-color: var(--color-arcade-yel);
 		color: var(--color-arcade-yel);

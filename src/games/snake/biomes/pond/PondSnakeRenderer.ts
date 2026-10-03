@@ -1,9 +1,5 @@
 import type { Graphics } from 'pixi.js';
-import type {
-	SnakeChainPoint,
-	SnakeHeadRender,
-	SnakeZoneStyle
-} from '../renderData.js';
+import type { SnakeChainPoint, SnakeHeadRender, SnakeZoneStyle } from '../renderData.js';
 import type { SnakeRenderer } from '../renderers.js';
 import { C } from './PondPalette.js';
 
@@ -106,14 +102,11 @@ export class PondSnakeRenderer implements SnakeRenderer {
 			return;
 		}
 
-		const dt =
-			this.lastFxTimeMS < 0
-				? 1 / 60
-				: Math.min(50, timeMS - this.lastFxTimeMS) / 1000;
+		const dt = this.lastFxTimeMS < 0 ? 1 / 60 : Math.min(50, timeMS - this.lastFxTimeMS) / 1000;
 		this.lastFxTimeMS = timeMS;
 
 		const t = timeMS / 1000;
-		const totalLen = zones.length * cellSize;
+		const totalLen = chain.length > 0 ? chain[chain.length - 1].d : zones.length * cellSize;
 		const radius = Math.max(2.8, cellSize * 0.155);
 
 		this.drawRipples(g, head, t);
@@ -194,9 +187,7 @@ export class PondSnakeRenderer implements SnakeRenderer {
 			if (a === undefined || b === undefined) continue;
 			const w = this.widthAt((a.d + b.d) / 2, totalLen, radius);
 			const pal = this.zonePalette(a.zone, zones);
-			g.moveTo(a.x, a.y)
-				.lineTo(b.x, b.y)
-				.stroke({ color: pal.mid, width: w, alpha: 1 });
+			g.moveTo(a.x, a.y).lineTo(b.x, b.y).stroke({ color: pal.mid, width: w, alpha: 1 });
 		}
 	}
 
@@ -211,25 +202,31 @@ export class PondSnakeRenderer implements SnakeRenderer {
 		for (let i = 0; i < chain.length - 1; i++) {
 			const a = chain[i];
 			const b = chain[i + 1];
-			if (a === undefined || b === undefined) continue;
+
+			if (a === undefined || b === undefined) {
+				continue;
+			}
+
 			const w = this.widthAt((a.d + b.d) / 2, totalLen, radius);
 			const pal = this.zonePalette(a.zone, zones);
 
-			// Ядро активного битового кольца — читаемость без неонового свечения.
+			// Активная битовая последовательность должна читаться сразу.
 			if (pal.active) {
 				g.moveTo(a.x, a.y)
 					.lineTo(b.x, b.y)
-					.stroke({ color: pal.core, width: w * 0.4, alpha: 0.5 });
+					.stroke({ color: pal.core, width: w * 0.55, alpha: 0.92 });
 			}
 
 			// Кремовое брюшко — свет снизу.
 			const bellyOff = w * 0.22;
+
 			g.moveTo(a.x, a.y + bellyOff)
 				.lineTo(b.x, b.y + bellyOff)
 				.stroke({ color: C.snakeBelly, width: w * 0.3, alpha: 0.45 });
 
-			// Солнечный блик — свет сверху. Главный инструмент отделения от фона.
+			// Солнечный блик — свет сверху.
 			const rimOff = w * 0.24;
+
 			g.moveTo(a.x, a.y - rimOff)
 				.lineTo(b.x, b.y - rimOff)
 				.stroke({ color: C.snakeHi, width: w * 0.24, alpha: 0.85 });
@@ -307,15 +304,19 @@ export class PondSnakeRenderer implements SnakeRenderer {
 
 	private zonePalette(zone: number, zones: SnakeZoneStyle[]): ZonePal {
 		const style = zones[zone];
+
 		if (zone > 0 && style !== undefined && style.active) {
-			const bit = style.bit === 1 ? C.bitOne : C.bitZero;
+			const bitColor = style.bit === 1 ? C.bitOne : C.bitZero;
+			const bitCore = style.bit === 1 ? C.bitOneHi : C.bitZeroHi;
+
 			return {
-				mid: mixColor(C.snakeMid, bit, 0.8),
-				edge: mixColor(C.snakeOutline, bit, 0.45),
-				core: mixColor(0xffffff, bit, 0.5),
+				mid: mixColor(C.snakeMid, bitColor, 0.88),
+				edge: mixColor(C.snakeOutline, bitColor, 0.55),
+				core: bitCore,
 				active: true
 			};
 		}
+
 		return {
 			mid: C.snakeMid,
 			edge: C.snakeEdge,
@@ -331,10 +332,7 @@ export class PondSnakeRenderer implements SnakeRenderer {
 		}
 		const taper = Math.max(0, total - 36);
 		if (d > taper && total > taper) {
-			w = Math.min(
-				w,
-				radius * Math.max(0.08, 1 - (d - taper) / (total - taper))
-			);
+			w = Math.min(w, radius * Math.max(0.08, 1 - (d - taper) / (total - taper)));
 		}
 		return Math.max(1, w * 2);
 	}
@@ -390,10 +388,7 @@ export class PondSnakeRenderer implements SnakeRenderer {
 			y + bob * 0.35 + lx * sin + ly * cos
 		];
 
-		const shape = this.localPoly(
-			(a, b) => rot(a * hs, b * hs),
-			HEAD_SHAPE
-		);
+		const shape = this.localPoly((a, b) => rot(a * hs, b * hs), HEAD_SHAPE);
 
 		// Тень головы.
 		const shadowPts: number[] = [];
@@ -408,18 +403,12 @@ export class PondSnakeRenderer implements SnakeRenderer {
 			const ext = Math.sin((tt / 0.2) * Math.PI) * 4.5;
 			const [sx, sy] = rot(9.6 * hs, 0);
 			const [ex, ey] = rot((9.6 + ext) * hs, 0);
-			g.moveTo(sx, sy)
-				.lineTo(ex, ey)
-				.stroke({ color: 0xd4687a, width: 1.1, alpha: 0.95 });
+			g.moveTo(sx, sy).lineTo(ex, ey).stroke({ color: 0xd4687a, width: 1.1, alpha: 0.95 });
 			if (ext > 2) {
 				const [f1x, f1y] = rot((9.6 + ext + 1.6) * hs, -1.1 * hs);
 				const [f2x, f2y] = rot((9.6 + ext + 1.6) * hs, 1.1 * hs);
-				g.moveTo(ex, ey)
-					.lineTo(f1x, f1y)
-					.stroke({ color: 0xd4687a, width: 1.1, alpha: 0.95 });
-				g.moveTo(ex, ey)
-					.lineTo(f2x, f2y)
-					.stroke({ color: 0xd4687a, width: 1.1, alpha: 0.95 });
+				g.moveTo(ex, ey).lineTo(f1x, f1y).stroke({ color: 0xd4687a, width: 1.1, alpha: 0.95 });
+				g.moveTo(ex, ey).lineTo(f2x, f2y).stroke({ color: 0xd4687a, width: 1.1, alpha: 0.95 });
 			}
 		}
 
@@ -445,13 +434,7 @@ export class PondSnakeRenderer implements SnakeRenderer {
 		for (const s of [-1, 1]) {
 			const cxp = -2.9 * hs;
 			const cyp = s * 2.9 * hs;
-			const collar = this.localEllipse(
-				(a, b) => rot(a * hs, b * hs),
-				-2.9,
-				s * 2.9,
-				1.55,
-				1.05
-			);
+			const collar = this.localEllipse((a, b) => rot(a * hs, b * hs), -2.9, s * 2.9, 1.55, 1.05);
 			void cxp;
 			void cyp;
 			g.poly(collar).fill({ color: C.snakeCollar, alpha: 0.92 });
@@ -477,51 +460,24 @@ export class PondSnakeRenderer implements SnakeRenderer {
 			if (blink) {
 				const [s1x, s1y] = rot(1.6 * hs, s * 2.9 * hs);
 				const [s2x, s2y] = rot(4.8 * hs, s * 3.1 * hs);
-				g.moveTo(s1x, s1y)
-					.lineTo(s2x, s2y)
-					.stroke({ color: C.snakeOutline, width: 1.3, alpha: 1 });
+				g.moveTo(s1x, s1y).lineTo(s2x, s2y).stroke({ color: C.snakeOutline, width: 1.3, alpha: 1 });
 				continue;
 			}
 
 			// Белок.
-			const white = this.localEllipse(
-				(a, b) => rot(a * hs, b * hs),
-				3.2,
-				s * 2.95,
-				2.15,
-				1.9
-			);
+			const white = this.localEllipse((a, b) => rot(a * hs, b * hs), 3.2, s * 2.95, 2.15, 1.9);
 			g.poly(white).fill(0xfaf2dc);
 
 			// Радужка — тёплый янтарь.
-			const iris = this.localEllipse(
-				(a, b) => rot(a * hs, b * hs),
-				3.35,
-				s * 2.95,
-				1.75,
-				1.6
-			);
+			const iris = this.localEllipse((a, b) => rot(a * hs, b * hs), 3.35, s * 2.95, 1.75, 1.6);
 			g.poly(iris).fill(0xe8b028);
 
 			// Зрачок — вертикальная щель, чуть смещён вперёд (смотрит куда едет).
-			const pupil = this.localEllipse(
-				(a, b) => rot(a * hs, b * hs),
-				3.7,
-				s * 2.95,
-				0.72,
-				1.45
-			);
+			const pupil = this.localEllipse((a, b) => rot(a * hs, b * hs), 3.7, s * 2.95, 0.72, 1.45);
 			g.poly(pupil).fill(0x140e04);
 
 			// Блик.
-			const glint = this.localEllipse(
-				(a, b) => rot(a * hs, b * hs),
-				2.5,
-				s * 2.35,
-				0.62,
-				0.62,
-				8
-			);
+			const glint = this.localEllipse((a, b) => rot(a * hs, b * hs), 2.5, s * 2.35, 0.62, 0.62, 8);
 			g.poly(glint).fill({ color: 0xffffff, alpha: 0.92 });
 
 			// Обводка глаза.
@@ -534,26 +490,13 @@ export class PondSnakeRenderer implements SnakeRenderer {
 
 		// Ноздри.
 		for (const s of [-1, 1]) {
-			const nostril = this.localEllipse(
-				(a, b) => rot(a * hs, b * hs),
-				8.9,
-				s * 1.15,
-				0.5,
-				0.42,
-				8
-			);
+			const nostril = this.localEllipse((a, b) => rot(a * hs, b * hs), 8.9, s * 1.15, 0.5, 0.42, 8);
 			g.poly(nostril).fill({ color: C.snakeOutline, alpha: 0.9 });
 		}
 	}
 
 	// ===== Пузырьки =====
-	private updateBubbles(
-		g: Graphics,
-		dt: number,
-		hx: number,
-		hy: number,
-		moving: boolean
-	): void {
+	private updateBubbles(g: Graphics, dt: number, hx: number, hy: number, moving: boolean): void {
 		this.bubbleTimerMS -= dt * 1000;
 		if (moving && this.bubbleTimerMS <= 0) {
 			this.bubbleTimerMS = 900 + Math.random() * 600;

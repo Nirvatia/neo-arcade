@@ -1,7 +1,7 @@
 import type { World } from '../core/ecs/World.js';
 import type { EntityId } from '../core/ecs/types.js';
 import { Direction } from '../components/index.js';
-import type { GridBitmask } from './GridBitmask.js';
+import type { GridBitmask } from './grid/GridBitmask.js';
 import { DIR_VECTORS, OPPOSITE } from './Directions.js';
 
 const BIT_BY_INDEX: (0 | 1)[] = [1, 0];

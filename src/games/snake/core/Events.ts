@@ -1,34 +1,3 @@
-import type { EntityId } from './ecs/types.js';
-import type { BitOp } from '../components/index.js';
-
-export type SnakeEventMap = {
-	'collision:food': { entity: EntityId; bit: 0 | 1 };
-	'collision:wall': { entity: EntityId };
-	'collision:self': { entity: EntityId };
-	'collision:exit': { entity: EntityId };
-	'collision:bitop': { entity: EntityId; op: BitOp };
-	'snake:grow': { amount: number };
-	'snake:shrink': { amount: number };
-	'snake:grown': { entity: EntityId; newLength: number };
-	'snake:died': { entity: EntityId };
-	'food:spawned': { entity: EntityId };
-	'food:eaten': { entity: EntityId };
-	'exit:opened': { entity: EntityId };
-	'exit:entered': { entity: EntityId };
-	'level:expanded': { level: number };
-	'score:changed': { score: number };
-	'score:add': { points: number };
-	'director:stateChanged': {
-		previous: DirectorStateType;
-		current: DirectorStateType;
-	};
-	'sequence:completed': { streak: number; growth: number };
-	'sequence:failed': {};
-	'final:started': {};
-	'final:completed': {};
-		'game:endless': {};
-};
-
 export const DirectorState = {
 	MENU: 'MENU',
 	PLAYING: 'PLAYING',
@@ -36,4 +5,17 @@ export const DirectorState = {
 	GAME_OVER: 'GAME_OVER',
 	VICTORY: 'VICTORY'
 } as const;
+
 export type DirectorStateType = (typeof DirectorState)[keyof typeof DirectorState];
+
+/**
+ * EventBus используется ТОЛЬКО для звука и UI/HUD.
+ * Игровая логика — только прямые вызовы.
+ */
+export type SnakeEventMap = {
+	'director:stateChanged': {
+		previous: DirectorStateType;
+		current: DirectorStateType;
+	};
+	'score:changed': { score: number };
+};

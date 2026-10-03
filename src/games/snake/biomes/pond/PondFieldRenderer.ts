@@ -1,5 +1,5 @@
 import type { Graphics } from 'pixi.js';
-import type { GridBitmask } from '../../logic/GridBitmask.js';
+import type { GridBitmask } from '../../logic/grid/GridBitmask.js';
 import type { FieldRenderer } from '../renderers.js';
 import { C } from './PondPalette.js';
 

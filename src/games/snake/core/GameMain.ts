@@ -1,521 +1,297 @@
 import type { GameModule } from '$shared/core/types.js';
-import { World } from './ecs/World.js';
+import type { World } from './ecs/World.js';
 import { GameLoop } from './GameLoop.js';
 import { Director } from './Director.js';
-import { DirectorState, type DirectorStateType } from './Events.js';
-import { GridBitmask } from '../logic/GridBitmask.js';
-import { GridHolder } from '../logic/GridHolder.js';
-import { SeededRNG } from '../logic/SeededRNG.js';
-import { spawnSnake } from '../logic/SnakeFactory.js';
-import { Direction } from '../components/index.js';
-import { GridConfig, GameplayConfig, getLevelTuning } from '../config/index.js';
-import { MovementSystem } from '../systems/MovementSystem.js';
-import { InputSystem } from '../systems/InputSystem.js';
-import { SpawnSystem } from '../systems/SpawnSystem.js';
-import { ScoreSystem } from '../systems/ScoreSystem.js';
-import { BitRegisterSystem } from '../systems/BitRegisterSystem.js';
-import { BitTokenSystem } from '../systems/BitTokenSystem.js';
-import { LevelSystem } from '../systems/LevelSystem.js';
-import { RenderSystem } from '../systems/RenderSystem.js';
+import { GridConfig, GameplayConfig } from '../config/index.js';
 import { PixiApp } from '../view/PixiApp.js';
-import { MusicPlayer } from '../audio/MusicPlayer.js';
-import { BIOME_REGISTRY, BiomeManager } from '../biomes/index.js';
-import { FoodWanderSystem } from '../systems/FoodWanderSystem.js';
-const MUSIC_SRC = '/assets/snake/music/theme.mp3';
+import { InputController, type InputCallbacks } from './InputController.js';
+import { LevelLoader, type WorldContext, type SystemsContext } from './LevelLoader.js';
+import { CanvasManager } from './CanvasManager.js';
+import type { RenderPipeline } from './RenderPipeline.js';
+import type { MusicPlayer } from '../audio/MusicPlayer.js';
+import type { BiomeChangedListener, BiomeManager } from '../biomes/index.js';
+import type { Direction } from '../components/index.js';
+
+import { saveScore } from '$shared/utils/scoreStore.js';
+import { DirectorState } from './Events.js';
+
 const CANVAS_BACKGROUND = 0x0a1008;
-const SWIPE_THRESHOLD_PX = 22;
-
-const KEY_TO_DIRECTION: Record<string, Direction> = {
-	ArrowUp: Direction.UP,
-	KeyW: Direction.UP,
-	ArrowDown: Direction.DOWN,
-	KeyS: Direction.DOWN,
-	ArrowLeft: Direction.LEFT,
-	KeyA: Direction.LEFT,
-	ArrowRight: Direction.RIGHT,
-	KeyD: Direction.RIGHT
-};
-
-const HOTKEYS = {
-	PAUSE: 'Space',
-	PAUSE_ALT: 'Escape',
-	CONFIRM: 'Enter',
-	MUTE: 'KeyM'
-} as const;
 
 export class SnakeGame implements GameModule {
 	private canvasParent!: HTMLDivElement;
 	private pixiApp!: PixiApp;
+	private inputController!: InputController;
+
 	private world: World | null = null;
-	private holder: GridHolder | null = null;
 	private gameLoop: GameLoop | null = null;
 	private director: Director | null = null;
-	private inputSystem: InputSystem | null = null;
-	private renderSystem: RenderSystem | null = null;
+
+	private renderPipeline: RenderPipeline | null = null;
 	private music: MusicPlayer | null = null;
-	private keyDownHandler: ((event: KeyboardEvent) => void) | null = null;
-	private pointerDownHandler: ((event: PointerEvent) => void) | null = null;
-	private pointerUpHandler: ((event: PointerEvent) => void) | null = null;
-	private activePointerId: number | null = null;
-	private pointerStartX = 0;
-	private pointerStartY = 0;
-	private lastTapAt = 0;
-	private muted = false;
-	// Первый ресайз в ране — мгновенный (стартовый размер). Дальше — зум.
-	private firstResizeDone = false;
 	private biomeManager: BiomeManager | null = null;
+	private lastSavedScore = -1;
+	private biomeBackgroundListener: BiomeChangedListener | null = null;
+
 	public async init(canvasParent: HTMLDivElement): Promise<void> {
 		this.canvasParent = canvasParent;
+
 		this.pixiApp = new PixiApp();
+
 		const width = GridConfig.START_COLS * GridConfig.CELL_SIZE;
 		const height = GridConfig.START_ROWS * GridConfig.CELL_SIZE;
-		await this.pixiApp.init(canvasParent, width, height, CANVAS_BACKGROUND);
-		this.pixiApp.addTickerCallback((deltaMS) => {
+
+		await this.pixiApp.init(canvasParent, width, height);
+
+		this.pixiApp.addTickerCallback((deltaMS: number) => {
 			this.pixiApp.updateZoom(deltaMS);
+
 			if (this.gameLoop !== null) {
 				this.gameLoop.tick(deltaMS);
 			}
 		});
-		this.bindKeyboard();
-		this.bindTouch();
+
+		this.inputController = new InputController();
+		this.inputController.bind(canvasParent);
+
 		this.setupRun();
+
+		// Сессия 5: начинаем сразу в PLAYING, без стартового оверлея.
+		// Движение стартует только после первого направления.
+		if (this.director !== null) {
+			this.director.startGame();
+		}
 	}
 
 	private setupRun(): void {
+		this.lastSavedScore = -1;
+
 		if (this.gameLoop !== null) {
 			this.gameLoop.stop();
 			this.gameLoop = null;
 		}
-		if (this.renderSystem !== null) {
-			this.renderSystem.dispose();
-			this.renderSystem = null;
+
+		if (this.renderPipeline !== null) {
+			this.renderPipeline.dispose();
+			this.renderPipeline = null;
 		}
+
 		if (this.music !== null) {
 			this.music.dispose();
 			this.music = null;
 		}
-		if (this.world !== null) {
-			this.world.clear();
-		}
-		this.director = null;
-		this.inputSystem = null;
-		this.firstResizeDone = false;
 
-		const world = new World();
-		this.world = world;
-
-		const grid = new GridBitmask(GridConfig.START_COLS, GridConfig.START_ROWS);
-		grid.buildPerimeter();
-		const holder = new GridHolder(grid);
-		this.holder = holder;
-
-		const rng = new SeededRNG(this.createSeed());
-		const tuning = getLevelTuning(1);
-
-		const startCol = Math.floor(GridConfig.START_COLS / 2);
-		const startRow = Math.floor(GridConfig.START_ROWS / 2);
-		const snakeId = spawnSnake(
-			world,
-			grid,
-			startCol,
-			startRow,
-			Direction.RIGHT,
-			GameplayConfig.INITIAL_SNAKE_LENGTH
-		);
-
-		const scoreEntity = world.createEntity();
-		world.addComponent(scoreEntity, 'score', { value: 0 });
-
-		const inputSystem = new InputSystem(world, snakeId, GameplayConfig.MAX_INPUT_QUEUE);
-		this.inputSystem = inputSystem;
-		const movementSystem = new MovementSystem(world, holder, snakeId, tuning.stepIntervalMS);
-		const bitRegisterSystem = new BitRegisterSystem(world, holder, rng, snakeId);
-		const bitTokenSystem = new BitTokenSystem(world, holder, rng, snakeId, tuning.maxActiveTokens);
-		const levelSystem = new LevelSystem(
-			world,
-			holder,
-			rng,
-			snakeId,
-			GridConfig.GROWTH_COLS,
-			GridConfig.GROWTH_ROWS,
-			GridConfig.MAX_COLS,
-			GridConfig.MAX_ROWS
-		);
-		const spawnSystem = new SpawnSystem(world, holder, rng, GameplayConfig.TARGET_FOOD_COUNT);
-		const scoreSystem = new ScoreSystem(
-			world,
-			GameplayConfig.POINTS_PER_FOOD,
-			GameplayConfig.POINTS_PER_SEQUENCE,
-			GameplayConfig.PENALTY_SEQUENCE_FAILED,
-			GameplayConfig.POINTS_FINAL_SEQUENCE
-		);
-
-		const biomeManager = new BiomeManager({
-			biomes: BIOME_REGISTRY,
-			levelsPerBiome: 3,
-			initialLevel: 1
-		});
-		this.biomeManager = biomeManager;
-		const foodWanderSystem = new FoodWanderSystem(world, holder, rng, snakeId);
-
-		const renderSystem = new RenderSystem(
-			world,
-			holder,
-			snakeId,
-			this.pixiApp.stage,
-			GridConfig.CELL_SIZE,
-			this.canvasParent,
-			biomeManager
-		);
-		this.renderSystem = renderSystem;
-
-		const music = new MusicPlayer(world.events, MUSIC_SRC);
-		music.setMuted(this.muted);
-		this.music = music;
-
-		spawnSystem.refillFood();
-
-		world.addSystem(inputSystem);
-		world.addSystem(movementSystem);
-		world.addSystem(bitTokenSystem);
-		world.addSystem(bitRegisterSystem);
-		world.addSystem(levelSystem);
-		world.addSystem(spawnSystem);
-		world.addSystem(scoreSystem);
-		world.addSystem(renderSystem);
-		world.addSystem(foodWanderSystem);
-		const gameLoop = new GameLoop(world, GameplayConfig.MAX_DELTA_MS);
-		this.gameLoop = gameLoop;
-		const director = new Director(world, gameLoop);
-		this.director = director;
-
-		this.bindWorldEvents(world);
-
-		// Канвас всегда соответствует текущему полю. Критично при рестарте:
-		// прошлый забег мог оставить канвас расширенным («серая область»).
-		this.resizeCanvas();
-		world.update(0);
-	}
-
-	private bindWorldEvents(world: World): void {
-		world.events.on('director:stateChanged', () => {
-			if (this.renderSystem !== null) {
-				this.renderSystem.forceRender();
+		if (this.biomeManager !== null) {
+			if (this.biomeBackgroundListener !== null) {
+				this.biomeManager.removeBiomeChangedListener(this.biomeBackgroundListener);
+				this.biomeBackgroundListener = null;
 			}
-		});
-		world.events.on('level:expanded', () => {
-			if (this.holder === null) {
-				return;
-			}
-			const grid = this.holder.grid;
-			this.pixiApp.animateResize(
-				grid.cols * GridConfig.CELL_SIZE,
-				grid.rows * GridConfig.CELL_SIZE
-			);
-		});
-	}
-
-	private async waitForFonts(): Promise<void> {
-		if (typeof document === 'undefined' || !document.fonts) {
-			return;
-		}
-		try {
-			await document.fonts.load('16px "DSEG7 Classic"');
-			await document.fonts.ready;
-		} catch {
-			// Шрифт недоступен — используем моноширинный фолбэк.
-		}
-	}
-
-	private resizeCanvas(): void {
-		if (this.holder === null) {
-			return;
-		}
-		const grid = this.holder.grid;
-		const width = grid.cols * GridConfig.CELL_SIZE;
-		const height = grid.rows * GridConfig.CELL_SIZE;
-		if (!this.firstResizeDone) {
-			this.firstResizeDone = true;
-			this.pixiApp.resize(
-				GridConfig.START_COLS * GridConfig.CELL_SIZE,
-				GridConfig.START_ROWS * GridConfig.CELL_SIZE
-			);
-			return;
-		}
-		this.pixiApp.animateResize(width, height);
-	}
-
-	private createSeed(): number {
-		return Math.floor(Math.random() * 2147483647);
-	}
-
-	// ============================== КЛАВИАТУРА ==============================
-
-	private bindKeyboard(): void {
-		this.keyDownHandler = (event: KeyboardEvent): void => {
-			this.handleKeyDown(event);
-		};
-		window.addEventListener('keydown', this.keyDownHandler);
-	}
-
-	private handleKeyDown(event: KeyboardEvent): void {
-		this.unlockAudio();
-
-		const direction = KEY_TO_DIRECTION[event.code];
-		if (direction !== undefined) {
-			event.preventDefault();
-			const state = this.getDirectorState();
-			if (state === DirectorState.MENU || state === DirectorState.PAUSED) {
-				if (this.director !== null) {
-					this.director.transitionTo(DirectorState.PLAYING);
-				}
-			}
-			if (this.isState(DirectorState.PLAYING) && this.inputSystem !== null) {
-				this.inputSystem.pressDirection(direction);
-			}
-			return;
+			this.biomeManager.destroy();
+			this.biomeManager = null;
 		}
 
-		if (event.code === HOTKEYS.PAUSE || event.code === HOTKEYS.PAUSE_ALT) {
-			event.preventDefault();
-			this.togglePause();
-			return;
-		}
-		if (event.code === HOTKEYS.CONFIRM) {
-			event.preventDefault();
-			this.onEnterPressed();
-			return;
-		}
-		if (event.code === HOTKEYS.MUTE) {
-			event.preventDefault();
-			this.toggleMute();
-			return;
-		}
-	}
-
-	// ============================== ТАЧ / СВАЙПЫ ==============================
-
-	private bindTouch(): void {
-		this.pointerDownHandler = (event: PointerEvent): void => {
-			this.unlockAudio();
-			if (this.activePointerId !== null) {
-				return;
-			}
-			this.activePointerId = event.pointerId;
-			this.pointerStartX = event.clientX;
-			this.pointerStartY = event.clientY;
-		};
-		this.pointerUpHandler = (event: PointerEvent): void => {
-			if (event.pointerId !== this.activePointerId) {
-				return;
-			}
-			this.activePointerId = null;
-			this.handleSwipeOrTap(event);
-		};
-		this.canvasParent.addEventListener('pointerdown', this.pointerDownHandler);
-		this.canvasParent.addEventListener('pointerup', this.pointerUpHandler);
-		this.canvasParent.addEventListener('pointercancel', this.pointerUpHandler);
-	}
-
-	private handleSwipeOrTap(event: PointerEvent): void {
-		const dx = event.clientX - this.pointerStartX;
-		const dy = event.clientY - this.pointerStartY;
-		const absX = Math.abs(dx);
-		const absY = Math.abs(dy);
-
-		if (absX >= SWIPE_THRESHOLD_PX || absY >= SWIPE_THRESHOLD_PX) {
-			let direction: Direction;
-			if (absX > absY) {
-				direction = dx > 0 ? Direction.RIGHT : Direction.LEFT;
-			} else {
-				direction = dy > 0 ? Direction.DOWN : Direction.UP;
-			}
-			this.pressDirectionInternal(direction);
-			return;
-		}
-		this.handleTap(event);
-	}
-
-	private handleTap(event: PointerEvent): void {
-		const state = this.getDirectorState();
-		if (state === DirectorState.MENU || state === DirectorState.GAME_OVER) {
-			this.onEnterPressed();
-			return;
-		}
-		if (state === DirectorState.VICTORY) {
-			this.startEndless();
-			return;
-		}
-		if (state === DirectorState.PAUSED) {
-			this.togglePause();
-			return;
-		}
-		if (state !== DirectorState.PLAYING) {
-			return;
-		}
-		const rect = this.canvasParent.getBoundingClientRect();
-		const y = event.clientY - rect.top;
-		const now = Date.now();
-		if (y < rect.height * 0.18 && now - this.lastTapAt < 350) {
-			this.lastTapAt = 0;
-			this.togglePause();
-			return;
-		}
-		this.lastTapAt = now;
-	}
-
-	// ================ ПУБЛИЧНЫЙ ТАЧ-ИНТЕРФЕЙС (для GameStage) ================
-
-	public touchDirection(dir: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT'): void {
-		this.unlockAudio();
-		this.pressDirectionInternal(Direction[dir]);
-	}
-
-	public touchPause(): void {
-		this.unlockAudio();
-		const state = this.getDirectorState();
-		if (state === DirectorState.MENU || state === DirectorState.GAME_OVER) {
-			this.onEnterPressed();
-			return;
-		}
-		if (state === DirectorState.VICTORY) {
-			this.startEndless();
-			return;
-		}
-		this.togglePause();
-	}
-
-	public touchMute(): void {
-		this.unlockAudio();
-		this.toggleMute();
-	}
-
-	private pressDirectionInternal(direction: Direction): void {
-		const state = this.getDirectorState();
-		if (state === DirectorState.MENU || state === DirectorState.PAUSED) {
-			if (this.director !== null) {
-				this.director.transitionTo(DirectorState.PLAYING);
-			}
-		}
-		if (this.isState(DirectorState.PLAYING) && this.inputSystem !== null) {
-			this.inputSystem.pressDirection(direction);
-		}
-	}
-
-	// ============================== ОБЩЕЕ ==============================
-
-	private isState(state: DirectorStateType): boolean {
-		if (this.director === null) {
-			return false;
-		}
-		return this.director.getState() === state;
-	}
-
-	private getDirectorState(): DirectorStateType {
-		if (this.director === null) {
-			return DirectorState.MENU;
-		}
-		return this.director.getState();
-	}
-
-	private togglePause(): void {
-		if (this.director === null) {
-			return;
-		}
-		const state = this.director.getState();
-		if (state === DirectorState.PLAYING) {
-			this.director.transitionTo(DirectorState.PAUSED);
-			return;
-		}
-		if (state === DirectorState.PAUSED) {
-			this.director.transitionTo(DirectorState.PLAYING);
-		}
-	}
-
-	private onEnterPressed(): void {
-		if (this.director === null) {
-			return;
-		}
-		const state = this.director.getState();
-		if (state === DirectorState.MENU || state === DirectorState.PAUSED) {
-			this.director.transitionTo(DirectorState.PLAYING);
-			return;
-		}
-		if (state === DirectorState.GAME_OVER) {
-			this.restart();
-			return;
-		}
-		if (state === DirectorState.VICTORY) {
-			this.startEndless();
-		}
-	}
-
-	private startEndless(): void {
-		if (this.world === null || this.director === null) {
-			return;
-		}
-		this.world.events.emit('game:endless', {});
-		this.director.transitionTo(DirectorState.PLAYING);
-	}
-
-	private restart(): void {
-		this.setupRun();
-		if (this.director !== null) {
-			this.director.transitionTo(DirectorState.PLAYING);
-		}
-	}
-
-	private unlockAudio(): void {
-		if (this.music !== null) {
-			this.music.unlock();
-		}
-	}
-
-	private toggleMute(): void {
-		this.muted = !this.muted;
-		if (this.music !== null) {
-			this.music.setMuted(this.muted);
-		}
-	}
-
-	public destroy(): void {
-		if (this.keyDownHandler !== null) {
-			window.removeEventListener('keydown', this.keyDownHandler);
-			this.keyDownHandler = null;
-		}
-		if (this.pointerDownHandler !== null) {
-			this.canvasParent.removeEventListener('pointerdown', this.pointerDownHandler);
-			this.pointerDownHandler = null;
-		}
-		if (this.pointerUpHandler !== null) {
-			this.canvasParent.removeEventListener('pointerup', this.pointerUpHandler);
-			this.canvasParent.removeEventListener('pointercancel', this.pointerUpHandler);
-			this.pointerUpHandler = null;
-		}
-		if (this.gameLoop !== null) {
-			this.gameLoop.stop();
-			this.gameLoop = null;
-		}
-		if (this.renderSystem !== null) {
-			this.renderSystem.dispose();
-			this.renderSystem = null;
-		}
-		if (this.music !== null) {
-			this.music.dispose();
-			this.music = null;
-		}
 		if (this.world !== null) {
 			this.world.clear();
 			this.world = null;
 		}
-		if (this.pixiApp !== undefined) {
-			this.pixiApp.destroy();
+
+		this.director = null;
+
+		const worldCtx: WorldContext = LevelLoader.createWorld();
+		this.world = worldCtx.world;
+
+		const gameLoop = new GameLoop(GameplayConfig.FIXED_STEP_MS, GameplayConfig.MAX_DELTA_MS);
+		this.gameLoop = gameLoop;
+
+		const director = new Director(worldCtx.world, gameLoop);
+		this.director = director;
+
+		const canvasManager = new CanvasManager(this.pixiApp, worldCtx.service);
+		canvasManager.resizeToGrid();
+
+		const systemsCtx: SystemsContext = LevelLoader.createSystems(
+			worldCtx,
+			director,
+			this.pixiApp.stage,
+			canvasManager,
+			this.inputController.isMuted
+		);
+
+		this.renderPipeline = systemsCtx.renderPipeline;
+		this.music = systemsCtx.music;
+		this.biomeManager = systemsCtx.biomeManager;
+		const biomeBackgroundListener: BiomeChangedListener = (next, _prev): void => {
+			this.pixiApp.setBackground(next.palette.screenBackground);
+		};
+		this.biomeBackgroundListener = biomeBackgroundListener;
+		this.biomeManager.addBiomeChangedListener(biomeBackgroundListener);
+		this.pixiApp.setBackground(this.biomeManager.biome.palette.screenBackground);
+
+		gameLoop.setCallbacks(
+			(fixedStepMS: number) => {
+				worldCtx.world.update(fixedStepMS);
+			},
+			(deltaMS: number, _interpolation: number) => {
+				systemsCtx.renderPipeline.update(deltaMS);
+			}
+		);
+
+		this.inputController.setCallbacks(this.createInputCallbacks(systemsCtx, director));
+
+		this.bindWorldEvents(worldCtx.world);
+
+		worldCtx.world.update(0);
+	}
+
+	private createInputCallbacks(systemsCtx: SystemsContext, director: Director): InputCallbacks {
+		return {
+			getState: () => director.getState(),
+
+			startGame: () => director.startGame(),
+
+			pause: () => {
+				if (systemsCtx.deathAnimation.isActive()) {
+					return;
+				}
+
+				director.pause();
+			},
+
+			resume: () => {
+				if (systemsCtx.deathAnimation.isActive()) {
+					return;
+				}
+
+				director.resume();
+			},
+
+			pressDirection: (dir: Direction) => {
+				systemsCtx.inputSystem.pressDirection(dir);
+			},
+
+			restart: () => {
+				this.setupRun();
+
+				if (this.director !== null) {
+					this.director.startGame();
+				}
+			},
+
+			startEndless: () => {
+				systemsCtx.levelSystem.onEndlessStarted();
+				systemsCtx.bitRegisterSystem.onEndlessStarted();
+				systemsCtx.renderPipeline.setFinalMode(false);
+
+				director.restart();
+				director.startGame();
+			},
+
+			unlockAudio: () => {
+				systemsCtx.music.unlock();
+			},
+
+			onMuteToggle: (muted: boolean) => {
+				systemsCtx.music.setMuted(muted);
+			}
+		};
+	}
+
+	private bindWorldEvents(world: World): void {
+		world.events.on('director:stateChanged', (payload) => {
+			if (
+				payload.current === DirectorState.GAME_OVER ||
+				payload.current === DirectorState.VICTORY
+			) {
+				this.saveHighScore();
+			}
+
+			if (this.renderPipeline !== null) {
+				this.renderPipeline.forceRender();
+			}
+		});
+	}
+
+	private saveHighScore(): void {
+		const score = this.readScore();
+
+		if (score === this.lastSavedScore) {
+			return;
 		}
 
-		this.biomeManager = null;
+		this.lastSavedScore = score;
+
+		const isNewRecord = saveScore('snake', score);
+
+		if (this.renderPipeline !== null) {
+			this.renderPipeline.setNewRecord(isNewRecord);
+		}
+	}
+
+	private readScore(): number {
+		if (this.world === null) {
+			return 0;
+		}
+
+		const scoreEntities = this.world.query(['score']).entities;
+		const scoreEntity = scoreEntities[0];
+
+		if (scoreEntity === undefined) {
+			return 0;
+		}
+
+		const score = this.world.getComponent(scoreEntity, 'score');
+
+		return score === undefined ? 0 : score.value;
+	}
+
+	public destroy(): void {
+		this.inputController.destroy();
+
+		if (this.gameLoop !== null) {
+			this.gameLoop.stop();
+			this.gameLoop = null;
+		}
+
+		if (this.renderPipeline !== null) {
+			this.renderPipeline.dispose();
+			this.renderPipeline = null;
+		}
+
+		if (this.music !== null) {
+			this.music.dispose();
+			this.music = null;
+		}
+		if (this.biomeManager !== null) {
+			if (this.biomeBackgroundListener !== null) {
+				this.biomeManager.removeBiomeChangedListener(this.biomeBackgroundListener);
+				this.biomeBackgroundListener = null;
+			}
+			this.biomeManager.destroy();
+			this.biomeManager = null;
+		}
+
+		if (this.world !== null) {
+			this.world.clear();
+			this.world = null;
+		}
+
+		this.director = null;
+
+		this.pixiApp.destroy();
 
 		if (typeof document !== 'undefined') {
 			document.documentElement.style.removeProperty('--stage-bg');
 		}
+	}
+
+	public touchDirection(dir: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT'): void {
+		this.inputController.touchDirection(dir);
+	}
+
+	public touchPause(): void {
+		this.inputController.touchPause();
+	}
+
+	public touchMute(): void {
+		this.inputController.touchMute();
 	}
 }

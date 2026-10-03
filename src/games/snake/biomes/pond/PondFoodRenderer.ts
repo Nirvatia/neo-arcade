@@ -4,12 +4,7 @@ import type { FoodRenderer } from '../renderers.js';
 import { C } from './PondPalette.js';
 
 export class PondFoodRenderer implements FoodRenderer {
-	public render(
-		g: Graphics,
-		foods: FoodRender[],
-		timeMS: number,
-		_cellSize: number
-	): void {
+	public render(g: Graphics, foods: FoodRender[], timeMS: number, _cellSize: number): void {
 		const ph = timeMS * 0.004;
 
 		for (const food of foods) {
@@ -17,19 +12,21 @@ export class PondFoodRenderer implements FoodRenderer {
 		}
 	}
 
-	private drawPrey(
-		g: Graphics,
-		x: number,
-		y: number,
-		ang: number,
-		ph: number,
-		bit: 0 | 1
-	): void {
-		const halo = bit === 1 ? 0xfff8dc : 0xc8aaff;
+	private drawPrey(g: Graphics, x: number, y: number, ang: number, ph: number, bit: 0 | 1): void {
+		const bitColor = bit === 1 ? C.bitOne : C.bitZero;
+		const bitHi = bit === 1 ? C.bitOneHi : C.bitZeroHi;
 
-		g.circle(x, y, 14).fill({ color: halo, alpha: 0.1 });
-		g.circle(x, y, 10).fill({ color: halo, alpha: 0.12 });
-		g.circle(x, y, 6).fill({ color: halo, alpha: 0.14 });
+		// Контрастный битовый ореол.
+		g.circle(x, y, 15).fill({ color: bitColor, alpha: 0.14 });
+		g.circle(x, y, 11).fill({ color: bitHi, alpha: 0.12 });
+		g.circle(x, y, 7).fill({ color: bitColor, alpha: 0.16 });
+
+		// Чёткое битовое кольцо.
+		g.circle(x, y, 12).stroke({
+			color: bitColor,
+			width: 2,
+			alpha: 0.65
+		});
 
 		if (bit === 1) {
 			this.drawStrider(g, x, y, ang, ph);
@@ -187,9 +184,7 @@ export class PondFoodRenderer implements FoodRenderer {
 		const [l1x, l1y] = rot(-5, 0);
 		const [l2x, l2y] = rot(5, 0);
 
-		g.moveTo(l1x, l1y)
-			.lineTo(l2x, l2y)
-			.stroke({ color: 0x140c04, width: 0.9, alpha: 0.7 });
+		g.moveTo(l1x, l1y).lineTo(l2x, l2y).stroke({ color: 0x140c04, width: 0.9, alpha: 0.7 });
 
 		// Голова
 		const headPoints: number[] = [];

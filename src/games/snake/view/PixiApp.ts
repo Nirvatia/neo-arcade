@@ -1,6 +1,5 @@
 import { Application, Container } from 'pixi.js';
-
-const ZOOM_DURATION_MS = 420;
+import { RenderConfig } from '../config';
 
 interface ZoomState {
 	fromScaleX: number;
@@ -20,16 +19,11 @@ export class PixiApp {
 		this.app = new Application();
 	}
 
-	public async init(
-		canvasParent: HTMLDivElement,
-		width: number,
-		height: number,
-		background: number
-	): Promise<void> {
+	public async init(canvasParent: HTMLDivElement, width: number, height: number): Promise<void> {
 		await this.app.init({
 			width,
 			height,
-			background,
+			background: 0x000000,
 			antialias: true,
 			// Резкий рендер на retina/HiDPI.
 			resolution: Math.min(window.devicePixelRatio || 1, 2),
@@ -44,6 +38,10 @@ export class PixiApp {
 
 	public get stage(): Container {
 		return this.app.stage;
+	}
+
+	public setBackground(color: number): void {
+		this.app.renderer.background.color = color;
 	}
 
 	public addTickerCallback(callback: (deltaMS: number) => void): void {
@@ -90,7 +88,7 @@ export class PixiApp {
 			return;
 		}
 		this.zoom.elapsedMS = this.zoom.elapsedMS + deltaMS;
-		const progress = Math.min(1, this.zoom.elapsedMS / ZOOM_DURATION_MS);
+		const progress = Math.min(1, this.zoom.elapsedMS / RenderConfig.ZOOM_DURATION_MS);
 		this.applyZoom(progress);
 		if (progress >= 1) {
 			this.resetZoom();

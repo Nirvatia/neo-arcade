@@ -1,5 +1,5 @@
 import type { Container, Graphics } from 'pixi.js';
-import type { GridBitmask } from '../../logic/GridBitmask.js';
+import type { GridBitmask } from '../../logic/grid/GridBitmask.js';
 import type { BitOp } from '../../components/index.js';
 import type { Biome, BiomePalette, BiomeTheme } from '../Biome.js';
 import type {
@@ -18,6 +18,7 @@ import { PondAmbient } from './PondAmbient.js';
 import type { OverlayPalette } from '../renderData.js';
 import {  POND_OVERLAY } from './PondPalette.js';
 import { PondOverlayRenderer } from './PondOverlayRenderer.js';
+import { PondParticleRenderer } from './PondParticleRenderer.js';
 
 export class PondBiome implements Biome {
 	public readonly id = 'pond';
@@ -32,7 +33,8 @@ export class PondBiome implements Biome {
 	private readonly snakeRenderer = new PondSnakeRenderer();
 	private readonly tokenFactory = new PondTokenFactory();
 	private readonly ambient = new PondAmbient();
-
+	public readonly particleRenderer = new PondParticleRenderer();
+	
 	public renderField(g: Graphics, grid: GridBitmask, cellSize: number): void {
 		this.fieldRenderer.render(g, grid, cellSize);
 	}
