@@ -16,12 +16,6 @@ import { LunarTokenFactory } from './LunarTokenFactory.js';
 import { LunarAmbient } from './LunarAmbient.js';
 import { LunarParticleRenderer } from './LunarParticleRenderer.js';
 
-/**
- * LunarBiome теперь параметризуется вариантом.
- *
- * Это позволяет иметь несколько биомов на одной арт-базе,
- * но с разными палитрами, темами и идентификаторами.
- */
 export class LunarBiome implements Biome {
 	public readonly id: string;
 	public readonly palette: BiomePalette;
@@ -57,21 +51,24 @@ export class LunarBiome implements Biome {
 	public renderFood(
 		ctx: CanvasRenderingContext2D,
 		foods: FoodRender[],
+		count: number,
 		timeMS: number,
 		cellSize: number
 	): void {
-		this.foodRenderer.render(ctx, foods, timeMS, cellSize);
+		this.foodRenderer.render(ctx, foods, count, timeMS, cellSize);
 	}
 
 	public renderSnake(
 		ctx: CanvasRenderingContext2D,
 		chain: SnakeChainPoint[],
+		start: number,
+		end: number,
 		zones: SnakeZoneStyle[],
 		head: SnakeHeadRender,
 		timeMS: number,
 		cellSize: number
 	): void {
-		this.snakeRenderer.render(ctx, chain, zones, head, timeMS, cellSize);
+		this.snakeRenderer.render(ctx, chain, start, end, zones, head, timeMS, cellSize);
 	}
 
 	public renderToken(

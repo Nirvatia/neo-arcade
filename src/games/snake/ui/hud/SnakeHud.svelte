@@ -1,22 +1,17 @@
 <script lang="ts">
 	import { snakeHudStore } from './hudStore';
-
 	let { part = 'all' }: { part?: 'top' | 'bottom' | 'all' } = $props();
-
 	const state = $derived($snakeHudStore);
-
 	const widthStyle = $derived(state.width > 0 ? `width: ${state.width}px;` : '');
 	const scoreText = $derived(String(state.score).padStart(6, '0'));
 	const movesText = $derived(String(state.movesLeft).padStart(2, '0'));
 	const movesLow = $derived(state.movesLeft > 0 && state.movesLeft <= 3);
-
 	const zoneLabel = $derived(state.infinite ? 'Mode' : 'Zone');
 	const zoneText = $derived(
 		state.infinite
 			? 'ENDLESS'
 			: `B${state.biomeIndex + 1} · LV ${state.biomeLevel}`
 	);
-
 	const matchedCount = $derived(
 		state.activeBits.reduce(
 			(acc: number, bit: 0 | 1, i: number) =>
@@ -24,16 +19,14 @@
 			0
 		)
 	);
-
 	const comboHot = $derived(state.comboMultiplier > 1);
-
-	const targetKey = $derived(
-		`${state.targetBits.length}:${state.targetBits.join('')}`
-	);
-	const activeKey = $derived(
-		`${state.activeBits.length}:${state.activeBits.join('')}`
-	);
+	
+	// Используем готовые ключи, чтобы не делать join() при каждом обновлении стора.
+	const targetKey = $derived(`${state.targetBits.length}:${state.targetKey}`);
+	const activeKey = $derived(`${state.activeBits.length}:${state.activeKey}`);
 </script>
+
+<!-- Остальной шаблон без изменений -->
 
 {#if part === 'top' || part === 'all'}
 	<header class="hud hud-top" style={widthStyle}>

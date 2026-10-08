@@ -22,33 +22,25 @@ export class GridSpawner {
 
 	/**
 	 * Ищет свободную клетку: не стена, не занята, не еда, не выход.
-	 * Возвращает координаты или null, если не нашёл за maxAttempts.
+	 * Fail-fast: бросает исключение, если поле переполнено.
 	 */
 	public findFreeCell(
 		rng: SeededRNG,
 		maxAttempts: number = GameplayConfig.MAX_FIND_ATTEMPTS
-	): { col: number; row: number } | null {
+	): { col: number; row: number } {
 		for (let attempt = 0; attempt < maxAttempts; attempt++) {
 			const col = rng.nextInt(this.model.cols);
 			const row = rng.nextInt(this.model.rows);
-			if (!this.collision.withinBounds(col, row)) {
-				continue;
-			}
-			if (this.collision.isWall(col, row)) {
-				continue;
-			}
-			if (this.collision.isOccupied(col, row)) {
-				continue;
-			}
-			if (this.collision.isFood(col, row)) {
-				continue;
-			}
-			if (this.collision.isExit(col, row)) {
-				continue;
-			}
+			
+			if (!this.collision.withinBounds(col, row)) continue;
+			if (this.collision.isWall(col, row)) continue;
+			if (this.collision.isOccupied(col, row)) continue;
+			if (this.collision.isFood(col, row)) continue;
+			if (this.collision.isExit(col, row)) continue;
+			
 			return { col, row };
 		}
-		return null;
+		throw new Error(`GridSpawner: no free cell found after ${maxAttempts} attempts.`);
 	}
 
 	public countFood(): number {

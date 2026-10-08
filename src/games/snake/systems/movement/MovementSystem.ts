@@ -136,24 +136,24 @@ export class MovementSystem extends SystemBase {
 		const head = this.world.getComponent(headId, 'snakeHead');
 		const headPos = this.world.getComponent(headId, 'gridPosition');
 
-		if (head === undefined || headPos === undefined) {
-			return false;
+		if (head === undefined) {
+			throw new Error(`MovementSystem: snakeHead missing on entity ${headId}`);
+		}
+		if (headPos === undefined) {
+			throw new Error(`MovementSystem: gridPosition missing on entity ${headId}`);
 		}
 
 		if (head.queue.length > 0) {
 			const next = head.queue.shift();
-
 			if (next !== undefined && next !== OPPOSITE[head.dir]) {
 				head.dir = next;
 			}
 		}
 
 		const vec = DIR_VECTORS[head.dir];
-
 		const rawCol = headPos.col + vec.dx;
 		const rawRow = headPos.row + vec.dy;
 
-		// Режим без рамок: заворачиваем координаты на противоположную сторону.
 		const nextCell = this.grid.wrap
 			? this.grid.wrapPosition(rawCol, rawRow)
 			: { col: rawCol, row: rawRow };
@@ -165,7 +165,6 @@ export class MovementSystem extends SystemBase {
 			this.deps.death.start();
 			return false;
 		}
-
 		if (this.grid.isExit(newCol, newRow)) {
 			this.deps.level.onExitReached();
 			return false;
@@ -173,9 +172,7 @@ export class MovementSystem extends SystemBase {
 
 		const grows = this.pendingGrowth > 0;
 		const eats = this.grid.isFood(newCol, newRow);
-
 		let eatenBit: 0 | 1 = 0;
-
 		if (eats) {
 			eatenBit = this.grid.getFoodBit(newCol, newRow);
 		}
@@ -183,9 +180,7 @@ export class MovementSystem extends SystemBase {
 		if (this.grid.isOccupied(newCol, newRow)) {
 			const tailId = getTail(this.world, this.snakeId);
 			const tailPos = this.world.getComponent(tailId, 'gridPosition');
-
 			const isTailCell = tailPos !== undefined && tailPos.col === newCol && tailPos.row === newRow;
-
 			if (grows || !isTailCell) {
 				this.deps.death.start();
 				return false;
@@ -194,27 +189,21 @@ export class MovementSystem extends SystemBase {
 
 		if (eats) {
 			this.grid.clearFood(newCol, newRow);
-
 			const foodEntities = this.world.query(['food', 'gridPosition']).entities;
-
 			for (const entityId of foodEntities) {
 				const pos = this.world.getComponent(entityId, 'gridPosition');
-
 				if (pos !== undefined && pos.col === newCol && pos.row === newRow) {
 					this.world.destroyEntity(entityId);
 					break;
 				}
 			}
-
 			this.deps.bitRegister.onFoodEaten(eatenBit);
 			this.deps.fx.onFoodEaten();
 		}
 
 		this.advance(newCol, newRow, grows, head.dir);
 		this.appendHeadToMotion(newCol, newRow);
-
 		this.motion.targetLengthCells = Math.max(0, getSnakeLength(this.world, this.snakeId) - 1);
-
 		return true;
 	}
 

@@ -6,7 +6,6 @@ import type {
 	SnakeHeadRender,
 	SnakeZoneStyle
 } from './renderData.js';
-
 import type { ParticleRenderer } from './renderers.js';
 
 export interface BiomeTheme {
@@ -28,47 +27,44 @@ export interface BiomePalette {
 	bitZero: number;
 }
 
-/**
- * Контракт биома.
- *
- * Оверлеи больше не являются частью биома.
- * Они рисуются общим Svelte-слоем.
- */
 export interface Biome {
 	readonly id: string;
 	readonly palette: BiomePalette;
 	readonly theme: BiomeTheme;
 	readonly particleRenderer: ParticleRenderer;
-
+	
 	renderField(
 		ctx: CanvasRenderingContext2D,
 		grid: GridBitmask,
 		cellSize: number
 	): void;
-
+	
 	renderExit(
 		ctx: CanvasRenderingContext2D,
 		grid: GridBitmask,
 		timeMS: number,
 		cellSize: number
 	): void;
-
+	
 	renderFood(
 		ctx: CanvasRenderingContext2D,
 		foods: FoodRender[],
+		count: number,
 		timeMS: number,
 		cellSize: number
 	): void;
-
+	
 	renderSnake(
 		ctx: CanvasRenderingContext2D,
 		chain: SnakeChainPoint[],
+		start: number,
+		end: number,
 		zones: SnakeZoneStyle[],
 		head: SnakeHeadRender,
 		timeMS: number,
 		cellSize: number
 	): void;
-
+	
 	renderToken(
 		ctx: CanvasRenderingContext2D,
 		op: BitOp,
@@ -77,7 +73,7 @@ export interface Biome {
 		cellSize: number,
 		timeMS: number
 	): void;
-
+	
 	updateAmbient(
 		deltaMS: number,
 		timeMS: number,
@@ -85,14 +81,7 @@ export interface Biome {
 		cols: number,
 		rows: number
 	): void;
-
 	renderAmbient(ctx: CanvasRenderingContext2D): void;
-
-	/**
-	 * Необязательный передний план амбиента.
-	 * Биом может рисовать часть атмосферных эффектов поверх змейки.
-	 */
 	renderAmbientForeground?(ctx: CanvasRenderingContext2D): void;
-
 	destroy(): void;
 }

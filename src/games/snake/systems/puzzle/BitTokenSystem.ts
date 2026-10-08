@@ -64,7 +64,6 @@ export class BitTokenSystem extends SystemBase {
 
 	private spawnToken(): void {
 		const cell = this.service.spawner.findFreeCell(this.rng);
-		if (cell === null) return;
 		const tokenId = this.world.createEntity();
 		this.world.addComponent(tokenId, 'gridPosition', { col: cell.col, row: cell.row });
 		this.world.addComponent(tokenId, 'bitPowerUp', { op: this.randomOp() });
@@ -82,11 +81,13 @@ export class BitTokenSystem extends SystemBase {
 		const headId = findHead(this.world, this.snakeId);
 		const headPos = this.world.getComponent(headId, 'gridPosition');
 		if (headPos === undefined) return;
+		
 		const tokens = this.world.query(['bitPowerUp', 'gridPosition']).entities;
 		for (const tokenId of tokens) {
 			const tokenPos = this.world.getComponent(tokenId, 'gridPosition');
 			const token = this.world.getComponent(tokenId, 'bitPowerUp');
 			if (tokenPos === undefined || token === undefined) continue;
+			
 			if (tokenPos.col === headPos.col && tokenPos.row === headPos.row) {
 				const op = token.op;
 				this.world.destroyEntity(tokenId);

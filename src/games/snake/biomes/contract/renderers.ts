@@ -8,10 +8,6 @@ import type {
 	SnakeZoneStyle
 } from './renderData.js';
 
-/**
- * Статичное поле: фон, вода, берег, стены, сетка.
- * Рисуется только при смене/расширении поля.
- */
 export interface FieldRenderer {
 	render(
 		ctx: CanvasRenderingContext2D,
@@ -20,9 +16,6 @@ export interface FieldRenderer {
 	): void;
 }
 
-/**
- * Выход. Рисуется каждый кадр, может анимироваться.
- */
 export interface ExitRenderer {
 	render(
 		ctx: CanvasRenderingContext2D,
@@ -32,44 +25,36 @@ export interface ExitRenderer {
 	): void;
 }
 
-/**
- * Еда. Получает уже подготовленные данные из FoodView.
- */
 export interface FoodRenderer {
 	render(
 		ctx: CanvasRenderingContext2D,
 		foods: FoodRender[],
+		count: number,
 		timeMS: number,
 		cellSize: number
 	): void;
-
 	destroy?(): void;
 }
 
 /**
- * Змейка. Получает готовую цепь точек из SnakeView.
- * Содержит только арт: тело, голова, FX.
+ * Змейка. Получает готовую цепь точек и диапазон для отрисовки.
+ * Это позволяет рисовать подцепи без создания новых массивов.
  */
 export interface SnakeRenderer {
 	render(
 		ctx: CanvasRenderingContext2D,
 		chain: SnakeChainPoint[],
+		start: number,
+		end: number,
 		zones: SnakeZoneStyle[],
 		head: SnakeHeadRender,
 		timeMS: number,
 		cellSize: number
 	): void;
-
 	reset?(): void;
 	destroy?(): void;
 }
 
-/**
- * Рендер токена.
- *
- * Токен рисуется напрямую в canvas каждый кадр.
- * Получает время для анимации.
- */
 export interface TokenRenderer {
 	render(
 		ctx: CanvasRenderingContext2D,
@@ -81,12 +66,6 @@ export interface TokenRenderer {
 	): void;
 }
 
-/**
- * Фоновый эмбиент биома.
- *
- * Больше нет контейнера.
- * Обновление и отрисовка разделяются.
- */
 export interface AmbientLayer {
 	update(
 		deltaMS: number,
@@ -95,25 +74,16 @@ export interface AmbientLayer {
 		cols: number,
 		rows: number
 	): void;
-
 	render(ctx: CanvasRenderingContext2D): void;
-
-	/**
-	 * Необязательный передний план амбиента.
-	 * Рисуется поверх змейки, но до оверлеев.
-	 */
 	renderForeground?(ctx: CanvasRenderingContext2D): void;
-
 	destroy(): void;
 }
 
-/**
- * Арт частиц биома.
- */
 export interface ParticleRenderer {
 	render(
 		ctx: CanvasRenderingContext2D,
 		particles: ParticleRender[],
+		count: number,
 		timeMS: number,
 		cellSize: number
 	): void;

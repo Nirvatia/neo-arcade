@@ -36,8 +36,11 @@ export class FxCoordinator {
 	private readonly cellSize: number;
 	private readonly biomeManager: BiomeManager;
 	private readonly screenRenderer: ScreenFxRenderer;
+
 	private readonly particles: FxParticle[] = [];
 	private readonly floats: FxFloat[] = [];
+	private readonly particleBuffer: ParticleRender[] = [];
+
 	private shakeMag = 0;
 	private time = 0;
 
@@ -58,54 +61,36 @@ export class FxCoordinator {
 
 	public onFoodEaten(): void {
 		const cell = this.findSegmentCell(0);
-
-		if (cell !== null) {
-			this.burst(cell.x, cell.y, 6, this.biomeManager.biome.palette.form, 130);
+		if (cell === null) {
+			throw new Error('FxCoordinator: head cell missing on food eaten.');
 		}
+		this.burst(cell.x, cell.y, 6, this.biomeManager.biome.palette.form, 130);
 	}
 
-	/**
-	 * Эффект успешной последовательности.
-	 * Радиальный импульс от головы + искры вдоль тела.
-	 */
 	public onSequenceCompleted(): void {
 		const headCell = this.findSegmentCell(0);
-
 		if (headCell === null) {
-			return;
+			throw new Error('FxCoordinator: head cell missing on sequence completed.');
 		}
 
-		// Радиальный импульс от головы.
 		this.screenRenderer.triggerSequencePulse(headCell.x, headCell.y);
-
-		// Всплеск частиц от головы.
-		this.burst(
-			headCell.x,
-			headCell.y,
-			10,
-			this.biomeManager.biome.palette.accent,
-			200
-		);
-
-		// Искры вдоль тела.
+		this.burst(headCell.x, headCell.y, 10, this.biomeManager.biome.palette.accent, 200);
 		this.sparkAlongBody();
 		this.addShake(2.5);
 	}
 
 	public onSequenceFailed(): void {
 		const cell = this.findTailCell();
-
-		if (cell !== null) {
-			this.burst(cell.x, cell.y, 8, this.biomeManager.biome.palette.formDim, 140);
+		if (cell === null) {
+			throw new Error('FxCoordinator: tail cell missing on sequence failed.');
 		}
-
+		this.burst(cell.x, cell.y, 8, this.biomeManager.biome.palette.formDim, 140);
 		this.screenRenderer.triggerFail();
 		this.addShake(6);
 	}
 
 	public onExitOpened(): void {
 		const cell = this.findExitCell();
-
 		if (cell !== null) {
 			this.burst(cell.x, cell.y, 10, this.biomeManager.biome.palette.accent, 150);
 		}
@@ -120,8 +105,6 @@ export class FxCoordinator {
 		const y = row * this.cellSize + this.cellSize / 2;
 		this.burst(x, y, 6, this.biomeManager.biome.palette.warn, 120);
 	}
-
-	// ===== Переход между биомами =====
 
 	public beginBiomeTransition(): void {
 		this.screenRenderer.beginBiomeTransition();
@@ -140,14 +123,7 @@ export class FxCoordinator {
 		const grid = this.service.grid;
 		const cx = (grid.cols * this.cellSize) / 2;
 		const cy = (grid.rows * this.cellSize) / 2;
-
-		this.floatText(
-			cx,
-			cy,
-			`BIOME ${level}`,
-			this.biomeManager.biome.palette.accent,
-			30
-		);
+		this.floatText(cx, cy, `BIOME ${level}`, this.biomeManager.biome.palette.accent, 30);
 	}
 
 	public update(deltaMS: number): void {
@@ -156,13 +132,9 @@ export class FxCoordinator {
 
 		for (let i = this.particles.length - 1; i >= 0; i--) {
 			const p = this.particles[i];
-
-			if (p === undefined) {
-				continue;
-			}
+			if (p === undefined) continue;
 
 			p.lifeMS -= deltaMS;
-
 			if (p.lifeMS <= 0) {
 				this.particles.splice(i, 1);
 				continue;
@@ -176,18 +148,13 @@ export class FxCoordinator {
 
 		for (let i = this.floats.length - 1; i >= 0; i--) {
 			const f = this.floats[i];
-
-			if (f === undefined) {
-				continue;
-			}
+			if (f === undefined) continue;
 
 			f.lifeMS -= deltaMS;
-
 			if (f.lifeMS <= 0) {
 				this.floats.splice(i, 1);
 				continue;
 			}
-
 			f.y += f.vy * dtS;
 		}
 
@@ -202,28 +169,33 @@ export class FxCoordinator {
 				y: (Math.random() * 2 - 1) * this.shakeMag
 			};
 		}
-
 		return { x: 0, y: 0 };
 	}
 
 	public draw(ctx: CanvasRenderingContext2D, width: number, height: number): void {
-		const particleRenders: ParticleRender[] = [];
-
+		let count = 0;
 		for (const p of this.particles) {
 			const life = Math.max(0, p.lifeMS / p.maxLifeMS);
 
-			particleRenders.push({
-				x: p.x,
-				y: p.y,
-				size: Math.max(1, p.size * life),
-				life,
-				color: p.color
-			});
+			if (count >= this.particleBuffer.length) {
+				this.particleBuffer.push({ x: 0, y: 0, size: 0, life: 0, color: 0 });
+			}
+
+			const pr = this.particleBuffer[count];
+			if (pr !== undefined) {
+				pr.x = p.x;
+				pr.y = p.y;
+				pr.size = Math.max(1, p.size * life);
+				pr.life = life;
+				pr.color = p.color;
+			}
+			count++;
 		}
 
 		this.biomeManager.biome.particleRenderer.render(
 			ctx,
-			particleRenders,
+			this.particleBuffer,
+			count,
 			this.time,
 			this.cellSize
 		);
@@ -237,26 +209,21 @@ export class FxCoordinator {
 		ctx.save();
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'middle';
-
 		for (const f of this.floats) {
 			const alpha = Math.max(0, f.lifeMS / f.maxLifeMS);
-
 			ctx.font = `700 ${f.size}px ${MonoFont.FAMILY}`;
 			ctx.fillStyle = rgba(f.color, alpha);
 			ctx.fillText(f.text, f.x, f.y);
 		}
-
 		ctx.restore();
 	}
 
 	public dispose(): void {
 		this.particles.length = 0;
 		this.floats.length = 0;
+		this.particleBuffer.length = 0;
 	}
 
-	/**
-	 * Искры вдоль тела змейки при успешной последовательности.
-	 */
 	private sparkAlongBody(): void {
 		const pal = this.biomeManager.biome.palette;
 		const entities = this.world.query(['snakeSegment', 'gridPosition']).entities;
@@ -265,22 +232,12 @@ export class FxCoordinator {
 		for (const entity of entities) {
 			const segment = this.world.getComponent(entity, 'snakeSegment');
 			const position = this.world.getComponent(entity, 'gridPosition');
-
-			if (segment === undefined || position === undefined) {
-				continue;
-			}
-
-			if (segment.snakeId !== this.snakeId) {
-				continue;
-			}
-
-			if (spawned >= FxConfig.SEQUENCE_SPARK_COUNT) {
-				break;
-			}
+			if (segment === undefined || position === undefined) continue;
+			if (segment.snakeId !== this.snakeId) continue;
+			if (spawned >= FxConfig.SEQUENCE_SPARK_COUNT) break;
 
 			const x = position.col * this.cellSize + this.cellSize / 2;
 			const y = position.row * this.cellSize + this.cellSize / 2;
-
 			this.burst(x, y, 2, pal.accent, 90);
 			spawned = spawned + 1;
 		}
@@ -291,7 +248,6 @@ export class FxCoordinator {
 			const a = Math.random() * Math.PI * 2;
 			const s = speed * (0.3 + Math.random() * 0.7);
 			const life = 300 + Math.random() * 300;
-
 			this.particles.push({
 				x,
 				y,
@@ -328,45 +284,30 @@ export class FxCoordinator {
 
 	private findSegmentCell(order: number): { x: number; y: number } | null {
 		const entities = this.world.query(['snakeSegment', 'gridPosition']).entities;
-
 		for (const entity of entities) {
 			const segment = this.world.getComponent(entity, 'snakeSegment');
 			const position = this.world.getComponent(entity, 'gridPosition');
-
-			if (segment === undefined || position === undefined) {
-				continue;
-			}
-
-			if (segment.snakeId !== this.snakeId || segment.order !== order) {
-				continue;
-			}
+			if (segment === undefined || position === undefined) continue;
+			if (segment.snakeId !== this.snakeId || segment.order !== order) continue;
 
 			return {
 				x: position.col * this.cellSize + this.cellSize / 2,
 				y: position.row * this.cellSize + this.cellSize / 2
 			};
 		}
-
 		return null;
 	}
 
 	private findTailCell(): { x: number; y: number } | null {
 		let best: { x: number; y: number } | null = null;
 		let maxOrder = -1;
-
 		const entities = this.world.query(['snakeSegment', 'gridPosition']).entities;
 
 		for (const entity of entities) {
 			const segment = this.world.getComponent(entity, 'snakeSegment');
 			const position = this.world.getComponent(entity, 'gridPosition');
-
-			if (segment === undefined || position === undefined) {
-				continue;
-			}
-
-			if (segment.snakeId !== this.snakeId || segment.order <= maxOrder) {
-				continue;
-			}
+			if (segment === undefined || position === undefined) continue;
+			if (segment.snakeId !== this.snakeId || segment.order <= maxOrder) continue;
 
 			maxOrder = segment.order;
 			best = {
@@ -374,13 +315,11 @@ export class FxCoordinator {
 				y: position.row * this.cellSize + this.cellSize / 2
 			};
 		}
-
 		return best;
 	}
 
 	private findExitCell(): { x: number; y: number } | null {
 		const grid = this.service.grid;
-
 		for (let row = 0; row < grid.rows; row++) {
 			for (let col = 0; col < grid.cols; col++) {
 				if (grid.isExit(col, row)) {
@@ -391,7 +330,6 @@ export class FxCoordinator {
 				}
 			}
 		}
-
 		return null;
 	}
 }

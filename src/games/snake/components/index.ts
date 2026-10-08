@@ -6,14 +6,12 @@ export const Direction = {
 	LEFT: 'LEFT',
 	RIGHT: 'RIGHT'
 } as const;
-
 export type Direction = (typeof Direction)[keyof typeof Direction];
 
 export const BitOp = {
 	BOOST: '<<',
 	UNDO: '>>'
 } as const;
-
 export type BitOp = (typeof BitOp)[keyof typeof BitOp];
 
 export interface GridPosition {
@@ -49,11 +47,14 @@ export interface TargetSequence {
 	movesLeft: number;
 	requiredBits: number;
 	streak: number;
+	version: number;
 }
 
 export interface BitCollector {
 	snakeId: EntityId;
 	collected: (0 | 1)[];
+	count: number;
+	version: number;
 }
 
 export interface FoodWander {

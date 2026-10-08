@@ -8,16 +8,21 @@ import type { SnakeMotion } from '../../components/index.js';
 import { RenderConfig } from '../../config/index.js';
 import { sampleSnakeMotion } from '../../logic/snake/SnakePath.js';
 
-/**
- * SnakeView теперь поддерживает режим без рамок.
- *
- * Если тело змейки визуально разрывается при переходе через край поля,
- * цепь разбивается на несколько сегментов, чтобы не рисовать
- * длинную линию через весь экран.
- */
+interface ChainRange {
+	start: number;
+	end: number;
+}
+
 export class SnakeView {
 	private readonly cellSize: number;
 	private readonly biomes: BiomeManager;
+	
+	private readonly chainBuffer: SnakeChainPoint[] = [];
+	private readonly segmentRanges: ChainRange[] = [];
+	private rangeCount = 0;
+	
+	private readonly headRender: SnakeHeadRender = { x: 0, y: 0, angle: 0, moving: false };
+	private readonly offscreenHead: SnakeHeadRender = { x: -10000, y: -10000, angle: 0, moving: false };
 
 	constructor(cellSize: number, biomes: BiomeManager) {
 		this.cellSize = cellSize;
@@ -28,168 +33,169 @@ export class SnakeView {
 		ctx: CanvasRenderingContext2D,
 		motion: SnakeMotion,
 		zones: SnakeZoneStyle[],
+		zoneCount: number,
 		deathProgress: number,
 		timeMS: number
 	): void {
-		if (zones.length === 0) {
+		if (zoneCount === 0 || deathProgress >= 1) {
 			return;
 		}
-
-		if (deathProgress >= 1) {
-			return;
-		}
-
+		
 		const visibleLengthCells = Math.max(
 			0,
 			motion.visualLengthCells * (1 - deathProgress)
 		);
-
 		if (visibleLengthCells <= 0.001) {
 			return;
 		}
-
+		
 		const pointsPerCell = RenderConfig.POINTS_PER_CELL;
 		const stepU = 1 / pointsPerCell;
-
 		const pointCount = Math.max(
 			2,
 			Math.ceil(visibleLengthCells / stepU) + 1
 		);
-
-		const chain: SnakeChainPoint[] = [];
-
+		
+		// Заполняем буфер точек
 		for (let k = 0; k < pointCount; k++) {
+			if (k >= this.chainBuffer.length) {
+				this.chainBuffer.push({ x: 0, y: 0, angle: 0, d: 0, zone: 0 });
+			}
+			
 			const distCells = Math.min(k * stepU, visibleLengthCells);
 			const u = motion.headU - distCells;
 			const sample = sampleSnakeMotion(motion, u);
-
-			const zone = Math.min(
-				zones.length - 1,
-				Math.floor(distCells + 0.0001)
-			);
-
-			chain.push({
-				x: sample.x,
-				y: sample.y,
-				angle: sample.angle,
-				d: distCells * this.cellSize,
-				zone
-			});
-		}
-
-		const headPoint = chain[0];
-
-		if (headPoint === undefined) {
-			return;
-		}
-
-		const headRender: SnakeHeadRender = {
-			x: headPoint.x,
-			y: headPoint.y,
-			angle: headPoint.angle,
-			moving: motion.hasSegment && deathProgress <= 0
-		};
-
-		const offscreenHead: SnakeHeadRender = {
-			x: -10000,
-			y: -10000,
-			angle: 0,
-			moving: false
-		};
-
-		const segments = this.splitChain(chain);
-
-		// Рисуем сегменты в обратном порядке, чтобы голова была сверху.
-		for (let i = segments.length - 1; i >= 0; i--) {
-			let segment = segments[i];
-
-			if (segment === undefined || segment.length === 0) {
-				continue;
+			const zone = Math.min(zoneCount - 1, Math.floor(distCells + 0.0001));
+			
+			const p = this.chainBuffer[k];
+			if (p !== undefined) {
+				p.x = sample.x;
+				p.y = sample.y;
+				p.angle = sample.angle;
+				p.d = distCells * this.cellSize;
+				p.zone = zone;
 			}
-
-			const hasHead = segment.some((point) => point.zone === 0);
-
-			if (segment.length === 1 && hasHead) {
-				const single = segment[0];
-
-				if (single !== undefined) {
-					segment = this.createHeadStub(single);
+		}
+		
+		// Гарантируем место для заглушки головы (2 точки)
+		while (this.chainBuffer.length < pointCount + 2) {
+			this.chainBuffer.push({ x: 0, y: 0, angle: 0, d: 0, zone: 0 });
+		}
+		
+		const headPoint = this.chainBuffer[0];
+		if (headPoint === undefined) {
+			throw new Error('SnakeView: chain buffer is empty.');
+		}
+		
+		this.headRender.x = headPoint.x;
+		this.headRender.y = headPoint.y;
+		this.headRender.angle = headPoint.angle;
+		this.headRender.moving = motion.hasSegment && deathProgress <= 0;
+		
+		this.splitChain(this.chainBuffer, pointCount);
+		
+		// Рисуем сегменты в обратном порядке, чтобы голова была сверху
+		for (let i = this.rangeCount - 1; i >= 0; i--) {
+			const range = this.segmentRanges[i];
+			if (range === undefined || range.end <= range.start) continue;
+			
+			const start = range.start;
+			const end = range.end;
+			
+			let hasHead = false;
+			for (let j = start; j < end; j++) {
+				const p = this.chainBuffer[j];
+				if (p !== undefined && p.zone === 0) {
+					hasHead = true;
+					break;
 				}
 			}
-
-			if (segment.length < 2) {
-				continue;
+			
+			// Если сегмент состоит из одной точки и это голова — создаем заглушку
+			if (end - start === 1 && hasHead) {
+				const single = this.chainBuffer[start];
+				if (single === undefined) continue;
+				
+				const p1 = this.chainBuffer[pointCount];
+				const p2 = this.chainBuffer[pointCount + 1];
+				if (p1 !== undefined && p2 !== undefined) {
+					p1.x = single.x;
+					p1.y = single.y;
+					p1.angle = single.angle;
+					p1.d = single.d;
+					p1.zone = single.zone;
+					
+					const backDistance = this.cellSize * 0.6;
+					p2.x = single.x - Math.cos(single.angle) * backDistance;
+					p2.y = single.y - Math.sin(single.angle) * backDistance;
+					p2.angle = single.angle;
+					p2.d = single.d + backDistance;
+					p2.zone = single.zone;
+					
+					this.biomes.biome.renderSnake(
+						ctx,
+						this.chainBuffer,
+						pointCount,
+						pointCount + 2,
+						zones,
+						this.headRender,
+						timeMS,
+						this.cellSize
+					);
+					continue;
+				}
 			}
-
+			
+			if (end - start < 2) continue;
+			
 			this.biomes.biome.renderSnake(
 				ctx,
-				segment,
+				this.chainBuffer,
+				start,
+				end,
 				zones,
-				hasHead ? headRender : offscreenHead,
+				hasHead ? this.headRender : this.offscreenHead,
 				timeMS,
 				this.cellSize
 			);
 		}
 	}
 
-	private splitChain(chain: SnakeChainPoint[]): SnakeChainPoint[][] {
-		const segments: SnakeChainPoint[][] = [];
-
-		let current: SnakeChainPoint[] = [];
-
-		for (let i = 0; i < chain.length; i++) {
-			const point = chain[i];
-
-			if (point === undefined) {
-				continue;
-			}
-
-			if (current.length === 0) {
-				current.push(point);
-				continue;
-			}
-
-			const prev = current[current.length - 1];
-
-			if (prev === undefined) {
-				current.push(point);
-				continue;
-			}
-
-			const dx = point.x - prev.x;
-			const dy = point.y - prev.y;
+	private splitChain(chain: SnakeChainPoint[], count: number): void {
+		this.rangeCount = 0;
+		let start = 0;
+		
+		for (let i = 1; i < count; i++) {
+			const prev = chain[i - 1];
+			const curr = chain[i];
+			if (prev === undefined || curr === undefined) continue;
+			
+			const dx = curr.x - prev.x;
+			const dy = curr.y - prev.y;
 			const distance = Math.hypot(dx, dy);
-
-			// Если расстояние слишком большое, значит произошёл переход через край поля.
+			
 			if (distance > this.cellSize * 2.5) {
-				segments.push(current);
-				current = [point];
-			} else {
-				current.push(point);
+				this.rangeCount = this.pushRange(this.rangeCount, start, i);
+				start = i;
 			}
 		}
-
-		if (current.length > 0) {
-			segments.push(current);
-		}
-
-		return segments;
+		
+		this.rangeCount = this.pushRange(this.rangeCount, start, count);
 	}
 
-	private createHeadStub(point: SnakeChainPoint): SnakeChainPoint[] {
-		const backDistance = this.cellSize * 0.6;
-
-		const backX = point.x - Math.cos(point.angle) * backDistance;
-		const backY = point.y - Math.sin(point.angle) * backDistance;
-
-		const back: SnakeChainPoint = {
-			x: backX,
-			y: backY,
-			angle: point.angle,
-			d: point.d + backDistance,
-			zone: point.zone
-		};
-
-		return [point, back];
+	private pushRange(index: number, start: number, end: number): number {
+		if (end <= start) return index;
+		
+		if (index >= this.segmentRanges.length) {
+			this.segmentRanges.push({ start: 0, end: 0 });
+		}
+		
+		const range = this.segmentRanges[index];
+		if (range !== undefined) {
+			range.start = start;
+			range.end = end;
+		}
+		
+		return index + 1;
 	}
 }

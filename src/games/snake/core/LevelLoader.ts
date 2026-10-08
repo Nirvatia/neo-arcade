@@ -24,7 +24,7 @@ import type { CanvasSurface } from '../canvas/CanvasSurface.js';
 import { BitRegisterSystem } from '../systems/puzzle/BitRegisterSystem.js';
 import { BitTokenSystem } from '../systems/puzzle/BitTokenSystem.js';
 import { DeathAnimationSystem } from '../systems/death/DeathAnimationSystem.js';
-import { FoodWanderSystem } from '../systems/spawn/FoodWanderSystem.js';
+import { FoodWanderSystem } from '../systems/food/FoodWanderSystem.js';
 import { LevelSystem } from '../systems/progression/LevelSystem.js';
 import { SvelteHudAdapter } from '../ui/hud/SvelteHudAdapter.js';
 import { SvelteOverlayAdapter } from '../ui/overlay/SvelteOverlayAdapter.js';
