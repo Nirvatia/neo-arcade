@@ -1,101 +1,87 @@
-import type { Graphics } from 'pixi.js';
 import type { GridBitmask } from '../../logic/grid/GridBitmask.js';
-import type { FieldRenderer } from '../renderers.js';
+import type { FieldRenderer } from '../contract/renderers.js';
 import { C } from './LunarPalette.js';
+import {
+	fillCircle,
+	fillEllipse,
+	fillRect,
+	rgba,
+	strokePolyPoints
+} from '../../canvas/canvasDraw.js';
+import { GridConfig } from '../../config/index.js';
+
+const TAU = Math.PI * 2;
 
 /**
- * Вариант C: контур воды строится от границы стены.
+ * Детерминированный хэш для декораций.
  *
- * - Контур ломаный, привязан к клеткам стены.
- * - Выступы идут в сторону стены, а не в воду.
- * - Поэтому вода всегда покрывает внутреннюю прямоугольную область.
- * - Сетка в воде рисуется отдельно и остаётся ровной.
+ * Важно: в статичном поле больше нет Math.random().
+ * Поле запекается в GridView, и его освещение не должно
+ * меняться случайным образом при пересоздании фона.
+ */
+function hash01(seed: number): number {
+	const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
+	return x - Math.floor(x);
+}
+
+/**
+ * Lunar Field Renderer.
+ *
+ * Новое освещение:
+ * - мягкий радиальный лунный свет;
+ * - широкий отражающий градиент вместо жёсткой лунной дорожки;
+ * - детерминированные световые пятна;
+ * - вода клиппится по береговому контуру;
+ * - радиальная виньетка без угловых артефактов.
  */
 export class LunarFieldRenderer implements FieldRenderer {
-	public render(g: Graphics, grid: GridBitmask, cellSize: number): void {
+	public render(ctx: CanvasRenderingContext2D, grid: GridBitmask, cellSize: number): void {
 		const W = grid.cols * cellSize;
 		const H = grid.rows * cellSize;
 		const B = cellSize;
 
-		// ===== Стена: базовый камень =====
-		g.rect(0, 0, W, H).fill(C.shore0);
+		const seed = this.gridSeed(cellSize);
 
-		g.rect(0, 0, W, H * 0.45).fill({
-			color: C.shoreLight,
-			alpha: 0.22
-		});
+		// Берег.
+		this.renderShoreBase(ctx, W, H, B);
+		this.renderShoreTexture(ctx, grid, cellSize);
 
-		g.rect(0, H * 0.55, W, H * 0.45).fill({
-			color: C.shoreDark,
-			alpha: 0.35
-		});
-
-		// ===== Текстура стены по клеткам =====
-		this.renderShoreTexture(g, grid, cellSize);
-
-		// ===== Внутренний контур воды, построенный от стены =====
+		// Вода и освещение.
 		const shore = this.buildWallContour(grid, cellSize);
-		const shoreFlat = this.flatPoly(shore);
+		this.renderWater(ctx, shore, W, H, B, seed, cellSize);
 
-		// ===== Вода =====
-		g.poly(shoreFlat).fill(C.water1);
+		// Навигационная сетка.
+		this.renderGrid(ctx, grid, cellSize);
 
-		// Толща воды.
-		g.rect(B + 4, B + 4, W - B * 2 - 8, (H - B * 2) * 0.4).fill({
-			color: C.waterLight,
-			alpha: 0.35
-		});
+		// Кромка берега.
+		this.renderShoreEdge(ctx, shore, cellSize);
 
-		g.rect(
-			B + 4,
-			H - B - 4 - (H - B * 2) * 0.35,
-			W - B * 2 - 8,
-			(H - B * 2) * 0.35
-		).fill({
-			color: C.water2,
-			alpha: 0.35
-		});
-
-		// ===== Сетка в воде =====
-		// Ровная, по клеткам, не привязана к органическому контуру.
-		this.renderGrid(g, grid, cellSize);
-
-		// ===== Декор воды =====
-		this.renderWaterDecor(g, shore, W, H, B);
-
-		// ===== Кромка воды / срез стены =====
-		g.poly(shoreFlat).stroke({
-			color: C.water2,
-			width: 6,
-			alpha: 0.35,
-			join: 'round'
-		});
-
-		g.poly(shoreFlat).stroke({
-			color: C.shoreDark,
-			width: 3,
-			alpha: 0.8,
-			join: 'round'
-		});
-
-		g.poly(shoreFlat).stroke({
-			color: C.shoreLight,
-			width: 1.2,
-			alpha: 0.6,
-			join: 'round'
-		});
-
-		// ===== Виньетка =====
-		g.rect(0, 0, W, H).stroke({
-			color: C.vignette,
-			width: 48,
-			alpha: 0.3
-		});
+		// Мягкая радиальная виньетка.
+		this.renderVignette(ctx, W, H);
 	}
 
-	// ===== Текстура стены: рисуем по клеткам, где реально есть стена =====
+	private renderShoreBase(ctx: CanvasRenderingContext2D, W: number, H: number, B: number): void {
+		// База камня.
+		fillRect(ctx, 0, 0, W, H, C.shore0);
+
+		// Вертикальный градиент берега.
+		const shoreGradient = ctx.createLinearGradient(0, 0, 0, H);
+		shoreGradient.addColorStop(0, rgba(C.shoreLight, 0.2));
+		shoreGradient.addColorStop(0.45, rgba(C.shore0, 0));
+		shoreGradient.addColorStop(1, rgba(C.shoreDark, 0.38));
+
+		ctx.fillStyle = shoreGradient;
+		ctx.fillRect(0, 0, W, H);
+
+		// Очень слабый верхний лунный свет на камне.
+		fillRect(ctx, 0, 0, W, B * 0.8, C.moon, 0.02);
+
+		// Нижнее затенение берега.
+		fillRect(ctx, 0, H - B * 0.9, W, B * 0.9, C.vignette, 0.1);
+	}
+
 	private renderShoreTexture(
-		g: Graphics,
+		ctx: CanvasRenderingContext2D,
 		grid: GridBitmask,
 		cellSize: number
 	): void {
@@ -109,41 +95,30 @@ export class LunarFieldRenderer implements FieldRenderer {
 				const y0 = row * cellSize;
 
 				// Мелкий каменный шум.
-				for (let i = 0; i < 4; i++) {
+				for (let i = 0; i < 3; i++) {
 					const x = x0 + this.cellRandom(col, row, i * 3.1) * cellSize;
 					const y = y0 + this.cellRandom(col, row, i * 5.7) * cellSize;
-					const r = 0.4 + this.cellRandom(col, row, i * 7.3) * 1.4;
+					const r = 0.4 + this.cellRandom(col, row, i * 7.3) * 1.2;
 
-					g.circle(x, y, r).fill({
-						color: i % 2 === 0 ? C.stoneDark : C.stoneLight,
-						alpha: 0.16
-					});
+					fillCircle(ctx, x, y, r, i % 2 === 0 ? C.stoneDark : C.stoneLight, 0.14);
 				}
 
 				// Камни.
 				for (let i = 0; i < 2; i++) {
-					const x =
-						x0 + 4 + this.cellRandom(col, row, i * 11.7) * (cellSize - 8);
-					const y =
-						y0 + 4 + this.cellRandom(col, row, i * 13.1) * (cellSize - 8);
+					const x = x0 + 4 + this.cellRandom(col, row, i * 11.7) * (cellSize - 8);
+					const y = y0 + 4 + this.cellRandom(col, row, i * 13.1) * (cellSize - 8);
 
-					const rx = 1.5 + this.cellRandom(col, row, i * 17.3) * 2.6;
-					const ry = 0.9 + this.cellRandom(col, row, i * 19.7) * 1.8;
+					const rx = 1.5 + this.cellRandom(col, row, i * 17.3) * 2.4;
+					const ry = 0.9 + this.cellRandom(col, row, i * 19.7) * 1.6;
 
-					g.ellipse(x + 1, y + 1.5, rx, ry).fill({
-						color: 0x1a2535,
-						alpha: 0.4
-					});
+					// Тень камня.
+					fillEllipse(ctx, x + 1, y + 1.5, rx, ry, 0x1a2535, 0.38);
 
-					g.ellipse(x, y, rx, ry).fill({
-						color: i % 2 === 0 ? C.stone : C.stoneDark,
-						alpha: 0.55
-					});
+					// Тело камня.
+					fillEllipse(ctx, x, y, rx, ry, i % 2 === 0 ? C.stone : C.stoneDark, 0.52);
 
-					g.ellipse(x - rx * 0.3, y - ry * 0.3, rx * 0.4, ry * 0.4).fill({
-						color: C.stoneLight,
-						alpha: 0.3
-					});
+					// Блик.
+					fillEllipse(ctx, x - rx * 0.3, y - ry * 0.3, rx * 0.4, ry * 0.4, C.stoneLight, 0.28);
 				}
 
 				// Трещина.
@@ -151,7 +126,8 @@ export class LunarFieldRenderer implements FieldRenderer {
 					let cx = x0 + 3 + this.cellRandom(col, row, 23.1) * (cellSize - 6);
 					let cy = y0 + 3 + this.cellRandom(col, row, 29.3) * (cellSize - 6);
 
-					g.moveTo(cx, cy);
+					ctx.beginPath();
+					ctx.moveTo(cx, cy);
 
 					const len = 3 + Math.floor(this.cellRandom(col, row, 31.7) * 3);
 
@@ -162,14 +138,12 @@ export class LunarFieldRenderer implements FieldRenderer {
 						cx = Math.max(x0 + 1, Math.min(x0 + cellSize - 1, cx));
 						cy = Math.max(y0 + 1, Math.min(y0 + cellSize - 1, cy));
 
-						g.lineTo(cx, cy);
+						ctx.lineTo(cx, cy);
 					}
 
-					g.stroke({
-						color: C.cracks,
-						width: 0.6,
-						alpha: 0.4
-					});
+					ctx.strokeStyle = rgba(C.cracks, 0.36);
+					ctx.lineWidth = 0.65;
+					ctx.stroke();
 				}
 
 				// Мох у края, обращённого к воде.
@@ -186,235 +160,352 @@ export class LunarFieldRenderer implements FieldRenderer {
 					}
 
 					if (!grid.isWall(nc, nr)) {
-						const mx =
-							x0 + cellSize / 2 + (nc - col) * (cellSize * 0.5 - 2);
-						const my =
-							y0 + cellSize / 2 + (nr - row) * (cellSize * 0.5 - 2);
+						const mx = x0 + cellSize / 2 + (nc - col) * (cellSize * 0.5 - 2);
+						const my = y0 + cellSize / 2 + (nr - row) * (cellSize * 0.5 - 2);
 
-						g.circle(
-							mx,
-							my,
-							0.8 + this.cellRandom(col, row, 47.7) * 1.2
-						).fill({
-							color: C.moss,
-							alpha: 0.35
-						});
+						fillCircle(ctx, mx, my, 0.8 + this.cellRandom(col, row, 47.7) * 1.2, C.moss, 0.34);
 					}
 				}
 			}
 		}
 	}
 
-	// ===== Контур воды от границы стены =====
-	//
-	// Контур идёт по внутренней границе стены,
-	// но ломаными выступами "съедает" часть стены.
-	// Внутрь воды выступы не идут, поэтому сетка остаётся в воде.
-	private buildWallContour(
-		grid: GridBitmask,
-		cellSize: number
-	): { x: number; y: number }[] {
-		const W = grid.cols * cellSize;
-		const H = grid.rows * cellSize;
-		const B = cellSize;
-
-		const pts: { x: number; y: number }[] = [];
-		const step = cellSize / 2;
-
-		// Верхний левый угол.
-		pts.push({ x: B, y: B });
-
-		// Верхняя стена: выступы вверх, в стену.
-		for (let x = B + step; x <= W - B - step; x += step) {
-			const out = this.wallBite(x, 0.7, cellSize);
-			pts.push({ x, y: B - out });
-		}
-
-		// Верхний правый угол.
-		pts.push({ x: W - B, y: B });
-
-		// Правая стена: выступы вправо, в стену.
-		for (let y = B + step; y <= H - B - step; y += step) {
-			const out = this.wallBite(y, 2.3, cellSize);
-			pts.push({ x: W - B + out, y });
-		}
-
-		// Нижний правый угол.
-		pts.push({ x: W - B, y: H - B });
-
-		// Нижняя стена: выступы вниз, в стену.
-		for (let x = W - B - step; x >= B + step; x -= step) {
-			const out = this.wallBite(x, 4.1, cellSize);
-			pts.push({ x, y: H - B + out });
-		}
-
-		// Нижний левый угол.
-		pts.push({ x: B, y: H - B });
-
-		// Левая стена: выступы влево, в стену.
-		for (let y = H - B - step; y >= B + step; y -= step) {
-			const out = this.wallBite(y, 6.2, cellSize);
-			pts.push({ x: B - out, y });
-		}
-
-		return pts;
-	}
-
-	// Ломаный "откус" стены.
-	// Квантование даёт не плавную синусоиду, а скалистые ступени.
-	private wallBite(t: number, seed: number, cellSize: number): number {
-		const n =
-			Math.sin(t * 0.11 + seed) * 0.45 +
-			Math.sin(t * 0.31 + seed * 1.7) * 0.35 +
-			Math.sin(t * 0.83 + seed * 0.6) * 0.2;
-
-		const normalized = (n + 1) / 2;
-		const quantized = Math.floor(normalized * 3) / 3;
-
-		return quantized * cellSize * 0.5;
-	}
-
-	// ===== Ровная сетка в воде =====
-	//
-	// Сетка не следует за контуром.
-	// Она рисуется прямыми линиями по клеткам внутренней области.
-	private renderGrid(
-		g: Graphics,
-		grid: GridBitmask,
+	private renderWater(
+		ctx: CanvasRenderingContext2D,
+		shore: { x: number; y: number }[],
+		W: number,
+		H: number,
+		B: number,
+		seed: number,
 		cellSize: number
 	): void {
+		if (shore.length < 3) {
+			return;
+		}
+
+		// Базовая вода.
+		this.traceShore(ctx, shore);
+
+		const waterBase = ctx.createLinearGradient(0, B, 0, H - B);
+		waterBase.addColorStop(0, rgba(C.waterLight, 0.96));
+		waterBase.addColorStop(0.3, rgba(C.water1, 1));
+		waterBase.addColorStop(1, rgba(C.water2, 1));
+
+		ctx.fillStyle = waterBase;
+		ctx.fill();
+
+		// Всё освещение воды клиппим по берегу.
+		ctx.save();
+		this.traceShore(ctx, shore);
+		ctx.clip();
+
+		// Градиент глубины.
+		const depth = ctx.createLinearGradient(0, B, 0, H - B);
+		depth.addColorStop(0, rgba(C.waterLight, 0.1));
+		depth.addColorStop(0.45, rgba(C.water0, 0));
+		depth.addColorStop(1, rgba(C.water2, 0.5));
+
+		ctx.fillStyle = depth;
+		ctx.fillRect(0, 0, W, H);
+
+		// Основной лунный свет.
+		const moonX = W * 0.5;
+		const moonY = B * 0.8;
+		const moonRadius = Math.max(W, H) * 0.65;
+
+		const moonGlow = ctx.createRadialGradient(moonX, moonY, 0, moonX, moonY, moonRadius);
+
+		moonGlow.addColorStop(0, rgba(C.glowTop, 0.2));
+		moonGlow.addColorStop(0.35, rgba(C.glowMid, 0.07));
+		moonGlow.addColorStop(1, rgba(C.glowTop, 0));
+
+		ctx.fillStyle = moonGlow;
+		ctx.fillRect(0, 0, W, H);
+
+		// Широкое отражение луны.
+		// Не узкий луч, а мягкая вертикальная зона.
+		const bandWidth = W * 0.16;
+		const bandX = W * 0.5;
+
+		const reflection = ctx.createLinearGradient(bandX - bandWidth, 0, bandX + bandWidth, 0);
+
+		reflection.addColorStop(0, rgba(C.path, 0));
+		reflection.addColorStop(0.5, rgba(C.path, 0.05));
+		reflection.addColorStop(1, rgba(C.path, 0));
+
+		ctx.fillStyle = reflection;
+		ctx.fillRect(bandX - bandWidth, B, bandWidth * 2, (H - B * 2) * 0.72);
+
+		// Нижняя глубина.
+		const abyss = ctx.createLinearGradient(0, H - B * 3, 0, H - B);
+		abyss.addColorStop(0, rgba(C.water2, 0));
+		abyss.addColorStop(1, rgba(C.water2, 0.4));
+
+		ctx.fillStyle = abyss;
+		ctx.fillRect(0, H - B * 3, W, B * 2);
+
+		// Позиции привязаны к центру мира, а не к текущему размеру поля.
+		const centerX = W / 2;
+		const centerY = H / 2;
+		const worldW = GridConfig.MAX_COLS * cellSize;
+		const worldH = GridConfig.MAX_ROWS * cellSize;
+
+		for (let i = 0; i < 12; i++) {
+			const nx = hash01(seed + i * 17.7) - 0.5;
+			const ny = hash01(seed + i * 29.3) - 0.5;
+
+			const px = centerX + nx * worldW * 0.72;
+			const py = centerY + ny * worldH * 0.72;
+
+			if (px < B || px > W - B || py < B || py > H - B) {
+				continue;
+			}
+
+			const pr = cellSize * (2.2 + hash01(seed + i * 41.1) * 2.6);
+
+			const pool = ctx.createRadialGradient(px, py, 0, px, py, pr);
+			pool.addColorStop(0, rgba(C.glowMid, 0.03));
+			pool.addColorStop(1, rgba(C.glowMid, 0));
+			ctx.fillStyle = pool;
+			ctx.fillRect(px - pr, py - pr, pr * 2, pr * 2);
+		}
+
+		// Позиции также привязаны к центру мира.
+		for (let i = 0; i < 36; i++) {
+			const nx = hash01(seed + i * 53.7) - 0.5;
+			const ny = hash01(seed + i * 61.3) - 0.5;
+
+			const x = centerX + nx * worldW * 0.8;
+			const y = centerY + ny * worldH * 0.8;
+
+			if (x < B + 8 || x > W - B - 8 || y < B + 8 || y > H - B - 8) {
+				continue;
+			}
+
+			const alpha = 0.02 + hash01(seed + i * 71.9) * 0.04;
+			fillCircle(ctx, x, y, 0.8, C.star, alpha);
+		}
+
+		// Кувшинки.
+		this.renderLilyPads(ctx, shore, W, H, seed, cellSize);
+
+		ctx.restore();
+	}
+
+	private renderLilyPads(
+		ctx: CanvasRenderingContext2D,
+		shore: { x: number; y: number }[],
+		W: number,
+		H: number,
+		seed: number,
+		cellSize: number
+	): void {
+		for (let i = 0; i < 3; i++) {
+			const h1 = hash01(seed + i * 97.1);
+			const shoreIndex = Math.floor(h1 * shore.length);
+			const shorePoint = shore[shoreIndex];
+
+			if (shorePoint === undefined) {
+				continue;
+			}
+
+			const dx = W / 2 - shorePoint.x;
+			const dy = H / 2 - shorePoint.y;
+			const dl = Math.hypot(dx, dy) || 1;
+
+			const distance = cellSize * (0.8 + hash01(seed + i * 103.7) * 1.4);
+
+			const lx = shorePoint.x + (dx / dl) * distance;
+			const ly = shorePoint.y + (dy / dl) * distance;
+
+			const r = cellSize * (0.16 + hash01(seed + i * 113.9) * 0.12);
+			const angle = hash01(seed + i * 127.7) * TAU;
+
+			// Тень под кувшинкой.
+			fillEllipse(ctx, lx + 1, ly + 2, r * 1.05, r * 0.8, C.water2, 0.22);
+
+			// Лист с вырезом.
+			ctx.beginPath();
+			ctx.moveTo(lx, ly);
+			ctx.arc(lx, ly, r, angle + 0.5, angle + TAU - 0.5);
+			ctx.closePath();
+
+			ctx.fillStyle = rgba(C.lily, 0.92);
+			ctx.fill();
+
+			ctx.strokeStyle = rgba(C.lilyEdge, 0.6);
+			ctx.lineWidth = 1;
+			ctx.stroke();
+
+			// Цветок только на одной кувшинке.
+			if (i === 0) {
+				fillCircle(ctx, lx, ly, r * 0.35, C.flower, 0.14);
+				fillCircle(ctx, lx, ly, r * 0.14, C.flowerCore, 0.9);
+			}
+		}
+	}
+
+	private renderGrid(ctx: CanvasRenderingContext2D, grid: GridBitmask, cellSize: number): void {
 		const W = grid.cols * cellSize;
 		const H = grid.rows * cellSize;
 		const B = cellSize;
+
+		ctx.beginPath();
 
 		for (let c = 1; c < grid.cols - 1; c++) {
 			const x = c * cellSize;
-			g.moveTo(x + 0.5, B).lineTo(x + 0.5, H - B);
+			ctx.moveTo(x + 0.5, B);
+			ctx.lineTo(x + 0.5, H - B);
 		}
 
 		for (let r = 1; r < grid.rows - 1; r++) {
 			const y = r * cellSize;
-			g.moveTo(B, y + 0.5).lineTo(W - B, y + 0.5);
+			ctx.moveTo(B, y + 0.5);
+			ctx.lineTo(W - B, y + 0.5);
 		}
 
-		g.stroke({
-			color: C.grid,
-			width: 1,
-			alpha: 0.05
-		});
+		ctx.strokeStyle = rgba(C.grid, 0.03);
+		ctx.lineWidth = 1;
+		ctx.stroke();
 	}
 
-	// ===== Декор воды =====
-	private renderWaterDecor(
-		g: Graphics,
+	private renderShoreEdge(
+		ctx: CanvasRenderingContext2D,
 		shore: { x: number; y: number }[],
-		W: number,
-		H: number,
-		B: number
+		cellSize: number
 	): void {
-		// Лунное свечение.
-		g.circle(W * 0.5, B, H * 0.7).fill({ color: C.glowTop, alpha: 0.06 });
-		g.circle(W * 0.5, B, H * 0.35).fill({ color: C.glowMid, alpha: 0.03 });
-		g.circle(W * 0.5, H - B, H * 0.5).fill({ color: C.glowBottom, alpha: 0.12 });
-
-		// Звёзды в воде.
-		for (let i = 0; i < 25; i++) {
-			const x = B + 8 + Math.random() * Math.max(1, W - B * 2 - 16);
-			const y = B + 8 + Math.random() * Math.max(1, H - B * 2 - 16);
-
-			g.circle(x, y, 0.9).fill({ color: C.star, alpha: 0.08 });
+		if (shore.length < 3) {
+			return;
 		}
 
-		// Лунная дорожка.
-		{
-			const ax = W * 0.85;
-			const ay = B + 10;
-			const bx = W * 0.35;
-			const by = H - B - 10;
+		// Мягкая внутренняя тень воды у берега.
+		strokePolyPoints(ctx, shore, C.water2, Math.max(4, cellSize * 0.16), 0.24, 'round');
 
-			const dx = bx - ax;
-			const dy = by - ay;
-			const dl = Math.hypot(dx, dy) || 1;
+		// Каменная кромка.
+		strokePolyPoints(ctx, shore, C.shoreDark, 3, 0.8, 'round');
 
-			const nx = -dy / dl;
-			const ny = dx / dl;
+		// Светлый край.
+		strokePolyPoints(ctx, shore, C.shoreLight, 1.2, 0.55, 'round');
 
-			const wA = W * 0.04;
-			const wB = W * 0.1;
+		// Лёгкий лунный блик на кромке.
+		strokePolyPoints(ctx, shore, C.moon, 1, 0.05, 'round');
+	}
 
-			g.moveTo(ax + nx * wA, ay + ny * wA)
-				.lineTo(bx + nx * wB, by + ny * wB)
-				.lineTo(bx - nx * wB, by - ny * wB)
-				.lineTo(ax - nx * wA, ay - ny * wA)
-				.closePath()
-				.fill({ color: C.path, alpha: 0.03 });
+	private renderVignette(ctx: CanvasRenderingContext2D, W: number, H: number): void {
+		const cx = W / 2;
+		const cy = H / 2;
+		const maxRadius = Math.hypot(W, H) / 2;
+
+		const vignette = ctx.createRadialGradient(cx, cy, maxRadius * 0.42, cx, cy, maxRadius);
+
+		vignette.addColorStop(0, rgba(C.vignette, 0));
+		vignette.addColorStop(1, rgba(C.vignette, 0.42));
+
+		ctx.fillStyle = vignette;
+		ctx.fillRect(0, 0, W, H);
+	}
+
+	private traceShore(ctx: CanvasRenderingContext2D, shore: { x: number; y: number }[]): void {
+		const first = shore[0];
+
+		if (first === undefined) {
+			return;
 		}
 
-		// Кувшинки.
-		for (let i = 0; i < 5; i++) {
-			const p = shore[Math.floor(Math.random() * shore.length)];
+		ctx.beginPath();
+		ctx.moveTo(first.x, first.y);
 
-			if (p === undefined) {
+		for (let i = 1; i < shore.length; i++) {
+			const point = shore[i];
+
+			if (point === undefined) {
 				continue;
 			}
 
-			const dx = W / 2 - p.x;
-			const dy = H / 2 - p.y;
-			const dl = Math.hypot(dx, dy) || 1;
-
-			const lx = p.x + (dx / dl) * (16 + Math.random() * 24);
-			const ly = p.y + (dy / dl) * (16 + Math.random() * 24);
-
-			const r = 5 + Math.random() * 4;
-			const a0 = Math.random() * Math.PI * 2;
-
-			g.moveTo(lx, ly);
-			g.arc(lx, ly, r, a0 + 0.5, a0 + Math.PI * 2 - 0.5);
-			g.closePath().fill({ color: C.lily, alpha: 0.92 });
-
-			g.arc(lx, ly, r, 0, Math.PI * 2).stroke({
-				color: C.lilyEdge,
-				width: 1,
-				alpha: 0.7
-			});
-
-			if (i < 2) {
-				g.circle(lx, ly, 3.4).fill({ color: C.flower, alpha: 0.15 });
-				g.circle(lx, ly, 1).fill({ color: C.flowerCore, alpha: 0.9 });
-			}
+			ctx.lineTo(point.x, point.y);
 		}
 
-		// Рябь.
-		for (let j = 0; j < 9; j++) {
-			const y0 = B + 10 + (H - B * 2 - 20) * (j / 8);
-
-			g.moveTo(B + 10, y0);
-
-			for (let x = B + 18; x <= W - B - 8; x += 10) {
-				g.lineTo(x, y0 + Math.sin(x * 0.04 + j * 1.7) * 1.8);
-			}
-
-			g.stroke({
-				color: C.path,
-				width: 1.2,
-				alpha: 0.06
-			});
-		}
+		ctx.closePath();
 	}
 
-	private flatPoly(pts: { x: number; y: number }[]): number[] {
-		const flat: number[] = [];
+	private buildWallContour(grid: GridBitmask, cellSize: number): { x: number; y: number }[] {
+		const W = grid.cols * cellSize;
+		const H = grid.rows * cellSize;
+		const B = cellSize;
 
-		for (const p of pts) {
-			flat.push(p.x, p.y);
+		const points: { x: number; y: number }[] = [];
+		const step = cellSize / 2;
+
+		// Верхний левый угол.
+		points.push({ x: B, y: B });
+
+		// Верхняя стена.
+		for (let x = B + step; x <= W - B - step; x += step) {
+			const out = this.wallBite(x, 0.7, cellSize);
+			points.push({ x, y: B - out });
 		}
 
-		return flat;
+		// Верхний правый угол.
+		points.push({ x: W - B, y: B });
+
+		// Правая стена.
+		for (let y = B + step; y <= H - B - step; y += step) {
+			const out = this.wallBite(y, 2.3, cellSize);
+			points.push({ x: W - B + out, y });
+		}
+
+		// Нижний правый угол.
+		points.push({ x: W - B, y: H - B });
+
+		// Нижняя стена.
+		for (let x = W - B - step; x >= B + step; x -= step) {
+			const out = this.wallBite(x, 4.1, cellSize);
+			points.push({ x, y: H - B + out });
+		}
+
+		// Нижний левый угол.
+		points.push({ x: B, y: H - B });
+
+		// Левая стена.
+		for (let y = H - B - step; y >= B + step; y -= step) {
+			const out = this.wallBite(y, 6.2, cellSize);
+			points.push({ x: B - out, y });
+		}
+
+		return points;
+	}
+
+	/**
+	 * Органичный контур стены.
+	 *
+	 * Без жёсткого квантования, чтобы берег не выглядел
+	 * как пиксельные ступени.
+	 */
+	private wallBite(t: number, seed: number, cellSize: number): number {
+		const n =
+			Math.sin(t * 0.085 + seed) * 0.5 +
+			Math.sin(t * 0.23 + seed * 1.7) * 0.3 +
+			Math.sin(t * 0.61 + seed * 0.6) * 0.2;
+
+		const normalized = (n + 1) / 2;
+		const smooth = normalized * normalized * (3 - 2 * normalized);
+
+		return smooth * cellSize * 0.34;
 	}
 
 	private cellRandom(col: number, row: number, salt: number): number {
-		const x =
-			Math.sin(col * 127.1 + row * 311.7 + salt * 74.7) * 43758.5453;
+		const x = Math.sin(col * 127.1 + row * 311.7 + salt * 74.7) * 43758.5453;
 		return x - Math.floor(x);
+	}
+
+	private gridSeed(cellSize: number): number {
+		let h = 2166136261;
+
+		// Фиксированный базовый сид, чтобы поле не «пересобиралось»
+		// визуально при каждом расширении.
+		h = Math.imul(h ^ 0x5eed, 16777619);
+		h = Math.imul(h ^ cellSize, 16777619);
+
+		return h >>> 0;
 	}
 }

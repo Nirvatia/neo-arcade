@@ -1,10 +1,26 @@
 <!-- src/shared/ui/GameStage.svelte
-     Универсальная обёртка игры: масштабирование, кнопка «меню», тач-контролы,
-     подсказка поворота. Подключение в +page игры:
-     <GameStage
-       init={(el) => { game = new MyGame(); void game.init(el); return () => game.destroy(); }}
-       touch={{ direction: game.pressDirection, pause: game.togglePause, mute: game.toggleMute }}
-     />
+	Универсальная обёртка игры: масштабирование, кнопка «меню», тач-контролы,
+	подсказка поворота и слой для игровых оверлеев.
+
+	Подключение в +page игры:
+
+	{#snippet overlay()}
+		<SnakeOverlay />
+	{/snippet}
+
+	<GameStage
+		init={(el) => {
+			const game = new MyGame();
+			void game.init(el);
+			return () => game.destroy();
+		}}
+		touch={{
+			direction: (dir) => game.pressDirection(dir),
+			pause: () => game.togglePause(),
+			mute: () => game.toggleMute()
+		}}
+		{overlay}
+	/>
 -->
 <script lang="ts">
 	import { onMount } from 'svelte';
@@ -22,6 +38,7 @@
 		touch?: TouchHandlers;
 		hudTop?: Snippet;
 		hudBottom?: Snippet;
+		overlay?: Snippet;
 	}
 
 	let {
@@ -29,28 +46,45 @@
 		backHref = '/',
 		touch = {},
 		hudTop,
-		hudBottom
+		hudBottom,
+		overlay
 	}: Props = $props();
 
 	let container = $state<HTMLDivElement | undefined>(undefined);
 	let shell = $state<HTMLDivElement | undefined>(undefined);
 	let scale = $state(1);
 	let portrait = $state(false);
+	let tablet = $state(false);
 	let rotateDismissed = $state(false);
 
 	const coarse =
 		typeof window !== 'undefined' &&
 		window.matchMedia('(pointer: coarse)').matches;
 
-	const showRotateHint = $derived(coarse && portrait && !rotateDismissed);
+	const showTouch = $derived(
+		coarse &&
+			tablet &&
+			!portrait &&
+			Boolean(touch.direction || touch.pause || touch.mute)
+	);
+
+	const showRotateHint = $derived(
+		coarse &&
+			portrait &&
+			!rotateDismissed
+	);
 
 	function fit() {
-		if (!shell) return;
+		if (!shell) {
+			return;
+		}
 
 		const w = shell.offsetWidth;
 		const h = shell.offsetHeight;
 
-		if (w === 0 || h === 0) return;
+		if (w === 0 || h === 0) {
+			return;
+		}
 
 		const next = Math.min(
 			1,
@@ -61,9 +95,23 @@
 		scale = next > 0.99 ? 1 : next;
 	}
 
+	function updateViewport() {
+		if (typeof window === 'undefined') {
+			return;
+		}
+
+		portrait = window.matchMedia('(orientation: portrait)').matches;
+		tablet = Math.min(window.innerWidth, window.innerHeight) >= 700;
+	}
+
 	function scheduleFit() {
 		// iOS отдаёт новые размеры с задержкой после смены ориентации.
 		window.setTimeout(fit, 120);
+	}
+
+	function handleViewport() {
+		updateViewport();
+		scheduleFit();
 	}
 
 	function dismissRotate() {
@@ -71,27 +119,34 @@
 	}
 
 	$effect(() => {
-		if (!portrait) rotateDismissed = false;
+		if (!portrait) {
+			rotateDismissed = false;
+		}
 	});
 
 	onMount(() => {
-		if (!container) return;
+		if (!container) {
+			return;
+		}
 
 		const dispose = init(container) ?? undefined;
 
+		updateViewport();
+		fit();
+
 		const ro = new ResizeObserver(() => fit());
 
-		if (shell) ro.observe(shell);
+		if (shell) {
+			ro.observe(shell);
+		}
 
-		window.addEventListener('resize', scheduleFit);
-		window.addEventListener('orientationchange', scheduleFit);
-
-		fit();
+		window.addEventListener('resize', handleViewport);
+		window.addEventListener('orientationchange', handleViewport);
 
 		return () => {
 			ro.disconnect();
-			window.removeEventListener('resize', scheduleFit);
-			window.removeEventListener('orientationchange', scheduleFit);
+			window.removeEventListener('resize', handleViewport);
+			window.removeEventListener('orientationchange', handleViewport);
 			dispose?.();
 		};
 	});
@@ -115,19 +170,27 @@
 			◄ MENU
 		</a>
 
-		{#if hudTop}
-			{@render hudTop()}
-		{/if}
+		<div class="relative flex flex-col items-start">
+			{#if hudTop}
+				{@render hudTop()}
+			{/if}
 
-		<div bind:this={container} class="flex flex-col"></div>
+			<div bind:this={container} class="flex flex-col"></div>
 
-		{#if hudBottom}
-			{@render hudBottom()}
-		{/if}
+			{#if hudBottom}
+				{@render hudBottom()}
+			{/if}
+
+			{#if overlay}
+				<div class="absolute inset-0 z-20">
+					{@render overlay()}
+				</div>
+			{/if}
+		</div>
 	</div>
 
 	<!-- Тач-контролы: вне масштабируемой колонки, всегда крупные -->
-	{#if coarse && (touch.direction || touch.pause || touch.mute)}
+	{#if showTouch}
 		<div
 			class="pointer-events-none absolute inset-x-0 bottom-0 z-30 pb-[calc(10px+env(safe-area-inset-bottom))]"
 			aria-hidden="true"
@@ -135,6 +198,7 @@
 			<div class="mx-auto flex w-full max-w-[640px] items-end justify-between px-4">
 				<div class="pointer-events-auto grid grid-cols-3 grid-rows-3 gap-1">
 					<span></span>
+
 					<button
 						type="button"
 						class="stage-btn"
@@ -142,9 +206,13 @@
 						onpointerdown={(e) => {
 							e.preventDefault();
 							touch.direction?.('UP');
-						}}>▲</button
+						}}
 					>
+						▲
+					</button>
+
 					<span></span>
+
 					<button
 						type="button"
 						class="stage-btn"
@@ -152,8 +220,11 @@
 						onpointerdown={(e) => {
 							e.preventDefault();
 							touch.direction?.('LEFT');
-						}}>◄</button
+						}}
 					>
+						◄
+					</button>
+
 					<button
 						type="button"
 						class="stage-btn"
@@ -161,8 +232,11 @@
 						onpointerdown={(e) => {
 							e.preventDefault();
 							touch.pause?.();
-						}}>❚❚</button
+						}}
 					>
+						❚❚
+					</button>
+
 					<button
 						type="button"
 						class="stage-btn"
@@ -170,9 +244,13 @@
 						onpointerdown={(e) => {
 							e.preventDefault();
 							touch.direction?.('RIGHT');
-						}}>►</button
+						}}
 					>
+						►
+					</button>
+
 					<span></span>
+
 					<button
 						type="button"
 						class="stage-btn"
@@ -180,8 +258,11 @@
 						onpointerdown={(e) => {
 							e.preventDefault();
 							touch.direction?.('DOWN');
-						}}>▼</button
+						}}
 					>
+						▼
+					</button>
+
 					<span></span>
 				</div>
 
@@ -192,13 +273,15 @@
 					onpointerdown={(e) => {
 						e.preventDefault();
 						touch.mute?.();
-					}}>M</button
+					}}
 				>
+					M
+				</button>
 			</div>
 		</div>
 	{/if}
 
-	<!-- Портрет на телефоне: играть в узкую полоску невозможно -->
+	<!-- Портрет: играть в узкую полоску невозможно -->
 	{#if showRotateHint}
 		<button
 			type="button"
@@ -206,11 +289,17 @@
 			onclick={dismissRotate}
 			aria-label="Rotate device to play"
 		>
-			<div class="animate-blink-slow text-[clamp(18px,5vw,30px)] text-arcade-yel">⟳</div>
+			<div class="animate-blink-slow text-[clamp(18px,5vw,30px)] text-arcade-yel">
+				⟳
+			</div>
+
 			<p class="text-[clamp(10px,2.6vw,14px)] tracking-[0.2em] text-arcade-white">
 				ROTATE DEVICE TO PLAY
 			</p>
-			<p class="text-[8px] tracking-[0.18em] text-arcade-dim">TAP TO DISMISS</p>
+
+			<p class="text-[8px] tracking-[0.18em] text-arcade-dim">
+				TAP TO DISMISS
+			</p>
 		</button>
 	{/if}
 </main>

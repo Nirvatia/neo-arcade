@@ -1,8 +1,9 @@
 <!-- src/routes/games/snake/+page.svelte -->
 <script lang="ts">
 	import GameStage from '$shared/ui/GameStage.svelte';
-	import { SnakeGame } from '$games/snake/core/GameMain.js';
-	import SnakeHud from '$games/snake/ui/SnakeHud.svelte';
+	import SnakeOverlay from '$games/snake/ui/overlay/SnakeOverlay.svelte';
+	import SnakeHud from '$games/snake/ui/hud/SnakeHud.svelte';
+	import { SnakeGame } from '$games/snake/core/GameMain';
 
 	let game: SnakeGame | null = $state(null);
 </script>
@@ -19,10 +20,15 @@
 	<SnakeHud part="bottom" />
 {/snippet}
 
+{#snippet overlay()}
+	<SnakeOverlay />
+{/snippet}
+
 <GameStage
 	init={(el) => {
 		const g = new SnakeGame();
 		game = g;
+
 		void g.init(el).catch((e) => console.error('[Snake] init failed', e));
 
 		return () => {
@@ -37,4 +43,5 @@
 	}}
 	{hudTop}
 	{hudBottom}
+	{overlay}
 />

@@ -1,6 +1,6 @@
 import type { GridModel } from './GridModel.js';
 import type { GridCollision } from './GridCollision.js';
-import type { SeededRNG } from '../SeededRNG.js';
+import type { SeededRNG } from '../math/SeededRNG.js';
 import { GameplayConfig } from '../../config/GameplayConfig.js';
 
 /**

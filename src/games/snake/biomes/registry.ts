@@ -1,17 +1,21 @@
-import type { BiomeDescriptor } from './BiomeDescriptor.js';
-import { LunarBiome } from './lunar/LunarBiome.js';
-import { PondBiome } from './pond/PondBiome.js';
+import type { BiomeDescriptor } from './contract/BiomeDescriptor.js';
+import { createLunarBiome } from './lunar/LunarBiome.js';
+import { BIOME_VARIANTS } from './lunar/LunarPalette.js';
 
 /**
  * Реестр биомов.
  *
- * Сейчас здесь только Пруд.
- * Дальше новые биомы добавляются сюда без переписывания BiomeManager.
+ * Сейчас все биомы представлены вариациями лунной лагуны.
+ * Это позволяет уже сейчас проверить прогрессию, смену палитры,
+ * переходы между биомами и бесконечный режим.
+ *
+ * Позже каждый вариант можно заменить на уникальный биом
+ * с собственным артом, амбиентом и рендерерами.
  */
-export const BIOME_REGISTRY: readonly BiomeDescriptor[] = [
-	{ id: 'lunar', create: () => new LunarBiome() },
-	{
-		id: 'pond',
-		create: () => new PondBiome()
-	}
-];
+export const BIOME_REGISTRY: readonly BiomeDescriptor[] = BIOME_VARIANTS.map(
+	(variant, index) => ({
+		id: variant.id,
+		infinite: index === BIOME_VARIANTS.length - 1,
+		create: () => createLunarBiome(variant)
+	})
+);

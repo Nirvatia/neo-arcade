@@ -5,16 +5,20 @@ import { GridSpawner } from './GridSpawner.js';
 import { GridBitmask } from './GridBitmask.js';
 
 /**
- * GridService — замена GridHolder.
- * Объединяет GridModel, GridCollision, GridWriter, GridSpawner
- * и предоставляет фасад GridBitmask для совместимости.
+ * GridService объединяет:
+ * - GridModel — данные;
+ * - GridCollision — чтение коллизий;
+ * - GridWriter — запись в битовые маски;
+ * - GridSpawner — поиск свободных клеток;
+ * - GridBitmask — фасад для внешнего кода.
  */
 export class GridService {
 	public model: GridModel;
 	public readonly collision: GridCollision;
 	public readonly writer: GridWriter;
 	public readonly spawner: GridSpawner;
-	/** Фасад для совместимости с SnakeFactory, биомами, RenderSystem. */
+
+	/** Фасад для совместимости. */
 	public grid: GridBitmask;
 
 	constructor(cols: number, rows: number) {
@@ -25,8 +29,7 @@ export class GridService {
 		this.grid = new GridBitmask(
 			this.model,
 			this.collision,
-			this.writer,
-			this.spawner
+			this.writer
 		);
 	}
 
@@ -42,8 +45,7 @@ export class GridService {
 		this.grid = new GridBitmask(
 			newModel,
 			this.collision,
-			this.writer,
-			this.spawner
+			this.writer
 		);
 	}
-}   
+}

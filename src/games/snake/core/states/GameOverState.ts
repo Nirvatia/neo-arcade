@@ -1,4 +1,4 @@
-import type { State } from '../StateMachine.js';
+import type { State } from '../../engine/StateMachine.js';
 import type { DirectorContext } from './types.js';
 import { DirectorState } from '../Events.js';
 

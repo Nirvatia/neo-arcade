@@ -1,4 +1,4 @@
-import type { EntityId } from '../core/ecs/types.js';
+import type { EntityId } from '../engine/ecs/types.js';
 
 export const Direction = {
 	UP: 'UP',
@@ -16,22 +16,9 @@ export const BitOp = {
 
 export type BitOp = (typeof BitOp)[keyof typeof BitOp];
 
-export const CollidableKind = {
-	WALL: 'WALL',
-	PICKUP: 'PICKUP',
-	EXIT: 'EXIT'
-} as const;
-
-export type CollidableKind = (typeof CollidableKind)[keyof typeof CollidableKind];
-
 export interface GridPosition {
 	col: number;
 	row: number;
-}
-
-export interface PixelPosition {
-	x: number;
-	y: number;
 }
 
 export interface SnakeHead {
@@ -49,32 +36,8 @@ export interface Food {
 	bit: 0 | 1;
 }
 
-export interface Exit {
-	active: boolean;
-}
-
 export interface BitPowerUp {
 	op: BitOp;
-}
-
-export interface Pulse {
-	phase: number;
-	speed: number;
-}
-
-export interface Lifetime {
-	remaining: number;
-}
-
-export interface Render {
-	color: number;
-	char: string;
-	scale: number;
-	alpha: number;
-}
-
-export interface Collidable {
-	kind: CollidableKind;
 }
 
 export interface Score {
@@ -101,7 +64,7 @@ export interface FoodWander {
 	targetX: number;
 	targetY: number;
 	/**
-	 * 0 —wander,
+	 * 0 — wander,
 	 * 1 — flee.
 	 */
 	mode: 0 | 1;
@@ -135,16 +98,10 @@ export interface SnakeMotion {
 
 export interface ComponentDataMap {
 	gridPosition: GridPosition;
-	pixelPosition: PixelPosition;
 	snakeHead: SnakeHead;
 	snakeSegment: SnakeSegment;
 	food: Food;
-	exit: Exit;
 	bitPowerUp: BitPowerUp;
-	pulse: Pulse;
-	lifetime: Lifetime;
-	render: Render;
-	collidable: Collidable;
 	score: Score;
 	targetSequence: TargetSequence;
 	bitCollector: BitCollector;

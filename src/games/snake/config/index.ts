@@ -1,14 +1,26 @@
 export { GridConfig } from './GridConfig.js';
 export type { GridConfigType } from './GridConfig.js';
+
 export { GameplayConfig } from './GameplayConfig.js';
 export type { GameplayConfigType } from './GameplayConfig.js';
-export { LevelConfig, getLevelTuning } from './LevelConfig.js';
-export type { LevelTuning } from './LevelConfig.js';
+
+export {
+	BIOME_PROGRESSION,
+	getBiomeForLevel,
+	getLevelTuning,
+	progressionResolver
+} from './LevelConfig.js';
+
+export type { LevelTuning, BiomeProgression } from './LevelConfig.js';
+
 export { InputConfig } from './InputConfig.js';
 export type { InputConfigType } from './InputConfig.js';
+
 export { RenderConfig } from './RenderConfig.js';
 export type { RenderConfigType } from './RenderConfig.js';
+
 export { FxConfig } from './FxConfig.js';
 export type { FxConfigType } from './FxConfig.js';
+
 export { AudioConfig } from './AudioConfig.js';
 export type { AudioConfigType } from './AudioConfig.js';

@@ -1,14 +1,14 @@
-import type { World } from './ecs/World.js';
-import type { EntityId } from './ecs/types.js';
+import type { World } from '../engine/ecs/World.js';
+import type { EntityId } from '../engine/ecs/types.js';
 import type { GridService } from '../logic/grid/GridService.js';
 import type { DirectorStateType } from './Events.js';
-import { WorldRenderer } from '../view/world/WorldRenderer.js';
-import { OverlayRenderer } from '../view/overlay/OverlayRenderer.js';
-import { FxCoordinator } from '../view/fx/FxCoordinator.js';
-import type { HudAdapter } from '../view/hud/HudAdapter.js';
-import { GameplayConfig } from '../config/index.js';
-import { Container, Graphics } from 'pixi.js';
+import { WorldRenderer } from '../render/world/WorldRenderer.js';
+import { GameplayConfig, getLevelTuning } from '../config/index.js';
 import type { BiomeManager } from '../biomes/index.js';
+import type { OverlayAdapter } from '../ui/overlay/SvelteOverlayAdapter.js';
+import type { CanvasSurface } from '../canvas/CanvasSurface.js';
+import type { HudAdapter } from '../ui/hud/HudAdapter.js';
+import { FxCoordinator } from '../render/fx/FxCoordinator.js';
 
 interface SequenceState {
 	targetBits: (0 | 1)[];
@@ -23,71 +23,44 @@ export class RenderPipeline {
 	private readonly world: World;
 	private readonly service: GridService;
 	private readonly snakeId: EntityId;
-	private readonly stage: Container;
+	private readonly surface: CanvasSurface;
 	private readonly cellSize: number;
 	private readonly biomeManager: BiomeManager;
 	private readonly hud: HudAdapter;
-
-	private readonly shakeLayer: Container;
-	private readonly overlay: Graphics;
-	private readonly overlayLayer: Container;
-
 	private readonly worldRenderer: WorldRenderer;
-	private readonly overlayRenderer: OverlayRenderer;
+	private readonly overlay: OverlayAdapter;
 
 	private level = 1;
 	private time = 0;
-	private finalMode = false;
 	private cachedWidth = -1;
 
 	private stateChangedHandler:
-		((payload: { previous: DirectorStateType; current: DirectorStateType }) => void) | null = null;
+		| ((payload: { previous: DirectorStateType; current: DirectorStateType }) => void)
+		| null = null;
 
 	constructor(
 		world: World,
 		service: GridService,
 		snakeId: EntityId,
-		stage: Container,
+		surface: CanvasSurface,
 		cellSize: number,
 		biomeManager: BiomeManager,
-		hud: HudAdapter
+		hud: HudAdapter,
+		overlay: OverlayAdapter
 	) {
 		this.world = world;
 		this.service = service;
 		this.snakeId = snakeId;
-		this.stage = stage;
+		this.surface = surface;
 		this.cellSize = cellSize;
 		this.biomeManager = biomeManager;
 		this.hud = hud;
+		this.worldRenderer = new WorldRenderer(world, service, snakeId, cellSize, biomeManager);
+		this.fx = new FxCoordinator(world, snakeId, service, cellSize, biomeManager);
+		this.overlay = overlay;
 
-		this.shakeLayer = new Container();
-		this.overlay = new Graphics();
-		this.overlayLayer = new Container();
-
-		this.worldRenderer = new WorldRenderer(
-			this.shakeLayer,
-			world,
-			service,
-			snakeId,
-			cellSize,
-			biomeManager
-		);
-
-		this.fx = new FxCoordinator(this.shakeLayer, world, snakeId, service, cellSize, biomeManager);
-
-		this.overlayRenderer = new OverlayRenderer(this.overlay, this.overlayLayer, biomeManager);
-
-		this.fx.onHudShake = () => {
-			// Пока тряска DOM-HUD не нужна.
-			// Если позже понадобится — можно пробросить отдельный UI-колбэк.
-		};
-
-		this.stage.addChild(this.shakeLayer);
-		this.stage.addChild(this.overlay);
-		this.stage.addChild(this.overlayLayer);
-
-		this.stateChangedHandler = (payload) => {
-			this.overlayRenderer.setState(payload.current);
+		this.stateChangedHandler = (payload): void => {
+			this.overlay.setState(payload.current);
 		};
 
 		this.world.events.on('director:stateChanged', this.stateChangedHandler);
@@ -98,16 +71,12 @@ export class RenderPipeline {
 		this.worldRenderer.setLevel(level);
 	}
 
-	public setFinalMode(finalMode: boolean): void {
-		this.finalMode = finalMode;
+	public setNewRecord(isNew: boolean): void {
+		this.overlay.setNewRecord(isNew);
 	}
 
 	public forceRender(): void {
 		this.update(0);
-	}
-
-	public setNewRecord(isNew: boolean): void {
-		this.overlayRenderer.setNewRecord(isNew);
 	}
 
 	public update(deltaMS: number): void {
@@ -124,13 +93,28 @@ export class RenderPipeline {
 
 		const sequenceState = this.readSequenceState();
 		const score = this.getScore();
+		const tuning = getLevelTuning(this.level);
 
 		this.worldRenderer.update(deltaMS, sequenceState.targetBits.length);
 		this.fx.update(deltaMS);
-		this.fx.drawFx();
 
-		this.overlayRenderer.setScore(score);
-		this.overlayRenderer.update(deltaMS, width, height, this.cellSize);
+		this.overlay.setScore(score);
+		this.overlay.setProgress(this.level, tuning.biomeIndex, tuning.infinite);
+
+		// ===== Отрисовка =====
+
+		this.surface.clear();
+
+		const ctx = this.surface.ctx;
+		ctx.save();
+
+		const shake = this.fx.getShakeOffset();
+		ctx.translate(shake.x, shake.y);
+
+		this.worldRenderer.draw(ctx);
+		this.fx.draw(ctx, width, height);
+
+		ctx.restore();
 
 		const comboMultiplier = Math.min(
 			Math.max(1, sequenceState.streak),
@@ -138,13 +122,14 @@ export class RenderPipeline {
 		);
 
 		this.hud.update({
-			level: this.level,
+			biomeIndex: tuning.biomeIndex,
+			biomeLevel: tuning.biomeLevel,
+			infinite: tuning.infinite,
 			score,
 			movesLeft: sequenceState.movesLeft,
 			targetBits: sequenceState.targetBits,
 			activeBits: sequenceState.activeBits,
-			comboMultiplier,
-			finalMode: this.finalMode
+			comboMultiplier
 		});
 	}
 
@@ -156,16 +141,8 @@ export class RenderPipeline {
 
 		this.worldRenderer.dispose();
 		this.fx.dispose();
-		this.overlayRenderer.dispose();
-		this.hud.destroy();
-
-		this.stage.removeChild(this.shakeLayer);
-		this.stage.removeChild(this.overlay);
-		this.stage.removeChild(this.overlayLayer);
-
-		this.shakeLayer.destroy({ children: true });
 		this.overlay.destroy();
-		this.overlayLayer.destroy({ children: true });
+		this.hud.destroy();
 	}
 
 	private readSequenceState(): SequenceState {

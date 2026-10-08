@@ -1,27 +1,33 @@
-import { World } from './ecs/World.js';
-import type { EntityId } from './ecs/types.js';
+import { World } from '../engine/ecs/World.js';
+import type { EntityId } from '../engine/ecs/types.js';
 import type { Director } from './Director.js';
 import { GridService } from '../logic/grid/GridService.js';
-import { SeededRNG } from '../logic/SeededRNG.js';
-import { spawnSnake } from '../logic/SnakeFactory.js';
+import { SeededRNG } from '../logic/math/SeededRNG.js';
+import { spawnSnake } from '../logic/snake/SnakeFactory.js';
 import { Direction } from '../components/index.js';
-import { GridConfig, GameplayConfig, getLevelTuning, AudioConfig } from '../config/index.js';
-import { MovementSystem } from '../systems/MovementSystem.js';
-import { InputSystem } from '../systems/InputSystem.js';
-import { SpawnSystem } from '../systems/SpawnSystem.js';
-import { ScoreSystem } from '../systems/ScoreSystem.js';
-import { BitRegisterSystem } from '../systems/BitRegisterSystem.js';
-import { BitTokenSystem } from '../systems/BitTokenSystem.js';
-import { LevelSystem } from '../systems/LevelSystem.js';
-import { FoodWanderSystem } from '../systems/FoodWanderSystem.js';
-import { DeathAnimationSystem } from '../systems/DeathAnimationSystem.js';
+import {
+	GridConfig,
+	GameplayConfig,
+	getLevelTuning,
+	AudioConfig,
+	progressionResolver
+} from '../config/index.js';
+import { MovementSystem } from '../systems//movement/MovementSystem.js';
+import { InputSystem } from '../systems//movement/InputSystem.js';
+import { SpawnSystem } from '../systems/spawn/SpawnSystem.js';
+import { ScoreSystem } from '../systems/progression/ScoreSystem.js';
 import { RenderPipeline } from './RenderPipeline.js';
 import { MusicPlayer } from '../audio/MusicPlayer.js';
 import { BIOME_REGISTRY, BiomeManager } from '../biomes/index.js';
-import { SvelteHudAdapter } from '../view/hud/SvelteHudAdapter.js';
-import type { CanvasManager } from './CanvasManager.js';
-import type { Container } from 'pixi.js';
-
+import type { CanvasManager } from '../canvas/CanvasManager.js';
+import type { CanvasSurface } from '../canvas/CanvasSurface.js';
+import { BitRegisterSystem } from '../systems/puzzle/BitRegisterSystem.js';
+import { BitTokenSystem } from '../systems/puzzle/BitTokenSystem.js';
+import { DeathAnimationSystem } from '../systems/death/DeathAnimationSystem.js';
+import { FoodWanderSystem } from '../systems/spawn/FoodWanderSystem.js';
+import { LevelSystem } from '../systems/progression/LevelSystem.js';
+import { SvelteHudAdapter } from '../ui/hud/SvelteHudAdapter.js';
+import { SvelteOverlayAdapter } from '../ui/overlay/SvelteOverlayAdapter.js';
 
 export interface WorldContext {
 	world: World;
@@ -44,7 +50,11 @@ export class LevelLoader {
 	public static createWorld(): WorldContext {
 		const world = new World();
 
-		const service = new GridService(GridConfig.START_COLS, GridConfig.START_ROWS);
+		const service = new GridService(
+			GridConfig.START_COLS,
+			GridConfig.START_ROWS
+		);
+
 		service.writer.buildPerimeter();
 
 		const rng = new SeededRNG(LevelLoader.createSeed());
@@ -70,11 +80,12 @@ export class LevelLoader {
 	public static createSystems(
 		worldCtx: WorldContext,
 		director: Director,
-		stage: Container,
+		surface: CanvasSurface,
 		canvasManager: CanvasManager,
 		muted: boolean
 	): SystemsContext {
 		const { world, service, rng, snakeId } = worldCtx;
+
 		const tuning = getLevelTuning(1);
 
 		const inputSystem = new InputSystem(
@@ -110,8 +121,6 @@ export class LevelLoader {
 			service,
 			rng,
 			snakeId,
-			GridConfig.GROWTH_COLS,
-			GridConfig.GROWTH_ROWS,
 			GridConfig.MAX_COLS,
 			GridConfig.MAX_ROWS
 		);
@@ -126,7 +135,8 @@ export class LevelLoader {
 		const scoreSystem = new ScoreSystem(
 			world,
 			GameplayConfig.POINTS_PER_SEQUENCE,
-			GameplayConfig.POINTS_FINAL_SEQUENCE,
+			GameplayConfig.POINTS_FLAWLESS_BONUS,
+			GameplayConfig.POINTS_BIOME_BONUS,
 			GameplayConfig.COMBO_MAX_MULTIPLIER
 		);
 
@@ -139,20 +149,22 @@ export class LevelLoader {
 
 		const biomeManager = new BiomeManager({
 			biomes: BIOME_REGISTRY,
-			levelsPerBiome: GameplayConfig.LEVELS_PER_BIOME,
-			initialLevel: 1
+			initialLevel: 1,
+			resolveIndex: progressionResolver
 		});
 
 		const hud = new SvelteHudAdapter();
+		const overlay = new SvelteOverlayAdapter();
 
 		const renderPipeline = new RenderPipeline(
 			world,
 			service,
 			snakeId,
-			stage,
+			surface,
 			GridConfig.CELL_SIZE,
 			biomeManager,
-			hud
+			hud,
+			overlay
 		);
 
 		const music = new MusicPlayer(world.events, AudioConfig.MUSIC_SRC);
@@ -182,8 +194,7 @@ export class LevelLoader {
 			movement: movementSystem,
 			level: levelSystem,
 			score: scoreSystem,
-			fx: renderPipeline.fx,
-			director
+			fx: renderPipeline.fx
 		});
 
 		bitTokenSystem.setBitRegister(bitRegisterSystem);
@@ -195,6 +206,8 @@ export class LevelLoader {
 			bitRegister: bitRegisterSystem,
 			bitToken: bitTokenSystem,
 			spawn: spawnSystem,
+			score: scoreSystem,
+			input: inputSystem,
 			fx: renderPipeline.fx,
 			canvasManager,
 			renderPipeline

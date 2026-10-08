@@ -1,6 +1,6 @@
-import type { EventBus } from '../core/EventBus.js';
 import { DirectorState, type DirectorStateType } from '../core/Events.js';
 import type { SnakeEventMap } from '../core/Events.js';
+import type { EventBus } from '../engine/EventBus.js';
 
 interface StateChangedPayload {
 	previous: DirectorStateType;

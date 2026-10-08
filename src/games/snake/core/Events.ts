@@ -3,7 +3,6 @@ export const DirectorState = {
 	PLAYING: 'PLAYING',
 	PAUSED: 'PAUSED',
 	GAME_OVER: 'GAME_OVER',
-	VICTORY: 'VICTORY'
 } as const;
 
 export type DirectorStateType = (typeof DirectorState)[keyof typeof DirectorState];

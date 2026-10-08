@@ -1,10 +1,9 @@
 import type { GridModel } from './GridModel.js';
-import { cellIndex, setBit, clearBit } from '../BitMath.js';
+import { cellIndex, setBit, clearBit } from '../math/BitMath.js';
 
 /**
  * GridWriter — только запись в битовые маски.
- * Не читает данные (кроме построения периметра, которое
- * оперирует размерами модели).
+ * Не читает данные.
  */
 export class GridWriter {
 	private model: GridModel;
@@ -24,6 +23,7 @@ export class GridWriter {
 	public setFood(col: number, row: number, bit: 0 | 1): void {
 		const idx = cellIndex(col, row, this.model.cols);
 		setBit(this.model.foodExists, idx);
+
 		if (bit === 1) {
 			setBit(this.model.foodBits, idx);
 		} else {
@@ -53,13 +53,23 @@ export class GridWriter {
 		clearBit(this.model.exit, cellIndex(col, row, this.model.cols));
 	}
 
+	/**
+	 * Строит периметр только если поле не находится
+	 * в режиме без рамок.
+	 */
 	public buildPerimeter(): void {
+		if (this.model.wrap) {
+			return;
+		}
+
 		const cols = this.model.cols;
 		const rows = this.model.rows;
+
 		for (let col = 0; col < cols; col++) {
 			this.setWall(col, 0);
 			this.setWall(col, rows - 1);
 		}
+
 		for (let row = 0; row < rows; row++) {
 			this.setWall(0, row);
 			this.setWall(cols - 1, row);

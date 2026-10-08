@@ -1,7 +1,10 @@
 import { Direction } from '../components/index.js';
 
 /**
- * InputConfig — клавиши, хоткеи, пороги свайпов и тапов.
+ * InputConfig — клавиши и хоткеи.
+ *
+ * Свайпы и тапы удалены.
+ * Планшетная поддержка реализуется через экранные кнопки.
  */
 export const InputConfig = {
 	KEY_TO_DIRECTION: {
@@ -14,14 +17,13 @@ export const InputConfig = {
 		ArrowRight: Direction.RIGHT,
 		KeyD: Direction.RIGHT
 	} as Record<string, Direction>,
+
 	HOTKEYS: {
 		PAUSE: 'Space',
 		PAUSE_ALT: 'Escape',
 		CONFIRM: 'Enter',
 		MUTE: 'KeyM'
-	},
-	SWIPE_THRESHOLD_PX: 22,
-	DOUBLE_TAP_MS: 350,
-	TOP_TAP_ZONE: 0.18
+	}
 } as const;
+
 export type InputConfigType = typeof InputConfig;

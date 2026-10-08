@@ -1,27 +1,27 @@
 // Контракт биома
-export type { Biome, BiomePalette, BiomeTheme } from './Biome.js';
+export type { Biome, BiomePalette, BiomeTheme } from './contract/Biome.js';
 
-// Данные рендера (контракт между игровым слоем и биомом)
+// Данные рендера
 export type {
 	FoodRender,
-	OverlayPalette,
 	SnakeChainPoint,
 	SnakeHeadRender,
 	SnakeZoneStyle,
-	ParticleRender,
-} from './renderData.js';
+	ParticleRender
+} from './contract/renderData.js';
 
 // Дескрипторы и менеджер
-export type { BiomeDescriptor, BiomeResolver } from './BiomeDescriptor.js';
-export { defaultBiomeResolver } from './BiomeDescriptor.js';
+export type { BiomeDescriptor, BiomeResolver } from './contract/BiomeDescriptor.js';
 export type { BiomeManagerOptions, BiomeChangedListener } from './BiomeManager.js';
 export { BiomeManager } from './BiomeManager.js';
 
 // Конкретные биомы
-export { PondBiome } from './pond/PondBiome.js';
-export { LunarBiome } from './lunar/LunarBiome.js';
+export { LunarBiome, createLunarBiome } from './lunar/LunarBiome.js';
+export type { BiomeVariant } from './lunar/LunarPalette.js';
+export { BIOME_VARIANTS } from './lunar/LunarPalette.js';
 
 // Реестр
 export { BIOME_REGISTRY } from './registry.js';
-// В блок "Контракт биома" (после существующих):
-export type { ParticleRenderer } from './renderers.js';
+
+// Рендер-контракт частиц
+export type { ParticleRenderer } from './contract/renderers.js';

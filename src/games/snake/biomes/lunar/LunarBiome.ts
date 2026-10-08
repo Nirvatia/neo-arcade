@@ -1,32 +1,33 @@
-import type { Container, Graphics } from 'pixi.js';
 import type { GridBitmask } from '../../logic/grid/GridBitmask.js';
 import type { BitOp } from '../../components/index.js';
-import type { Biome, BiomePalette, BiomeTheme } from '../Biome.js';
+import type { Biome, BiomePalette, BiomeTheme } from '../contract/Biome.js';
 import type {
 	FoodRender,
-	OverlayPalette,
 	SnakeChainPoint,
 	SnakeHeadRender,
 	SnakeZoneStyle
-} from '../renderData.js';
-import { LUNAR_PALETTE, LUNAR_THEME, LUNAR_OVERLAY } from './LunarPalette.js';
+} from '../contract/renderData.js';
+import type { BiomeVariant } from './LunarPalette.js';
 import { LunarFieldRenderer } from './LunarFieldRenderer.js';
 import { LunarExitRenderer } from './LunarExitRenderer.js';
 import { LunarFoodRenderer } from './LunarFoodRenderer.js';
 import { LunarSnakeRenderer } from './LunarSnakeRenderer.js';
 import { LunarTokenFactory } from './LunarTokenFactory.js';
 import { LunarAmbient } from './LunarAmbient.js';
-import { LunarOverlayRenderer } from './LunarOverlayRenderer.js';
 import { LunarParticleRenderer } from './LunarParticleRenderer.js';
 
+/**
+ * LunarBiome теперь параметризуется вариантом.
+ *
+ * Это позволяет иметь несколько биомов на одной арт-базе,
+ * но с разными палитрами, темами и идентификаторами.
+ */
 export class LunarBiome implements Biome {
-	public readonly id = 'lunar';
-	public readonly palette: BiomePalette = LUNAR_PALETTE;
-	public readonly theme: BiomeTheme = LUNAR_THEME;
-	public readonly overlay: OverlayPalette = LUNAR_OVERLAY;
+	public readonly id: string;
+	public readonly palette: BiomePalette;
+	public readonly theme: BiomeTheme;
 	public readonly particleRenderer = new LunarParticleRenderer();
 
-	private readonly overlayRenderer = new LunarOverlayRenderer();
 	private readonly fieldRenderer = new LunarFieldRenderer();
 	private readonly exitRenderer = new LunarExitRenderer();
 	private readonly foodRenderer = new LunarFoodRenderer();
@@ -34,55 +35,53 @@ export class LunarBiome implements Biome {
 	private readonly tokenFactory = new LunarTokenFactory();
 	private readonly ambient = new LunarAmbient();
 
-	public renderField(g: Graphics, grid: GridBitmask, cellSize: number): void {
-		this.fieldRenderer.render(g, grid, cellSize);
+	constructor(variant: BiomeVariant) {
+		this.id = variant.id;
+		this.palette = variant.palette;
+		this.theme = variant.theme;
+	}
+
+	public renderField(ctx: CanvasRenderingContext2D, grid: GridBitmask, cellSize: number): void {
+		this.fieldRenderer.render(ctx, grid, cellSize);
 	}
 
 	public renderExit(
-		g: Graphics,
+		ctx: CanvasRenderingContext2D,
 		grid: GridBitmask,
 		timeMS: number,
 		cellSize: number
 	): void {
-		this.exitRenderer.render(g, grid, timeMS, cellSize);
+		this.exitRenderer.render(ctx, grid, timeMS, cellSize);
 	}
 
 	public renderFood(
-		g: Graphics,
+		ctx: CanvasRenderingContext2D,
 		foods: FoodRender[],
 		timeMS: number,
 		cellSize: number
 	): void {
-		this.foodRenderer.render(g, foods, timeMS, cellSize);
+		this.foodRenderer.render(ctx, foods, timeMS, cellSize);
 	}
 
 	public renderSnake(
-		g: Graphics,
+		ctx: CanvasRenderingContext2D,
 		chain: SnakeChainPoint[],
 		zones: SnakeZoneStyle[],
 		head: SnakeHeadRender,
 		timeMS: number,
 		cellSize: number
 	): void {
-		this.snakeRenderer.render(g, chain, zones, head, timeMS, cellSize);
+		this.snakeRenderer.render(ctx, chain, zones, head, timeMS, cellSize);
 	}
 
-	public createTokenVisual(op: BitOp, cellSize: number): Container {
-		return this.tokenFactory.create(op, cellSize);
-	}
-
-	public getAmbientContainer(): Container {
-		return this.ambient.container;
-	}
-
-	public renderOverlay(
-		g: Graphics,
-		width: number,
-		height: number,
-		timeMS: number,
+	public renderToken(
+		ctx: CanvasRenderingContext2D,
+		op: BitOp,
+		x: number,
+		y: number,
 		cellSize: number
 	): void {
-		this.overlayRenderer.render(g, width, height, timeMS, cellSize);
+		this.tokenFactory.render(ctx, op, x, y, cellSize);
 	}
 
 	public updateAmbient(
@@ -95,8 +94,20 @@ export class LunarBiome implements Biome {
 		this.ambient.update(deltaMS, timeMS, cellSize, cols, rows);
 	}
 
+	public renderAmbient(ctx: CanvasRenderingContext2D): void {
+		this.ambient.render(ctx);
+	}
+
+	public renderAmbientForeground(ctx: CanvasRenderingContext2D): void {
+		this.ambient.renderForeground(ctx);
+	}
+
 	public destroy(): void {
 		this.snakeRenderer.destroy?.();
 		this.ambient.destroy();
 	}
+}
+
+export function createLunarBiome(variant: BiomeVariant): LunarBiome {
+	return new LunarBiome(variant);
 }
