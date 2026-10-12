@@ -21,7 +21,14 @@ export const games: GameConfig[] = [
 		defaultScore: 0
 	},
 	{ id: 'pacman', title: 'PAC-MAN', genre: 'MAZE', status: 'soon', defaultScore: 0 },
-	{ id: 'tetris', title: 'TETRIS', genre: 'PUZZLE', status: 'soon', defaultScore: 0 },
+	{
+		id: 'tetris',
+		title: 'TETRIS',
+		genre: 'PUZZLE',
+		status: 'ready',
+		route: '/games/tetris',
+		defaultScore: 0
+	},
 	{ id: 'simon-says', title: 'SIMON SAYS', genre: 'PUZZLE', status: 'soon', defaultScore: 0 }
 ];
 

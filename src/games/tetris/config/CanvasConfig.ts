@@ -1,0 +1,12 @@
+import { GRID_COLS, VISIBLE_ROWS } from './GridConfig';
+
+export const CELL_SIZE = 34;
+export const BORDER_WIDTH = 12;
+export const PLAYFIELD_WIDTH = GRID_COLS * CELL_SIZE;
+export const PLAYFIELD_HEIGHT = VISIBLE_ROWS * CELL_SIZE;
+export const CANVAS_WIDTH = PLAYFIELD_WIDTH + BORDER_WIDTH * 2;
+export const CANVAS_HEIGHT = PLAYFIELD_HEIGHT + BORDER_WIDTH * 2;
+export const PLAYFIELD_X = BORDER_WIDTH;
+export const PLAYFIELD_Y = BORDER_WIDTH;
+export const PLAYFIELD_BG = '#241B14';
+export const BORDER_COLOR = '#171210';
