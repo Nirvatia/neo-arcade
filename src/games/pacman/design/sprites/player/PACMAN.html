@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOLAR FLARE — Pac-Man Visual Demo</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #0a0404;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        #ui {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            color: #ffaa66;
+            font-size: 13px;
+            pointer-events: none;
+            background: rgba(20, 8, 2, 0.7);
+            padding: 12px 16px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 136, 68, 0.3);
+            backdrop-filter: blur(4px);
+            line-height: 1.6;
+        }
+        #ui kbd {
+            background: rgba(255, 136, 68, 0.2);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+            color: #ffccaa;
+            border: 1px solid rgba(255, 136, 68, 0.4);
+        }
+        #ui .title {
+            color: #fff;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <div class="title">☀ SOLAR FLARE v2.0</div>
+        <kbd>Space</kbd> Toggle Supernova &nbsp;|&nbsp;
+        <kbd>Click</kbd> Trigger Collapse<br>
+        <kbd>E</kbd> Solar Flare (Munch) &nbsp;|&nbsp;
+        <kbd>W</kbd> Coronal Ejection (Teleport)<br>
+        <kbd>G</kbd> Absorb Plasma (Ghost) &nbsp;|&nbsp;
+        <kbd>R</kbd> Reset / Reignite
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+    <script type="module">
+        // ══════════════════════════════════════════════════
+        // SOLAR FLARE v2.0 — Refined Plasma Aesthetics
+        // ══════════════════════════════════════════════════
+
+        const CHROMOSPHERE    = 0x110500;
+        const PHOTOSPHERE     = 0xff4400;
+        const CORONA_OUTER    = 0xff8800;
+        const CORONA_INNER    = 0xffcc44;
+        const SOLAR_FLARE     = 0xffee88;
+        const PROMINENCE      = 0xff2200;
+        const PLASMA_TRAIL    = 0xff6600;
+        const SUPERHOT_CORE   = 0xffffff;
+        const PLASMA_GHOST    = 0xff9944;
+
+        const lerpColor = (a, b, t) => {
+            const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
+            const br = (b >> 16) & 0xff, bg = (b >> 8) & 0xff, bb = b & 0xff;
+            const cr = Math.round(ar + (br - ar) * t);
+            const cg = Math.round(ag + (bg - ag) * t);
+            const cb = Math.round(ab + (bb - ab) * t);
+            return (cr << 16) | (cg << 8) | cb;
+        };
+
+        class SolarPacman {
+            constructor() {
+                this.x = 0;
+                this.y = 0;
+                this.r = 28;
+                this.direction = { dx: 1, dy: 0 };
+                this.lastDirection = { dx: 1, dy: 0 };
+                this.state = "ALIVE";
+                this.supernova = false;
+                this.time = 0;
+
+                this.config = {
+                    mouthSpeed: 0.01,
+                    maxMouthAngle: Math.PI / 2.8,
+                    idleMouthAngle: Math.PI / 14,
+                };
+
+                this.container = new PIXI.Container();
+                this.container.isRenderGroup = true;
+
+                this.trailGfx = new PIXI.Graphics();
+                this.coronaGfx = new PIXI.Graphics();
+                this.bodyGfx = new PIXI.Graphics();
+                this.mouthGfx = new PIXI.Graphics();
+                this.particleGfx = new PIXI.Graphics();
+                this.ringVfxGfx = new PIXI.Graphics();
+                this.flashGfx = new PIXI.Graphics();
+                this.prominenceGfx = new PIXI.Graphics();
+
+                this.trailGfx.blendMode = "add";
+                this.coronaGfx.blendMode = "add";
+                this.bodyGfx.blendMode = "normal";
+                this.mouthGfx.blendMode = "add";
+                this.particleGfx.blendMode = "add";
+                this.ringVfxGfx.blendMode = "add";
+                this.flashGfx.blendMode = "add";
+                this.prominenceGfx.blendMode = "add";
+
+                this.container.addChild(
+                    this.trailGfx, this.coronaGfx, this.bodyGfx, this.mouthGfx,
+                    this.particleGfx, this.ringVfxGfx, this.prominenceGfx, this.flashGfx
+                );
+
+                this.trail = [];
+                this.particles = [];
+                this.ringVfx = [];
+
+                this.lastTrailX = 0;
+                this.lastTrailY = 0;
+
+                this.collapseTimer = 0;
+                this.collapseParticleTimer = 0;
+                this.collapseShrinkFactor = 0;
+                this.collapseConvulsePhase = 0;
+
+                this.prominenceTimer = 0;
+                this.prominenceStartX = 0;
+                this.prominenceStartY = 0;
+                this.prominenceFlash = 0;
+
+                this.flareFlashTimer = 0;
+                this.flareFlashType = null;
+
+                for (let i = 0; i < 250; i++) {
+                    this.particles.push({ 
+                        x: 0, y: 0, vx: 0, vy: 0, 
+                        life: 0, maxLife: 1, size: 0, 
+                        active: false, temperature: 0 
+                    });
+                }
+                for (let i = 0; i < 15; i++) {
+                    this.ringVfx.push({ 
+                        x: 0, y: 0, radius: 0, maxRadius: 0, 
+                        life: 0, maxLife: 1, type: "FLARE_BURST", 
+                        rotation: 0 
+                    });
+                }
+            }
+
+            update(dt) {
+                this.time += dt;
+
+                if (this.state === "COLLAPSING") {
+                    this.updateCollapse(dt);
+                    this.updateParticles(dt);
+                    this.updateRingVfx(dt);
+                    this.draw();
+                    return;
+                }
+
+                this.updateTrail(dt);
+                this.updateParticles(dt);
+                this.updateRingVfx(dt);
+                this.updateProminence(dt);
+                if (this.flareFlashTimer > 0) this.flareFlashTimer -= dt;
+
+                const dx = this.x - this.lastTrailX;
+                const dy = this.y - this.lastTrailY;
+                const distSq = dx * dx + dy * dy;
+
+                if (distSq > 16) {
+                    this.trail.push({
+                        x: this.x, y: this.y,
+                        life: this.supernova ? 0.7 : 0.45,
+                        maxLife: this.supernova ? 0.7 : 0.45
+                    });
+                    this.lastTrailX = this.x;
+                    this.lastTrailY = this.y;
+                    this.emitPlasmaParticles();
+                }
+
+                this.draw();
+            }
+
+            triggerCollapse() {
+                if (this.state === "COLLAPSING") return;
+                this.state = "COLLAPSING";
+                this.collapseTimer = 0;
+                this.collapseParticleTimer = 0;
+                this.collapseShrinkFactor = 0;
+                this.collapseConvulsePhase = 0;
+            }
+
+            simulateFlare(type) {
+                this.flareFlashTimer = type === "MICRO" ? 0.12 : type === "MEGA" ? 0.5 : 0.45;
+                this.flareFlashType = type;
+                if (type === "MICRO") this.spawnMicroFlareVFX(this.x + 30, this.y);
+                if (type === "MEGA") this.spawnMegaFlareVFX();
+            }
+
+            simulateCoronalEjection() {
+                this.spawnCoronalVFX(this.x - 60, this.y, false);
+                this.spawnCoronalVFX(this.x + 60, this.y, true);
+            }
+
+            simulatePlasmaAbsorb() {
+                // Мгновенный ghost absorb: стрик появляется и сразу завершается вспышкой
+                this.prominenceTimer = 0.0; // сразу активируем терминальную вспышку
+                this.prominenceStartX = this.x - 140;
+                this.prominenceStartY = this.y;
+                this.prominenceFlash = 0.3; // длительность финальной вспышки
+                this.flareFlashTimer = 0.3;
+                this.flareFlashType = "PLASMA";
+                
+                // Спавним частицы как при манче
+                for (let i = 0; i < 15; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = 100 + Math.random() * 200;
+                    this.spawnParticle({
+                        x: this.x + Math.cos(angle) * this.r * 0.5,
+                        y: this.y + Math.sin(angle) * this.r * 0.5,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        life: 0.3 + Math.random() * 0.5,
+                        maxLife: 0.8,
+                        size: 1 + Math.random() * 3,
+                        temperature: 0.8 + Math.random() * 0.2,
+                    });
+                }
+            }
+
+            spawnRingVFX(x, y, maxR, life, type, rot = 0) {
+                for (const r of this.ringVfx) {
+                    if (r.life <= 0) {
+                        r.x = x;
+                        r.y = y;
+                        r.radius = type === "MEGA_EXPAND" || type === "CORONAL_ENTRY" ? 0 : maxR;
+                        r.maxRadius = maxR;
+                        r.life = life;
+                        r.maxLife = life;
+                        r.type = type;
+                        r.rotation = rot;
+                        return;
+                    }
+                }
+            }
+
+            spawnMicroFlareVFX(wx, wy) {
+                this.spawnRingVFX(wx, wy, 6, 0.15, "MICRO_BURST");
+            }
+
+            spawnMegaFlareVFX() {
+                this.spawnRingVFX(this.x, this.y, this.r * 3.5, 0.5, "MEGA_EXPAND");
+                
+                // Дополнительные искры при манче
+                for (let i = 0; i < 20; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = 50 + Math.random() * 250;
+                    const temp = 0.6 + Math.random() * 0.4;
+                    this.spawnParticle({
+                        x: this.x + Math.cos(angle) * this.r * 0.3,
+                        y: this.y + Math.sin(angle) * this.r * 0.3,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        life: 0.4 + Math.random() * 0.6,
+                        maxLife: 1.0,
+                        size: 0.8 + Math.random() * 2.5,
+                        temperature: temp,
+                    });
+                }
+            }
+
+            spawnCoronalVFX(wx, wy, isEntry) {
+                const type = isEntry ? "CORONAL_ENTRY" : "CORONAL_EXIT";
+                const life = isEntry ? 0.35 : 0.25;
+                const rot = Math.random() * Math.PI;
+                this.spawnRingVFX(wx, wy, this.r * 1.6, life, type, rot);
+                
+                // Искры при телепорте
+                const sparkCount = isEntry ? 12 : 8;
+                for (let i = 0; i < sparkCount; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = 80 + Math.random() * 180;
+                    this.spawnParticle({
+                        x: wx + Math.cos(angle) * 10,
+                        y: wy + Math.sin(angle) * 10,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        life: 0.2 + Math.random() * 0.3,
+                        maxLife: 0.5,
+                        size: 0.5 + Math.random() * 1.5,
+                        temperature: 0.7 + Math.random() * 0.3,
+                    });
+                }
+            }
+
+            spawnParticle(overrides) {
+                for (const p of this.particles) {
+                    if (!p.active) {
+                        Object.assign(p, {
+                            x: 0, y: 0, vx: 0, vy: 0,
+                            life: 1, maxLife: 1, size: 1.5,
+                            temperature: 0.5,
+                        }, overrides, { active: true });
+                        return;
+                    }
+                }
+            }
+
+            emitPlasmaParticles() {
+                // Редкие, очень маленькие искры при движении
+                const rate = this.supernova ? 0.15 : 0.06;
+                if (Math.random() < rate) {
+                    const rimAngle = Math.random() * Math.PI * 2;
+                    const dist = this.r * (0.95 + Math.random() * 0.15);
+                    const temp = 0.7 + Math.random() * 0.3;
+                    this.spawnParticle({
+                        x: this.x + Math.cos(rimAngle) * dist,
+                        y: this.y + Math.sin(rimAngle) * dist,
+                        vx: Math.cos(rimAngle) * (40 + Math.random() * 100),
+                        vy: Math.sin(rimAngle) * (40 + Math.random() * 100),
+                        life: 0.15 + Math.random() * 0.25,
+                        maxLife: 0.4,
+                        size: 0.3 + Math.random() * 0.8, // очень маленькие
+                        temperature: temp,
+                    });
+                }
+            }
+
+            emitCollapseParticles() {
+                const count = 2 + Math.floor(this.collapseShrinkFactor * 5);
+                for (let i = 0; i < count; i++) {
+                    const jetAxis = this.getAngle();
+                    const isJet = Math.random() < 0.45;
+                    const angle = isJet
+                        ? jetAxis + (Math.random() - 0.5) * 0.7 + (Math.random() < 0.5 ? 0 : Math.PI)
+                        : Math.random() * Math.PI * 2;
+                    const speed = isJet ? 200 + Math.random() * 300 : 70 + Math.random() * 150;
+                    this.spawnParticle({
+                        x: this.x + Math.cos(angle) * this.r * 0.3,
+                        y: this.y + Math.sin(angle) * this.r * 0.3,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        life: 0.45 + Math.random() * 0.8,
+                        maxLife: 1.2,
+                        size: 0.5 + Math.random() * 3,
+                        temperature: 0.7 + Math.random() * 0.3,
+                    });
+                }
+            }
+
+            updateTrail(dt) {
+                for (let i = this.trail.length - 1; i >= 0; i--) {
+                    this.trail[i].life -= dt;
+                    if (this.trail[i].life <= 0) this.trail.splice(i, 1);
+                }
+            }
+
+            updateParticles(dt) {
+                for (const p of this.particles) {
+                    if (!p.active) continue;
+                    p.life -= dt;
+                    if (p.life <= 0) {
+                        p.active = false;
+                        continue;
+                    }
+                    p.x += p.vx * dt;
+                    p.y += p.vy * dt;
+                    p.vx *= 0.92;
+                    p.vy *= 0.92;
+                    p.temperature *= 0.995;
+                }
+            }
+
+            updateRingVfx(dt) {
+                for (const r of this.ringVfx) {
+                    if (r.life <= 0) continue;
+                    r.life -= dt;
+                    const progress = 1 - r.life / r.maxLife;
+                    if (r.type === "MICRO_BURST") {
+                        r.radius = r.maxRadius * (1 - progress);
+                    } else if (r.type === "MEGA_EXPAND" || r.type === "CORONAL_ENTRY") {
+                        r.radius = r.maxRadius * progress;
+                    }
+                }
+            }
+
+            updateProminence(dt) {
+                if (this.prominenceFlash > 0) {
+                    this.prominenceFlash -= dt;
+                }
+                if (this.prominenceTimer > 0) {
+                    this.prominenceTimer -= dt;
+                }
+            }
+
+            updateCollapse(dt) {
+                this.collapseTimer += dt;
+                this.collapseShrinkFactor = Math.min(1, Math.max(0, (this.collapseTimer - 0.3) / 1.5));
+
+                if (this.collapseTimer < 0.3) {
+                    this.collapseConvulsePhase += dt * 45;
+                }
+
+                if (this.collapseTimer >= 0.3 && this.collapseTimer < 1.8) {
+                    this.collapseParticleTimer += dt;
+                    const interval = 0.06 - this.collapseShrinkFactor * 0.04;
+                    while (this.collapseParticleTimer > interval) {
+                        this.collapseParticleTimer -= interval;
+                        this.emitCollapseParticles();
+                    }
+                }
+            }
+
+            getAngle() {
+                const d = (this.direction.dx !== 0 || this.direction.dy !== 0)
+                    ? this.direction
+                    : this.lastDirection;
+
+                if (d.dx === 0 && d.dy === 0) return 0;
+                return Math.atan2(d.dy, d.dx);
+            }
+
+            getDisplayRadius() {
+                if (this.state === "COLLAPSING" && this.collapseTimer < 0.3) {
+                    const convulse = 1 + Math.sin(this.collapseConvulsePhase) * 0.1;
+                    return this.r * convulse;
+                }
+                if (this.state === "COLLAPSING") {
+                    return Math.max(0, this.r * (1 - this.collapseShrinkFactor * 0.85));
+                }
+                return this.r;
+            }
+
+            draw() {
+                this.trailGfx.clear();
+                this.coronaGfx.clear();
+                this.bodyGfx.clear();
+                this.mouthGfx.clear();
+                this.particleGfx.clear();
+                this.ringVfxGfx.clear();
+                this.flashGfx.clear();
+                this.prominenceGfx.clear();
+
+                const r = this.getDisplayRadius();
+                if (r <= 0.3) return;
+
+                if (this.state === "COLLAPSING") {
+                    this.drawCollapseBody(r);
+                    this.drawParticles();
+                    this.drawRingVfx();
+                    return;
+                }
+
+                this.drawTrail();
+                if (this.supernova) this.drawCorona(r);
+                this.drawBody(r);
+                this.drawMouthGlow(r);
+                this.drawParticles();
+                this.drawRingVfx();
+                this.drawProminence();
+                this.drawFlareFlash(r);
+            }
+
+            drawTrail() {
+                if (this.trail.length < 2) return;
+
+                const baseWidth = this.r * (this.supernova ? 0.6 : 0.4);
+
+                for (let i = 1; i < this.trail.length; i++) {
+                    const p1 = this.trail[i - 1];
+                    const p2 = this.trail[i];
+                    const ratio = p2.life / p2.maxLife;
+                    if (ratio <= 0.01) continue;
+
+                    const x1 = p1.x - this.x;
+                    const y1 = p1.y - this.y;
+                    const x2 = p2.x - this.x;
+                    const y2 = p2.y - this.y;
+
+                    const width = baseWidth * ratio;
+
+                    this.trailGfx.moveTo(x1, y1);
+                    this.trailGfx.lineTo(x2, y2);
+                    this.trailGfx.stroke({
+                        color: PROMINENCE,
+                        width: width * 3.5,
+                        alpha: ratio * (this.supernova ? 0.22 : 0.13),
+                        cap: "round",
+                        join: "round",
+                    });
+
+                    this.trailGfx.moveTo(x1, y1);
+                    this.trailGfx.lineTo(x2, y2);
+                    this.trailGfx.stroke({
+                        color: this.supernova ? SUPERHOT_CORE : CORONA_INNER,
+                        width: width * (this.supernova ? 1.1 : 0.6),
+                        alpha: ratio * (this.supernova ? 0.65 : 0.5),
+                        cap: "round",
+                        join: "round",
+                    });
+                }
+            }
+
+            drawCorona(r) {
+                const coronaR = r * 1.2;
+                
+                this.coronaGfx.circle(0, 0, coronaR + 6);
+                this.coronaGfx.stroke({
+                    color: CORONA_OUTER,
+                    width: 10,
+                    alpha: 0.12,
+                });
+
+                this.coronaGfx.circle(0, 0, coronaR);
+                this.coronaGfx.stroke({
+                    color: CORONA_OUTER,
+                    width: 2.5,
+                    alpha: 0.35,
+                });
+
+                this.coronaGfx.circle(0, 0, coronaR - 2);
+                this.coronaGfx.stroke({
+                    color: SOLAR_FLARE,
+                    width: 1,
+                    alpha: 0.2,
+                });
+            }
+
+            drawBody(r) {
+                const t = this.time * 1000;
+                const moving = this.direction.dx !== 0 || this.direction.dy !== 0;
+                const angle = this.getAngle();
+
+                let mouth;
+                if (moving) {
+                    const speedMult = this.supernova ? 1.45 : 1;
+                    mouth = Math.abs(Math.sin(t * this.config.mouthSpeed * speedMult)) * this.config.maxMouthAngle;
+                } else {
+                    mouth = this.config.idleMouthAngle;
+                }
+                mouth = Math.max(0.06, Math.min(mouth, Math.PI * 0.45));
+                if (this.supernova) mouth = Math.min(mouth * 1.2, Math.PI * 0.48);
+
+                const sa = angle + mouth;
+                const ea = angle + Math.PI * 2 - mouth;
+
+                const gradSteps = 5;
+                for (let i = gradSteps; i >= 0; i--) {
+                    const frac = i / gradSteps;
+                    const gradR = r * (1 - frac * 0.12);
+                    if (gradR < 0.5) continue;
+
+                    const color = lerpColor(
+                        frac < 0.5 ? PHOTOSPHERE : PROMINENCE,
+                        frac < 0.5 ? CORONA_INNER : SOLAR_FLARE,
+                        frac
+                    );
+                    const alpha = 0.8 + (1 - frac) * 0.2;
+
+                    this.bodyGfx.moveTo(0, 0);
+                    this.bodyGfx.arc(0, 0, gradR, sa, ea, false);
+                    this.bodyGfx.lineTo(0, 0);
+                    this.bodyGfx.closePath();
+                    this.bodyGfx.fill({ color, alpha });
+                }
+
+                this.bodyGfx.moveTo(0, 0);
+                this.bodyGfx.arc(0, 0, r, sa, ea, false);
+                this.bodyGfx.lineTo(0, 0);
+                this.bodyGfx.closePath();
+                this.bodyGfx.stroke({
+                    color: this.supernova ? SOLAR_FLARE : CORONA_OUTER,
+                    width: this.supernova ? 8 : 6,
+                    alpha: this.supernova ? 0.55 : 0.5,
+                    alignment: 0.5,
+                });
+
+                this.drawTemperatureRing(r, sa, ea, angle);
+            }
+
+            drawTemperatureRing(r, sa, ea, angle) {
+                const segments = 48;
+                for (let i = 0; i < segments; i++) {
+                    const a1 = sa + ((ea - sa) / segments) * i;
+                    const a2 = sa + ((ea - sa) / segments) * (i + 1);
+
+                    const midAngle = (a1 + a2) / 2;
+                    const temp = 0.5 + 0.5 * Math.cos(midAngle - angle);
+                    const brightness = 0.4 + temp * 0.6;
+
+                    const cr = Math.round(180 + temp * 75);
+                    const cg = Math.round(40 + temp * 100);
+                    const cb = Math.round(10 + temp * 30);
+                    const color = (cr << 16) | (cg << 8) | cb;
+
+                    this.bodyGfx.moveTo(Math.cos(a1) * r, Math.sin(a1) * r);
+                    this.bodyGfx.arc(0, 0, r, a1, a2, false);
+                    this.bodyGfx.stroke({
+                        color,
+                        width: this.supernova ? 3 : 2.5,
+                        alpha: brightness * (this.supernova ? 1 : 0.9),
+                        cap: "butt",
+                    });
+                }
+            }
+
+            drawMouthGlow(r) {
+                const moving = this.direction.dx !== 0 || this.direction.dy !== 0;
+                const t = this.time * 1000;
+                const angle = this.getAngle();
+
+                let mouth;
+                if (moving) {
+                    const speedMult = this.supernova ? 1.45 : 1;
+                    mouth = Math.abs(Math.sin(t * this.config.mouthSpeed * speedMult)) * this.config.maxMouthAngle;
+                } else {
+                    mouth = this.config.idleMouthAngle;
+                }
+                mouth = Math.max(0.06, Math.min(mouth, Math.PI * 0.45));
+                if (this.supernova) mouth = Math.min(mouth * 1.2, Math.PI * 0.48);
+
+                const sa = angle + mouth;
+                const ea = angle + Math.PI * 2 - mouth;
+                const mouthSize = Math.PI * 2 - (ea - sa);
+
+                if (mouthSize < 0.05) return;
+
+                const glowR = r * 0.8;
+                let alpha = Math.min(1, mouthSize / 0.55) * (this.supernova ? 0.45 : 0.3);
+
+                if (!moving && !this.supernova) {
+                    alpha *= 0.75 + 0.25 * Math.sin(this.time * 3);
+                }
+
+                this.mouthGfx.moveTo(0, 0);
+                this.mouthGfx.arc(0, 0, glowR, sa, ea, false);
+                this.mouthGfx.lineTo(0, 0);
+                this.mouthGfx.closePath();
+                this.mouthGfx.fill({ 
+                    color: this.supernova ? SUPERHOT_CORE : CORONA_INNER, 
+                    alpha 
+                });
+
+                const ringR = r * 0.5;
+                const ringSpan = Math.PI * 0.6;
+                const mouthCenter = sa + (ea - sa) / 2;
+                const ra1 = mouthCenter - ringSpan / 2;
+                const ra2 = mouthCenter + ringSpan / 2;
+
+                this.mouthGfx.moveTo(Math.cos(ra1) * ringR, Math.sin(ra1) * ringR);
+                this.mouthGfx.arc(0, 0, ringR, ra1, ra2, false);
+                this.mouthGfx.stroke({
+                    color: this.supernova ? SUPERHOT_CORE : SOLAR_FLARE,
+                    width: this.supernova ? 1.4 : 1,
+                    alpha: alpha * 1.7,
+                    cap: "round",
+                });
+
+                if (mouthSize > 0.2) {
+                    const pointAlpha = alpha * 1.3;
+                    this.mouthGfx.circle(0, 0, r * 0.06);
+                    this.mouthGfx.fill({ color: SUPERHOT_CORE, alpha: pointAlpha });
+                }
+            }
+
+            drawParticles() {
+                let hasVisible = false;
+                for (const p of this.particles) {
+                    if (p.active && p.life > 0.01) {
+                        hasVisible = true;
+                        break;
+                    }
+                }
+                if (!hasVisible) return;
+
+                for (const p of this.particles) {
+                    if (!p.active) continue;
+                    const alpha = Math.max(0, p.life / p.maxLife);
+                    if (alpha <= 0.01) continue;
+
+                    const rx = p.x - this.x;
+                    const ry = p.y - this.y;
+                    const temp = p.temperature;
+
+                    const color = lerpColor(PROMINENCE, SUPERHOT_CORE, temp);
+
+                    this.particleGfx.circle(rx, ry, p.size * 2 * alpha);
+                    this.particleGfx.fill({ color: PHOTOSPHERE, alpha: alpha * 0.18 });
+
+                    this.particleGfx.circle(rx, ry, p.size * 0.4 * alpha);
+                    this.particleGfx.fill({ color, alpha: alpha * 0.75 });
+                }
+            }
+
+            drawRingVfx() {
+                for (const r of this.ringVfx) {
+                    if (r.life <= 0) continue;
+                    const alpha = Math.max(0, r.life / r.maxLife);
+
+                    const rx = r.x - this.x;
+                    const ry = r.y - this.y;
+
+                    if (r.type === "MICRO_BURST") {
+                        if (r.radius > 0.3) {
+                            this.ringVfxGfx.circle(rx, ry, r.radius);
+                            this.ringVfxGfx.stroke({
+                                color: SOLAR_FLARE,
+                                width: 1.5 * alpha,
+                                alpha: alpha * 0.8,
+                            });
+                            this.ringVfxGfx.circle(rx, ry, r.radius * 0.4);
+                            this.ringVfxGfx.stroke({
+                                color: SUPERHOT_CORE,
+                                width: 0.8 * alpha,
+                                alpha: alpha * 0.65,
+                            });
+                        }
+                    } else if (r.type === "MEGA_EXPAND") {
+                        this.ringVfxGfx.circle(rx, ry, r.radius);
+                        this.ringVfxGfx.stroke({
+                            color: SUPERHOT_CORE,
+                            width: 3 * alpha,
+                            alpha: alpha * 0.7,
+                        });
+                        this.ringVfxGfx.circle(rx, ry, r.radius * 0.75);
+                        this.ringVfxGfx.stroke({
+                            color: CORONA_OUTER,
+                            width: 5 * alpha,
+                            alpha: alpha * 0.3,
+                        });
+                        this.ringVfxGfx.circle(rx, ry, r.radius * 0.2);
+                        this.ringVfxGfx.stroke({
+                            color: SUPERHOT_CORE,
+                            width: 1.5 * alpha,
+                            alpha: alpha * 0.55,
+                        });
+                    } else if (r.type === "CORONAL_EXIT" || r.type === "CORONAL_ENTRY") {
+                        const isEntry = r.type === "CORONAL_ENTRY";
+                        const progress = 1 - alpha;
+                        const ringR = isEntry ? r.radius : r.maxRadius;
+
+                        this.ringVfxGfx.circle(rx, ry, ringR);
+                        this.ringVfxGfx.stroke({
+                            color: isEntry ? SOLAR_FLARE : CORONA_INNER,
+                            width: 4 * alpha,
+                            alpha: alpha * 0.7,
+                        });
+
+                        this.ringVfxGfx.circle(rx, ry, ringR * 0.55);
+                        this.ringVfxGfx.stroke({
+                            color: SUPERHOT_CORE,
+                            width: 2.5 * alpha,
+                            alpha: alpha * 0.8,
+                        });
+
+                        const streakCount = 12;
+                        const twist = isEntry
+                            ? progress * Math.PI * 1.5 * (0.8 + 0.4 * Math.sin(progress * 10))
+                            : (1 - progress) * Math.PI * 1.5;
+
+                        for (let s = 0; s < streakCount; s++) {
+                            const baseAngle = (s / streakCount) * Math.PI * 2 + r.rotation;
+                            const innerAngle = baseAngle + twist;
+                            const outerAngle = baseAngle - twist * 0.5;
+                            const innerDist = ringR * 0.15 * alpha;
+                            const outerDist = ringR * (0.8 + alpha * 0.2);
+
+                            this.ringVfxGfx.moveTo(
+                                rx + Math.cos(innerAngle) * innerDist,
+                                ry + Math.sin(innerAngle) * innerDist,
+                            );
+                            this.ringVfxGfx.lineTo(
+                                rx + Math.cos(outerAngle) * outerDist,
+                                ry + Math.sin(outerAngle) * outerDist,
+                            );
+                            this.ringVfxGfx.stroke({
+                                color: s % 3 === 0 ? SUPERHOT_CORE : CORONA_INNER,
+                                width: (s % 3 === 0 ? 1.8 : 0.8) * alpha,
+                                alpha: alpha * 0.5,
+                            });
+                        }
+
+                        if (isEntry && progress > 0.7) {
+                            const coreAlpha = (progress - 0.7) / 0.3;
+                            this.ringVfxGfx.circle(rx, ry, ringR * 0.2 * coreAlpha);
+                            this.ringVfxGfx.fill({ 
+                                color: SUPERHOT_CORE, 
+                                alpha: coreAlpha * 0.9 
+                            });
+                        }
+                    }
+                }
+            }
+
+            drawProminence() {
+                // Только терминальная вспышка (ghost absorb)
+                if (this.prominenceFlash > 0) {
+                    const flashAlpha = this.prominenceFlash / 0.3;
+                    const flashR = this.r * (0.5 + flashAlpha * 2);
+                    
+                    // Внешнее свечение
+                    this.prominenceGfx.circle(0, 0, flashR * 1.8);
+                    this.prominenceGfx.fill({ color: PLASMA_GHOST, alpha: flashAlpha * 0.2 });
+                    
+                    // Средний слой
+                    this.prominenceGfx.circle(0, 0, flashR * 1.2);
+                    this.prominenceGfx.fill({ color: CORONA_INNER, alpha: flashAlpha * 0.45 });
+                    
+                    // Яркое ядро
+                    this.prominenceGfx.circle(0, 0, flashR);
+                    this.prominenceGfx.fill({ color: SUPERHOT_CORE, alpha: flashAlpha * 0.8 });
+                }
+                
+                // Быстрый стрик (только если есть таймер — для визуального эффекта)
+                if (this.prominenceTimer > 0) {
+                    const progress = 1 - this.prominenceTimer / 0.15;
+                    const startX = this.prominenceStartX - this.x;
+                    const startY = this.prominenceStartY - this.y;
+                    const t = Math.min(1, progress * 3);
+                    const cx = startX + (0 - startX) * t;
+                    const cy = startY + (0 - startY) * t;
+                    const alpha = 1 - progress;
+
+                    this.prominenceGfx.moveTo(startX, startY);
+                    this.prominenceGfx.lineTo(cx, cy);
+                    this.prominenceGfx.stroke({
+                        color: PLASMA_GHOST,
+                        width: 4 * alpha,
+                        alpha: alpha * 0.35,
+                        cap: "round",
+                    });
+
+                    this.prominenceGfx.moveTo(startX, startY);
+                    this.prominenceGfx.lineTo(cx, cy);
+                    this.prominenceGfx.stroke({
+                        color: SUPERHOT_CORE,
+                        width: 1.5 * alpha,
+                        alpha: alpha * 0.75,
+                        cap: "round",
+                    });
+                }
+            }
+
+            drawFlareFlash(r) {
+                if (this.flareFlashTimer <= 0) return;
+
+                const maxTime = this.flareFlashType === "MICRO" ? 0.12
+                    : this.flareFlashType === "MEGA" ? 0.5
+                    : 0.3;
+                const alpha = this.flareFlashTimer / maxTime;
+
+                if (this.flareFlashType === "PLASMA") {
+                    this.flashGfx.circle(0, 0, r);
+                    this.flashGfx.stroke({
+                        color: SUPERHOT_CORE,
+                        width: 4 * alpha,
+                        alpha: alpha * 0.7,
+                    });
+                    this.flashGfx.circle(0, 0, r + 12);
+                    this.flashGfx.stroke({
+                        color: PLASMA_GHOST,
+                        width: 8 * alpha,
+                        alpha: alpha * 0.25,
+                    });
+                } else if (this.flareFlashType === "MEGA") {
+                    this.flashGfx.circle(0, 0, r);
+                    this.flashGfx.stroke({
+                        color: SUPERHOT_CORE,
+                        width: 3 * alpha,
+                        alpha: alpha * 0.85,
+                    });
+                    this.flashGfx.circle(0, 0, r + 8);
+                    this.flashGfx.stroke({
+                        color: SOLAR_FLARE,
+                        width: 6 * alpha,
+                        alpha: alpha * 0.35,
+                    });
+                }
+                if (this.flareFlashType === "MICRO") {
+                    this.flashGfx.circle(0, 0, r * 0.25);
+                    this.flashGfx.fill({ color: SUPERHOT_CORE, alpha: alpha * 0.2 });
+                }
+            }
+
+            drawCollapseBody(r) {
+                const alpha = this.collapseTimer < 1.8 ? 1 : Math.max(0, 1 - (this.collapseTimer - 1.8) / 0.2);
+                if (alpha <= 0) return;
+
+                this.bodyGfx.circle(0, 0, r);
+                this.bodyGfx.fill({ color: CHROMOSPHERE, alpha });
+
+                const shrink = this.collapseShrinkFactor;
+                const rimBrightness = 0.5 + shrink * 0.5;
+                const rimWidth = 1.5 + shrink * 2;
+
+                if (this.collapseTimer < 0.3) {
+                    const flicker = 0.5 + 0.5 * Math.sin(this.collapseConvulsePhase);
+                    const color = flicker > 0.7 ? SUPERHOT_CORE : CORONA_INNER;
+                    this.bodyGfx.circle(0, 0, r);
+                    this.bodyGfx.stroke({
+                        color,
+                        width: 2 + flicker * 3.5,
+                        alpha: (0.5 + flicker * 0.5) * alpha,
+                    });
+                } else {
+                    const color = shrink > 0.7 ? SUPERHOT_CORE : SOLAR_FLARE;
+                    this.bodyGfx.circle(0, 0, r);
+                    this.bodyGfx.stroke({
+                        color,
+                        width: rimWidth,
+                        alpha: rimBrightness * alpha,
+                    });
+
+                    const haloR = r * (1.1 + shrink * 2.8);
+                    this.bodyGfx.circle(0, 0, haloR);
+                    this.bodyGfx.stroke({
+                        color: CORONA_OUTER,
+                        width: 1.2,
+                        alpha: shrink * alpha * 0.35,
+                    });
+                }
+
+                if (this.collapseTimer >= 1.5 && this.collapseTimer < 1.8) {
+                    const popProgress = (this.collapseTimer - 1.5) / 0.3;
+                    this.flashGfx.circle(0, 0, this.r * 0.15 * (1 + popProgress * 4));
+                    this.flashGfx.fill({ color: SUPERHOT_CORE, alpha: (1 - popProgress) * 0.9 });
+                }
+
+                if (this.collapseTimer >= 1.8 && this.collapseTimer < 1.95) {
+                    const flashAlpha = Math.max(0, 1 - (this.collapseTimer - 1.8) / 0.15);
+                    this.flashGfx.circle(0, 0, this.r * 2.5 * (2 - flashAlpha));
+                    this.flashGfx.fill({ color: SUPERHOT_CORE, alpha: flashAlpha * 0.55 });
+                }
+            }
+        }
+
+        async function main() {
+            const app = new PIXI.Application();
+            await app.init({
+                width: window.innerWidth,
+                height: window.innerHeight,
+                backgroundColor: 0x050101,
+                antialias: true,
+                resolution: window.devicePixelRatio || 1,
+                autoDensity: true,
+            });
+            document.body.appendChild(app.canvas);
+
+            const pacman = new SolarPacman();
+            app.stage.addChild(pacman.container);
+
+            let demoTime = 0;
+            const radius = Math.min(window.innerWidth, window.innerHeight) * 0.25;
+            const speed = 1.3;
+
+            window.addEventListener('keydown', (e) => {
+                if (e.code === 'Space') {
+                    pacman.supernova = !pacman.supernova;
+                } else if (e.code === 'KeyE') {
+                    pacman.simulateFlare("MEGA");
+                } else if (e.code === 'KeyW') {
+                    pacman.simulateCoronalEjection();
+                } else if (e.code === 'KeyG') {
+                    pacman.simulatePlasmaAbsorb();
+                } else if (e.code === 'KeyR') {
+                    if (pacman.state === "COLLAPSING") {
+                        pacman.state = "ALIVE";
+                        pacman.collapseTimer = 0;
+                    }
+                }
+            });
+
+            window.addEventListener('click', () => {
+                if (pacman.state === "ALIVE") {
+                    pacman.triggerCollapse();
+                }
+            });
+
+            window.addEventListener('resize', () => {
+                app.renderer.resize(window.innerWidth, window.innerHeight);
+            });
+
+            app.ticker.add((ticker) => {
+                const dt = ticker.deltaMS / 1000;
+                demoTime += dt * speed;
+
+                pacman.x = window.innerWidth / 2 + Math.cos(demoTime) * radius;
+                pacman.y = window.innerHeight / 2 + Math.sin(demoTime) * radius;
+
+                pacman.direction.dx = -Math.sin(demoTime);
+                pacman.direction.dy = Math.cos(demoTime);
+                pacman.lastDirection = { ...pacman.direction };
+
+                pacman.container.position.set(pacman.x, pacman.y);
+
+                pacman.update(dt);
+            });
+        }
+
+        main();
+    </script>
+</body>
+</html>

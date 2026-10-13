@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Supernova — Full Version</title>
+<style>
+    body { 
+        margin: 0; 
+        background: #06080e; 
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: center; 
+        min-height: 100vh; 
+        font-family: 'Courier New', monospace; 
+        color: #c8d4e0; 
+        gap: 30px;
+    }
+    .title { 
+        font-size: 16px; 
+        letter-spacing: 5px; 
+        opacity: 0.7; 
+    }
+    canvas { 
+        display: block; 
+        border: 1px solid #1a2430; 
+        border-radius: 4px; 
+    }
+</style>
+</head>
+<body>
+<div class="title">SUPERNOVA · FULL VERSION</div>
+<div id="pixi-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+<script type="module">
+const { Application, Container, Sprite, Texture, BlurFilter } = PIXI;
+
+function createSupernova(time) {
+    const size = 512;
+    const canvas = document.createElement("canvas");
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    const cx = size / 2, cy = size / 2;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    // ═══════════════════════════════════════════════════════════
+    // 1. ФОНОВОЕ ОБЛАКО (очень мягкое, большое)
+    // ═══════════════════════════════════════════════════════════
+    const bgPulse = 1 + Math.sin(time * 1.2) * 0.08;
+    
+    const bg1 = ctx.createRadialGradient(0, 0, 0, 0, 0, size * 0.48 * bgPulse);
+    bg1.addColorStop(0, "rgba(255,230,180,0.35)");
+    bg1.addColorStop(0.3, "rgba(255,180,100,0.18)");
+    bg1.addColorStop(0.6, "rgba(255,130,60,0.08)");
+    bg1.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = bg1;
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.48 * bgPulse, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Дополнительный слой — чуть смещённый для асимметрии
+    const bg2 = ctx.createRadialGradient(size * 0.05, -size * 0.03, 0, 0, 0, size * 0.42 * bgPulse);
+    bg2.addColorStop(0, "rgba(255,240,200,0.15)");
+    bg2.addColorStop(0.5, "rgba(255,200,120,0.06)");
+    bg2.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = bg2;
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.42 * bgPulse, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ═══════════════════════════════════════════════════════════
+    // 2. КОРОНА (внешняя аура с неровными краями)
+    // ═══════════════════════════════════════════════════════════
+    const coronaR = size * 0.32;
+    const coronaSpikes = 24;
+    
+    ctx.shadowBlur = 30;
+    ctx.shadowColor = "rgba(255,200,100,0.8)";
+    
+    ctx.beginPath();
+    for (let i = 0; i <= coronaSpikes * 4; i++) {
+        const angle = (i / (coronaSpikes * 4)) * Math.PI * 2;
+        const spikeNoise = Math.sin(angle * coronaSpikes + time * 2) * 0.15 
+                         + Math.sin(angle * coronaSpikes * 2 + time * 3) * 0.08;
+        const r = coronaR * (1 + spikeNoise);
+        const x = Math.cos(angle) * r;
+        const y = Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    
+    const coronaGrad = ctx.createRadialGradient(0, 0, coronaR * 0.3, 0, 0, coronaR * 1.2);
+    coronaGrad.addColorStop(0, "rgba(255,240,200,0.25)");
+    coronaGrad.addColorStop(0.5, "rgba(255,180,100,0.15)");
+    coronaGrad.addColorStop(1, "rgba(255,130,60,0)");
+    ctx.fillStyle = coronaGrad;
+    ctx.fill();
+
+    // ═══════════════════════════════════════════════════════════
+    // 3. РАСХОДЯЩИЕСЯ ВОЛНЫ (5 штук, разные)
+    // ═══════════════════════════════════════════════════════════
+    const waveConfigs = [
+        { speed: 1.2, offset: 0, width: 4, color: [255, 240, 200] },
+        { speed: 1.0, offset: 0.8, width: 3, color: [255, 220, 160] },
+        { speed: 0.85, offset: 1.6, width: 3.5, color: [255, 200, 120] },
+        { speed: 1.4, offset: 2.4, width: 2.5, color: [255, 230, 180] },
+        { speed: 0.7, offset: 3.2, width: 3, color: [255, 190, 110] }
+    ];
+
+    const coreR = size * 0.09;
+    
+    for (const wave of waveConfigs) {
+        const wavePhase = (time * wave.speed + wave.offset) % 3.5;
+        const waveR = coreR * 1.5 + wavePhase * size * 0.1;
+        const waveAlpha = Math.max(0, 1 - wavePhase / 3.5);
+        
+        if (waveAlpha > 0.05) {
+            // Свечение волны
+            ctx.strokeStyle = `rgba(${wave.color[0]},${wave.color[1]},${wave.color[2]},${waveAlpha * 0.3})`;
+            ctx.lineWidth = wave.width * 3;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = `rgba(${wave.color[0]},${wave.color[1]},${wave.color[2]},${waveAlpha * 0.6})`;
+            ctx.beginPath();
+            ctx.arc(0, 0, waveR, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Яркая сердцевина волны
+            ctx.strokeStyle = `rgba(255,255,240,${waveAlpha * 0.7})`;
+            ctx.lineWidth = wave.width;
+            ctx.shadowBlur = 8;
+            ctx.beginPath();
+            ctx.arc(0, 0, waveR, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Искры на фронте волны (8 штук)
+            if (waveAlpha > 0.3) {
+                for (let s = 0; s < 8; s++) {
+                    const sparkAngle = (s / 8) * Math.PI * 2 + time * 0.5 + wave.offset;
+                    const sparkX = Math.cos(sparkAngle) * waveR;
+                    const sparkY = Math.sin(sparkAngle) * waveR;
+                    const sparkSize = 1.5 + Math.sin(time * 5 + s) * 0.8;
+                    
+                    ctx.fillStyle = `rgba(255,255,240,${waveAlpha * 0.8})`;
+                    ctx.shadowBlur = 6;
+                    ctx.shadowColor = `rgba(${wave.color[0]},${wave.color[1]},${wave.color[2]},1)`;
+                    ctx.beginPath();
+                    ctx.arc(sparkX, sparkY, sparkSize, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 4. ГЛАВНЫЕ ЛУЧИ (8 штук, длинные, с зазубринами)
+    // ═══════════════════════════════════════════════════════════
+    const mainRayCount = 8;
+    const mainRayRotation = time * 0.25;
+    
+    for (let i = 0; i < mainRayCount; i++) {
+        const angle = (i / mainRayCount) * Math.PI * 2 + mainRayRotation;
+        const rayPulse = 1 + Math.sin(time * 2.5 + i * 0.8) * 0.15;
+        const rayLength = size * 0.32 * rayPulse;
+        const rayBaseWidth = size * 0.025;
+        
+        ctx.save();
+        ctx.rotate(angle);
+        
+        // Луч с зазубринами (несколько слоёв)
+        const segments = 5;
+        const segLen = rayLength / segments;
+        
+        // Внешнее свечение луча
+        for (let s = 0; s < segments; s++) {
+            const t1 = s / segments;
+            const t2 = (s + 1) / segments;
+            const x1 = coreR * 1.2 + t1 * (rayLength - coreR * 1.2);
+            const x2 = coreR * 1.2 + t2 * (rayLength - coreR * 1.2);
+            
+            const w1 = rayBaseWidth * (1 - t1 * 0.7);
+            const w2 = rayBaseWidth * (1 - t2 * 0.7);
+            const alpha = 0.5 * (1 - (t1 + t2) / 2);
+            
+            // Зазубрины (случайное смещение)
+            const jitter1 = Math.sin(time * 4 + s * 2 + i) * w1 * 0.3;
+            const jitter2 = Math.sin(time * 4 + (s + 1) * 2 + i) * w2 * 0.3;
+            
+            // Свечение
+            const rayGrad = ctx.createLinearGradient(x1, 0, x2, 0);
+            rayGrad.addColorStop(0, `rgba(255,240,200,${alpha})`);
+            rayGrad.addColorStop(1, `rgba(255,200,120,${alpha * 0.5})`);
+            
+            ctx.fillStyle = rayGrad;
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = "rgba(255,220,150,0.8)";
+            ctx.beginPath();
+            ctx.moveTo(x1, -w1 + jitter1);
+            ctx.lineTo(x2, -w2 + jitter2);
+            ctx.lineTo(x2, w2 + jitter2);
+            ctx.lineTo(x1, w1 + jitter1);
+            ctx.closePath();
+            ctx.fill();
+        }
+        
+        // Яркая сердцевина луча
+        ctx.strokeStyle = "rgba(255,255,240,0.9)";
+        ctx.lineWidth = 2;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = "rgba(255,255,220,1)";
+        ctx.beginPath();
+        ctx.moveTo(coreR * 1.2, 0);
+        ctx.lineTo(rayLength, 0);
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 5. ВТОРИЧНЫЕ ЛУЧИ (8 штук, короткие, между главными)
+    // ═══════════════════════════════════════════════════════════
+    const secRayCount = 8;
+    const secRayRotation = -time * 0.4;
+    
+    for (let i = 0; i < secRayCount; i++) {
+        const angle = (i / secRayCount) * Math.PI * 2 + secRayRotation + Math.PI / secRayCount;
+        const rayPulse = 1 + Math.sin(time * 3 + i * 1.2) * 0.2;
+        const rayLength = size * 0.18 * rayPulse;
+        const rayWidth = size * 0.012;
+        
+        ctx.save();
+        ctx.rotate(angle);
+        
+        const rayGrad = ctx.createLinearGradient(coreR, 0, rayLength, 0);
+        rayGrad.addColorStop(0, "rgba(255,230,180,0.7)");
+        rayGrad.addColorStop(0.5, "rgba(255,200,120,0.4)");
+        rayGrad.addColorStop(1, "rgba(255,150,60,0)");
+        
+        ctx.fillStyle = rayGrad;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = "rgba(255,200,120,0.7)";
+        ctx.beginPath();
+        ctx.moveTo(coreR, -rayWidth);
+        ctx.lineTo(rayLength, 0);
+        ctx.lineTo(coreR, rayWidth);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Сердцевина
+        ctx.strokeStyle = "rgba(255,250,220,0.7)";
+        ctx.lineWidth = 1;
+        ctx.shadowBlur = 5;
+        ctx.beginPath();
+        ctx.moveTo(coreR, 0);
+        ctx.lineTo(rayLength * 0.8, 0);
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 6. ЭНЕРГЕТИЧЕСКИЕ ЧАСТИЦЫ (разлетающиеся искры)
+    // ═══════════════════════════════════════════════════════════
+    const particleCount = 18;
+    for (let i = 0; i < particleCount; i++) {
+        // Детерминированные "случайные" значения для стабильности
+        const seed1 = Math.sin(i * 12.9898) * 43758.5453;
+        const seed2 = Math.sin(i * 78.233) * 43758.5453;
+        const seed3 = Math.sin(i * 45.164) * 43758.5453;
+        
+        const baseAngle = (seed1 - Math.floor(seed1)) * Math.PI * 2;
+        const speed = 0.3 + (seed2 - Math.floor(seed2)) * 0.5;
+        const phase = (seed3 - Math.floor(seed3)) * Math.PI * 2;
+        
+        const particlePhase = (time * speed + phase) % 2;
+        const particleR = coreR * 1.5 + particlePhase * size * 0.18;
+        const particleAlpha = Math.max(0, 1 - particlePhase / 2);
+        
+        if (particleAlpha > 0.05) {
+            const angle = baseAngle + time * 0.2;
+            const x = Math.cos(angle) * particleR;
+            const y = Math.sin(angle) * particleR;
+            const pSize = (2 + (seed1 - Math.floor(seed1)) * 2) * particleAlpha;
+            
+            // Хвост частицы
+            const tailLen = pSize * 4;
+            const tailAngle = angle + Math.PI;
+            const tailX = x + Math.cos(tailAngle) * tailLen;
+            const tailY = y + Math.sin(tailAngle) * tailLen;
+            
+            const tailGrad = ctx.createLinearGradient(x, y, tailX, tailY);
+            tailGrad.addColorStop(0, `rgba(255,240,200,${particleAlpha * 0.6})`);
+            tailGrad.addColorStop(1, "rgba(255,200,120,0)");
+            
+            ctx.strokeStyle = tailGrad;
+            ctx.lineWidth = pSize * 0.8;
+            ctx.shadowBlur = 6;
+            ctx.shadowColor = `rgba(255,220,150,${particleAlpha})`;
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(tailX, tailY);
+            ctx.stroke();
+            
+            // Ядро частицы
+            ctx.fillStyle = `rgba(255,255,240,${particleAlpha})`;
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = `rgba(255,240,200,1)`;
+            ctx.beginPath();
+            ctx.arc(x, y, pSize, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 7. ЯДРО — ВНЕШНЕЕ СВЕЧЕНИЕ
+    // ═══════════════════════════════════════════════════════════
+    const corePulse = 1 + Math.sin(time * 3) * 0.12;
+    
+    // Мягкое внешнее свечение
+    const outerGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, coreR * 3 * corePulse);
+    outerGlow.addColorStop(0, "rgba(255,250,220,0.6)");
+    outerGlow.addColorStop(0.3, "rgba(255,220,150,0.3)");
+    outerGlow.addColorStop(0.6, "rgba(255,180,100,0.1)");
+    outerGlow.addColorStop(1, "rgba(255,150,60,0)");
+    ctx.fillStyle = outerGlow;
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.arc(0, 0, coreR * 3 * corePulse, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ═══════════════════════════════════════════════════════════
+    // 8. ЯДРО — ВИХРЕВАЯ СТРУКТУРА
+    // ═══════════════════════════════════════════════════════════
+    const vortexArms = 4;
+    const vortexRotation = time * 2;
+    
+    for (let arm = 0; arm < vortexArms; arm++) {
+        const baseAngle = (arm / vortexArms) * Math.PI * 2 + vortexRotation;
+        const steps = 30;
+        
+        ctx.beginPath();
+        for (let s = 0; s <= steps; s++) {
+            const t = s / steps;
+            const r = coreR * 0.2 + t * coreR * 0.7;
+            const spiralAngle = baseAngle + t * Math.PI * 1.5;
+            const x = Math.cos(spiralAngle) * r;
+            const y = Math.sin(spiralAngle) * r;
+            if (s === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        
+        ctx.strokeStyle = `rgba(255,250,220,${0.5 - 0.3 * 0})`;
+        ctx.lineWidth = 2.5;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = "rgba(255,240,200,0.9)";
+        ctx.lineCap = "round";
+        ctx.stroke();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 9. ЯДРО — КОНЦЕНТРИЧЕСКИЕ КОЛЬЦА
+    // ═══════════════════════════════════════════════════════════
+    const ringCount = 3;
+    for (let i = 0; i < ringCount; i++) {
+        const ringR = coreR * (0.4 + i * 0.2);
+        const ringPulse = 1 + Math.sin(time * 4 + i * 0.8) * 0.1;
+        const ringAlpha = 0.4 - i * 0.1;
+        
+        ctx.strokeStyle = `rgba(255,250,230,${ringAlpha})`;
+        ctx.lineWidth = 1.5;
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = "rgba(255,240,200,0.8)";
+        ctx.beginPath();
+        ctx.arc(0, 0, ringR * ringPulse, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 10. ЯДРО — ОСНОВНОЙ ШАР
+    // ═══════════════════════════════════════════════════════════
+    ctx.shadowBlur = 40;
+    ctx.shadowColor = "rgba(255,250,220,1)";
+    
+    const mainCore = ctx.createRadialGradient(-coreR * 0.2, -coreR * 0.2, 0, 0, 0, coreR * 1.2 * corePulse);
+    mainCore.addColorStop(0, "rgba(255,255,255,1)");
+    mainCore.addColorStop(0.2, "rgba(255,255,240,1)");
+    mainCore.addColorStop(0.5, "rgba(255,240,200,0.95)");
+    mainCore.addColorStop(0.8, "rgba(255,220,150,0.85)");
+    mainCore.addColorStop(1, "rgba(255,180,100,0.6)");
+    
+    ctx.fillStyle = mainCore;
+    ctx.beginPath();
+    ctx.arc(0, 0, coreR * 1.2 * corePulse, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ═══════════════════════════════════════════════════════════
+    // 11. ЯДРО — ЯРКИЙ ЦЕНТР
+    // ═══════════════════════════════════════════════════════════
+    const brightCenter = ctx.createRadialGradient(0, 0, 0, 0, 0, coreR * 0.5 * corePulse);
+    brightCenter.addColorStop(0, "rgba(255,255,255,1)");
+    brightCenter.addColorStop(0.5, "rgba(255,255,250,0.95)");
+    brightCenter.addColorStop(1, "rgba(255,250,230,0)");
+    
+    ctx.fillStyle = brightCenter;
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = "rgba(255,255,255,1)";
+    ctx.beginPath();
+    ctx.arc(0, 0, coreR * 0.5 * corePulse, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Маленький яркий блик
+    ctx.fillStyle = "rgba(255,255,255,1)";
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = "rgba(255,255,255,1)";
+    ctx.beginPath();
+    ctx.arc(-coreR * 0.25, -coreR * 0.25, coreR * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+    return Texture.from(canvas);
+}
+
+// ═══════════════════════════════════════════════════════════
+// SETUP
+// ═══════════════════════════════════════════════════════════
+async function setup() {
+    const app = new Application();
+    await app.init({
+        width: 500, height: 500,
+        backgroundColor: 0x06080e,
+        antialias: true,
+    });
+    document.getElementById('pixi-container').appendChild(app.canvas);
+
+    const container = new Container();
+    container.x = 250; container.y = 250;
+    app.stage.addChild(container);
+
+    let time = 0;
+    
+    app.ticker.add(() => {
+        time += 0.016;
+        
+        const tex = createSupernova(time);
+        
+        while (container.children.length > 0) {
+            container.removeChildAt(0);
+        }
+        
+        // Основной спрайт
+        const sprite = new Sprite(tex);
+        sprite.anchor.set(0.5);
+        sprite.width = 380; sprite.height = 380;
+        container.addChild(sprite);
+
+        // Bloom слой 1 (близкий)
+        const bloom1 = new Sprite(tex);
+        bloom1.anchor.set(0.5);
+        bloom1.width = 420; bloom1.height = 420;
+        bloom1.alpha = 0.45;
+        bloom1.blendMode = "add";
+        bloom1.filters = [new BlurFilter({ strength: 15, quality: 3 })];
+        container.addChild(bloom1);
+
+        // Bloom слой 2 (средний)
+        const bloom2 = new Sprite(tex);
+        bloom2.anchor.set(0.5);
+        bloom2.width = 480; bloom2.height = 480;
+        bloom2.alpha = 0.25;
+        bloom2.blendMode = "add";
+        bloom2.filters = [new BlurFilter({ strength: 30, quality: 3 })];
+        container.addChild(bloom2);
+
+        // Bloom слой 3 (далёкий, очень мягкий)
+        const bloom3 = new Sprite(tex);
+        bloom3.anchor.set(0.5);
+        bloom3.width = 560; bloom3.height = 560;
+        bloom3.alpha = 0.15;
+        bloom3.blendMode = "add";
+        bloom3.filters = [new BlurFilter({ strength: 50, quality: 3 })];
+        container.addChild(bloom3);
+
+        // Дыхание
+        const breathe = 1 + Math.sin(time * 1.5) * 0.03;
+        container.scale.set(breathe);
+    });
+}
+
+setup();
+</script>
+</body>
+</html>

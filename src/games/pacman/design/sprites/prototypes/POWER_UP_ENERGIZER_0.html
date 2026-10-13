@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Icosahedron — Power Core</title>
+<style>
+    body { 
+        margin: 0; 
+        background: #06080e; 
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: center; 
+        min-height: 100vh; 
+        font-family: 'Courier New', monospace; 
+        color: #c8d4e0; 
+        gap: 30px;
+    }
+    .title { 
+        font-size: 16px; 
+        letter-spacing: 5px; 
+        opacity: 0.7; 
+    }
+    canvas { 
+        display: block; 
+        border: 1px solid #1a2430; 
+        border-radius: 4px; 
+    }
+</style>
+</head>
+<body>
+<div class="title">ICOSAHEDRON · POWER CORE</div>
+<div id="pixi-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+<script type="module">
+const { Application, Container, Graphics, BlurFilter } = PIXI;
+
+function project3D(x, y, z, rotX, rotY, rotZ, scale, perspective = 4) {
+    let y1 = y * Math.cos(rotX) - z * Math.sin(rotX);
+    let z1 = y * Math.sin(rotX) + z * Math.cos(rotX);
+    
+    let x2 = x * Math.cos(rotY) + z1 * Math.sin(rotY);
+    let z2 = -x * Math.sin(rotY) + z1 * Math.cos(rotY);
+    
+    let x3 = x2 * Math.cos(rotZ) - y1 * Math.sin(rotZ);
+    let y3 = x2 * Math.sin(rotZ) + y1 * Math.cos(rotZ);
+    
+    const p = perspective / (perspective + z2);
+    
+    return { x: x3 * scale * p, y: y3 * scale * p, z: z2, scale: p };
+}
+
+async function setup() {
+    const app = new Application();
+    await app.init({
+        width: 400, height: 400,
+        backgroundColor: 0x06080e,
+        antialias: true,
+    });
+    document.getElementById('pixi-container').appendChild(app.canvas);
+
+    const container = new Container();
+    container.x = 200; container.y = 200;
+    app.stage.addChild(container);
+
+    const icoGfx = new Graphics();
+    container.addChild(icoGfx);
+
+    const bloomContainer = new Container();
+    bloomContainer.filters = [new BlurFilter({ strength: 25, quality: 3 })];
+    bloomContainer.alpha = 0.6;
+    bloomContainer.blendMode = "add";
+    app.stage.addChild(bloomContainer);
+
+    const bloomGfx = new Graphics();
+    bloomContainer.addChild(bloomGfx);
+
+    let time = 0;
+
+    // Icosahedron geometry
+    const phi = (1 + Math.sqrt(5)) / 2;
+    const baseVertices = [
+        { x: -1, y: phi, z: 0 }, { x: 1, y: phi, z: 0 },
+        { x: -1, y: -phi, z: 0 }, { x: 1, y: -phi, z: 0 },
+        { x: 0, y: -1, z: phi }, { x: 0, y: 1, z: phi },
+        { x: 0, y: -1, z: -phi }, { x: 0, y: 1, z: -phi },
+        { x: phi, y: 0, z: -1 }, { x: phi, y: 0, z: 1 },
+        { x: -phi, y: 0, z: -1 }, { x: -phi, y: 0, z: 1 }
+    ];
+
+    const len = Math.sqrt(1 + phi * phi);
+    baseVertices.forEach(v => { v.x /= len; v.y /= len; v.z /= len; });
+
+    const edges = [
+        [0, 1], [0, 5], [0, 7], [0, 10], [0, 11],
+        [1, 5], [1, 7], [1, 8], [1, 9],
+        [2, 3], [2, 4], [2, 6], [2, 10], [2, 11],
+        [3, 4], [3, 6], [3, 8], [3, 9],
+        [4, 5], [4, 9], [4, 11],
+        [5, 9], [5, 11],
+        [6, 7], [6, 8], [6, 10],
+        [7, 8], [7, 10],
+        [8, 9],
+        [10, 11]
+    ];
+
+    const faces = [
+        [0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11],
+        [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
+        [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9],
+        [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]
+    ];
+
+    function drawIcosahedron(gfx, isBloom = false) {
+        gfx.clear();
+
+        const scale = 100;
+        
+        // Smooth rotation
+        const rotX = time * 0.3;
+        const rotY = time * 0.4;
+        const rotZ = time * 0.2;
+
+        // ═══════════════════════════════════════════════════════════
+        // AURA (outer glow)
+        // ═══════════════════════════════════════════════════════════
+        const auraPulse = 1 + Math.sin(time * 2) * 0.15;
+        const auraSize = isBloom ? 180 : 140;
+        
+        gfx.circle(0, 0, auraSize * auraPulse)
+            .fill({ color: 0x64dcc8, alpha: isBloom ? 0.15 : 0.08 });
+        
+        gfx.circle(0, 0, auraSize * 0.7 * auraPulse)
+            .fill({ color: 0x9ae8d8, alpha: isBloom ? 0.2 : 0.1 });
+
+        // ═══════════════════════════════════════════════════════════
+        // PROJECT VERTICES
+        // ═══════════════════════════════════════════════════════════
+        const projected = baseVertices.map(v => 
+            project3D(v.x, v.y, v.z, rotX, rotY, rotZ, scale)
+        );
+
+        // ═══════════════════════════════════════════════════════════
+        // FACES (semi-transparent, depth-sorted)
+        // ═══════════════════════════════════════════════════════════
+        const facesWithDepth = faces.map(face => {
+            const avgZ = (projected[face[0]].z + projected[face[1]].z + projected[face[2]].z) / 3;
+            return { face, avgZ };
+        }).sort((a, b) => a.avgZ - b.avgZ);
+
+        for (const { face, avgZ } of facesWithDepth) {
+            const p0 = projected[face[0]];
+            const p1 = projected[face[1]];
+            const p2 = projected[face[2]];
+
+            const depthFactor = (avgZ + 1.5) / 3;
+            
+            if (isBloom) {
+                gfx.moveTo(p0.x, p0.y)
+                    .lineTo(p1.x, p1.y)
+                    .lineTo(p2.x, p2.y)
+                    .lineTo(p0.x, p0.y)
+                    .fill({ color: 0x64dcc8, alpha: depthFactor * 0.25 });
+            } else {
+                const alpha = 0.08 + depthFactor * 0.18;
+                gfx.moveTo(p0.x, p0.y)
+                    .lineTo(p1.x, p1.y)
+                    .lineTo(p2.x, p2.y)
+                    .lineTo(p0.x, p0.y)
+                    .fill({ color: 0x9ae8d8, alpha });
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // EDGES (pulsating, depth-based)
+        // ═══════════════════════════════════════════════════════════
+        const edgesWithDepth = edges.map((edge, idx) => {
+            const avgZ = (projected[edge[0]].z + projected[edge[1]].z) / 2;
+            return { edge, avgZ, idx };
+        }).sort((a, b) => a.avgZ - b.avgZ);
+
+        for (const { edge, avgZ, idx } of edgesWithDepth) {
+            const p1 = projected[edge[0]];
+            const p2 = projected[edge[1]];
+
+            const depthFactor = (avgZ + 1.5) / 3;
+            
+            // Pulsating width (wave effect)
+            const pulsePhase = time * 3 + idx * 0.3;
+            const pulse = 1 + Math.sin(pulsePhase) * 0.4;
+            
+            const baseWidth = isBloom ? 5 : 2;
+            const width = (baseWidth + depthFactor * 3) * pulse;
+            
+            const alpha = isBloom 
+                ? 0.3 + depthFactor * 0.5 
+                : 0.5 + depthFactor * 0.5;
+
+            gfx.moveTo(p1.x, p1.y)
+                .lineTo(p2.x, p2.y)
+                .stroke({ color: 0xf0f8ff, width, alpha, cap: "round" });
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // CENTRAL CORE (power source)
+        // ═══════════════════════════════════════════════════════════
+        const corePulse = 1 + Math.sin(time * 2.5) * 0.2;
+        
+        // Outer glow
+        gfx.circle(0, 0, (isBloom ? 35 : 18) * corePulse)
+            .fill({ color: 0x64dcc8, alpha: isBloom ? 0.25 : 0.15 });
+        
+        // Middle layer
+        gfx.circle(0, 0, (isBloom ? 25 : 12) * corePulse)
+            .fill({ color: 0x9ae8d8, alpha: isBloom ? 0.35 : 0.25 });
+        
+        // Bright core
+        gfx.circle(0, 0, (isBloom ? 15 : 7) * corePulse)
+            .fill({ color: 0xffffff, alpha: isBloom ? 0.8 : 0.95 });
+    }
+
+    app.ticker.add(() => {
+        time += 0.016;
+        drawIcosahedron(icoGfx, false);
+        drawIcosahedron(bloomGfx, true);
+        bloomContainer.x = 200;
+        bloomContainer.y = 200;
+        
+        // Subtle breathing
+        const breathe = 1 + Math.sin(time * 1.5) * 0.03;
+        container.scale.set(breathe);
+        bloomContainer.scale.set(breathe);
+    });
+
+    return app;
+}
+
+setup();
+</script>
+</body>
+</html>

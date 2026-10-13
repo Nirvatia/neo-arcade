@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EVENT HORIZON — White Core Comet</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: #050505; 
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+        canvas { 
+            display: block; 
+        }
+        #ui { 
+            position: absolute; 
+            top: 15px; 
+            left: 15px; 
+            color: #8899ff; 
+            font-size: 13px; 
+            background: rgba(2, 6, 18, 0.85);
+            padding: 14px 18px;
+            border-radius: 6px;
+            border: 1px solid rgba(136, 153, 255, 0.2);
+            backdrop-filter: blur(4px);
+            line-height: 1.8;
+        }
+        #ui h3 {
+            margin: 0 0 10px 0;
+            color: #fff;
+            font-size: 14px;
+            border-bottom: 1px solid rgba(136, 153, 255, 0.2);
+            padding-bottom: 8px;
+        }
+        #ui kbd {
+            background: rgba(136, 153, 255, 0.15);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+            color: #ccddff;
+            border: 1px solid rgba(136, 153, 255, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <h3>EVENT HORIZON v5.0 — White Core</h3>
+        <kbd>Space</kbd> Toggle Buffed &nbsp;|&nbsp; 
+        <kbd>Click</kbd> Trigger Death<br>
+        <kbd>E</kbd> Simulate Eat &nbsp;|&nbsp; 
+        <kbd>W</kbd> Wormhole &nbsp;|&nbsp; 
+        <kbd>G</kbd> Ghost Absorb<br>
+        <kbd>R</kbd> Reset / Revive
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+    <script type="module">
+        // ──────────────────────────────────────────────
+        // EVENT HORIZON — v5.0 (White Core Comet)
+        // Pulsating white core + flame tail
+        // ──────────────────────────────────────────────
+
+        const C = {
+            // Тело
+            CORE_WHITE: 0xffffff,
+            CORE_LIGHT: 0xddeeff,
+            CORE_MID: 0x99bbff,
+            CORE_EDGE: 0x5577cc,
+            CORE_ATMOSPHERE: 0x8899ff,
+            
+            // Рот
+            MOUTH_DARK: 0x020308,
+            MOUTH_GLOW: 0xaabbff,
+            MOUTH_GLOW_BRIGHT: 0xffffff,
+            
+            // Хвост
+            TAIL_START: 0xddeeff,
+            TAIL_MID: 0x6688cc,
+            TAIL_END: 0x0a1122,
+            
+            // VFX
+            PHOTON_BUFFED: 0xccddff,
+            PHOTON_OUTER: 0x4455cc,
+            CHERENKOV_BASE: 0x3344aa,
+            CHERENKOV_GLOW: 0x8899ff,
+            FLARE_WHITE: 0xffffff,
+            GHOST_STREAK: 0x44ccff,
+        };
+
+        const lerpColor = (a, b, t) => {
+            const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
+            const br = (b >> 16) & 0xff, bg = (b >> 8) & 0xff, bb = b & 0xff;
+            const cr = Math.round(ar + (br - ar) * t);
+            const cg = Math.round(ag + (bg - ag) * t);
+            const cb = Math.round(ab + (bb - ab) * t);
+            return (cr << 16) | (cg << 8) | cb;
+        };
+
+        class PacmanVisual {
+            constructor() {
+                this.x = 0;
+                this.y = 0;
+                this.r = 24;
+                this.direction = { dx: 1, dy: 0 };
+                this.lastDirection = { dx: 1, dy: 0 };
+                this.state = "ALIVE";
+                this.isBuffed = false;
+                this.time = 0;
+
+                this.config = {
+                    mouthSpeed: 0.008,
+                    maxMouthAngle: Math.PI / 3,
+                    idleMouthAngle: Math.PI / 12,
+                    tailParticleCount: 80,
+                    tailTurbulence: 0.3,
+                    corePulseSpeed: 2.5,
+                    corePulseAmp: 0.08,
+                    surfaceFlickerCount: 6,
+                };
+
+                this.container = new PIXI.Container();
+                this.container.isRenderGroup = true;
+                
+                this.trailGfx = new PIXI.Graphics();
+                this.accretionGfx = new PIXI.Graphics();
+                this.cometTailGfx = new PIXI.Graphics();
+                this.bodyGfx = new PIXI.Graphics();
+                this.mouthGfx = new PIXI.Graphics();
+                this.particleGfx = new PIXI.Graphics();
+                this.ringVfxGfx = new PIXI.Graphics();
+                this.flashGfx = new PIXI.Graphics();
+                this.ghostStreakGfx = new PIXI.Graphics();
+
+                this.trailGfx.blendMode = "add";
+                this.accretionGfx.blendMode = "add";
+                this.cometTailGfx.blendMode = "add";
+                this.bodyGfx.blendMode = "normal";
+                this.mouthGfx.blendMode = "add";
+                this.particleGfx.blendMode = "add";
+                this.ringVfxGfx.blendMode = "add";
+                this.flashGfx.blendMode = "add";
+                this.ghostStreakGfx.blendMode = "add";
+
+                this.container.addChild(
+                    this.trailGfx, this.accretionGfx, this.cometTailGfx, this.bodyGfx, this.mouthGfx,
+                    this.particleGfx, this.ringVfxGfx, this.ghostStreakGfx, this.flashGfx
+                );
+
+                this.trail = [];
+                this.particles = [];
+                this.ringVfx = [];
+                this.tailParticles = [];
+                this.surfaceFlickers = [];
+
+                this.lastTrailX = 0;
+                this.lastTrailY = 0;
+
+                this.deathTimer = 0;
+                this.deathParticleTimer = 0;
+                this.deathShrinkFactor = 0;
+                this.deathConvulsePhase = 0;
+
+                this.ghostStreakTimer = 0;
+                this.ghostStreakStartX = 0;
+                this.ghostStreakStartY = 0;
+                this.ghostTerminalFlash = 0;
+
+                this.eatFlashTimer = 0;
+                this.eatFlashType = null;
+
+                // Tail particles
+                for (let i = 0; i < this.config.tailParticleCount; i++) {
+                    this.tailParticles.push({
+                        x: 0, y: 0, vx: 0, vy: 0,
+                        life: 0, maxLife: 0, size: 0,
+                        active: false,
+                        turbulence: Math.random() * Math.PI * 2,
+                    });
+                }
+
+                // Surface flickers (мерцание поверхности)
+                for (let i = 0; i < this.config.surfaceFlickerCount; i++) {
+                    this.surfaceFlickers.push({
+                        angle: Math.random() * Math.PI * 2,
+                        dist: 0.3 + Math.random() * 0.5,
+                        size: 0.05 + Math.random() * 0.08,
+                        phase: Math.random() * Math.PI * 2,
+                        speed: 2 + Math.random() * 3,
+                    });
+                }
+
+                for (let i = 0; i < 250; i++) {
+                    this.particles.push({ x: 0, y: 0, vx: 0, vy: 0, life: 0, maxLife: 1, size: 0, active: false });
+                }
+                for (let i = 0; i < 12; i++) {
+                    this.ringVfx.push({ x: 0, y: 0, radius: 0, maxRadius: 0, life: 0, maxLife: 1, type: "DOT_SWALLOW", rotation: 0 });
+                }
+            }
+
+            update(dt) {
+                this.time += dt;
+
+                if (this.state === "DYING") {
+                    this.updateDeath(dt);
+                    this.updateParticles(dt);
+                    this.updateRingVfx(dt);
+                    this.updateTailParticles(dt);
+                    this.draw();
+                    return;
+                }
+
+                this.updateTrail(dt);
+                this.updateParticles(dt);
+                this.updateRingVfx(dt);
+                this.updateGhostStreak(dt);
+                this.updateTailParticles(dt);
+                if (this.eatFlashTimer > 0) this.eatFlashTimer -= dt;
+
+                const dx = this.x - this.lastTrailX;
+                const dy = this.y - this.lastTrailY;
+                const distSq = dx * dx + dy * dy;
+                
+                if (distSq > 16) { 
+                    this.trail.push({ 
+                        x: this.x, y: this.y, 
+                        life: this.isBuffed ? 0.55 : 0.38, 
+                        maxLife: this.isBuffed ? 0.55 : 0.38 
+                    });
+                    this.lastTrailX = this.x;
+                    this.lastTrailY = this.y;
+                    this.emitHawkingParticles();
+                    this.emitTailParticles();
+                }
+
+                this.draw();
+            }
+
+            triggerDeath() {
+                if (this.state === "DYING") return;
+                this.state = "DYING";
+                this.deathTimer = 0;
+                this.deathParticleTimer = 0;
+                this.deathShrinkFactor = 0;
+                this.deathConvulsePhase = 0;
+            }
+
+            simulateEat(type) {
+                this.eatFlashTimer = type === "DOT" ? 0.1 : type === "PILL" ? 0.45 : 0.4;
+                this.eatFlashType = type;
+                if (type === "DOT") this.spawnDotSwallowVFX(this.x + 30, this.y);
+                if (type === "PILL") this.spawnPillExpandVFX();
+            }
+
+            simulateWormhole() {
+                this.spawnWormholeVFX(this.x - 60, this.y, false);
+                this.spawnWormholeVFX(this.x + 60, this.y, true);
+            }
+
+            simulateGhostAbsorb() {
+                this.ghostStreakTimer = 0.45;
+                this.ghostStreakStartX = this.x - 120;
+                this.ghostStreakStartY = this.y;
+                this.ghostTerminalFlash = 0;
+                this.eatFlashTimer = 0.4;
+                this.eatFlashType = "GHOST";
+            }
+
+            spawnRingVFX(x, y, maxR, life, type, rot = 0) {
+                for (const r of this.ringVfx) {
+                    if (r.life <= 0) {
+                        r.x = x; r.y = y;
+                        r.radius = type === "PILL_EXPAND" || type === "WORMHOLE_ENTRY" ? 0 : maxR;
+                        r.maxRadius = maxR;
+                        r.life = life; r.maxLife = life;
+                        r.type = type; r.rotation = rot;
+                        return;
+                    }
+                }
+            }
+
+            spawnDotSwallowVFX(wx, wy) { this.spawnRingVFX(wx, wy, 7, 0.18, "DOT_SWALLOW"); }
+            spawnPillExpandVFX() { this.spawnRingVFX(this.x, this.y, this.r * 3.5, 0.45, "PILL_EXPAND"); }
+            spawnWormholeVFX(wx, wy, isEntry) {
+                const type = isEntry ? "WORMHOLE_ENTRY" : "WORMHOLE_EXIT";
+                this.spawnRingVFX(wx, wy, this.r * 1.6, isEntry ? 0.35 : 0.25, type, Math.random() * Math.PI);
+            }
+
+            spawnParticle(overrides) {
+                for (const p of this.particles) {
+                    if (!p.active) {
+                        Object.assign(p, { x: 0, y: 0, vx: 0, vy: 0, life: 1, maxLife: 1, size: 1.5 }, overrides, { active: true });
+                        return;
+                    }
+                }
+            }
+
+            emitHawkingParticles() {
+                const rate = this.isBuffed ? 0.7 : 0.25;
+                if (Math.random() < rate) {
+                    const rimAngle = Math.random() * Math.PI * 2;
+                    const dist = this.r * (0.85 + Math.random() * 0.3);
+                    this.spawnParticle({
+                        x: this.x + Math.cos(rimAngle) * dist,
+                        y: this.y + Math.sin(rimAngle) * dist,
+                        vx: Math.cos(rimAngle) * (50 + Math.random() * 140),
+                        vy: Math.sin(rimAngle) * (50 + Math.random() * 140),
+                        life: 0.3 + Math.random() * 0.6,
+                        maxLife: 0.9,
+                        size: 0.5 + Math.random() * 2.2,
+                    });
+                }
+            }
+
+            emitTailParticles() {
+                const backAngle = this.getAngle() + Math.PI;
+                const count = this.isBuffed ? 3 : 2;
+                for (let i = 0; i < count; i++) {
+                    for (const p of this.tailParticles) {
+                        if (!p.active) {
+                            const offsetAngle = backAngle + (Math.random() - 0.5) * 0.5;
+                            const offsetDist = this.r * (0.8 + Math.random() * 0.2);
+                            p.x = this.x + Math.cos(offsetAngle) * offsetDist;
+                            p.y = this.y + Math.sin(offsetAngle) * offsetDist;
+                            const speed = 80 + Math.random() * 60;
+                            const turbAngle = backAngle + (Math.random() - 0.5) * this.config.tailTurbulence;
+                            p.vx = Math.cos(turbAngle) * speed;
+                            p.vy = Math.sin(turbAngle) * speed;
+                            p.life = p.maxLife = 0.6 + Math.random() * 0.4;
+                            p.size = 2 + Math.random() * 3;
+                            p.active = true;
+                            p.turbulence = Math.random() * Math.PI * 2;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            emitDeathParticles() {
+                const count = 2 + Math.floor(this.deathShrinkFactor * 4);
+                for (let i = 0; i < count; i++) {
+                    const jetAxis = this.getAngle();
+                    const isJet = Math.random() < 0.5;
+                    const angle = isJet
+                        ? jetAxis + (Math.random() - 0.5) * 0.6 + (Math.random() < 0.5 ? 0 : Math.PI)
+                        : Math.random() * Math.PI * 2;
+                    const speed = isJet ? 180 + Math.random() * 250 : 60 + Math.random() * 120;
+                    this.spawnParticle({
+                        x: this.x + Math.cos(angle) * this.r * 0.3,
+                        y: this.y + Math.sin(angle) * this.r * 0.3,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        life: 0.4 + Math.random() * 0.7,
+                        maxLife: 1.1,
+                        size: 0.4 + Math.random() * 2.5,
+                    });
+                }
+            }
+
+            updateTrail(dt) {
+                for (let i = this.trail.length - 1; i >= 0; i--) {
+                    this.trail[i].life -= dt;
+                    if (this.trail[i].life <= 0) this.trail.splice(i, 1);
+                }
+            }
+
+            updateParticles(dt) {
+                for (const p of this.particles) {
+                    if (!p.active) continue;
+                    p.life -= dt;
+                    if (p.life <= 0) { p.active = false; continue; }
+                    p.x += p.vx * dt; p.y += p.vy * dt;
+                    p.vx *= 0.93; p.vy *= 0.93;
+                }
+            }
+
+            updateTailParticles(dt) {
+                for (const p of this.tailParticles) {
+                    if (!p.active) continue;
+                    p.life -= dt;
+                    if (p.life <= 0) { p.active = false; continue; }
+                    p.turbulence += dt * 5;
+                    const turbX = Math.sin(p.turbulence) * 20 * dt;
+                    const turbY = Math.cos(p.turbulence * 1.3) * 20 * dt;
+                    p.x += (p.vx + turbX) * dt;
+                    p.y += (p.vy + turbY) * dt;
+                    p.vx *= 0.96; p.vy *= 0.96;
+                }
+            }
+
+            updateRingVfx(dt) {
+                for (const r of this.ringVfx) {
+                    if (r.life <= 0) continue;
+                    r.life -= dt;
+                    const progress = 1 - r.life / r.maxLife;
+                    if (r.type === "DOT_SWALLOW") r.radius = r.maxRadius * (1 - progress);
+                    else if (r.type === "PILL_EXPAND" || r.type === "WORMHOLE_ENTRY") r.radius = r.maxRadius * progress;
+                }
+            }
+
+            updateGhostStreak(dt) {
+                if (this.ghostStreakTimer > 0) {
+                    this.ghostStreakTimer -= dt;
+                    if (this.ghostStreakTimer <= 0.1 && this.ghostTerminalFlash === 0) this.ghostTerminalFlash = 0.15;
+                }
+                if (this.ghostTerminalFlash > 0) this.ghostTerminalFlash -= dt;
+            }
+
+            updateDeath(dt) {
+                this.deathTimer += dt;
+                this.deathShrinkFactor = Math.min(1, Math.max(0, (this.deathTimer - 0.3) / 1.5));
+                if (this.deathTimer < 0.3) this.deathConvulsePhase += dt * 50;
+                if (this.deathTimer >= 0.3 && this.deathTimer < 1.8) {
+                    this.deathParticleTimer += dt;
+                    const interval = 0.06 - this.deathShrinkFactor * 0.04;
+                    while (this.deathParticleTimer > interval) {
+                        this.deathParticleTimer -= interval;
+                        this.emitDeathParticles();
+                    }
+                }
+            }
+
+            getAngle() {
+                const d = (this.direction.dx !== 0 || this.direction.dy !== 0) ? this.direction : this.lastDirection;
+                if (d.dx === 0 && d.dy === 0) return 0;
+                return Math.atan2(d.dy, d.dx);
+            }
+
+            getDisplayRadius() {
+                if (this.state === "DYING" && this.deathTimer < 0.3) {
+                    return this.r * (1 + Math.sin(this.deathConvulsePhase) * 0.12);
+                }
+                if (this.state === "DYING") {
+                    return Math.max(0, this.r * (1 - this.deathShrinkFactor * 0.88));
+                }
+                return this.r;
+            }
+
+            draw() {
+                this.trailGfx.clear();
+                this.accretionGfx.clear();
+                this.cometTailGfx.clear();
+                this.bodyGfx.clear();
+                this.mouthGfx.clear();
+                this.particleGfx.clear();
+                this.ringVfxGfx.clear();
+                this.flashGfx.clear();
+                this.ghostStreakGfx.clear();
+
+                const r = this.getDisplayRadius();
+                if (r <= 0.3) return;
+
+                if (this.state === "DYING") {
+                    this.drawDeathBody(r);
+                    this.drawParticles();
+                    this.drawRingVfx();
+                    return;
+                }
+
+                this.drawTrail();
+                if (this.isBuffed) this.drawAccretionDisk(r);
+                this.drawCometTail(r);
+                this.drawBody(r);
+                this.drawParticles();
+                this.drawRingVfx();
+                this.drawGhostStreak();
+                this.drawEatFlash(r);
+            }
+
+            drawTrail() {
+                if (this.trail.length < 2) return;
+                const baseWidth = this.r * (this.isBuffed ? 0.55 : 0.35);
+
+                for (let i = 1; i < this.trail.length; i++) {
+                    const p1 = this.trail[i - 1];
+                    const p2 = this.trail[i];
+                    const ratio = p2.life / p2.maxLife;
+                    if (ratio <= 0.01) continue;
+
+                    const x1 = p1.x - this.x, y1 = p1.y - this.y;
+                    const x2 = p2.x - this.x, y2 = p2.y - this.y;
+                    const width = baseWidth * ratio;
+
+                    this.trailGfx.moveTo(x1, y1).lineTo(x2, y2).stroke({
+                        color: C.CHERENKOV_BASE, width: width * 3.5,
+                        alpha: ratio * (this.isBuffed ? 0.2 : 0.12),
+                        cap: "round", join: "round",
+                    });
+                    this.trailGfx.moveTo(x1, y1).lineTo(x2, y2).stroke({
+                        color: this.isBuffed ? 0xffffff : C.CHERENKOV_GLOW,
+                        width: width * (this.isBuffed ? 1.0 : 0.55),
+                        alpha: ratio * (this.isBuffed ? 0.65 : 0.5),
+                        cap: "round", join: "round",
+                    });
+                }
+            }
+
+            drawAccretionDisk(r) {
+                const diskR = r * 1.2;
+                this.accretionGfx.circle(0, 0, diskR).stroke({ color: 0x4466aa, width: 2.5, alpha: 0.35 });
+                this.accretionGfx.circle(0, 0, diskR + 3).stroke({ color: C.PHOTON_BUFFED, width: 1, alpha: 0.15 });
+            }
+
+            drawCometTail(r) {
+                for (const p of this.tailParticles) {
+                    if (!p.active) continue;
+                    const lifeRatio = p.life / p.maxLife;
+                    const rx = p.x - this.x, ry = p.y - this.y;
+                    const size = p.size * lifeRatio;
+                    const color = lerpColor(C.TAIL_START, C.TAIL_END, 1 - lifeRatio);
+                    
+                    this.cometTailGfx.circle(rx, ry, size * 2).fill({ color, alpha: lifeRatio * 0.3 });
+                    this.cometTailGfx.circle(rx, ry, size * 0.6).fill({ color: C.FLARE_WHITE, alpha: lifeRatio * 0.8 });
+                }
+            }
+
+            // ══════════════════════════════════════════
+            // BODY — WHITE CORE
+            // ══════════════════════════════════════════
+            drawBody(r) {
+                const t = this.time * 1000;
+                const moving = this.direction.dx !== 0 || this.direction.dy !== 0;
+                const angle = this.getAngle();
+
+                let mouth;
+                if (moving) {
+                    const speedMult = this.isBuffed ? 1.35 : 1;
+                    mouth = Math.abs(Math.sin(t * this.config.mouthSpeed * speedMult)) * this.config.maxMouthAngle;
+                } else {
+                    mouth = this.config.idleMouthAngle;
+                }
+                mouth = Math.max(0.06, Math.min(mouth, Math.PI * 0.5));
+                if (this.isBuffed) mouth = Math.min(mouth * 1.15, Math.PI * 0.52);
+
+                const sa = angle + mouth;
+                const ea = angle + Math.PI * 2 - mouth;
+
+                // Пульсация ядра
+                const pulse = 1 + Math.sin(this.time * this.config.corePulseSpeed) * this.config.corePulseAmp;
+                const coreR = r * pulse;
+
+                // Смещение для асимметрии (свет сверху-слева)
+                const offsetX = -r * 0.15;
+                const offsetY = -r * 0.15;
+
+                // 1. Атмосферное свечение (тонкое, в форме сектора)
+                this.bodyGfx.moveTo(0, 0);
+                this.bodyGfx.arc(0, 0, r * 1.18, sa, ea, false);
+                this.bodyGfx.lineTo(0, 0);
+                this.bodyGfx.closePath();
+                this.bodyGfx.fill({ color: C.CORE_ATMOSPHERE, alpha: 0.12 });
+
+                // 2. Внешний слой (голубой)
+                this.bodyGfx.moveTo(offsetX * 0.3, offsetY * 0.3);
+                this.bodyGfx.arc(offsetX * 0.3, offsetY * 0.3, r, sa, ea, false);
+                this.bodyGfx.lineTo(offsetX * 0.3, offsetY * 0.3);
+                this.bodyGfx.closePath();
+                this.bodyGfx.fill({ color: C.CORE_EDGE, alpha: 0.95 });
+
+                // 3. Средний слой (светло-голубой)
+                this.bodyGfx.moveTo(offsetX * 0.6, offsetY * 0.6);
+                this.bodyGfx.arc(offsetX * 0.6, offsetY * 0.6, r * 0.75, sa, ea, false);
+                this.bodyGfx.lineTo(offsetX * 0.6, offsetY * 0.6);
+                this.bodyGfx.closePath();
+                this.bodyGfx.fill({ color: C.CORE_MID, alpha: 0.95 });
+
+                // 4. Белое ядро (пульсирующее)
+                this.bodyGfx.moveTo(offsetX, offsetY);
+                this.bodyGfx.arc(offsetX, offsetY, coreR * 0.45, sa, ea, false);
+                this.bodyGfx.lineTo(offsetX, offsetY);
+                this.bodyGfx.closePath();
+                this.bodyGfx.fill({ color: C.CORE_LIGHT, alpha: 0.95 });
+
+                // 5. Яркий центр ядра
+                this.bodyGfx.moveTo(offsetX * 1.1, offsetY * 1.1);
+                this.bodyGfx.arc(offsetX * 1.1, offsetY * 1.1, coreR * 0.22, sa, ea, false);
+                this.bodyGfx.lineTo(offsetX * 1.1, offsetY * 1.1);
+                this.bodyGfx.closePath();
+                this.bodyGfx.fill({ color: C.CORE_WHITE, alpha: 1.0 });
+
+                // 6. Мерцание поверхности (случайные яркие точки)
+                this.drawSurfaceFlickers(r, sa, ea);
+
+                // 7. Тонкая обводка
+                this.bodyGfx.moveTo(0, 0);
+                this.bodyGfx.arc(0, 0, r, sa, ea, false);
+                this.bodyGfx.lineTo(0, 0);
+                this.bodyGfx.closePath();
+                this.bodyGfx.stroke({
+                    color: this.isBuffed ? C.PHOTON_BUFFED : C.CORE_MID,
+                    width: this.isBuffed ? 3 : 2,
+                    alpha: this.isBuffed ? 0.7 : 0.5,
+                });
+
+                // 8. Рот с яркими светящимися краями
+                this.drawMouth(r, sa, ea, mouth);
+            }
+
+            drawSurfaceFlickers(r, sa, ea) {
+                for (const flicker of this.surfaceFlickers) {
+                    const intensity = 0.5 + Math.sin(this.time * flicker.speed + flicker.phase) * 0.5;
+                    if (intensity < 0.7) continue; // Показываем только яркие
+                    
+                    const fx = Math.cos(flicker.angle) * r * flicker.dist;
+                    const fy = Math.sin(flicker.angle) * r * flicker.dist;
+                    const fSize = r * flicker.size * intensity;
+                    
+                    // Проверяем, что точка внутри сектора (не в ротовой вырезке)
+                    const pointAngle = Math.atan2(fy, fx);
+                    let normalizedAngle = pointAngle;
+                    let normalizedSa = sa;
+                    let normalizedEa = ea;
+                    
+                    // Простая проверка — если точка слишком близко к центру рта, пропускаем
+                    const distFromCenter = Math.sqrt(fx * fx + fy * fy);
+                    if (distFromCenter < r * 0.2) continue;
+                    
+                    this.bodyGfx.circle(fx, fy, fSize).fill({ 
+                        color: C.CORE_WHITE, 
+                        alpha: intensity * 0.6 
+                    });
+                }
+            }
+
+            drawMouth(r, sa, ea, mouth) {
+                const mouthSize = Math.PI * 2 - (ea - sa);
+                if (mouthSize < 0.05) return;
+
+                // Тёмная бездна внутри рта
+                const glowR = r * 0.85;
+                this.mouthGfx.moveTo(0, 0);
+                this.mouthGfx.arc(0, 0, glowR, sa, ea, false);
+                this.mouthGfx.lineTo(0, 0);
+                this.mouthGfx.closePath();
+                this.mouthGfx.fill({ color: C.MOUTH_DARK, alpha: 0.85 });
+
+                // Яркие светящиеся края рта
+                const edgePulse = 0.6 + Math.sin(this.time * 4) * 0.3;
+                
+                // Внешнее свечение края
+                this.mouthGfx.moveTo(Math.cos(sa) * r, Math.sin(sa) * r);
+                this.mouthGfx.lineTo(0, 0);
+                this.mouthGfx.stroke({
+                    color: C.MOUTH_GLOW,
+                    width: 4,
+                    alpha: edgePulse * 0.4,
+                    cap: "round",
+                });
+                
+                this.mouthGfx.moveTo(Math.cos(ea) * r, Math.sin(ea) * r);
+                this.mouthGfx.lineTo(0, 0);
+                this.mouthGfx.stroke({
+                    color: C.MOUTH_GLOW,
+                    width: 4,
+                    alpha: edgePulse * 0.4,
+                    cap: "round",
+                });
+
+                // Яркая сердцевина края
+                this.mouthGfx.moveTo(Math.cos(sa) * r, Math.sin(sa) * r);
+                this.mouthGfx.lineTo(0, 0);
+                this.mouthGfx.stroke({
+                    color: C.MOUTH_GLOW_BRIGHT,
+                    width: 1.5,
+                    alpha: edgePulse * 0.9,
+                    cap: "round",
+                });
+                
+                this.mouthGfx.moveTo(Math.cos(ea) * r, Math.sin(ea) * r);
+                this.mouthGfx.lineTo(0, 0);
+                this.mouthGfx.stroke({
+                    color: C.MOUTH_GLOW_BRIGHT,
+                    width: 1.5,
+                    alpha: edgePulse * 0.9,
+                    cap: "round",
+                });
+
+                // Точка в глубине рта (бездна)
+                if (mouthSize > 0.2) {
+                    this.mouthGfx.circle(0, 0, r * 0.04).fill({ 
+                        color: C.CORE_WHITE, 
+                        alpha: edgePulse * 0.5 
+                    });
+                }
+            }
+
+            drawParticles() {
+                let hasVisible = false;
+                for (const p of this.particles) {
+                    if (p.active && p.life > 0.01) { hasVisible = true; break; }
+                }
+                if (!hasVisible) return;
+
+                for (const p of this.particles) {
+                    if (!p.active) continue;
+                    const alpha = Math.max(0, p.life / p.maxLife);
+                    if (alpha <= 0.01) continue;
+                    const rx = p.x - this.x, ry = p.y - this.y;
+                    this.particleGfx.circle(rx, ry, p.size * 2.2 * alpha).fill({ color: C.CHERENKOV_BASE, alpha: alpha * 0.18 });
+                    this.particleGfx.circle(rx, ry, p.size * 0.45 * alpha).fill({ color: C.CHERENKOV_GLOW, alpha: alpha * 0.7 });
+                }
+            }
+
+            drawRingVfx() {
+                for (const r of this.ringVfx) {
+                    if (r.life <= 0) continue;
+                    const alpha = Math.max(0, r.life / r.maxLife);
+                    const rx = r.x - this.x, ry = r.y - this.y;
+
+                    if (r.type === "DOT_SWALLOW" && r.radius > 0.5) {
+                        this.ringVfxGfx.circle(rx, ry, r.radius).stroke({ color: C.CHERENKOV_GLOW, width: 1.5 * alpha, alpha: alpha * 0.8 });
+                        this.ringVfxGfx.circle(rx, ry, r.radius * 0.6).stroke({ color: 0xffffff, width: 0.8 * alpha, alpha: alpha * 0.6 });
+                    } else if (r.type === "PILL_EXPAND") {
+                        this.ringVfxGfx.circle(rx, ry, r.radius).stroke({ color: 0xffffff, width: 3 * alpha, alpha: alpha * 0.7 });
+                        this.ringVfxGfx.circle(rx, ry, r.radius * 0.85).stroke({ color: C.PHOTON_OUTER, width: 5 * alpha, alpha: alpha * 0.3 });
+                        this.ringVfxGfx.circle(rx, ry, r.radius * 0.3).stroke({ color: 0xffffff, width: 1.5 * alpha, alpha: alpha * 0.5 });
+                    } else if (r.type === "WORMHOLE_EXIT" || r.type === "WORMHOLE_ENTRY") {
+                        const isEntry = r.type === "WORMHOLE_ENTRY";
+                        const progress = 1 - alpha;
+                        const ringR = isEntry ? r.radius : r.maxRadius;
+                        this.ringVfxGfx.circle(rx, ry, ringR).stroke({ color: isEntry ? C.PHOTON_BUFFED : C.CHERENKOV_GLOW, width: 4 * alpha, alpha: alpha * 0.7 });
+                        this.ringVfxGfx.circle(rx, ry, ringR * 0.65).stroke({ color: 0xffffff, width: 2.5 * alpha, alpha: alpha * 0.8 });
+                        
+                        const streakCount = 12;
+                        const baseTwist = Math.PI * 1.8;
+                        const twist = isEntry ? progress * baseTwist * (0.8 + 0.4 * Math.sin(progress * 10)) : (1 - progress) * baseTwist;
+                        for (let s = 0; s < streakCount; s++) {
+                            const baseAngle = (s / streakCount) * Math.PI * 2 + r.rotation;
+                            const innerAngle = baseAngle + twist;
+                            const outerAngle = baseAngle - twist * 0.5;
+                            this.ringVfxGfx.moveTo(rx + Math.cos(innerAngle) * ringR * 0.15 * alpha, ry + Math.sin(innerAngle) * ringR * 0.15 * alpha);
+                            this.ringVfxGfx.lineTo(rx + Math.cos(outerAngle) * ringR * (0.9 + alpha * 0.1), ry + Math.sin(outerAngle) * ringR * (0.9 + alpha * 0.1));
+                            this.ringVfxGfx.stroke({ color: s % 3 === 0 ? 0xffffff : C.CHERENKOV_GLOW, width: (s % 3 === 0 ? 1.8 : 0.8) * alpha, alpha: alpha * 0.5 });
+                        }
+                        if (isEntry && progress > 0.7) {
+                            const coreAlpha = (progress - 0.7) / 0.3;
+                            this.ringVfxGfx.circle(rx, ry, ringR * 0.2 * coreAlpha).fill({ color: 0xffffff, alpha: coreAlpha * 0.9 });
+                        }
+                    }
+                }
+            }
+
+            drawGhostStreak() {
+                if (this.ghostStreakTimer <= 0 && this.ghostTerminalFlash <= 0) return;
+                if (this.ghostStreakTimer > 0) {
+                    const progress = 1 - this.ghostStreakTimer / 0.45;
+                    const startX = this.ghostStreakStartX - this.x, startY = this.ghostStreakStartY - this.y;
+                    const t = Math.min(1, progress * 2.5);
+                    const cx = startX + (0 - startX) * t, cy = startY + (0 - startY) * t;
+                    const alpha = 1 - progress;
+                    this.ghostStreakGfx.moveTo(startX, startY).lineTo(cx, cy).stroke({ color: C.GHOST_STREAK, width: 3.5 * alpha, alpha: alpha * 0.3, cap: "round" });
+                    this.ghostStreakGfx.moveTo(startX, startY).lineTo(cx, cy).stroke({ color: 0xffffff, width: 1.2 * alpha, alpha: alpha * 0.7, cap: "round" });
+                }
+                if (this.ghostTerminalFlash > 0) {
+                    const flashAlpha = this.ghostTerminalFlash / 0.15;
+                    const flashR = this.r * (0.5 + flashAlpha * 1.5);
+                    this.ghostStreakGfx.circle(0, 0, flashR).fill({ color: 0xffffff, alpha: flashAlpha * 0.6 });
+                    this.ghostStreakGfx.circle(0, 0, flashR * 1.6).fill({ color: C.GHOST_STREAK, alpha: flashAlpha * 0.2 });
+                }
+            }
+
+            drawEatFlash(r) {
+                if (this.eatFlashTimer <= 0) return;
+                const maxTime = this.eatFlashType === "DOT" ? 0.1 : this.eatFlashType === "PILL" ? 0.45 : 0.4;
+                const alpha = this.eatFlashTimer / maxTime;
+                if (this.eatFlashType === "GHOST") {
+                    this.flashGfx.circle(0, 0, r).stroke({ color: 0xffffff, width: 3.5 * alpha, alpha: alpha * 0.65 });
+                    this.flashGfx.circle(0, 0, r + 8).stroke({ color: C.GHOST_STREAK, width: 6 * alpha, alpha: alpha * 0.25 });
+                } else if (this.eatFlashType === "PILL") {
+                    this.flashGfx.circle(0, 0, r).stroke({ color: 0xffffff, width: 2.5 * alpha, alpha: alpha * 0.8 });
+                }
+                if (this.eatFlashType === "DOT") {
+                    this.flashGfx.circle(0, 0, r * 0.25).fill({ color: 0xffffff, alpha: alpha * 0.2 });
+                }
+            }
+
+            drawDeathBody(r) {
+                const alpha = this.deathTimer < 1.8 ? 1 : Math.max(0, 1 - (this.deathTimer - 1.8) / 0.2);
+                if (alpha <= 0) return;
+                this.bodyGfx.circle(0, 0, r).fill({ color: 0x020612, alpha });
+                const shrink = this.deathShrinkFactor;
+                const rimWidth = 1.5 + shrink * 1.5;
+                if (this.deathTimer < 0.3) {
+                    const flicker = 0.5 + 0.5 * Math.sin(this.deathConvulsePhase);
+                    const color = flicker > 0.7 ? 0xffffff : C.CORE_MID;
+                    this.bodyGfx.circle(0, 0, r).stroke({ color, width: 2 + flicker * 3, alpha: (0.5 + flicker * 0.5) * alpha });
+                } else {
+                    const color = shrink > 0.7 ? 0xffffff : C.PHOTON_BUFFED;
+                    this.bodyGfx.circle(0, 0, r).stroke({ color, width: rimWidth, alpha: (0.5 + shrink * 0.5) * alpha });
+                    this.bodyGfx.circle(0, 0, r * (1.2 + shrink * 2.5)).stroke({ color: C.PHOTON_OUTER, width: 1, alpha: shrink * alpha * 0.3 });
+                }
+                if (this.deathTimer >= 1.5 && this.deathTimer < 1.8) {
+                    const popProgress = (this.deathTimer - 1.5) / 0.3;
+                    this.flashGfx.circle(0, 0, this.r * 0.2 * (1 + popProgress * 3)).fill({ color: 0xffffff, alpha: (1 - popProgress) * 0.8 });
+                }
+                if (this.deathTimer >= 1.8 && this.deathTimer < 1.95) {
+                    const flashAlpha = Math.max(0, 1 - (this.deathTimer - 1.8) / 0.15);
+                    this.flashGfx.circle(0, 0, this.r * 2 * (2 - flashAlpha)).fill({ color: 0xffffff, alpha: flashAlpha * 0.5 });
+                }
+            }
+        }
+
+        async function main() {
+            const app = new PIXI.Application();
+            await app.init({
+                width: window.innerWidth, height: window.innerHeight,
+                backgroundColor: 0x050505, antialias: true,
+                resolution: window.devicePixelRatio || 1, autoDensity: true,
+            });
+            document.body.appendChild(app.canvas);
+
+            const pacman = new PacmanVisual();
+            app.stage.addChild(pacman.container);
+
+            let demoTime = 0;
+            const radius = Math.min(window.innerWidth, window.innerHeight) * 0.25;
+            const speed = 1.2;
+
+            window.addEventListener('keydown', (e) => {
+                if (e.code === 'Space') pacman.isBuffed = !pacman.isBuffed;
+                else if (e.code === 'KeyE') pacman.simulateEat("PILL");
+                else if (e.code === 'KeyW') pacman.simulateWormhole();
+                else if (e.code === 'KeyG') pacman.simulateGhostAbsorb();
+                else if (e.code === 'KeyR' && pacman.state === "DYING") {
+                    pacman.state = "ALIVE";
+                    pacman.deathTimer = 0;
+                }
+            });
+
+            window.addEventListener('click', () => {
+                if (pacman.state === "ALIVE") pacman.triggerDeath();
+            });
+
+            window.addEventListener('resize', () => app.renderer.resize(window.innerWidth, window.innerHeight));
+
+            app.ticker.add((ticker) => {
+                const dt = ticker.deltaMS / 1000;
+                demoTime += dt * speed;
+                pacman.x = window.innerWidth / 2 + Math.cos(demoTime) * radius;
+                pacman.y = window.innerHeight / 2 + Math.sin(demoTime) * radius;
+                pacman.direction.dx = -Math.sin(demoTime);
+                pacman.direction.dy = Math.cos(demoTime);
+                pacman.lastDirection = { ...pacman.direction };
+                pacman.container.position.set(pacman.x, pacman.y);
+                pacman.update(dt);
+            });
+        }
+
+        main();
+    </script>
+</body>
+</html>

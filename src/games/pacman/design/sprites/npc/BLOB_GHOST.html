@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Winter Ghosts — Enhanced (PixiJS v8)</title>
+<style>
+    body { 
+        margin: 0; 
+        overflow: hidden; 
+        background: #0a1520; 
+        font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+    canvas { display: block; }
+    #ui { 
+        position: absolute; 
+        top: 15px; 
+        left: 15px; 
+        color: #c8d8e8; 
+        font-size: 13px; 
+        pointer-events: none;
+        background: rgba(10, 21, 32, 0.85);
+        padding: 12px 16px;
+        border-radius: 6px;
+        border: 1px solid rgba(168, 200, 232, 0.25);
+        backdrop-filter: blur(8px);
+        line-height: 1.8;
+    }
+    #ui kbd {
+        background: rgba(168, 200, 232, 0.15);
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: monospace;
+        color: #e0f0ff;
+        border: 1px solid rgba(168, 200, 232, 0.3);
+    }
+    .controls {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 12px;
+    }
+    .btn {
+        background: rgba(15, 25, 35, 0.85);
+        border: 1px solid rgba(168, 200, 232, 0.3);
+        color: #c8d8e8;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        transition: all 0.3s;
+        backdrop-filter: blur(8px);
+    }
+    .btn:hover {
+        background: rgba(25, 40, 55, 0.9);
+        border-color: rgba(200, 220, 240, 0.5);
+    }
+    .btn.active {
+        background: rgba(80, 120, 160, 0.9);
+        border-color: rgba(220, 240, 255, 0.6);
+        color: #ffffff;
+        box-shadow: 0 0 15px rgba(168, 200, 232, 0.4);
+    }
+</style>
+</head>
+<body>
+    <div id="ui">
+        <strong style="color: #fff;">❄ Winter Ghosts</strong><br>
+        <kbd>Space</kbd> Toggle Frightened<br>
+        <kbd>1-4</kbd> Change Color
+    </div>
+    <div class="controls">
+        <button class="btn active" id="btnNormal">Normal</button>
+        <button class="btn" id="btnFrightened">Frightened</button>
+        <button class="btn" id="btnFleeing">Fleeing</button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+    <script type="module">
+        function rotPt(x, y, angle) {
+            const c = Math.cos(angle);
+            const s = Math.sin(angle);
+            return { x: x * c - y * s, y: x * s + y * c };
+        }
+
+        class WinterGhost {
+            constructor(x, y, color = 'blinky') {
+                this.x = x;
+                this.y = y;
+                this.vx = 0;
+                this.vy = 0;
+                this.targetX = x;
+                this.targetY = y;
+                this.direction = { x: 1, y: 0 };
+                this.targetDirection = { x: 1, y: 0 };
+                this.visualAngle = 0;
+                this.targetVisualAngle = 0;
+                this.state = 'normal';
+                this.time = 0;
+                this.colorScheme = this.getColorScheme(color);
+                this.baseColor = color;
+                this.ghostType = color;
+                
+                this.container = new PIXI.Container();
+                this.container.x = x;
+                this.container.y = y;
+                
+                this.mainContainer = new PIXI.Container();
+                this.leftEarContainer = new PIXI.Container();
+                this.rightEarContainer = new PIXI.Container();
+                
+                this.shadowGfx = new PIXI.Graphics();
+                this.trailGfx = new PIXI.Graphics();
+                this.auraGfx = new PIXI.Graphics();
+                this.bodyGfx = new PIXI.Graphics();
+                this.frostGfx = new PIXI.Graphics();
+                this.leftEarGfx = new PIXI.Graphics();
+                this.rightEarGfx = new PIXI.Graphics();
+                this.eyesGfx = new PIXI.Graphics();
+                this.mouthGfx = new PIXI.Graphics();
+                
+                this.trailGfx.blendMode = 'add';
+                this.auraGfx.blendMode = 'add';
+                this.frostGfx.blendMode = 'add';
+                
+                this.container.addChild(this.shadowGfx);
+                this.container.addChild(this.trailGfx);
+                this.container.addChild(this.auraGfx);
+                this.container.addChild(this.mainContainer);
+                
+                this.mainContainer.addChild(this.bodyGfx);
+                this.mainContainer.addChild(this.frostGfx);
+                this.mainContainer.addChild(this.leftEarContainer);
+                this.mainContainer.addChild(this.rightEarContainer);
+                this.mainContainer.addChild(this.eyesGfx);
+                this.mainContainer.addChild(this.mouthGfx);
+                
+                this.leftEarContainer.addChild(this.leftEarGfx);
+                this.rightEarContainer.addChild(this.rightEarGfx);
+                
+                this.trail = [];
+                for (let i = 0; i < 25; i++) {
+                    this.trail.push({ 
+                        x: 0, y: 0, life: 0, maxLife: 1, 
+                        size: 0, rotation: 0 
+                    });
+                }
+                
+                this.auraCrystals = [];
+                for (let i = 0; i < 8; i++) {
+                    this.auraCrystals.push({
+                        angle: (i / 8) * Math.PI * 2,
+                        dist: 32 + Math.random() * 5,
+                        size: 2.5 + Math.random() * 1.5,
+                        speed: 0.4 + Math.random() * 0.3,
+                        phase: Math.random() * Math.PI * 2,
+                        rotation: Math.random() * Math.PI * 2
+                    });
+                }
+                
+                this.frostPatterns = [];
+                for (let i = 0; i < 16; i++) {
+                    this.frostPatterns.push({
+                        x: (Math.random() - 0.5) * 28,
+                        y: (Math.random() - 0.5) * 28,
+                        size: 2 + Math.random() * 2.5,
+                        angle: Math.random() * Math.PI * 2,
+                        alpha: 0.3 + Math.random() * 0.3
+                    });
+                }
+                
+                this.blobPhases = [0, 1.5, 3.0, 4.5];
+                
+                this.breathe = 0;
+                this.squish = { x: 1, y: 1 };
+                this.targetSquish = { x: 1, y: 1 };
+                this.eyeOffset = { x: 0, y: 0 };
+                this.targetEyeOffset = { x: 0, y: 0 };
+                this.lean = 0;
+                this.targetLean = 0;
+                this.fleeTimer = 0;
+                this.earPinch = 0;
+                this.targetEarPinch = 0;
+                this.earFlap = { left: 0, right: 0 };
+                this.mouthOpen = 0;
+                this.targetMouthOpen = 0;
+            }
+            
+            getColorScheme(name) {
+                const schemes = {
+                    blinky: {
+                        body: 0xFF3030, bodyLight: 0xFF5555, bodyMid: 0xCC2020,
+                        bodyDark: 0x881515, bodyShadow: 0x550808,
+                        eyes: 0xFFFFFF, pupil: 0x1a2a4a,
+                        glow: 0xFF6666, trail: 0xFF4444, frost: 0xFFAAAA, shadow: 0x881515
+                    },
+                    pinky: {
+                        body: 0xFFB8E8, bodyLight: 0xFFD0F0, bodyMid: 0xDD99C8,
+                        bodyDark: 0xAA6699, bodyShadow: 0x663366,
+                        eyes: 0xFFFFFF, pupil: 0x3a1a3a,
+                        glow: 0xFFCCEE, trail: 0xFFAADD, frost: 0xFFDDFF, shadow: 0xAA6699
+                    },
+                    inky: {
+                        body: 0x40E0E0, bodyLight: 0x70F0F0, bodyMid: 0x20B8B8,
+                        bodyDark: 0x108888, bodyShadow: 0x085555,
+                        eyes: 0xFFFFFF, pupil: 0x0a2a3a,
+                        glow: 0x66EEEE, trail: 0x44DDDD, frost: 0xAAFFFF, shadow: 0x108888
+                    },
+                    clyde: {
+                        body: 0xFFB852, bodyLight: 0xFFCC77, bodyMid: 0xCC9933,
+                        bodyDark: 0x886622, bodyShadow: 0x553311,
+                        eyes: 0xFFFFFF, pupil: 0x3a2a1a,
+                        glow: 0xFFCC77, trail: 0xFFAA44, frost: 0xFFDDAA, shadow: 0x886622
+                    },
+                    frightened: {
+                        body: 0x6688CC, bodyLight: 0x88AAEE, bodyMid: 0x4466AA,
+                        bodyDark: 0x224488, bodyShadow: 0x112244,
+                        eyes: 0xFFFFFF, pupil: 0x1a2a4a,
+                        glow: 0x88AAEE, trail: 0x6699DD, frost: 0xAABBFF, shadow: 0x224488
+                    }
+                };
+                return schemes[name] || schemes.blinky;
+            }
+            
+            setState(state) {
+                this.state = state;
+                if (state === 'fleeing') {
+                    this.fleeTimer = 0;
+                    this.targetMouthOpen = 0.8;
+                } else if (state === 'frightened') {
+                    this.targetMouthOpen = 0.4;
+                } else {
+                    this.targetMouthOpen = 0;
+                }
+                
+                if (state === 'normal') {
+                    this.colorScheme = this.getColorScheme(this.baseColor);
+                    this.targetEarPinch = 0;
+                } else if (state === 'frightened') {
+                    this.colorScheme = this.getColorScheme('frightened');
+                    this.targetEarPinch = 0.5;
+                } else if (state === 'fleeing') {
+                    this.colorScheme = this.getColorScheme('frightened');
+                    this.targetEarPinch = 0.8;
+                }
+            }
+            
+            setColor(color) {
+                this.baseColor = color;
+                if (this.state === 'normal') {
+                    this.colorScheme = this.getColorScheme(color);
+                }
+            }
+            
+            moveTo(x, y) {
+                this.targetX = x;
+                this.targetY = y;
+            }
+            
+            update(dt) {
+                this.time += dt;
+                
+                if (this.state === 'fleeing') this.fleeTimer += dt;
+                
+                const dx = this.targetX - this.x;
+                const dy = this.targetY - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                const speeds = { normal: 50, frightened: 40, fleeing: 95 };
+                const targetSpeed = speeds[this.state];
+                
+                if (dist > 1) {
+                    const targetVx = (dx / dist) * targetSpeed;
+                    const targetVy = (dy / dist) * targetSpeed;
+                    this.vx += (targetVx - this.vx) * 0.08;
+                    this.vy += (targetVy - this.vy) * 0.08;
+                    
+                    this.x += this.vx * dt;
+                    this.y += this.vy * dt;
+                    
+                    const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                    if (speed > 5) {
+                        this.targetDirection.x = this.vx / speed;
+                        this.targetDirection.y = this.vy / speed;
+                        this.targetVisualAngle = Math.atan2(this.vy, this.vx);
+                    }
+                } else {
+                    this.vx *= 0.92;
+                    this.vy *= 0.92;
+                }
+                
+                this.direction.x += (this.targetDirection.x - this.direction.x) * 0.08;
+                this.direction.y += (this.targetDirection.y - this.direction.y) * 0.08;
+                
+                let angleDiff = this.targetVisualAngle - this.visualAngle;
+                while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                this.visualAngle += angleDiff * 0.06;
+                
+                this.breathe = Math.sin(this.time * 1.5) * 0.04;
+                
+                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                const deform = Math.min(speed / 100, 0.25);
+                
+                if (this.state === 'frightened') {
+                    const tremble = Math.sin(this.time * 8) * 0.025;
+                    this.targetSquish.x = 0.88 + tremble;
+                    this.targetSquish.y = 0.88 + tremble;
+                } else if (this.state === 'fleeing') {
+                    const tremble = Math.sin(this.time * 12) * 0.02;
+                    this.targetSquish.x = 0.82 + deform * 0.25 + tremble;
+                    this.targetSquish.y = 0.88 - deform * 0.15 + tremble;
+                } else {
+                    const absDx = Math.abs(this.direction.x);
+                    const absDy = Math.abs(this.direction.y);
+                    this.targetSquish.x = 1 - deform * 0.3 + absDy * deform * 0.6 + this.breathe;
+                    this.targetSquish.y = 1 - deform * 0.3 + absDx * deform * 0.6 + this.breathe;
+                }
+                
+                this.squish.x += (this.targetSquish.x - this.squish.x) * 0.12;
+                this.squish.y += (this.targetSquish.y - this.squish.y) * 0.12;
+                
+                this.targetLean = -angleDiff * 0.3;
+                this.targetLean = Math.max(-0.3, Math.min(0.3, this.targetLean));
+                this.lean += (this.targetLean - this.lean) * 0.1;
+                
+                this.targetEyeOffset.x = this.direction.x * 3.5;
+                this.targetEyeOffset.y = this.direction.y * 3.5;
+                this.eyeOffset.x += (this.targetEyeOffset.x - this.eyeOffset.x) * 0.15;
+                this.eyeOffset.y += (this.targetEyeOffset.y - this.eyeOffset.y) * 0.15;
+                
+                this.earPinch += (this.targetEarPinch - this.earPinch) * 0.1;
+                this.mouthOpen += (this.targetMouthOpen - this.mouthOpen) * 0.1;
+                
+                const earPhysics = Math.sin(this.time * 3) * 0.3 * (1 - this.earPinch);
+                this.earFlap.left = earPhysics;
+                this.earFlap.right = Math.sin(this.time * 3 + 0.5) * 0.3 * (1 - this.earPinch);
+                
+                this.updateTrail(dt);
+                
+                this.container.x = this.x;
+                this.container.y = this.y;
+                
+                this.mainContainer.rotation = this.lean;
+            }
+            
+            updateTrail(dt) {
+                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                const spawnRate = this.state === 'fleeing' ? 0.8 : (this.state === 'frightened' ? 0.6 : 0.5);
+                
+                if (speed > 15 && Math.random() < spawnRate) {
+                    for (const p of this.trail) {
+                        if (p.life <= 0) {
+                            p.x = -this.direction.x * 22 + (Math.random() - 0.5) * 10;
+                            p.y = -this.direction.y * 22 + (Math.random() - 0.5) * 10;
+                            p.life = p.maxLife = 0.7 + Math.random() * 0.5;
+                            p.size = 4 + Math.random() * 3;
+                            p.rotation = Math.random() * Math.PI * 2;
+                            break;
+                        }
+                    }
+                }
+                
+                for (const p of this.trail) {
+                    if (p.life > 0) {
+                        p.life -= dt;
+                        p.rotation += dt * 2;
+                    }
+                }
+            }
+            
+            draw() {
+                this.shadowGfx.clear();
+                this.trailGfx.clear();
+                this.auraGfx.clear();
+                this.bodyGfx.clear();
+                this.frostGfx.clear();
+                this.leftEarGfx.clear();
+                this.rightEarGfx.clear();
+                this.eyesGfx.clear();
+                this.mouthGfx.clear();
+                
+                if (this.state === 'fleeing') {
+                    const flickerCycle = Math.sin(this.fleeTimer * 6);
+                    if (flickerCycle > 0.3) {
+                        this.colorScheme = {
+                            body: 0xAABBDD, bodyLight: 0xCCDDFF, bodyMid: 0x8899BB,
+                            bodyDark: 0x667799, bodyShadow: 0x445577,
+                            eyes: 0xFFFFFF, pupil: 0x1a2a4a,
+                            glow: 0xCCDDFF, trail: 0xAABBDD, frost: 0xDDDDFF, shadow: 0x667799
+                        };
+                    } else {
+                        this.colorScheme = this.getColorScheme('frightened');
+                    }
+                }
+                
+                this.drawShadow();
+                this.drawTrail();
+                this.drawAura();
+                this.drawBody();
+                this.drawFrost();
+                this.drawEars();
+                this.drawEyes();
+                this.drawMouth();
+            }
+            
+            drawShadow() {
+                this.shadowGfx.ellipse(0, 26, 20 * this.squish.x, 8)
+                    .fill({ color: this.colorScheme.shadow, alpha: 0.25 });
+            }
+            
+            drawTrail() {
+                for (const p of this.trail) {
+                    if (p.life <= 0) continue;
+                    const t = p.life / p.maxLife;
+                    const sz = p.size * t;
+                    
+                    this.trailGfx.circle(p.x, p.y, sz * 2)
+                        .fill({ color: this.colorScheme.glow, alpha: t * 0.15 });
+                    
+                    for (let i = 0; i < 6; i++) {
+                        const a = (i / 6) * Math.PI * 2 + p.rotation;
+                        const ex = p.x + Math.cos(a) * sz;
+                        const ey = p.y + Math.sin(a) * sz;
+                        this.trailGfx.moveTo(p.x, p.y);
+                        this.trailGfx.lineTo(ex, ey);
+                    }
+                    this.trailGfx.stroke({ 
+                        color: this.colorScheme.trail, 
+                        width: 1.5, 
+                        alpha: t * 0.7 
+                    });
+                    
+                    this.trailGfx.circle(p.x, p.y, sz * 0.4)
+                        .fill({ color: this.colorScheme.trail, alpha: t * 0.9 });
+                }
+            }
+            
+            drawAura() {
+                for (const crystal of this.auraCrystals) {
+                    crystal.angle += crystal.speed * 0.016;
+                    crystal.rotation += 0.02;
+                    
+                    const pulse = 1 + Math.sin(this.time * 2 + crystal.phase) * 0.15;
+                    const fx = Math.cos(crystal.angle) * crystal.dist * pulse;
+                    const fy = Math.sin(crystal.angle) * crystal.dist * pulse;
+                    const alpha = 0.3 + Math.sin(this.time * 3 + crystal.phase) * 0.15;
+                    
+                    this.auraGfx.circle(fx, fy, crystal.size * 2.5)
+                        .fill({ color: this.colorScheme.glow, alpha: alpha * 0.2 });
+                    
+                    for (let i = 0; i < 6; i++) {
+                        const a = (i / 6) * Math.PI * 2 + crystal.rotation;
+                        
+                        const tip = rotPt(Math.cos(a) * crystal.size, Math.sin(a) * crystal.size, 0);
+                        this.auraGfx.moveTo(fx, fy);
+                        this.auraGfx.lineTo(fx + tip.x, fy + tip.y);
+                        
+                        const branchLen = crystal.size * 0.4;
+                        const branchBaseX = fx + Math.cos(a) * crystal.size * 0.7;
+                        const branchBaseY = fy + Math.sin(a) * crystal.size * 0.7;
+                        
+                        const b1 = rotPt(Math.cos(a + 0.5) * branchLen, Math.sin(a + 0.5) * branchLen, 0);
+                        const b2 = rotPt(Math.cos(a - 0.5) * branchLen, Math.sin(a - 0.5) * branchLen, 0);
+                        
+                        this.auraGfx.moveTo(branchBaseX, branchBaseY);
+                        this.auraGfx.lineTo(branchBaseX + b1.x, branchBaseY + b1.y);
+                        this.auraGfx.moveTo(branchBaseX, branchBaseY);
+                        this.auraGfx.lineTo(branchBaseX + b2.x, branchBaseY + b2.y);
+                    }
+                    this.auraGfx.stroke({ 
+                        color: this.colorScheme.frost, 
+                        width: 1, 
+                        alpha: alpha 
+                    });
+                    
+                    this.auraGfx.circle(fx, fy, crystal.size * 0.3)
+                        .fill({ color: this.colorScheme.frost, alpha: alpha * 0.9 });
+                }
+            }
+            
+            drawBody() {
+                const c = this.colorScheme;
+                const baseRadius = this.state === 'frightened' ? 21 : (this.state === 'fleeing' ? 21 : 22);
+                const rX = baseRadius * this.squish.x;
+                const rY = baseRadius * this.squish.y;
+                
+                this.bodyGfx.circle(0, 0, rX * 1.6)
+                    .fill({ color: c.glow, alpha: 0.06 });
+                this.bodyGfx.circle(0, 0, rX * 1.3)
+                    .fill({ color: c.glow, alpha: 0.1 });
+                
+                const blobAmplitudes = this.blobPhases.map((phase) => {
+                    return Math.sin(this.time * 3 + phase) * 2.5;
+                });
+                
+                this.bodyGfx.moveTo(-rX, 0);
+                this.bodyGfx.quadraticCurveTo(-rX, -rY * 1.1, 0, -rY);
+                this.bodyGfx.quadraticCurveTo(rX, -rY * 1.1, rX, 0);
+                
+                const bY = rY * 0.3;
+                const bAmp = rY * 0.4;
+                
+                this.bodyGfx.quadraticCurveTo(rX * 0.7, bY + blobAmplitudes[0], rX * 0.45, bY + bAmp + blobAmplitudes[0]);
+                this.bodyGfx.quadraticCurveTo(rX * 0.25, bY + blobAmplitudes[1] * 0.5, 0, bY + bAmp + blobAmplitudes[1]);
+                this.bodyGfx.quadraticCurveTo(-rX * 0.25, bY + blobAmplitudes[2] * 0.5, -rX * 0.45, bY + bAmp + blobAmplitudes[2]);
+                this.bodyGfx.quadraticCurveTo(-rX * 0.7, bY + blobAmplitudes[3], -rX, 0);
+                
+                this.bodyGfx.closePath();
+                this.bodyGfx.fill({ color: c.bodyShadow, alpha: 0.4 });
+                
+                this.bodyGfx.moveTo(-rX, 0);
+                this.bodyGfx.quadraticCurveTo(-rX, -rY * 1.1, 0, -rY);
+                this.bodyGfx.quadraticCurveTo(rX, -rY * 1.1, rX, 0);
+                this.bodyGfx.quadraticCurveTo(rX * 0.7, bY + blobAmplitudes[0], rX * 0.45, bY + bAmp + blobAmplitudes[0]);
+                this.bodyGfx.quadraticCurveTo(rX * 0.25, bY + blobAmplitudes[1] * 0.5, 0, bY + bAmp + blobAmplitudes[1]);
+                this.bodyGfx.quadraticCurveTo(-rX * 0.25, bY + blobAmplitudes[2] * 0.5, -rX * 0.45, bY + bAmp + blobAmplitudes[2]);
+                this.bodyGfx.quadraticCurveTo(-rX * 0.7, bY + blobAmplitudes[3], -rX, 0);
+                this.bodyGfx.closePath();
+                this.bodyGfx.fill({ color: c.body, alpha: 0.95 });
+                
+                this.bodyGfx.circle(-rX * 0.3, -rY * 0.4, rX * 0.7)
+                    .fill({ color: c.bodyLight, alpha: 0.35 });
+                this.bodyGfx.circle(-rX * 0.4, -rY * 0.5, rX * 0.4)
+                    .fill({ color: 0xffffff, alpha: 0.4 });
+                
+                this.bodyGfx.circle(0, -rY * 0.2, rX * 0.6)
+                    .fill({ color: c.bodyLight, alpha: 0.2 });
+                
+                this.bodyGfx.ellipse(0, rY * 0.4, rX * 0.9, rY * 0.3)
+                    .fill({ color: c.bodyDark, alpha: 0.25 });
+                
+                this.bodyGfx.moveTo(-rX, 0);
+                this.bodyGfx.quadraticCurveTo(-rX, -rY * 1.1, 0, -rY);
+                this.bodyGfx.quadraticCurveTo(rX, -rY * 1.1, rX, 0);
+                this.bodyGfx.quadraticCurveTo(rX * 0.7, bY + blobAmplitudes[0], rX * 0.45, bY + bAmp + blobAmplitudes[0]);
+                this.bodyGfx.quadraticCurveTo(rX * 0.25, bY + blobAmplitudes[1] * 0.5, 0, bY + bAmp + blobAmplitudes[1]);
+                this.bodyGfx.quadraticCurveTo(-rX * 0.25, bY + blobAmplitudes[2] * 0.5, -rX * 0.45, bY + bAmp + blobAmplitudes[2]);
+                this.bodyGfx.quadraticCurveTo(-rX * 0.7, bY + blobAmplitudes[3], -rX, 0);
+                this.bodyGfx.stroke({ color: c.bodyDark, width: 1.5, alpha: 0.5 });
+            }
+            
+            drawFrost() {
+                const c = this.colorScheme;
+                
+                for (const frost of this.frostPatterns) {
+                    const pulse = 0.7 + Math.sin(this.time * 2 + frost.angle) * 0.3;
+                    
+                    for (let i = 0; i < 6; i++) {
+                        const a = (i / 6) * Math.PI * 2;
+                        const lx = Math.cos(a) * frost.size;
+                        const ly = Math.sin(a) * frost.size;
+                        const rotated = rotPt(lx, ly, frost.angle);
+                        this.frostGfx.moveTo(frost.x, frost.y);
+                        this.frostGfx.lineTo(frost.x + rotated.x, frost.y + rotated.y);
+                    }
+                    this.frostGfx.stroke({ 
+                        color: c.frost, 
+                        width: 0.8, 
+                        alpha: frost.alpha * pulse 
+                    });
+                }
+            }
+            
+            drawEars() {
+                const c = this.colorScheme;
+                const baseRadius = this.state === 'frightened' ? 21 : (this.state === 'fleeing' ? 21 : 22);
+                const rY = baseRadius * this.squish.y;
+                
+                const earSpread = 10 - this.earPinch * 4;
+                const earY = -rY * (0.95 - this.earPinch * 0.2);
+                const earSize = this.state === 'frightened' ? 8 : (this.state === 'fleeing' ? 7.5 : 9);
+                
+                const leftAngle = -0.3 + this.earFlap.left;
+                const rightAngle = 0.3 + this.earFlap.right;
+                
+                this.leftEarContainer.position.set(-earSpread, earY);
+                this.leftEarContainer.rotation = leftAngle;
+                this.rightEarContainer.position.set(earSpread, earY);
+                this.rightEarContainer.rotation = rightAngle;
+                
+                this.drawEar(this.leftEarGfx, c, earSize, false);
+                this.drawEar(this.rightEarGfx, c, earSize, true);
+            }
+            
+            drawEar(gfx, c, earSize, isRight) {
+                gfx.ellipse(0, 3, earSize, earSize * 1.3)
+                    .fill({ color: c.bodyShadow, alpha: 0.3 });
+                
+                gfx.ellipse(0, 0, earSize, earSize * 1.3)
+                    .fill({ color: c.body, alpha: 0.95 });
+                
+                gfx.ellipse(0, 0, earSize * 0.6, earSize * 0.8)
+                    .fill({ color: c.bodyLight, alpha: 0.5 });
+                
+                const highlightOffset = isRight ? earSize * 0.2 : -earSize * 0.2;
+                gfx.ellipse(highlightOffset, -earSize * 0.3, earSize * 0.3, earSize * 0.4)
+                    .fill({ color: 0xffffff, alpha: 0.5 });
+                
+                gfx.ellipse(0, 0, earSize, earSize * 1.3)
+                    .stroke({ color: c.bodyDark, width: 1.2, alpha: 0.5 });
+            }
+            
+            drawEyes() {
+                const c = this.colorScheme;
+                const baseRadius = this.state === 'frightened' ? 21 : (this.state === 'fleeing' ? 21 : 22);
+                const rY = baseRadius * this.squish.y;
+                
+                if (this.state === 'frightened' || this.state === 'fleeing') {
+                    const eyeSize = this.state === 'fleeing' ? 9 : 8.5;
+                    const eyeY = -rY * 0.15;
+                    const eyeSpacing = 8;
+                    
+                    this.eyesGfx.circle(-eyeSpacing, eyeY, eyeSize)
+                        .fill({ color: 0xffffff, alpha: 0.98 });
+                    this.eyesGfx.circle(eyeSpacing, eyeY, eyeSize)
+                        .fill({ color: 0xffffff, alpha: 0.98 });
+                    
+                    this.eyesGfx.circle(-eyeSpacing, eyeY + 1.5, eyeSize * 0.9)
+                        .fill({ color: 0xdddddd, alpha: 0.3 });
+                    this.eyesGfx.circle(eyeSpacing, eyeY + 1.5, eyeSize * 0.9)
+                        .fill({ color: 0xdddddd, alpha: 0.3 });
+                    
+                    const pupilSize = eyeSize * 0.35;
+                    const px = this.eyeOffset.x * 0.3;
+                    const py = this.eyeOffset.y * 0.3;
+                    
+                    this.eyesGfx.circle(-eyeSpacing + px, eyeY + py, pupilSize)
+                        .fill({ color: c.pupil, alpha: 1 });
+                    this.eyesGfx.circle(eyeSpacing + px, eyeY + py, pupilSize)
+                        .fill({ color: c.pupil, alpha: 1 });
+                    
+                    this.eyesGfx.circle(-eyeSpacing + px - 2, eyeY + py - 2, pupilSize * 0.5)
+                        .fill({ color: 0xffffff, alpha: 0.95 });
+                    this.eyesGfx.circle(eyeSpacing + px - 2, eyeY + py - 2, pupilSize * 0.5)
+                        .fill({ color: 0xffffff, alpha: 0.95 });
+                    
+                    this.eyesGfx.circle(-eyeSpacing + px + 1.5, eyeY + py + 1.5, pupilSize * 0.25)
+                        .fill({ color: 0xffffff, alpha: 0.7 });
+                    this.eyesGfx.circle(eyeSpacing + px + 1.5, eyeY + py + 1.5, pupilSize * 0.25)
+                        .fill({ color: 0xffffff, alpha: 0.7 });
+                    
+                    const browY = eyeY - eyeSize - 3;
+                    this.eyesGfx.moveTo(-eyeSpacing - 5, browY + 2);
+                    this.eyesGfx.lineTo(-eyeSpacing + 5, browY - 2);
+                    this.eyesGfx.stroke({ color: c.bodyDark, width: 2, alpha: 0.7 });
+                    
+                    this.eyesGfx.moveTo(eyeSpacing - 5, browY - 2);
+                    this.eyesGfx.lineTo(eyeSpacing + 5, browY + 2);
+                    this.eyesGfx.stroke({ color: c.bodyDark, width: 2, alpha: 0.7 });
+                    
+                } else {
+                    const eyeSize = 7.5;
+                    const eyeY = -rY * 0.2;
+                    const eyeSpacing = 8;
+                    
+                    this.eyesGfx.circle(-eyeSpacing, eyeY, eyeSize)
+                        .fill({ color: 0xffffff, alpha: 0.98 });
+                    this.eyesGfx.circle(eyeSpacing, eyeY, eyeSize)
+                        .fill({ color: 0xffffff, alpha: 0.98 });
+                    
+                    this.eyesGfx.circle(-eyeSpacing, eyeY + 1.5, eyeSize * 0.9)
+                        .fill({ color: 0xdddddd, alpha: 0.3 });
+                    this.eyesGfx.circle(eyeSpacing, eyeY + 1.5, eyeSize * 0.9)
+                        .fill({ color: 0xdddddd, alpha: 0.3 });
+                    
+                    const pupilSize = eyeSize * 0.5;
+                    const px = this.eyeOffset.x * 0.4;
+                    const py = this.eyeOffset.y * 0.4;
+                    
+                    this.eyesGfx.circle(-eyeSpacing + px, eyeY + py, pupilSize)
+                        .fill({ color: c.pupil, alpha: 1 });
+                    this.eyesGfx.circle(eyeSpacing + px, eyeY + py, pupilSize)
+                        .fill({ color: c.pupil, alpha: 1 });
+                    
+                    this.eyesGfx.circle(-eyeSpacing + px - 1.5, eyeY + py - 1.5, pupilSize * 0.4)
+                        .fill({ color: 0xffffff, alpha: 0.9 });
+                    this.eyesGfx.circle(eyeSpacing + px - 1.5, eyeY + py - 1.5, pupilSize * 0.4)
+                        .fill({ color: 0xffffff, alpha: 0.9 });
+                    
+                    this.eyesGfx.circle(-eyeSpacing, eyeY, eyeSize)
+                        .stroke({ color: c.bodyDark, width: 1, alpha: 0.4 });
+                    this.eyesGfx.circle(eyeSpacing, eyeY, eyeSize)
+                        .stroke({ color: c.bodyDark, width: 1, alpha: 0.4 });
+                    
+                    const browY = eyeY - eyeSize - 2;
+                    this.eyesGfx.moveTo(-eyeSpacing - 4, browY);
+                    this.eyesGfx.lineTo(-eyeSpacing + 4, browY);
+                    this.eyesGfx.stroke({ color: c.bodyDark, width: 1.5, alpha: 0.5 });
+                    
+                    this.eyesGfx.moveTo(eyeSpacing - 4, browY);
+                    this.eyesGfx.lineTo(eyeSpacing + 4, browY);
+                    this.eyesGfx.stroke({ color: c.bodyDark, width: 1.5, alpha: 0.5 });
+                }
+            }
+            
+            drawMouth() {
+                const c = this.colorScheme;
+                const baseRadius = this.state === 'frightened' ? 21 : (this.state === 'fleeing' ? 21 : 22);
+                const rY = baseRadius * this.squish.y;
+                
+                if (this.mouthOpen < 0.1) return;
+                
+                const mouthY = rY * 0.35;
+                const mouthSize = 3 + this.mouthOpen * 3;
+                
+                if (this.state === 'fleeing') {
+                    this.mouthGfx.ellipse(0, mouthY, mouthSize * 1.2, mouthSize)
+                        .fill({ color: c.bodyShadow, alpha: 0.8 });
+                    
+                    const teethSize = mouthSize * 0.3;
+                    this.mouthGfx.rect(-teethSize, mouthY - teethSize, teethSize * 0.8, teethSize)
+                        .fill({ color: 0xffffff, alpha: 0.9 });
+                    this.mouthGfx.rect(teethSize * 0.2, mouthY - teethSize, teethSize * 0.8, teethSize)
+                        .fill({ color: 0xffffff, alpha: 0.9 });
+                } else if (this.state === 'frightened') {
+                    this.mouthGfx.ellipse(0, mouthY, mouthSize * 0.8, mouthSize)
+                        .fill({ color: c.bodyShadow, alpha: 0.7 });
+                }
+            }
+        }
+        
+        async function main() {
+            const app = new PIXI.Application();
+            await app.init({
+                width: window.innerWidth,
+                height: window.innerHeight,
+                backgroundColor: 0x0a1520,
+                antialias: true,
+                resolution: window.devicePixelRatio || 1,
+            });
+            document.body.appendChild(app.canvas);
+            
+            const colors = ['blinky', 'pinky', 'inky', 'clyde'];
+            const ghosts = colors.map((color, i) => {
+                const ghost = new WinterGhost(
+                    window.innerWidth / 2 + (i - 1.5) * 100,
+                    window.innerHeight / 2,
+                    color
+                );
+                app.stage.addChild(ghost.container);
+                return ghost;
+            });
+            
+            let time = 0;
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
+            const radiusX = Math.min(window.innerWidth * 0.25, 200);
+            const radiusY = Math.min(window.innerHeight * 0.2, 100);
+            
+            document.getElementById('btnNormal').addEventListener('click', () => {
+                ghosts.forEach(g => {
+                    g.setState('normal');
+                    g.setColor(g.baseColor);
+                });
+                document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+                document.getElementById('btnNormal').classList.add('active');
+            });
+            
+            document.getElementById('btnFrightened').addEventListener('click', () => {
+                ghosts.forEach(g => g.setState('frightened'));
+                document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+                document.getElementById('btnFrightened').classList.add('active');
+            });
+            
+            document.getElementById('btnFleeing').addEventListener('click', () => {
+                ghosts.forEach(g => g.setState('fleeing'));
+                document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+                document.getElementById('btnFleeing').classList.add('active');
+            });
+            
+            window.addEventListener('keydown', (e) => {
+                if (e.code === 'Space') {
+                    document.getElementById('btnFrightened').click();
+                }
+            });
+            
+            app.ticker.add(() => {
+                const dt = 0.016;
+                time += dt;
+                
+                ghosts.forEach((ghost, i) => {
+                    const offset = (i / ghosts.length) * Math.PI * 2;
+                    const speed = ghost.state === 'fleeing' ? 0.6 : (ghost.state === 'frightened' ? 0.4 : 0.45);
+                    const t = time * speed + offset;
+                    
+                    const x = centerX + Math.sin(t) * radiusX;
+                    const y = centerY + Math.sin(t * 2) * radiusY;
+                    
+                    ghost.moveTo(x, y);
+                    ghost.update(dt);
+                    ghost.draw();
+                });
+            });
+        }
+        
+        main();
+    </script>
+</body>
+</html>

@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cosmic Crystal Key — Elegant</title>
+<style>
+    body { 
+        margin: 0; 
+        background: #06080e; 
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: center; 
+        min-height: 100vh; 
+        font-family: 'Courier New', monospace; 
+        color: #c8d4e0; 
+        gap: 30px;
+    }
+    .title { 
+        font-size: 16px; 
+        letter-spacing: 5px; 
+        opacity: 0.7; 
+    }
+    canvas { 
+        display: block; 
+        border: 1px solid #1a2430; 
+        border-radius: 4px; 
+    }
+</style>
+</head>
+<body>
+<div class="title">COSMIC CRYSTAL KEY · ELEGANT</div>
+<div id="pixi-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+<script type="module">
+const { Application, Container, Sprite, Texture, BlurFilter } = PIXI;
+
+function createCrystalKey() {
+    const size = 256;
+    const canvas = document.createElement("canvas");
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    const cx = size / 2, cy = size / 2;
+
+    // ═══════════════════════════════════════════════════════════
+    // 1. AMBIENT GLOW (3 слоя, фиолетово-голубой)
+    // ═══════════════════════════════════════════════════════════
+    const glowLayers = [
+        { r: size * 0.48, stops: [[0, "rgba(150,120,255,0.35)"], [0.5, "rgba(100,80,220,0.15)"], [1, "rgba(0,0,0,0)"]] },
+        { r: size * 0.35, stops: [[0, "rgba(180,150,255,0.3)"], [0.5, "rgba(120,100,240,0.12)"], [1, "rgba(0,0,0,0)"]] },
+        { r: size * 0.25, stops: [[0, "rgba(200,180,255,0.25)"], [0.5, "rgba(140,120,255,0.1)"], [1, "rgba(0,0,0,0)"]] }
+    ];
+
+    for (const layer of glowLayers) {
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
+        for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, size, size);
+    }
+
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    // Размеры
+    const headR = size * 0.14;
+    const headY = -size * 0.1;
+    const shaftW = size * 0.035;
+    const shaftTop = headY + headR * 0.9;
+    const shaftBottom = size * 0.32;
+
+    // ═══════════════════════════════════════════════════════════
+    // 2. SHAFT + ELEGANT TEETH (элегантные зубцы)
+    // ═══════════════════════════════════════════════════════════
+    
+    function drawShaftAndTeeth() {
+        ctx.beginPath();
+        ctx.moveTo(-shaftW, shaftTop);
+        ctx.lineTo(-shaftW, shaftBottom);
+        
+        // Элегантный зубец 1 (нижний) — тонкий, с закруглёнными краями
+        ctx.lineTo(shaftW * 1.8, shaftBottom);
+        ctx.quadraticCurveTo(
+            shaftW * 2.2, shaftBottom,
+            shaftW * 2.2, shaftBottom - size * 0.015
+        );
+        ctx.lineTo(shaftW * 2.2, shaftBottom - size * 0.04);
+        ctx.quadraticCurveTo(
+            shaftW * 2.2, shaftBottom - size * 0.055,
+            shaftW * 1.8, shaftBottom - size * 0.055
+        );
+        ctx.lineTo(shaftW, shaftBottom - size * 0.055);
+        
+        // Промежуток
+        ctx.lineTo(shaftW, shaftBottom - size * 0.1);
+        
+        // Элегантный зубец 2 (верхний) — длиннее, изящный
+        ctx.lineTo(shaftW * 1.5, shaftBottom - size * 0.1);
+        ctx.quadraticCurveTo(
+            shaftW * 2, shaftBottom - size * 0.1,
+            shaftW * 2, shaftBottom - size * 0.115
+        );
+        ctx.lineTo(shaftW * 2, shaftBottom - size * 0.15);
+        ctx.quadraticCurveTo(
+            shaftW * 2, shaftBottom - size * 0.165,
+            shaftW * 1.5, shaftBottom - size * 0.165
+        );
+        ctx.lineTo(shaftW, shaftBottom - size * 0.165);
+        
+        ctx.lineTo(shaftW, shaftTop);
+        ctx.closePath();
+    }
+
+    // Градиент стержня (фиолетово-голубой)
+    const shaftGrad = ctx.createLinearGradient(-shaftW, 0, shaftW * 2.2, 0);
+    shaftGrad.addColorStop(0, "rgba(100,120,180,0.9)");
+    shaftGrad.addColorStop(0.3, "rgba(180,200,240,0.98)");
+    shaftGrad.addColorStop(0.6, "rgba(150,170,220,0.95)");
+    shaftGrad.addColorStop(1, "rgba(80,100,150,0.85)");
+    
+    ctx.fillStyle = shaftGrad;
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = "rgba(150,180,255,0.9)";
+    drawShaftAndTeeth();
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(200,220,255,0.7)";
+    ctx.lineWidth = 1.5;
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = "rgba(180,200,255,0.8)";
+    drawShaftAndTeeth();
+    ctx.stroke();
+
+    // Блик на стержне
+    const shaftHighlight = ctx.createLinearGradient(-shaftW, 0, shaftW, 0);
+    shaftHighlight.addColorStop(0, "rgba(255,255,255,0)");
+    shaftHighlight.addColorStop(0.3, "rgba(220,240,255,0.5)");
+    shaftHighlight.addColorStop(0.5, "rgba(255,255,255,0.7)");
+    shaftHighlight.addColorStop(0.7, "rgba(220,240,255,0.5)");
+    shaftHighlight.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = shaftHighlight;
+    ctx.shadowBlur = 0;
+    ctx.fillRect(-shaftW, shaftTop, shaftW * 2, shaftBottom - shaftTop);
+
+    // Декоративные кольца на стержне
+    for (let i = 0; i < 2; i++) {
+        const ringY = shaftTop + (shaftBottom - shaftTop) * (0.3 + i * 0.35);
+        ctx.strokeStyle = "rgba(200,220,255,0.5)";
+        ctx.lineWidth = 1.5;
+        ctx.shadowBlur = 4;
+        ctx.shadowColor = "rgba(180,200,255,0.7)";
+        ctx.beginPath();
+        ctx.moveTo(-shaftW * 1.2, ringY);
+        ctx.lineTo(shaftW * 1.2, ringY);
+        ctx.stroke();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 3. HEAD (элегантная головка)
+    // ═══════════════════════════════════════════════════════════
+    
+    // Тень под головкой
+    const headShadow = ctx.createRadialGradient(0, headY + headR * 0.3, 0, 0, headY + headR * 0.3, headR * 1.3);
+    headShadow.addColorStop(0, "rgba(60,40,120,0.4)");
+    headShadow.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = headShadow;
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.arc(0, headY + headR * 0.3, headR * 1.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Основное тело головки
+    const headGrad = ctx.createRadialGradient(
+        -headR * 0.3, headY - headR * 0.3, 0,
+        0, headY, headR
+    );
+    headGrad.addColorStop(0, "rgba(230,220,255,1)");
+    headGrad.addColorStop(0.2, "rgba(180,160,240,0.98)");
+    headGrad.addColorStop(0.5, "rgba(140,120,220,0.95)");
+    headGrad.addColorStop(0.75, "rgba(100,80,180,0.9)");
+    headGrad.addColorStop(1, "rgba(60,40,120,0.8)");
+    
+    ctx.fillStyle = headGrad;
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = "rgba(150,120,255,1)";
+    ctx.beginPath();
+    ctx.arc(0, headY, headR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ═══════════════════════════════════════════════════════════
+    // 4. DECORATIVE DETAILS (элегантные детали)
+    // ═══════════════════════════════════════════════════════════
+    
+    // Внешнее декоративное кольцо (тонкое)
+    ctx.strokeStyle = "rgba(200,220,255,0.6)";
+    ctx.lineWidth = 1.5;
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = "rgba(180,200,255,0.8)";
+    ctx.beginPath();
+    ctx.arc(0, headY, headR * 0.88, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Внутреннее кольцо
+    ctx.strokeStyle = "rgba(220,230,255,0.5)";
+    ctx.lineWidth = 1.2;
+    ctx.shadowBlur = 5;
+    ctx.beginPath();
+    ctx.arc(0, headY, headR * 0.7, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 8 тонких кристаллов по кругу (элегантные)
+    for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * Math.PI * 2;
+        const x = Math.cos(angle) * headR * 0.78;
+        const y = headY + Math.sin(angle) * headR * 0.78;
+
+        // Тонкий кристалл (вытянутый ромб)
+        const crystalSize = headR * 0.1;
+        ctx.fillStyle = "rgba(200,220,255,0.8)";
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = "rgba(180,200,255,0.9)";
+        ctx.beginPath();
+        ctx.moveTo(x, y - crystalSize * 1.3);
+        ctx.lineTo(x + crystalSize * 0.4, y);
+        ctx.lineTo(x, y + crystalSize * 1.3);
+        ctx.lineTo(x - crystalSize * 0.4, y);
+        ctx.closePath();
+        ctx.fill();
+
+        // Блик на кристалле
+        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.arc(x - crystalSize * 0.15, y - crystalSize * 0.4, crystalSize * 0.15, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Центральное отверстие (элегантное)
+    const holeR = headR * 0.22;
+    const holeGrad = ctx.createRadialGradient(0, headY, 0, 0, headY, holeR);
+    holeGrad.addColorStop(0, "rgba(10,5,20,0.95)");
+    holeGrad.addColorStop(0.7, "rgba(30,20,50,0.9)");
+    holeGrad.addColorStop(1, "rgba(60,40,100,0.7)");
+    ctx.fillStyle = holeGrad;
+    ctx.shadowBlur = 4;
+    ctx.shadowColor = "rgba(0,0,0,0.8)";
+    ctx.beginPath();
+    ctx.arc(0, headY, holeR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Светящаяся обводка отверстия
+    ctx.strokeStyle = "rgba(200,220,255,0.6)";
+    ctx.lineWidth = 1.2;
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = "rgba(180,200,255,0.8)";
+    ctx.beginPath();
+    ctx.arc(0, headY, holeR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Внешняя обводка головки
+    ctx.strokeStyle = "rgba(220,230,255,0.7)";
+    ctx.lineWidth = 1.5;
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = "rgba(200,220,255,0.9)";
+    ctx.beginPath();
+    ctx.arc(0, headY, headR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // ═══════════════════════════════════════════════════════════
+    // 5. HIGHLIGHTS (блики)
+    // ═══════════════════════════════════════════════════════════
+    
+    const highlight1 = ctx.createRadialGradient(
+        -headR * 0.35, headY - headR * 0.35, 0,
+        -headR * 0.35, headY - headR * 0.35, headR * 0.3
+    );
+    highlight1.addColorStop(0, "rgba(255,255,255,0.95)");
+    highlight1.addColorStop(0.3, "rgba(240,245,255,0.6)");
+    highlight1.addColorStop(0.7, "rgba(200,220,255,0.2)");
+    highlight1.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = highlight1;
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.arc(-headR * 0.35, headY - headR * 0.35, headR * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    const highlight2 = ctx.createRadialGradient(
+        headR * 0.3, headY + headR * 0.15, 0,
+        headR * 0.3, headY + headR * 0.15, headR * 0.12
+    );
+    highlight2.addColorStop(0, "rgba(255,255,255,0.6)");
+    highlight2.addColorStop(0.5, "rgba(220,240,255,0.3)");
+    highlight2.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = highlight2;
+    ctx.beginPath();
+    ctx.arc(headR * 0.3, headY + headR * 0.15, headR * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ═══════════════════════════════════════════════════════════
+    // 6. ENERGY SPARKLES (космические искры)
+    // ═══════════════════════════════════════════════════════════
+    const sparkles = [
+        { x: size * 0.22, y: -size * 0.15, r: 2 },
+        { x: -size * 0.2, y: -size * 0.2, r: 1.5 },
+        { x: size * 0.18, y: size * 0.1, r: 1.8 },
+        { x: -size * 0.22, y: size * 0.15, r: 1.5 },
+        { x: size * 0.05, y: size * 0.28, r: 1.8 },
+        { x: -size * 0.08, y: -size * 0.28, r: 1.5 }
+    ];
+
+    for (const s of sparkles) {
+        const sparkleGlow = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r * 3);
+        sparkleGlow.addColorStop(0, "rgba(200,220,255,0.8)");
+        sparkleGlow.addColorStop(0.5, "rgba(150,170,255,0.3)");
+        sparkleGlow.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = sparkleGlow;
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r * 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "rgba(255,255,255,0.95)";
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = "rgba(200,220,255,1)";
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.restore();
+    return Texture.from(canvas);
+}
+
+async function setup() {
+    const app = new Application();
+    await app.init({
+        width: 400, height: 400,
+        backgroundColor: 0x06080e,
+        antialias: true,
+    });
+    document.getElementById('pixi-container').appendChild(app.canvas);
+
+    const container = new Container();
+    container.x = 200; container.y = 200;
+    app.stage.addChild(container);
+
+    const tex = createCrystalKey();
+
+    const sprite = new Sprite(tex);
+    sprite.anchor.set(0.5);
+    sprite.width = 240; sprite.height = 240;
+    container.addChild(sprite);
+
+    const bloom1 = new Sprite(tex);
+    bloom1.anchor.set(0.5);
+    bloom1.width = 280; bloom1.height = 280;
+    bloom1.alpha = 0.4;
+    bloom1.blendMode = "add";
+    bloom1.filters = [new BlurFilter({ strength: 12, quality: 3 })];
+    container.addChild(bloom1);
+
+    const bloom2 = new Sprite(tex);
+    bloom2.anchor.set(0.5);
+    bloom2.width = 340; bloom2.height = 340;
+    bloom2.alpha = 0.2;
+    bloom2.blendMode = "add";
+    bloom2.filters = [new BlurFilter({ strength: 25, quality: 3 })];
+    container.addChild(bloom2);
+
+    let time = 0;
+    app.ticker.add(() => {
+        const dt = 0.016;
+        time += dt;
+
+        const pulse = 1 + Math.sin(time * 1.5) * 0.03;
+        container.scale.set(pulse);
+
+        container.rotation = Math.sin(time * 0.8) * 0.04;
+
+        bloom1.alpha = 0.4 + Math.sin(time * 2) * 0.05;
+        bloom2.alpha = 0.2 + Math.sin(time * 1.5) * 0.03;
+    });
+}
+
+setup();
+</script>
+</body>
+</html>

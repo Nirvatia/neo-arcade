@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Golden Cosmic Egg — Vertical</title>
+<style>
+    body { margin: 0; background: #06080e; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: 'Courier New', monospace; color: #c8d4e0; gap: 30px; }
+    .title { font-size: 14px; letter-spacing: 4px; opacity: 0.6; }
+    canvas { display: block; border: 1px solid #1a2430; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="title">GOLDEN COSMIC EGG · VERTICAL</div>
+<div id="pixi-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+<script type="module">
+const { Application, Container, Sprite, Texture, BlurFilter } = PIXI;
+
+function createEgg(time) {
+    const size = 512;
+    const canvas = document.createElement("canvas");
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    const cx = size / 2, cy = size / 2;
+
+    const breathe = Math.sin(time * 1.8);
+    const breathe2 = Math.sin(time * 1.8 + 0.5);
+
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    // Размеры яйца: высота > ширины (вертикальное)
+    const eggW = 55;   // половина максимальной ширины
+    const eggH = 170;  // полная высота
+
+    // ═══════════════════════════════════════════════════════════
+    // 1. AMBIENT GLOW
+    // ═══════════════════════════════════════════════════════════
+    const ambientR = size * 0.48 + breathe * size * 0.015;
+    const ambient = ctx.createRadialGradient(0, 0, 0, 0, 0, ambientR);
+    ambient.addColorStop(0, "rgba(255,220,120,0.25)");
+    ambient.addColorStop(0.3, "rgba(255,180,80,0.12)");
+    ambient.addColorStop(0.6, "rgba(220,140,40,0.05)");
+    ambient.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = ambient;
+    ctx.beginPath();
+    ctx.arc(0, 0, ambientR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ═══════════════════════════════════════════════════════════
+    // 2. EXPANDING WAVES
+    // ═══════════════════════════════════════════════════════════
+    for (let w = 0; w < 3; w++) {
+        const wavePhase = (time * 0.6 + w * 1.2) % 3.5;
+        const waveR = 80 + wavePhase * 80;
+        const waveAlpha = Math.max(0, 1 - wavePhase / 3.5) * 0.5;
+        
+        if (waveAlpha > 0.02) {
+            ctx.strokeStyle = `rgba(255,220,140,${waveAlpha})`;
+            ctx.lineWidth = 1.5;
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = `rgba(255,200,100,${waveAlpha * 1.5})`;
+            ctx.beginPath();
+            ctx.arc(0, 0, waveR, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 3. PEDESTAL
+    // ═══════════════════════════════════════════════════════════
+    const pedestalY = eggH * 0.55;
+    for (let i = 0; i < 3; i++) {
+        const pr = 50 + i * 20 + breathe2 * 3;
+        const pAlpha = 0.35 - i * 0.1;
+        ctx.strokeStyle = `rgba(255,200,100,${pAlpha})`;
+        ctx.lineWidth = 1.2;
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = "rgba(255,180,80,0.6)";
+        ctx.beginPath();
+        ctx.arc(0, pedestalY, pr, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 4. AURA
+    // ═══════════════════════════════════════════════════════════
+    const auraPoints = 48;
+    ctx.beginPath();
+    for (let i = 0; i <= auraPoints; i++) {
+        const angle = (i / auraPoints) * Math.PI * 2;
+        const baseR = eggH * 0.55;
+        const noise = Math.sin(angle * 6 + time * 2) * 4 
+                    + Math.sin(angle * 12 + time * 3) * 2;
+        const r = baseR + noise;
+        const x = Math.cos(angle) * r;
+        const y = Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    const auraGrad = ctx.createRadialGradient(0, 0, eggH * 0.4, 0, 0, eggH * 0.65);
+    auraGrad.addColorStop(0, "rgba(255,220,120,0.15)");
+    auraGrad.addColorStop(0.5, "rgba(255,180,80,0.08)");
+    auraGrad.addColorStop(1, "rgba(255,150,60,0)");
+    ctx.fillStyle = auraGrad;
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = "rgba(255,200,100,0.5)";
+    ctx.fill();
+
+    // ═══════════════════════════════════════════════════════════
+    // 5. ENERGY VORTICES
+    // ═══════════════════════════════════════════════════════════
+    const vortexCount = 2;
+    for (let v = 0; v < vortexCount; v++) {
+        const vortexAngle = time * 0.8 + v * Math.PI;
+        const vortexR = eggH * 0.45;
+        const steps = 40;
+        
+        ctx.beginPath();
+        for (let s = 0; s <= steps; s++) {
+            const t = s / steps;
+            const spiralAngle = vortexAngle + t * Math.PI * 3;
+            const r = vortexR * (1 - t * 0.6);
+            const x = Math.cos(spiralAngle) * r;
+            const y = Math.sin(spiralAngle) * r;
+            if (s === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        
+        const vortexAlpha = 0.3 + breathe * 0.1;
+        ctx.strokeStyle = `rgba(255,230,150,${vortexAlpha})`;
+        ctx.lineWidth = 1.5;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = `rgba(255,210,100,${vortexAlpha * 1.5})`;
+        ctx.lineCap = "round";
+        ctx.stroke();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 6. EGG BODY (вертикальное яйцо)
+    // ═══════════════════════════════════════════════════════════
+    ctx.shadowBlur = 0;
+    
+    function drawEggShape() {
+        ctx.beginPath();
+        const steps = 100;
+        for (let i = 0; i <= steps; i++) {
+            const t = (i / steps) * Math.PI * 2;
+            const y = Math.sin(t); // от -1 (верх) до 1 (низ)
+            // Ширина зависит от высоты: уже сверху, шире снизу
+            const widthFactor = 0.85 + (y + 1) * 0.125; // от 0.85 до 1.1
+            const x = Math.cos(t) * eggW * widthFactor;
+            const yPos = y * eggH * 0.5;
+            if (i === 0) ctx.moveTo(x, yPos);
+            else ctx.lineTo(x, yPos);
+        }
+        ctx.closePath();
+    }
+
+    const eggGrad = ctx.createRadialGradient(
+        -eggW * 0.2, -eggH * 0.2, 0,
+        0, 0, eggH * 0.6
+    );
+    eggGrad.addColorStop(0, "rgba(255,250,210,1)");
+    eggGrad.addColorStop(0.2, "rgba(255,220,130,0.98)");
+    eggGrad.addColorStop(0.5, "rgba(240,180,70,0.95)");
+    eggGrad.addColorStop(0.8, "rgba(200,140,40,0.9)");
+    eggGrad.addColorStop(1, "rgba(140,90,20,0.85)");
+    
+    ctx.fillStyle = eggGrad;
+    ctx.shadowBlur = 30;
+    ctx.shadowColor = "rgba(255,200,100,1)";
+    drawEggShape();
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+    const innerGlow = ctx.createRadialGradient(0, 0, eggW * 0.3, 0, 0, eggH * 0.5);
+    innerGlow.addColorStop(0, "rgba(255,240,180,0)");
+    innerGlow.addColorStop(0.7, "rgba(255,200,100,0.15)");
+    innerGlow.addColorStop(1, "rgba(255,180,80,0.35)");
+    ctx.fillStyle = innerGlow;
+    drawEggShape();
+    ctx.fill();
+
+    // ═══════════════════════════════════════════════════════════
+    // 7. ANCIENT INSCRIPTIONS
+    // ═══════════════════════════════════════════════════════════
+    ctx.save();
+    drawEggShape();
+    ctx.clip();
+    
+    const inscriptionAlpha = 0.4 + breathe * 0.15;
+    ctx.strokeStyle = `rgba(255,240,180,${inscriptionAlpha})`;
+    ctx.lineWidth = 0.8;
+    ctx.shadowBlur = 3;
+    ctx.shadowColor = `rgba(255,220,120,${inscriptionAlpha})`;
+    
+    for (let i = 0; i < 4; i++) {
+        const y = -eggH * 0.3 + i * eggH * 0.2;
+        const r = eggW * (0.9 - Math.abs(y / eggH) * 0.3);
+        ctx.beginPath();
+        ctx.ellipse(0, y, r, r * 0.15, 0, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+    
+    for (let i = 0; i < 3; i++) {
+        const x = -eggW * 0.3 + i * eggW * 0.3;
+        ctx.beginPath();
+        ctx.ellipse(x, 0, eggW * 0.15, eggH * 0.4, 0, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+    
+    const symbols = [
+        { x: 0, y: -eggH * 0.2, type: 'circle' },
+        { x: -eggW * 0.3, y: 0, type: 'triangle' },
+        { x: eggW * 0.3, y: 0, type: 'cross' },
+        { x: 0, y: eggH * 0.2, type: 'star' }
+    ];
+    
+    for (const sym of symbols) {
+        const symSize = 4;
+        ctx.beginPath();
+        if (sym.type === 'circle') {
+            ctx.arc(sym.x, sym.y, symSize, 0, Math.PI * 2);
+        } else if (sym.type === 'triangle') {
+            ctx.moveTo(sym.x, sym.y - symSize);
+            ctx.lineTo(sym.x - symSize, sym.y + symSize * 0.7);
+            ctx.lineTo(sym.x + symSize, sym.y + symSize * 0.7);
+            ctx.closePath();
+        } else if (sym.type === 'cross') {
+            ctx.moveTo(sym.x, sym.y - symSize);
+            ctx.lineTo(sym.x, sym.y + symSize);
+            ctx.moveTo(sym.x - symSize, sym.y);
+            ctx.lineTo(sym.x + symSize, sym.y);
+        } else if (sym.type === 'star') {
+            for (let j = 0; j < 10; j++) {
+                const a = (j / 10) * Math.PI * 2 - Math.PI / 2;
+                const r = j % 2 === 0 ? symSize : symSize * 0.4;
+                const px = sym.x + Math.cos(a) * r;
+                const py = sym.y + Math.sin(a) * r;
+                if (j === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+        }
+        ctx.stroke();
+    }
+    
+    ctx.restore();
+
+    // ═══════════════════════════════════════════════════════════
+    // 8. CRACKS OF LIGHT
+    // ═══════════════════════════════════════════════════════════
+    const cracks = [
+        { x1: 0, y1: -eggH * 0.1, x2: eggW * 0.4, y2: -eggH * 0.3 },
+        { x1: 0, y1: 0, x2: -eggW * 0.45, y2: -eggH * 0.1 },
+        { x1: 0, y1: eggH * 0.1, x2: eggW * 0.35, y2: eggH * 0.25 },
+        { x1: 0, y1: -eggH * 0.15, x2: -eggW * 0.3, y2: eggH * 0.2 }
+    ];
+    
+    const crackPulse = 0.5 + breathe * 0.3;
+    
+    for (const crack of cracks) {
+        ctx.strokeStyle = `rgba(255,255,230,${0.6 * crackPulse})`;
+        ctx.lineWidth = 5;
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = `rgba(255,240,180,${0.8 * crackPulse})`;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(crack.x1, crack.y1);
+        ctx.lineTo(crack.x2, crack.y2);
+        ctx.stroke();
+        
+        ctx.strokeStyle = `rgba(255,250,200,${0.8 * crackPulse})`;
+        ctx.lineWidth = 2.5;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.moveTo(crack.x1, crack.y1);
+        ctx.lineTo(crack.x2, crack.y2);
+        ctx.stroke();
+        
+        ctx.strokeStyle = `rgba(255,255,255,${0.95 * crackPulse})`;
+        ctx.lineWidth = 1;
+        ctx.shadowBlur = 4;
+        ctx.beginPath();
+        ctx.moveTo(crack.x1, crack.y1);
+        ctx.lineTo(crack.x2, crack.y2);
+        ctx.stroke();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 9. HIGHLIGHTS
+    // ═══════════════════════════════════════════════════════════
+    const hl1 = ctx.createRadialGradient(
+        -eggW * 0.25, -eggH * 0.25, 0,
+        -eggW * 0.25, -eggH * 0.25, eggW * 0.4
+    );
+    hl1.addColorStop(0, "rgba(255,255,255,0.75)");
+    hl1.addColorStop(0.3, "rgba(255,250,220,0.35)");
+    hl1.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = hl1;
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.ellipse(-eggW * 0.25, -eggH * 0.25, eggW * 0.35, eggH * 0.15, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    const hl2 = ctx.createRadialGradient(
+        eggW * 0.3, eggH * 0.1, 0,
+        eggW * 0.3, eggH * 0.1, eggW * 0.15
+    );
+    hl2.addColorStop(0, "rgba(255,250,220,0.4)");
+    hl2.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = hl2;
+    ctx.beginPath();
+    ctx.arc(eggW * 0.3, eggH * 0.1, eggW * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(255,230,150,0.7)";
+    ctx.lineWidth = 1.5;
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = "rgba(255,210,100,0.9)";
+    drawEggShape();
+    ctx.stroke();
+
+    // ═══════════════════════════════════════════════════════════
+    // 10. RUNES
+    // ═══════════════════════════════════════════════════════════
+    const runeRadius = eggH * 0.6;
+    const runeRotation = time * 0.3;
+    const runeAlpha = 0.7 + breathe2 * 0.2;
+    
+    for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * Math.PI * 2 + runeRotation;
+        const x = Math.cos(angle) * runeRadius;
+        const y = Math.sin(angle) * runeRadius;
+        
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle + Math.PI / 2);
+        
+        const runeSize = 8;
+        ctx.strokeStyle = `rgba(255,230,150,${runeAlpha})`;
+        ctx.lineWidth = 1.2;
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = `rgba(255,210,100,${runeAlpha})`;
+        ctx.lineCap = "round";
+        
+        const runeType = i;
+        if (runeType === 0) {
+            ctx.beginPath();
+            ctx.moveTo(0, -runeSize); ctx.lineTo(0, runeSize);
+            ctx.moveTo(0, -runeSize * 0.3); ctx.lineTo(-runeSize * 0.5, -runeSize * 0.8);
+            ctx.moveTo(0, -runeSize * 0.3); ctx.lineTo(runeSize * 0.5, -runeSize * 0.8);
+            ctx.stroke();
+        } else if (runeType === 1) {
+            ctx.beginPath();
+            ctx.arc(0, 0, runeSize * 0.7, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fillStyle = `rgba(255,250,200,${runeAlpha})`;
+            ctx.beginPath();
+            ctx.arc(0, 0, runeSize * 0.15, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (runeType === 2) {
+            ctx.beginPath();
+            ctx.moveTo(0, -runeSize);
+            ctx.lineTo(-runeSize * 0.7, runeSize * 0.6);
+            ctx.lineTo(runeSize * 0.7, runeSize * 0.6);
+            ctx.closePath();
+            ctx.stroke();
+        } else if (runeType === 3) {
+            ctx.beginPath();
+            ctx.moveTo(0, -runeSize); ctx.lineTo(0, runeSize);
+            ctx.moveTo(-runeSize, 0); ctx.lineTo(runeSize, 0);
+            ctx.stroke();
+            ctx.fillStyle = `rgba(255,250,200,${runeAlpha})`;
+            for (let d = 0; d < 4; d++) {
+                const da = (d / 4) * Math.PI * 2;
+                ctx.beginPath();
+                ctx.arc(Math.cos(da) * runeSize * 0.5, Math.sin(da) * runeSize * 0.5, 1, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        } else if (runeType === 4) {
+            ctx.beginPath();
+            for (let j = 0; j < 10; j++) {
+                const a = (j / 10) * Math.PI * 2 - Math.PI / 2;
+                const r = j % 2 === 0 ? runeSize : runeSize * 0.4;
+                const px = Math.cos(a) * r;
+                const py = Math.sin(a) * r;
+                if (j === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.stroke();
+        } else if (runeType === 5) {
+            ctx.beginPath();
+            ctx.moveTo(0, -runeSize);
+            ctx.lineTo(runeSize * 0.6, 0);
+            ctx.lineTo(0, runeSize);
+            ctx.lineTo(-runeSize * 0.6, 0);
+            ctx.closePath();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(-runeSize * 0.3, 0); ctx.lineTo(runeSize * 0.3, 0);
+            ctx.moveTo(0, -runeSize * 0.5); ctx.lineTo(0, runeSize * 0.5);
+            ctx.stroke();
+        } else if (runeType === 6) {
+            ctx.beginPath();
+            ctx.moveTo(-runeSize, 0);
+            ctx.quadraticCurveTo(-runeSize * 0.5, -runeSize * 0.6, 0, 0);
+            ctx.quadraticCurveTo(runeSize * 0.5, runeSize * 0.6, runeSize, 0);
+            ctx.stroke();
+        } else {
+            ctx.beginPath();
+            for (let s = 0; s <= 30; s++) {
+                const t = s / 30;
+                const a = t * Math.PI * 3;
+                const r = t * runeSize * 0.8;
+                const px = Math.cos(a) * r;
+                const py = Math.sin(a) * r;
+                if (s === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+        }
+        
+        ctx.restore();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 11. PARTICLES WITH TAILS
+    // ═══════════════════════════════════════════════════════════
+    const particleCount = 10;
+    for (let i = 0; i < particleCount; i++) {
+        const seed1 = (Math.sin(i * 12.9898) * 43758.5453) % 1;
+        const seed2 = (Math.sin(i * 78.233) * 43758.5453) % 1;
+        const seed3 = (Math.sin(i * 45.164) * 43758.5453) % 1;
+        
+        const baseAngle = seed1 * Math.PI * 2;
+        const speed = 0.4 + seed2 * 0.4;
+        const phase = seed3 * Math.PI * 2;
+        const orbitR = eggH * 0.5 + seed1 * 25;
+        
+        const angle = baseAngle + time * speed + phase;
+        const x = Math.cos(angle) * orbitR;
+        const y = Math.sin(angle) * orbitR;
+        
+        const pAlpha = 0.6 + Math.sin(time * 3 + i) * 0.3;
+        const pSize = 1.5 + seed2 * 1.5;
+        
+        const tailLen = 12 + seed3 * 8;
+        const tailAngle = angle - Math.PI / 2 * (speed > 0 ? 1 : -1);
+        const tailX = x + Math.cos(tailAngle) * tailLen * 0.3;
+        const tailY = y + Math.sin(tailAngle) * tailLen * 0.3;
+        
+        const tailGrad = ctx.createLinearGradient(x, y, tailX, tailY);
+        tailGrad.addColorStop(0, `rgba(255,230,150,${pAlpha * 0.7})`);
+        tailGrad.addColorStop(1, "rgba(255,200,100,0)");
+        
+        ctx.strokeStyle = tailGrad;
+        ctx.lineWidth = pSize * 0.8;
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = `rgba(255,210,100,${pAlpha})`;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(tailX, tailY);
+        ctx.stroke();
+        
+        ctx.fillStyle = `rgba(255,250,220,${pAlpha})`;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = `rgba(255,230,150,1)`;
+        ctx.beginPath();
+        ctx.arc(x, y, pSize, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.restore();
+    return Texture.from(canvas);
+}
+
+async function setup() {
+    const app = new Application();
+    await app.init({
+        width: 500, height: 500,
+        backgroundColor: 0x06080e,
+        antialias: true,
+    });
+    document.getElementById('pixi-container').appendChild(app.canvas);
+
+    const container = new Container();
+    container.x = 250; container.y = 250;
+    app.stage.addChild(container);
+
+    let time = 0;
+    
+    app.ticker.add(() => {
+        time += 0.016;
+        
+        const tex = createEgg(time);
+        
+        while (container.children.length > 0) {
+            container.removeChildAt(0);
+        }
+        
+        const sprite = new Sprite(tex);
+        sprite.anchor.set(0.5);
+        sprite.width = 380; sprite.height = 380;
+        container.addChild(sprite);
+
+        const bloom1 = new Sprite(tex);
+        bloom1.anchor.set(0.5);
+        bloom1.width = 420; bloom1.height = 420;
+        bloom1.alpha = 0.4;
+        bloom1.blendMode = "add";
+        bloom1.filters = [new BlurFilter({ strength: 12, quality: 3 })];
+        container.addChild(bloom1);
+
+        const bloom2 = new Sprite(tex);
+        bloom2.anchor.set(0.5);
+        bloom2.width = 480; bloom2.height = 480;
+        bloom2.alpha = 0.2;
+        bloom2.blendMode = "add";
+        bloom2.filters = [new BlurFilter({ strength: 25, quality: 3 })];
+        container.addChild(bloom2);
+
+        const bloom3 = new Sprite(tex);
+        bloom3.anchor.set(0.5);
+        bloom3.width = 560; bloom3.height = 560;
+        bloom3.alpha = 0.12;
+        bloom3.blendMode = "add";
+        bloom3.filters = [new BlurFilter({ strength: 45, quality: 3 })];
+        container.addChild(bloom3);
+
+        const levitation = Math.sin(time * 1.2) * 8;
+        container.y = 250 + levitation;
+        
+        const sway = Math.sin(time * 0.8) * 0.03;
+        container.rotation = sway;
+    });
+}
+
+setup();
+</script>
+</body>
+</html>

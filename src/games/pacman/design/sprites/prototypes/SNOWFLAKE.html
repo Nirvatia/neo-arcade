@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Snow Power Pill — Crystal Snowflake</title>
+<style>
+    body { 
+        margin: 0; 
+        background: #0a1520; 
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: center; 
+        min-height: 100vh; 
+        font-family: 'Courier New', monospace; 
+        color: #c8d4e0; 
+        gap: 30px;
+    }
+    .title { 
+        font-size: 16px; 
+        letter-spacing: 5px; 
+        opacity: 0.7; 
+    }
+    canvas { 
+        display: block; 
+        border: 1px solid #1a2430; 
+        border-radius: 4px; 
+    }
+</style>
+</head>
+<body>
+<div class="title">SNOW POWER PILL · CRYSTAL SNOWFLAKE</div>
+<div id="pixi-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+<script type="module">
+const { Application, Container, Sprite, Texture, BlurFilter } = PIXI;
+
+function createSnowflake(time) {
+    const size = 512;
+    const canvas = document.createElement("canvas");
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    const cx = size / 2, cy = size / 2;
+
+    const breathe = Math.sin(time * 1.8);
+    const breathe2 = Math.sin(time * 1.8 + 0.5);
+
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    // ═══════════════════════════════════════════════════════════
+    // 1. AMBIENT GLOW (мягкое голубое свечение)
+    // ═══════════════════════════════════════════════════════════
+    const ambientR = size * 0.45 + breathe * size * 0.02;
+    const ambient = ctx.createRadialGradient(0, 0, 0, 0, 0, ambientR);
+    ambient.addColorStop(0, "rgba(200,220,255,0.3)");
+    ambient.addColorStop(0.3, "rgba(168,200,232,0.15)");
+    ambient.addColorStop(0.6, "rgba(140,180,220,0.06)");
+    ambient.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = ambient;
+    ctx.beginPath();
+    ctx.arc(0, 0, ambientR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ═══════════════════════════════════════════════════════════
+    // 2. EXPANDING WAVES (расходящиеся снежные волны)
+    // ═══════════════════════════════════════════════════════════
+    for (let w = 0; w < 3; w++) {
+        const wavePhase = (time * 0.6 + w * 1.2) % 3.5;
+        const waveR = 100 + wavePhase * 80;
+        const waveAlpha = Math.max(0, 1 - wavePhase / 3.5) * 0.4;
+        
+        if (waveAlpha > 0.02) {
+            ctx.strokeStyle = `rgba(200,220,255,${waveAlpha})`;
+            ctx.lineWidth = 1.5;
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = `rgba(168,200,232,${waveAlpha * 1.5})`;
+            ctx.beginPath();
+            ctx.arc(0, 0, waveR, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+    }
+    ctx.shadowBlur = 0;
+
+    // ═══════════════════════════════════════════════════════════
+    // 3. MAIN SNOWFLAKE (большая 6-лучевая снежинка)
+    // ═══════════════════════════════════════════════════════════
+    const rotation = time * 0.3;
+    const snowflakeR = 140;
+    const armCount = 6;
+
+    ctx.save();
+    ctx.rotate(rotation);
+
+    // Рисуем 6 лучей с веточками
+    for (let arm = 0; arm < armCount; arm++) {
+        const armAngle = (arm / armCount) * Math.PI * 2;
+        
+        ctx.save();
+        ctx.rotate(armAngle);
+
+        // Основной луч (толстый, с градиентом)
+        const rayGrad = ctx.createLinearGradient(0, 0, snowflakeR, 0);
+        rayGrad.addColorStop(0, "rgba(255,255,255,0.9)");
+        rayGrad.addColorStop(0.5, "rgba(220,235,255,0.8)");
+        rayGrad.addColorStop(1, "rgba(168,200,232,0.4)");
+        
+        ctx.strokeStyle = rayGrad;
+        ctx.lineWidth = 8;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = "rgba(200,220,255,0.8)";
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(snowflakeR, 0);
+        ctx.stroke();
+
+        // Тонкая сердцевина луча (яркая)
+        ctx.strokeStyle = "rgba(255,255,255,0.95)";
+        ctx.lineWidth = 2.5;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(snowflakeR * 0.95, 0);
+        ctx.stroke();
+
+        // Веточки на луче (3 пары)
+        const branches = [
+            { pos: 0.35, len: 0.25, angle: 0.5 },
+            { pos: 0.6, len: 0.2, angle: 0.5 },
+            { pos: 0.8, len: 0.12, angle: 0.5 }
+        ];
+
+        for (const branch of branches) {
+            const bx = snowflakeR * branch.pos;
+            const branchLen = snowflakeR * branch.len;
+            const branchAngle = branch.angle;
+
+            // Верхняя веточка
+            ctx.strokeStyle = rayGrad;
+            ctx.lineWidth = 5;
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.moveTo(bx, 0);
+            ctx.lineTo(bx + Math.cos(branchAngle) * branchLen, Math.sin(branchAngle) * branchLen);
+            ctx.stroke();
+
+            // Сердцевина верхней веточки
+            ctx.strokeStyle = "rgba(255,255,255,0.9)";
+            ctx.lineWidth = 1.8;
+            ctx.shadowBlur = 5;
+            ctx.beginPath();
+            ctx.moveTo(bx, 0);
+            ctx.lineTo(bx + Math.cos(branchAngle) * branchLen * 0.95, Math.sin(branchAngle) * branchLen * 0.95);
+            ctx.stroke();
+
+            // Нижняя веточка (зеркально)
+            ctx.strokeStyle = rayGrad;
+            ctx.lineWidth = 5;
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.moveTo(bx, 0);
+            ctx.lineTo(bx + Math.cos(-branchAngle) * branchLen, Math.sin(-branchAngle) * branchLen);
+            ctx.stroke();
+
+            ctx.strokeStyle = "rgba(255,255,255,0.9)";
+            ctx.lineWidth = 1.8;
+            ctx.shadowBlur = 5;
+            ctx.beginPath();
+            ctx.moveTo(bx, 0);
+            ctx.lineTo(bx + Math.cos(-branchAngle) * branchLen * 0.95, Math.sin(-branchAngle) * branchLen * 0.95);
+            ctx.stroke();
+
+            // Маленькие вторичные веточки на главных веточках
+            const subBranches = [
+                { pos: 0.5, len: 0.3, angle: 0.6 },
+                { pos: 0.8, len: 0.2, angle: 0.6 }
+            ];
+
+            for (const sub of subBranches) {
+                const subX = bx + Math.cos(branchAngle) * branchLen * sub.pos;
+                const subY = Math.sin(branchAngle) * branchLen * sub.pos;
+                const subLen = branchLen * sub.len;
+
+                ctx.strokeStyle = "rgba(220,235,255,0.7)";
+                ctx.lineWidth = 2;
+                ctx.shadowBlur = 4;
+                ctx.beginPath();
+                ctx.moveTo(subX, subY);
+                ctx.lineTo(
+                    subX + Math.cos(branchAngle + sub.angle) * subLen,
+                    subY + Math.sin(branchAngle + sub.angle) * subLen
+                );
+                ctx.stroke();
+
+                // Зеркально
+                ctx.beginPath();
+                ctx.moveTo(subX, subY);
+                ctx.lineTo(
+                    subX + Math.cos(branchAngle - sub.angle) * subLen,
+                    subY + Math.sin(branchAngle - sub.angle) * subLen
+                );
+                ctx.stroke();
+            }
+        }
+
+        // Кончик луча (кристаллический наконечник)
+        const tipX = snowflakeR;
+        const tipSize = 8;
+        
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = "rgba(200,220,255,0.9)";
+        ctx.beginPath();
+        ctx.moveTo(tipX + tipSize, 0);
+        ctx.lineTo(tipX - tipSize * 0.5, tipSize * 0.7);
+        ctx.lineTo(tipX - tipSize * 0.5, -tipSize * 0.7);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    ctx.restore(); // Конец вращения снежинки
+
+    // ═══════════════════════════════════════════════════════════
+    // 4. CENTER CRYSTAL (центральный кристалл)
+    // ═══════════════════════════════════════════════════════════
+    const centerR = 30;
+    const centerPulse = 1 + breathe * 0.08;
+
+    // Внешнее свечение центра
+    const centerGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, centerR * 2.5 * centerPulse);
+    centerGlow.addColorStop(0, "rgba(255,255,255,0.5)");
+    centerGlow.addColorStop(0.3, "rgba(220,235,255,0.3)");
+    centerGlow.addColorStop(0.6, "rgba(168,200,232,0.15)");
+    centerGlow.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = centerGlow;
+    ctx.beginPath();
+    ctx.arc(0, 0, centerR * 2.5 * centerPulse, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Основной кристалл (гексагон)
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = "rgba(200,220,255,0.9)";
+    
+    const hexGrad = ctx.createRadialGradient(-centerR * 0.3, -centerR * 0.3, 0, 0, 0, centerR * centerPulse);
+    hexGrad.addColorStop(0, "rgba(255,255,255,1)");
+    hexGrad.addColorStop(0.4, "rgba(240,248,255,0.95)");
+    hexGrad.addColorStop(0.7, "rgba(200,220,255,0.9)");
+    hexGrad.addColorStop(1, "rgba(168,200,232,0.8)");
+    
+    ctx.fillStyle = hexGrad;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2 - Math.PI / 2;
+        const x = Math.cos(angle) * centerR * centerPulse;
+        const y = Math.sin(angle) * centerR * centerPulse;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // Обводка кристалла
+    ctx.strokeStyle = "rgba(255,255,255,0.7)";
+    ctx.lineWidth = 1.5;
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+
+    // Внутренние грани кристалла (линии от центра к углам)
+    ctx.strokeStyle = "rgba(200,220,255,0.4)";
+    ctx.lineWidth = 1;
+    ctx.shadowBlur = 4;
+    for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2 - Math.PI / 2;
+        const x = Math.cos(angle) * centerR * centerPulse * 0.8;
+        const y = Math.sin(angle) * centerR * centerPulse * 0.8;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+    }
+
+    // Яркий блик на кристалле
+    const hlGrad = ctx.createRadialGradient(-centerR * 0.3, -centerR * 0.3, 0, -centerR * 0.3, -centerR * 0.3, centerR * 0.4);
+    hlGrad.addColorStop(0, "rgba(255,255,255,0.95)");
+    hlGrad.addColorStop(0.5, "rgba(255,255,255,0.5)");
+    hlGrad.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = hlGrad;
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.arc(-centerR * 0.3, -centerR * 0.3, centerR * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Маленький яркий блик
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = "rgba(255,255,255,1)";
+    ctx.beginPath();
+    ctx.arc(centerR * 0.2, centerR * 0.2, centerR * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ═══════════════════════════════════════════════════════════
+    // 5. ORBITING SNOWFLAKES (маленькие снежинки на орбите)
+    // ═══════════════════════════════════════════════════════════
+    const orbitCount = 8;
+    for (let i = 0; i < orbitCount; i++) {
+        const orbitAngle = (i / orbitCount) * Math.PI * 2 + time * 0.8;
+        const orbitDist = 180 + Math.sin(time * 2 + i) * 10;
+        const ox = Math.cos(orbitAngle) * orbitDist;
+        const oy = Math.sin(orbitAngle) * orbitDist;
+        const oSize = 6 + Math.sin(time * 3 + i * 2) * 2;
+        const oAlpha = 0.5 + Math.sin(time * 4 + i) * 0.3;
+
+        ctx.save();
+        ctx.translate(ox, oy);
+        ctx.rotate(time * 2 + i);
+
+        // Свечение маленькой снежинки
+        const oGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, oSize * 2.5);
+        oGlow.addColorStop(0, `rgba(200,220,255,${oAlpha * 0.3})`);
+        oGlow.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = oGlow;
+        ctx.beginPath();
+        ctx.arc(0, 0, oSize * 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 6 лучей
+        for (let j = 0; j < 6; j++) {
+            const a = (j / 6) * Math.PI * 2;
+            ctx.strokeStyle = `rgba(255,255,255,${oAlpha})`;
+            ctx.lineWidth = 1;
+            ctx.shadowBlur = 4;
+            ctx.shadowColor = `rgba(200,220,255,${oAlpha})`;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(a) * oSize, Math.sin(a) * oSize);
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 6. ENERGY SPARKLES (энергетические искры)
+    // ═══════════════════════════════════════════════════════════
+    const sparkles = [
+        { x: 120, y: -80, r: 2.5 },
+        { x: -130, y: -60, r: 2 },
+        { x: 100, y: 110, r: 2.2 },
+        { x: -110, y: 100, r: 2 },
+        { x: 0, y: -150, r: 2.5 },
+        { x: 150, y: 20, r: 2 },
+        { x: -140, y: 30, r: 2.2 },
+        { x: 30, y: 140, r: 2 }
+    ];
+
+    for (const s of sparkles) {
+        const sparkAlpha = 0.6 + Math.sin(time * 5 + s.x * 0.1) * 0.3;
+        
+        // Свечение
+        const sparkGlow = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r * 3);
+        sparkGlow.addColorStop(0, `rgba(220,235,255,${sparkAlpha * 0.6})`);
+        sparkGlow.addColorStop(0.5, `rgba(200,220,255,${sparkAlpha * 0.3})`);
+        sparkGlow.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = sparkGlow;
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r * 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Ядро
+        ctx.fillStyle = `rgba(255,255,255,${sparkAlpha})`;
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = "rgba(200,220,255,1)";
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.restore();
+    return Texture.from(canvas);
+}
+
+// ═══════════════════════════════════════════════════════════
+// SETUP
+// ═══════════════════════════════════════════════════════════
+async function setup() {
+    const app = new Application();
+    await app.init({
+        width: 500, height: 500,
+        backgroundColor: 0x0a1520,
+        antialias: true,
+    });
+    document.getElementById('pixi-container').appendChild(app.canvas);
+
+    const container = new Container();
+    container.x = 250; container.y = 250;
+    app.stage.addChild(container);
+
+    let time = 0;
+    
+    app.ticker.add(() => {
+        time += 0.016;
+        
+        const tex = createSnowflake(time);
+        
+        while (container.children.length > 0) {
+            container.removeChildAt(0);
+        }
+        
+        const sprite = new Sprite(tex);
+        sprite.anchor.set(0.5);
+        sprite.width = 380; sprite.height = 380;
+        container.addChild(sprite);
+
+        const bloom1 = new Sprite(tex);
+        bloom1.anchor.set(0.5);
+        bloom1.width = 420; bloom1.height = 420;
+        bloom1.alpha = 0.4;
+        bloom1.blendMode = "add";
+        bloom1.filters = [new BlurFilter({ strength: 12, quality: 3 })];
+        container.addChild(bloom1);
+
+        const bloom2 = new Sprite(tex);
+        bloom2.anchor.set(0.5);
+        bloom2.width = 480; bloom2.height = 480;
+        bloom2.alpha = 0.2;
+        bloom2.blendMode = "add";
+        bloom2.filters = [new BlurFilter({ strength: 25, quality: 3 })];
+        container.addChild(bloom2);
+
+        const bloom3 = new Sprite(tex);
+        bloom3.anchor.set(0.5);
+        bloom3.width = 560; bloom3.height = 560;
+        bloom3.alpha = 0.12;
+        bloom3.blendMode = "add";
+        bloom3.filters = [new BlurFilter({ strength: 45, quality: 3 })];
+        container.addChild(bloom3);
+
+        // Левитация + покачивание
+        const levitation = Math.sin(time * 1.2) * 8;
+        container.y = 250 + levitation;
+        const sway = Math.sin(time * 0.8) * 0.03;
+        container.rotation = sway;
+    });
+}
+
+setup();
+</script>
+</body>
+</html>

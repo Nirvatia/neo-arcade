@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Winter Labyrinth — Final Polish</title>
+    <style>
+        :root { --bg: #0a1520; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: var(--bg); font-family: "Courier New", monospace; display: flex; justify-content: center; align-items: center; min-height: 100vh; overflow: hidden; }
+        .main-container { display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 20px; }
+        .title { font-size: 18px; color: #c8d8e8; letter-spacing: 6px; text-transform: uppercase; text-shadow: 0 0 20px rgba(168,200,232,0.4); }
+        .viewport { position: relative; border: 1px solid rgba(168,200,232,0.3); box-shadow: 0 0 40px rgba(100,140,180,0.15), inset 0 0 60px rgba(0,0,0,0.5); border-radius: 4px; overflow: hidden; }
+        canvas { display: block; }
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+        .btn { background: rgba(15,25,35,0.8); color: #c8d8e8; border: 1px solid rgba(168,200,232,0.3); padding: 8px 16px; font-family: inherit; font-size: 11px; letter-spacing: 2px; cursor: pointer; text-transform: uppercase; border-radius: 2px; transition: all 0.3s; }
+        .btn:hover { background: rgba(25,40,55,0.9); border-color: rgba(200,216,232,0.5); }
+        .btn.active { background: rgba(40,60,80,0.9); border-color: rgba(220,235,255,0.6); color: #fff; box-shadow: 0 0 15px rgba(168,200,232,0.3); }
+        .separator { width: 1px; background: rgba(168,200,232,0.2); margin: 0 5px; }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="title">Winter Labyrinth</div>
+        <div class="viewport" id="viewport"><div id="pixi-container"></div></div>
+        <div class="controls">
+            <button class="btn" id="btnNoon">◐ Noon</button>
+            <button class="btn active" id="btnNight">● Night</button>
+            <div class="separator"></div>
+            <button class="btn" id="btnBlizzard">❄ Blizzard</button>
+            <div class="separator"></div>
+            <button class="btn" id="btnLair">◇ Lair Gate</button>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+    <script type="module">
+        const TILE_MAP = [
+            ["ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES"],
+            ["ES","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","ES"],
+            ["ES","WL","PP","DT","DT","DT","DT","DT","DT","DT","DT","DT","WL","DT","DT","DT","DT","DT","DT","DT","DT","DT","PP","WL","ES"],
+            ["ES","WL","DT","WL","WL","WL","DT","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","DT","WL","WL","WL","DT","WL","ES"],
+            ["ES","WL","DT","WL","WL","WL","DT","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","DT","WL","WL","WL","DT","WL","ES"],
+            ["ES","WL","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","WL","ES"],
+            ["ES","WL","DT","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","DT","WL","ES"],
+            ["ES","WL","DT","DT","DT","DT","DT","WL","DT","DT","DT","DT","WL","DT","DT","DT","DT","WL","DT","DT","DT","DT","DT","WL","ES"],
+            ["ES","WL","WL","WL","WL","WL","DT","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","DT","WL","WL","WL","WL","WL","ES"],
+            ["ES","ES","ES","ES","ES","WL","DT","WL","DT","DT","DT","DT","DT","DT","DT","DT","DT","WL","DT","WL","ES","ES","ES","ES","ES"],
+            ["ES","ES","ES","ES","ES","WL","DT","WL","DT","WL","WL","LE","LE","LE","WL","WL","DT","WL","DT","WL","ES","ES","ES","ES","ES"],
+            ["ES","WL","WL","WL","WL","WL","DT","WL","DT","WL","LT","LT","LT","LT","LT","WL","DT","WL","DT","WL","WL","WL","WL","WL","ES"],
+            ["ES","0A","DT","DT","DT","DT","DT","DT","DT","WL","BY","IY","LT","PY","CE","WL","DT","DT","DT","DT","DT","DT","DT","0A","ES"],
+            ["ES","WL","WL","WL","WL","WL","DT","WL","DT","WL","LT","LT","LT","LT","LT","WL","DT","WL","DT","WL","WL","WL","WL","WL","ES"],
+            ["ES","ES","ES","ES","ES","WL","DT","WL","DT","WL","WL","WL","WL","WL","WL","WL","DT","WL","DT","WL","ES","ES","ES","ES","ES"],
+            ["ES","ES","ES","ES","ES","WL","DT","WL","DT","DT","DT","DT","DT","DT","DT","DT","DT","WL","DT","WL","ES","ES","ES","ES","ES"],
+            ["ES","WL","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","WL","ES"],
+            ["ES","WL","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","WL","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","WL","ES"],
+            ["ES","WL","DT","WL","WL","WL","DT","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","DT","WL","WL","WL","DT","WL","ES"],
+            ["ES","WL","DT","DT","DT","WL","DT","DT","DT","DT","DT","DT","PM","DT","DT","DT","DT","DT","DT","WL","DT","DT","DT","WL","ES"],
+            ["ES","WL","WL","WL","DT","WL","DT","WL","DT","WL","WL","WL","WL","WL","WL","WL","DT","WL","DT","WL","DT","WL","WL","WL","ES"],
+            ["ES","WL","DT","DT","DT","DT","DT","WL","DT","DT","DT","DT","WL","DT","DT","DT","DT","WL","DT","DT","DT","DT","DT","WL","ES"],
+            ["ES","WL","DT","WL","WL","WL","WL","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","WL","WL","WL","WL","DT","WL","ES"],
+            ["ES","WL","PP","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","PP","WL","ES"],
+            ["ES","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","ES"],
+            ["ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES"],
+        ];
+
+        const COLS = 25, ROWS = 26, TILE = 28;
+        const GW = COLS * TILE, GH = ROWS * TILE;
+
+        const PALS = {
+            noon: { void:0x101a28, floor:0x162436, floorSnow:0xe4eef6, wallBase:0x5a6a7a, wallTop:0x748494, wallShadow:0x344454, wallEdge:0x8898a8, wallCrack:0x445464, wallSnow:0xeaf2f8, wallFrost:0xf8fafe, icicle:0xe2ecf4, lairBase:0x445464, lairGlow:0x9ab8d0, lairRune:0xc0d6ec, teleCore:0x101a28, teleRing:0x84a0b8, teleBright:0xcce0f6, teleArc:0x9ab8d0, teleCrystal:0xb4cce0, snowflake:0xe4eef6, icePatch:0xb0c4d8, aoColor:0x060e14, fogColor:0x8899aa },
+            night:{ void:0x0a1520, floor:0x0f1a25, floorSnow:0xd8e8f8, wallBase:0x4a5a6a, wallTop:0x6a7a8a, wallShadow:0x2a3a4a, wallEdge:0x7a8a9a, wallCrack:0x3a4a5a, wallSnow:0xe0ecf8, wallFrost:0xffffff, icicle:0xe8f4ff, lairBase:0x3a4a5a, lairGlow:0xa8c8e8, lairRune:0xd0e8ff, teleCore:0x0a1520, teleRing:0x88b8d8, teleBright:0xd0e8ff, teleArc:0xa8c8e8, teleCrystal:0xb8d0e8, snowflake:0xd8e8f8, icePatch:0xb0c8e0, aoColor:0x000810, fogColor:0x8aa8c8 },
+        };
+
+        let pal = { ...PALS.night }, tPal = { ...PALS.night }, pTrans = 1, mode = "night";
+        let blizzard = false, lairO = 0, tLair = 0, T = 0;
+        let blizzardLerp = 0, timeOfDay = 1.0;
+
+        const h2r = h => ({ r:(h>>16)&0xff, g:(h>>8)&0xff, b:h&0xff });
+        const lerpH = (a,b,t) => { const A=h2r(a), B=h2r(b); return (Math.round(A.r+(B.r-A.r)*t)<<16)|(Math.round(A.g+(B.g-A.g)*t)<<8)|Math.round(A.b+(B.b-A.b)*t); };
+
+        function setMode(m) {
+            if (m === mode) return;
+            mode = m; tPal = { ...PALS[m] }; pTrans = 0;
+            timeOfDay = m === "noon" ? 0.0 : 1.0;
+            document.querySelectorAll('#btnNoon,#btnNight').forEach(b => b.classList.remove('active'));
+            document.getElementById('btn' + m.charAt(0).toUpperCase() + m.slice(1)).classList.add('active');
+        }
+
+        const wTiles = [], lTiles = [], tTiles = [], ltTiles = [];
+        for (let r=0; r<ROWS; r++) for (let c=0; c<COLS; c++) {
+            const t=TILE_MAP[r][c], cx=c*TILE+TILE/2, cy=r*TILE+TILE/2, bx=c*TILE+1, by=r*TILE+1, s=TILE-2;
+            if (t==="WL") wTiles.push({bx,by,s,cx,cy,seed:c*73+r*31,c,r});
+            else if (t==="LE") lTiles.push({bx,by,s,cx,cy});
+            else if (t==="LT") ltTiles.push({bx,by,s,cx,cy,seed:c*53+r*17});
+            else if (t.startsWith("0")) tTiles.push({cx,cy,seed:c*0.7+r*1.1});
+        }
+        const isW = (c,r) => c>=0&&c<COLS&&r>=0&&r<ROWS&&TILE_MAP[r][c]==="WL";
+        const isP = (c,r) => c>=0&&c<COLS&&r>=0&&r<ROWS&&TILE_MAP[r][c]!=="WL"&&TILE_MAP[r][c]!=="ES"&&TILE_MAP[r][c]!=="LE";
+
+        const app = new PIXI.Application();
+        await app.init({ width:GW, height:GH, backgroundColor:0x000000, resolution:Math.min(window.devicePixelRatio||1,2), antialias:true });
+        document.getElementById("pixi-container").appendChild(app.canvas);
+
+        const gameRT = PIXI.RenderTexture.create({ width:GW, height:GH });
+        const gameSprite = new PIXI.Sprite(gameRT);
+        app.stage.addChild(gameSprite);
+
+        const mainStage = new PIXI.Container();
+        const glowLayer = new PIXI.Container(); glowLayer.blendMode = "add";
+        const dynLayer = new PIXI.Container();
+        const fogLayer = new PIXI.Container();
+        fogLayer.alpha = 0.55;
+        mainStage.addChild(fogLayer, glowLayer, dynLayer);
+
+        let statSp = null, rebuilding = false;
+        const lairG = new PIXI.Graphics(); dynLayer.addChild(lairG);
+        const teleG = new PIXI.Graphics(); dynLayer.addChild(teleG);
+        const teleGG = new PIXI.Graphics(); glowLayer.addChild(teleGG);
+        const fogG = new PIXI.Graphics(); fogLayer.addChild(fogG);
+        glowLayer.filters = [new PIXI.BlurFilter({ strength:4, quality:3 })];
+        glowLayer.alpha = 0.7;
+
+        // ── FOG CIRCLES ──────────────────────────────
+        const fogParticles = [];
+        for (let i = 0; i < 12; i++) {
+            fogParticles.push({
+                x: Math.random() * GW, y: Math.random() * GH,
+                size: 100 + Math.random() * 200,
+                vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 1.5,
+                phase: Math.random() * Math.PI * 2,
+                alpha: 0.05 + Math.random() * 0.06,
+            });
+        }
+
+        function drawFog(dt) {
+            fogG.clear();
+            const mult = blizzard ? 1.6 : 1;
+            for (const f of fogParticles) {
+                f.x += f.vx * dt * mult; f.y += f.vy * dt * mult;
+                if (f.x < -f.size) f.x = GW + f.size;
+                if (f.x > GW + f.size) f.x = -f.size;
+                if (f.y < -f.size) f.y = GH + f.size;
+                if (f.y > GH + f.size) f.y = -f.size;
+                const pulse = f.alpha * (0.7 + 0.3 * Math.sin(T * 0.3 + f.phase));
+                const alphaMult = blizzard ? 1.5 : 1;
+                fogG.circle(f.x, f.y, f.size).fill({ color: pal.fogColor, alpha: pulse * alphaMult });
+                fogG.circle(f.x, f.y, f.size * 0.5).fill({ color: pal.fogColor, alpha: pulse * alphaMult * 0.7 });
+            }
+        }
+
+        // ── SNOWFALL (-20%) ──────────────────────────
+        const snowG = new PIXI.Graphics(); mainStage.addChild(snowG);
+        const snowBack = [], snowMid = [], snowFront = [];
+        for (let i = 0; i < 112; i++) snowBack.push({ x:Math.random()*GW, y:Math.random()*GH, size:0.4+Math.random()*0.6, speed:5+Math.random()*8, drift:(Math.random()-0.5)*3, phase:Math.random()*Math.PI*2, alpha:0.1+Math.random()*0.15 });
+        for (let i = 0; i < 168; i++) snowMid.push({ x:Math.random()*GW, y:Math.random()*GH, size:0.8+Math.random()*1.2, speed:12+Math.random()*18, drift:(Math.random()-0.5)*8, phase:Math.random()*Math.PI*2, alpha:0.2+Math.random()*0.25 });
+        for (let i = 0; i < 56; i++) snowFront.push({ x:Math.random()*GW, y:Math.random()*GH, size:1.5+Math.random()*2, speed:30+Math.random()*40, drift:15+Math.random()*25, phase:Math.random()*Math.PI*2, alpha:0.3+Math.random()*0.3 });
+
+        function drawSnow(dt) {
+            snowG.clear();
+            const mult = blizzard ? 1.6 : 1;
+            for (const sf of snowBack) {
+                sf.y += sf.speed * dt * mult; sf.x += sf.drift * dt + Math.sin(T*0.3+sf.phase)*0.2;
+                if (sf.y > GH) { sf.y = -5; sf.x = Math.random()*GW; }
+                if (sf.x < 0) sf.x = GW; if (sf.x > GW) sf.x = 0;
+                snowG.circle(sf.x, sf.y, sf.size).fill({ color: pal.snowflake, alpha: sf.alpha });
+            }
+            for (const sf of snowMid) {
+                sf.y += sf.speed * dt * mult; sf.x += sf.drift * dt * mult + Math.sin(T*0.5+sf.phase)*0.3;
+                if (sf.y > GH) { sf.y = -5; sf.x = Math.random()*GW; }
+                if (sf.x < 0) sf.x = GW; if (sf.x > GW) sf.x = 0;
+                snowG.circle(sf.x, sf.y, sf.size*1.3).fill({ color: pal.snowflake, alpha: sf.alpha*0.12 });
+                snowG.circle(sf.x, sf.y, sf.size).fill({ color: pal.snowflake, alpha: sf.alpha });
+            }
+            if (blizzard) {
+                for (const sf of snowFront) {
+                    sf.y += sf.speed * dt * 1.1; sf.x += sf.drift * dt * 1.1 + Math.sin(T*2+sf.phase)*1.2;
+                    if (sf.y > GH) { sf.y = -10; sf.x = Math.random()*GW; }
+                    if (sf.x > GW) { sf.x = -10; sf.y = Math.random()*GH; }
+                    if (sf.x < -20) sf.x = GW;
+                    snowG.circle(sf.x, sf.y, sf.size*1.8).fill({ color: 0xffffff, alpha: sf.alpha*0.12 });
+                    snowG.circle(sf.x, sf.y, sf.size).fill({ color: 0xffffff, alpha: sf.alpha*0.4 });
+                }
+                // Wind streaks (blizzard only)
+                for (let i = 0; i < 20; i++) {
+                    const sx = ((T*100 + i*41) % (GW+180)) - 90;
+                    const sy = ((i*79 + Math.sin(T+i)*35) % GH + GH) % GH;
+                    snowG.moveTo(sx, sy).lineTo(sx + 50 + Math.sin(i)*18, sy + Math.cos(i)*3)
+                        .stroke({ color: 0xffffff, width: 0.4, alpha: 0.08 + Math.sin(T*3+i)*0.04 });
+                }
+            }
+        }
+
+        // ── FILTER ────────────────────────────────────
+        const filter = PIXI.Filter.from({
+            gl: {
+                vertex: `in vec2 aPosition;
+out vec2 vTextureCoord;
+uniform vec4 uInputSize;
+uniform vec4 uOutputFrame;
+uniform vec4 uOutputTexture;
+vec4 filterVertexPosition(void){ vec2 position=aPosition*uOutputFrame.zw+uOutputFrame.xy; position.x=position.x*(2.0/uOutputTexture.x)-1.0; position.y=position.y*(2.0*uOutputTexture.z/uOutputTexture.y)-uOutputTexture.z; return vec4(position,0.0,1.0); }
+vec2 filterTextureCoord(void){ return aPosition*(uOutputFrame.zw*uInputSize.zw); }
+void main(void){ gl_Position=filterVertexPosition(); vTextureCoord=filterTextureCoord(); }`,
+                fragment: `
+varying vec2 vTextureCoord;
+uniform sampler2D uTexture;
+uniform float uTime;
+uniform float uBlizzard;
+uniform float uTimeOfDay;
+
+float hash1(float n) { return fract(sin(n)*43758.5453123); }
+
+void main() {
+    vec4 color = texture2D(uTexture, vTextureCoord);
+    vec2 uv = vTextureCoord;
+    float t = uTime;
+    float bliz = uBlizzard;
+    float tod = uTimeOfDay;
+
+    vec3 noonTint  = mix(vec3(1.0), vec3(0.99,0.995,1.01), 0.2);
+    vec3 nightTint = vec3(0.84,0.90,1.06);
+    color.rgb = mix(color.rgb * noonTint, color.rgb * nightTint, tod);
+
+    float rays = 0.0;
+    for (int i = 0; i < 5; i++) {
+        float fi = float(i);
+        float rayPos = uv.x * 0.6 + uv.y * 0.8 + fi * 0.22;
+        rayPos += sin(t * 0.04 + fi) * 0.03;
+        float ray = 0.012 / (abs(fract(rayPos) - 0.5) + 0.04);
+        ray *= smoothstep(0.5, 0.0, uv.y);
+        ray *= smoothstep(0.0, 0.3, uv.x);
+        rays += ray * 0.3;
+    }
+    float rayStr = mix(0.5, 0.25, tod);
+    color.rgb += rays * vec3(0.8,0.85,1.0) * rayStr;
+
+    float dist = length(uv - 0.5) * 1.4;
+    float vig = 1.0 - dist;
+    vig = smoothstep(0.2, 0.92, vig);
+    vec3 noonEdge = vec3(0.06,0.08,0.14);
+    vec3 nightEdge = vec3(0.02,0.04,0.10);
+    vec3 edgeCol = mix(noonEdge, nightEdge, tod);
+    float vigStrength = mix(0.5, 0.65, tod);
+    color.rgb = mix(color.rgb, edgeCol, (1.0 - vig) * vigStrength);
+
+    float breathZone = exp(-length(uv-vec2(0.5,0.86))*4.5)*0.5;
+    breathZone += exp(-length(uv-vec2(0.45,0.89))*6.0)*0.25;
+    breathZone += exp(-length(uv-vec2(0.55,0.89))*6.0)*0.25;
+    float breathPulse = pow(sin(t*2.0)*0.5+0.5,3.5);
+    float breath = breathZone * breathPulse * 0.05 * (1.0+bliz*1.2);
+    color.rgb = mix(color.rgb, vec3(0.92,0.95,1.0), breath);
+
+    gl_FragColor = color;
+}`,
+            },
+            resources: {
+                filterUniforms: {
+                    uTime: { value: 0, type: "f32" },
+                    uBlizzard: { value: 0, type: "f32" },
+                    uTimeOfDay: { value: 1.0, type: "f32" },
+                },
+            },
+        });
+        gameSprite.filters = [filter];
+
+        // ── STATIC BUILD ────────────────────────────
+        function rebuild() {
+            if (rebuilding) return;
+            rebuilding = true;
+            requestAnimationFrame(() => {
+                if (statSp) { mainStage.removeChild(statSp); statSp.destroy(); }
+                const sc = new PIXI.Container(), fg = new PIXI.Graphics(), wg = new PIXI.Graphics(), sg = new PIXI.Graphics(), frg = new PIXI.Graphics(), lg = new PIXI.Graphics();
+                floor(fg); walls(wg); caps(sg); frost(frg); lairFloor(lg);
+                sc.addChild(fg,wg,sg,frg,lg);
+                statSp = new PIXI.Sprite(app.renderer.generateTexture(sc)); mainStage.addChildAt(statSp, 0);
+                sc.destroy({ children: true });
+                rebuilding = false;
+            });
+        }
+
+        function floor(g) {
+            g.rect(0,0,GW,GH).fill({color:pal.void});
+            for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+                const t=TILE_MAP[r][c]; if (t==="WL"||t==="ES"||t==="LE") continue;
+                const bx=c*TILE+1, by=r*TILE+1, s=TILE-2, cx=c*TILE+TILE/2, cy=r*TILE+TILE/2, seed=c*31+r*17;
+                g.rect(bx,by,s,s).fill({color:pal.floor,alpha:0.95});
+                // AO: all sides except top (wall bases touching floor)
+                if (isW(c,r+1)) g.rect(bx,by+s-3,s,3).fill({color:pal.aoColor,alpha:0.3});
+                if (isW(c-1,r)) g.rect(bx,by,3,s).fill({color:pal.aoColor,alpha:0.25});
+                if (isW(c+1,r)) g.rect(bx+s-3,by,3,s).fill({color:pal.aoColor,alpha:0.25});
+                if (seed%3===0) g.circle(cx+Math.sin(seed)*7,cy+Math.cos(seed)*7,0.7).fill({color:pal.floorSnow,alpha:0.35});
+                if (seed%5===0) g.circle(cx+Math.sin(seed+3)*9,cy+Math.cos(seed+3)*9,0.5).fill({color:pal.floorSnow,alpha:0.25});
+                if (seed%7===0) g.ellipse(cx+Math.sin(seed)*6,cy+Math.cos(seed)*6,4,2).fill({color:pal.floorSnow,alpha:0.18});
+            }
+        }
+
+        function walls(g){for(const w of wTiles){g.rect(w.bx+1.5,w.by+1.5,w.s,w.s).fill({color:pal.wallShadow,alpha:0.5});g.rect(w.bx,w.by,w.s,w.s).fill({color:pal.wallBase});g.rect(w.bx+1,w.by+1,w.s-2,w.s*0.22).fill({color:pal.wallTop,alpha:0.45});g.rect(w.bx+1,w.by+w.s-w.s*0.18,w.s-2,w.s*0.18).fill({color:pal.wallShadow,alpha:0.35});g.moveTo(w.bx+w.s*0.5,w.by+3).lineTo(w.bx+w.s*0.5,w.by+w.s-3).stroke({color:pal.wallCrack,width:0.6,alpha:0.35});if(isP(w.c,w.r-1))g.moveTo(w.bx,w.by).lineTo(w.bx+w.s,w.by).stroke({color:pal.wallEdge,width:1.2,alpha:0.5});if(isP(w.c,w.r+1))g.moveTo(w.bx,w.by+w.s).lineTo(w.bx+w.s,w.by+w.s).stroke({color:pal.wallEdge,width:1.2,alpha:0.5});if(isP(w.c-1,w.r))g.moveTo(w.bx,w.by).lineTo(w.bx,w.by+w.s).stroke({color:pal.wallEdge,width:1.2,alpha:0.5});if(isP(w.c+1,w.r))g.moveTo(w.bx+w.s,w.by).lineTo(w.bx+w.s,w.by+w.s).stroke({color:pal.wallEdge,width:1.2,alpha:0.5});
+        // Icicles: -30% fewer (1-2 instead of 2-3)
+        if(isP(w.c,w.r+1)){const count=1+(w.seed%2);for(let i=0;i<count;i++){const ix=w.bx+3+(i/(count-1||1))*(w.s-6)+Math.sin(w.seed+i)*2,iLen=2+((w.seed+i*7)%4);g.moveTo(ix-0.8,w.by+w.s).lineTo(ix,w.by+w.s+iLen).lineTo(ix+0.8,w.by+w.s).closePath().fill({color:pal.icicle,alpha:0.7});g.moveTo(ix-0.4,w.by+w.s).lineTo(ix,w.by+w.s+iLen*0.8).stroke({color:0xffffff,width:0.3,alpha:0.3});}}}}
+
+        // ── SNOW CAPS (prototype shape, +50% in lair) ──
+        function caps(g, isLair=false) {
+            for (const w of wTiles) {
+                if (!isP(w.c, w.r - 1)) continue;
+                const H = (3 + (w.seed % 3)) * (isLair ? 1.5 : 1);
+                g.moveTo(w.bx - 1, w.by + 1);
+                for (let i = 0; i <= 8; i++) {
+                    const t = i / 8,
+                        x = w.bx - 1 + t * (w.s + 2),
+                        parabolic = 1 - 4 * (t - 0.5) * (t - 0.5);
+                    g.lineTo(x, Math.max(w.by - H - 1, w.by - H * parabolic * (0.7 + 0.3 * Math.sin(w.seed + t * 4))));
+                }
+                g.lineTo(w.bx + w.s + 1, w.by + 1);
+                g.closePath();
+                g.fill({ color: pal.wallSnow, alpha: 0.9 });
+                g.moveTo(w.bx + w.s / 2 - 4, w.by - H - 0.5 + 1)
+                    .lineTo(w.bx + w.s / 2 + 4, w.by - H - 0.5 + 1)
+                    .stroke({ color: 0xffffff, width: 0.5, alpha: 0.35 });
+            }
+        }
+        // Override caps to split normal vs lair
+        const origCaps = caps;
+        caps = function(g) { origCaps(g, false); };
+        function lairCaps(g) { origCaps(g, true); }
+
+        function frost(g){for(const w of wTiles){if(w.seed%7!==0)continue;const branches=3+(w.seed%3);for(let i=0;i<branches;i++){const a=(w.seed*0.3+i*2.1)%(Math.PI*2),len=4+((w.seed+i*7)%6);g.moveTo(w.cx+Math.cos(a)*3,w.cy+Math.sin(a)*3).lineTo(w.cx+Math.cos(a)*len,w.cy+Math.sin(a)*len).stroke({color:pal.wallFrost,width:0.4,alpha:0.5});for(let j=-1;j<=1;j+=2){const ba=a+j*0.6;g.moveTo(w.cx+Math.cos(a)*len,w.cy+Math.sin(a)*len).lineTo(w.cx+Math.cos(a)*len+Math.cos(ba)*2,w.cy+Math.sin(a)*len+Math.sin(ba)*2).stroke({color:pal.wallFrost,width:0.3,alpha:0.3});}}}}
+        function lairFloor(g){for(const lt of ltTiles){const{bx,by,s,cx,cy,seed}=lt;g.rect(bx,by,s,s).fill({color:pal.floor,alpha:0.9});if(seed%3===0){const a1=seed*0.7,a2=seed*1.3;g.moveTo(cx+Math.cos(a1)*4,cy+Math.sin(a1)*4).lineTo(cx+Math.cos(a2)*6,cy+Math.sin(a2)*6).stroke({color:pal.icePatch,width:0.6,alpha:0.4});}if(seed%5===0){const a1=seed*1.1+1,a2=seed*0.5+2;g.moveTo(cx+Math.cos(a1)*5,cy+Math.sin(a1)*5).lineTo(cx+Math.cos(a2)*4,cy+Math.sin(a2)*4).stroke({color:pal.icePatch,width:0.5,alpha:0.3});}g.circle(cx+Math.sin(seed)*6,cy+Math.cos(seed)*6,0.5).fill({color:pal.floorSnow,alpha:0.3});g.circle(cx+Math.sin(seed+2)*7,cy+Math.cos(seed+2)*7,0.4).fill({color:pal.floorSnow,alpha:0.2});}}
+
+        function drawTele(){teleG.clear();teleGG.clear();for(const tp of tTiles){const{cx,cy,seed}=tp,maxR=TILE*0.44,breathe=1+Math.sin(T*0.8+seed)*0.04;teleGG.circle(cx,cy,maxR*1.7*breathe).fill({color:pal.teleBright,alpha:0.18});teleGG.circle(cx,cy,maxR*1.0*breathe).fill({color:pal.teleBright,alpha:0.28});teleG.circle(cx,cy,maxR*0.9*breathe).stroke({color:pal.teleRing,width:1,alpha:0.5});for(let arm=0;arm<3;arm++){const baseA=(arm/3)*Math.PI*2+T*0.3;teleG.beginPath();for(let j=0;j<=20;j++){const t=j/20,a=baseA+t*Math.PI*2.5,r=maxR*t*0.8*breathe;j===0?teleG.moveTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r):teleG.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r);}teleG.stroke({color:arm===0?pal.teleBright:pal.teleArc,width:1.2-arm*0.2,alpha:0.6});}teleG.circle(cx,cy,maxR*0.16*breathe).fill({color:pal.teleBright,alpha:0.9});teleG.circle(cx,cy,maxR*0.06*breathe).fill({color:0xffffff,alpha:1});for(let i=0;i<3;i++){const ph=(i/3)*Math.PI*2+T*1.3+seed,or=maxR*(0.5+Math.sin(T*2+i)*0.1);teleG.circle(cx+Math.cos(ph)*or,cy+Math.sin(ph)*or,1).fill({color:0xffffff,alpha:0.7});}}}
+
+        function drawLair(prog){lairG.clear();for(const l of lTiles){const{bx,by,s,cx,cy}=l,p=Math.max(0,Math.min(1,prog));if(p<0.5){const a=1-p*2;
+        lairG.rect(bx,by,s,s).fill({color:pal.wallBase,alpha:a});
+        lairG.rect(bx+1,by+1,s-2,s*0.2).fill({color:pal.wallTop,alpha:a*0.5});
+        lairG.rect(bx+1,by+s-s*0.15,s-2,s*0.15).fill({color:pal.wallShadow,alpha:a*0.4});
+        const rr=s*0.32;
+        for(let i=0;i<6;i++){const angle=(i/6)*Math.PI*2;lairG.moveTo(cx+Math.cos(angle)*rr*0.1,cy+Math.sin(angle)*rr*0.1).lineTo(cx+Math.cos(angle)*rr,cy+Math.sin(angle)*rr).stroke({color:pal.wallSnow,width:1.8,alpha:a*0.75});const bx2=cx+Math.cos(angle)*rr*0.5,by2=cy+Math.sin(angle)*rr*0.5;for(let br=-1;br<=1;br+=2){const ba=angle+br*0.55;lairG.moveTo(bx2,by2).lineTo(bx2+Math.cos(ba)*rr*0.25,by2+Math.sin(ba)*rr*0.25).stroke({color:pal.wallSnow,width:0.9,alpha:a*0.55});}}
+        for(let i=0;i<6;i++){const angle=(i/6)*Math.PI*2+Math.PI/6;lairG.moveTo(cx+Math.cos(angle)*rr*0.15,cy+Math.sin(angle)*rr*0.15).lineTo(cx+Math.cos(angle)*rr*0.6,cy+Math.sin(angle)*rr*0.6).stroke({color:pal.wallSnow,width:1.2,alpha:a*0.55});const bx2=cx+Math.cos(angle)*rr*0.35,by2=cy+Math.sin(angle)*rr*0.35;for(let br=-1;br<=1;br+=2){const ba=angle+br*0.65;lairG.moveTo(bx2,by2).lineTo(bx2+Math.cos(ba)*rr*0.15,by2+Math.sin(ba)*rr*0.15).stroke({color:pal.wallSnow,width:0.6,alpha:a*0.4});}}
+        lairG.beginPath();for(let i=0;i<6;i++){const angle=(i/6)*Math.PI*2+Math.PI/6;const px=cx+Math.cos(angle)*rr*0.08,py=cy+Math.sin(angle)*rr*0.08;if(i===0)lairG.moveTo(px,py);else lairG.lineTo(px,py);}lairG.closePath().fill({color:pal.wallFrost,alpha:a*0.9}).stroke({color:pal.wallSnow,width:0.8,alpha:a*0.6});
+        lairG.rect(bx+1,by+1,s-2,s-2).stroke({color:pal.wallEdge,width:0.8,alpha:a*0.35});
+        }else{const a=(p-0.5)*2;lairG.rect(bx,by,s,s).fill({color:pal.floor,alpha:a*0.75});}}};
+
+        rebuild();
+        document.getElementById("btnNoon").onclick = () => setMode("noon");
+        document.getElementById("btnNight").onclick = () => setMode("night");
+        document.getElementById("btnBlizzard").onclick = () => { blizzard=!blizzard; document.getElementById("btnBlizzard").classList.toggle("active",blizzard); };
+        document.getElementById("btnLair").onclick = () => { tLair=tLair>0.5?0:1; };
+
+        let lt = performance.now();
+        app.ticker.add(() => {
+            const n=performance.now(), dt=Math.min((n-lt)/1000,0.05); lt=n; T+=dt;
+            if (pTrans < 1) { pTrans = Math.min(1, pTrans + dt * 0.8); for (const k in tPal) pal[k] = lerpH(PALS[mode][k], tPal[k], pTrans); if (pTrans >= 1) rebuild(); }
+            blizzardLerp += ((blizzard?1:0)-blizzardLerp) * Math.min(1, dt*3);
+            if (Math.abs(lairO-tLair)>0.001) lairO += Math.sign(tLair-lairO)*Math.min(2.5*dt, Math.abs(lairO-tLair));
+
+            filter.resources.filterUniforms.uniforms.uTime = T;
+            filter.resources.filterUniforms.uniforms.uBlizzard = blizzardLerp;
+            filter.resources.filterUniforms.uniforms.uTimeOfDay = timeOfDay;
+
+            app.renderer.render({ container: mainStage, target: gameRT, clear: true });
+            drawFog(dt);
+            drawTele();
+            drawSnow(dt);
+            drawLair(lairO);
+        });
+        window.addEventListener('resize', () => { app.renderer.resize(GW, GH); });
+    </script>
+</body>
+</html>

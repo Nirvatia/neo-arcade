@@ -1,0 +1,834 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pac-Man Lightning Mode</title>
+    <style>
+      :root { --bg: #06080e; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        background: var(--bg);
+        font-family: "Courier New", monospace;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+      .main-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 24px;
+        padding: 20px;
+      }
+      .header { text-align: center; }
+      .title {
+        font-size: 22px;
+        color: #c8d4e0;
+        letter-spacing: 8px;
+        text-transform: uppercase;
+        text-shadow: 0 0 30px rgba(102, 120, 136, 0.5), 0 0 60px rgba(58, 79, 124, 0.3);
+        margin-bottom: 6px;
+      }
+      .subtitle {
+        font-size: 11px;
+        color: #667888;
+        letter-spacing: 5px;
+        opacity: 0.7;
+      }
+      .viewport {
+        position: relative;
+        border: 2px solid #1a2430;
+        box-shadow: 0 0 40px rgba(102, 120, 136, 0.15), 0 0 80px rgba(58, 79, 124, 0.08), inset 0 0 60px rgba(0, 0, 0, 0.4);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      canvas { display: block; }
+      .vignette {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        pointer-events: none;
+        background: radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, 0.5) 100%);
+        opacity: 0.7;
+      }
+      .controls {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      .btn {
+        background: #111620;
+        color: #c8d4e0;
+        border: 1px solid #1a2430;
+        padding: 10px 20px;
+        font-family: inherit;
+        font-size: 12px;
+        letter-spacing: 3px;
+        cursor: pointer;
+        transition: all 0.25s ease;
+        text-transform: uppercase;
+        border-radius: 2px;
+      }
+      .btn:hover {
+        background: #19222e;
+        border-color: #556680;
+        box-shadow: 0 0 20px rgba(102, 120, 136, 0.2);
+        transform: translateY(-1px);
+      }
+      .btn:active { transform: translateY(0); }
+      .btn.active {
+        background: #1a2a3a;
+        border-color: #667888;
+        box-shadow: 0 0 25px rgba(102, 120, 136, 0.3);
+        color: #dde8f0;
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="main-container">
+      <div class="header">
+        <div class="title">Pac-Man Lightning</div>
+        <div class="subtitle">Cosmic Speed Demon</div>
+      </div>
+      <div class="viewport" id="viewport">
+        <div id="pixi-container"></div>
+        <div class="vignette"></div>
+      </div>
+      <div class="controls">
+        <button class="btn" id="btnLightning">⚡ Lightning Mode</button>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+    <script type="module">
+      const TILE_MAP = [
+        ["ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES"],
+        ["ES","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","ES"],
+        ["ES","WL","PP","DT","DT","DT","DT","DT","DT","DT","DT","DT","WL","DT","DT","DT","DT","DT","DT","DT","DT","DT","PP","WL","ES"],
+        ["ES","WL","DT","WL","WL","WL","DT","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","DT","WL","WL","WL","DT","WL","ES"],
+        ["ES","WL","DT","WL","WL","WL","DT","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","DT","WL","WL","WL","DT","WL","ES"],
+        ["ES","WL","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","WL","ES"],
+        ["ES","WL","DT","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","DT","WL","ES"],
+        ["ES","WL","DT","DT","DT","DT","DT","WL","DT","DT","DT","DT","WL","DT","DT","DT","DT","WL","DT","DT","DT","DT","DT","WL","ES"],
+        ["ES","WL","WL","WL","WL","WL","DT","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","DT","WL","WL","WL","WL","WL","ES"],
+        ["ES","ES","ES","ES","ES","WL","DT","WL","DT","DT","DT","DT","DT","DT","DT","DT","DT","WL","DT","WL","ES","ES","ES","ES","ES"],
+        ["ES","ES","ES","ES","ES","WL","DT","WL","DT","WL","WL","LE","LE","LE","WL","WL","DT","WL","DT","WL","ES","ES","ES","ES","ES"],
+        ["ES","WL","WL","WL","WL","WL","DT","WL","DT","WL","LT","LT","LT","LT","LT","WL","DT","WL","DT","WL","WL","WL","WL","WL","ES"],
+        ["ES","0A","DT","DT","DT","DT","DT","DT","DT","WL","BY","IY","LT","PY","CE","WL","DT","DT","DT","DT","DT","DT","DT","0A","ES"],
+        ["ES","WL","WL","WL","WL","WL","DT","WL","DT","WL","LT","LT","LT","LT","LT","WL","DT","WL","DT","WL","WL","WL","WL","WL","ES"],
+        ["ES","ES","ES","ES","ES","WL","DT","WL","DT","WL","WL","WL","WL","WL","WL","WL","DT","WL","DT","WL","ES","ES","ES","ES","ES"],
+        ["ES","ES","ES","ES","ES","WL","DT","WL","DT","DT","DT","DT","DT","DT","DT","DT","DT","WL","DT","WL","ES","ES","ES","ES","ES"],
+        ["ES","WL","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","WL","ES"],
+        ["ES","WL","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","WL","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","WL","ES"],
+        ["ES","WL","DT","WL","WL","WL","DT","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","DT","WL","WL","WL","DT","WL","ES"],
+        ["ES","WL","DT","DT","DT","WL","DT","DT","DT","DT","DT","DT","PM","DT","DT","DT","DT","DT","DT","WL","DT","DT","DT","WL","ES"],
+        ["ES","WL","WL","WL","DT","WL","DT","WL","DT","WL","WL","WL","WL","WL","WL","WL","DT","WL","DT","WL","DT","WL","WL","WL","ES"],
+        ["ES","WL","DT","DT","DT","DT","DT","WL","DT","DT","DT","DT","WL","DT","DT","DT","DT","WL","DT","DT","DT","DT","DT","WL","ES"],
+        ["ES","WL","DT","WL","WL","WL","WL","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","WL","WL","WL","WL","DT","WL","ES"],
+        ["ES","WL","PP","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","PP","WL","ES"],
+        ["ES","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","ES"],
+        ["ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES"],
+      ];
+      
+      const COLS = 25, ROWS = 26, TILE_SIZE = 28;
+      const GRID_W = COLS * TILE_SIZE, GRID_H = ROWS * TILE_SIZE;
+
+      const C = {
+        void: 0x06080e,
+        path: 0x0c1018,
+        wall: 0x111620,
+        wallEdge: 0x1a2430,
+        wallGlow: 0x3a4f7c,
+        wallLightningGlow: 0x88ccff,
+        dot: 0xffdd88,
+      };
+
+      // Parse map
+      const wallTiles = [], teleTiles = [], lairTiles = [];
+      const dots = [];
+      let spawnTile = { c: -1, r: -1 };
+      let powerUpTile = null;
+
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const t = TILE_MAP[r][c];
+          const cx = c * TILE_SIZE + TILE_SIZE / 2;
+          const cy = r * TILE_SIZE + TILE_SIZE / 2;
+          const bx = c * TILE_SIZE + 1;
+          const by = r * TILE_SIZE + 1;
+          const size = TILE_SIZE - 2;
+
+          if (t === "WL") {
+            wallTiles.push({ bx, by, size, cx, cy, c, r });
+          } else if (t === "DT") {
+            dots.push({ c, r, cx, cy, collected: false });
+          } else if (t === "PP") {
+            if (!powerUpTile) powerUpTile = { c, r, cx, cy };
+          } else if (t === "LE") {
+            lairTiles.push({ bx, by, size, cx, cy, col: c });
+          } else if (typeof t === "string" && t.startsWith("0")) {
+            teleTiles.push({ cx, cy, seed: c * 0.7 + r * 1.1 });
+          } else if (t === "PM") {
+            spawnTile = { c, r };
+          }
+        }
+      }
+
+      function isPath(c, r) {
+        if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return false;
+        const t = TILE_MAP[r][c];
+        return t !== "WL" && t !== "ES" && t !== "LE";
+      }
+
+      wallTiles.forEach((w) => {
+        w.glowEdges = {
+          top: isPath(w.c, w.r - 1),
+          bottom: isPath(w.c, w.r + 1),
+          left: isPath(w.c - 1, w.r),
+          right: isPath(w.c + 1, w.r),
+        };
+      });
+
+      // Setup Pixi
+      const app = new PIXI.Application();
+      await app.init({
+        width: GRID_W,
+        height: GRID_H,
+        backgroundColor: C.void,
+        resolution: window.devicePixelRatio || 1,
+        antialias: true,
+      });
+      document.getElementById("pixi-container").appendChild(app.canvas);
+
+      const labyrinthContainer = new PIXI.Container();
+      app.stage.addChild(labyrinthContainer);
+
+      const floorGfx = new PIXI.Graphics();
+      const wallGfx = new PIXI.Graphics();
+      const dotGfx = new PIXI.Graphics();
+      const lairGfx = new PIXI.Graphics();
+      const teleGfx = new PIXI.Graphics();
+
+      labyrinthContainer.addChild(floorGfx);
+      labyrinthContainer.addChild(wallGfx);
+      labyrinthContainer.addChild(dotGfx);
+      labyrinthContainer.addChild(lairGfx);
+      labyrinthContainer.addChild(teleGfx);
+
+      const trailGfx = new PIXI.Graphics();
+      const effectGfx = new PIXI.Graphics();
+      app.stage.addChild(trailGfx);
+      app.stage.addChild(effectGfx);
+
+      // Create Pac-Man texture
+      function createPacmanTexture() {
+        const size = 64;
+        const canvas = document.createElement("canvas");
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        const cx = size / 2, cy = size / 2;
+
+        const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.4);
+        glow.addColorStop(0, "rgba(255,255,100,0.4)");
+        glow.addColorStop(0.5, "rgba(255,220,50,0.2)");
+        glow.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = glow;
+        ctx.fillRect(0, 0, size, size);
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        
+        const radius = size * 0.3;
+        const mouthAngle = Math.PI / 4;
+        
+        ctx.fillStyle = "rgba(255,240,100,0.95)";
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = "rgba(255,220,80,1)";
+        ctx.beginPath();
+        ctx.arc(0, 0, radius, mouthAngle, Math.PI * 2 - mouthAngle);
+        ctx.lineTo(0, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        const innerGrad = ctx.createRadialGradient(-radius * 0.3, -radius * 0.3, 0, 0, 0, radius);
+        innerGrad.addColorStop(0, "rgba(255,255,200,0.6)");
+        innerGrad.addColorStop(0.5, "rgba(255,240,120,0.3)");
+        innerGrad.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = innerGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius, mouthAngle, Math.PI * 2 - mouthAngle);
+        ctx.lineTo(0, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.restore();
+
+        return PIXI.Texture.from(canvas);
+      }
+
+      // Create spark texture (lightning spark)
+      function createSparkTexture() {
+        const size = 64;
+        const canvas = document.createElement("canvas");
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        const cx = size / 2, cy = size / 2;
+
+        // Outer glow
+        const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.45);
+        glow.addColorStop(0, "rgba(255,255,255,0.9)");
+        glow.addColorStop(0.2, "rgba(200,240,255,0.7)");
+        glow.addColorStop(0.5, "rgba(100,200,255,0.4)");
+        glow.addColorStop(0.8, "rgba(60,150,255,0.15)");
+        glow.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = glow;
+        ctx.fillRect(0, 0, size, size);
+
+        // Bright core
+        ctx.fillStyle = "rgba(255,255,255,1)";
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = "rgba(150,220,255,1)";
+        ctx.beginPath();
+        ctx.arc(cx, cy, size * 0.12, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Secondary glow
+        const coreGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.2);
+        coreGlow.addColorStop(0, "rgba(255,255,255,0.8)");
+        coreGlow.addColorStop(0.5, "rgba(200,240,255,0.4)");
+        coreGlow.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = coreGlow;
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.arc(cx, cy, size * 0.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        return PIXI.Texture.from(canvas);
+      }
+
+      const PACMAN_TEX = createPacmanTexture();
+      const SPARK_TEX = createSparkTexture();
+
+      // Pac-Man sprite
+      const pacman = new PIXI.Sprite(PACMAN_TEX);
+      pacman.anchor.set(0.5);
+      pacman.width = TILE_SIZE * 0.9;
+      pacman.height = TILE_SIZE * 0.9;
+      pacman.x = spawnTile.c * TILE_SIZE + TILE_SIZE / 2;
+      pacman.y = spawnTile.r * TILE_SIZE + TILE_SIZE / 2;
+      app.stage.addChild(pacman);
+
+      // Power-up sprite
+      const powerUp = new PIXI.Sprite(SPARK_TEX);
+      powerUp.anchor.set(0.5);
+      powerUp.width = TILE_SIZE * 0.8;
+      powerUp.height = TILE_SIZE * 0.8;
+      powerUp.x = powerUpTile.cx;
+      powerUp.y = powerUpTile.cy;
+      app.stage.addChild(powerUp);
+
+      // Game state
+      let time = 0;
+      let lightningMode = false;
+      let lightningPath = [];
+      let lightningPathIndex = 0;
+      let powerUpCollected = false;
+      
+      // Smooth movement
+      const MOVE_DURATION = 0.15; // 150ms per tile
+      let moveProgress = 0;
+      let moveFrom = { x: 0, y: 0 };
+      let moveTo = { x: 0, y: 0 };
+      let isMoving = false;
+
+      // Lightning trail system
+      const TRAIL_LIFE = 2.5;
+      const lightningTrail = []; // { points: [{x,y}], birthTime }
+
+      // Wall glow system
+      const WALL_GLOW_LIFE = 2.5;
+      const wallGlowMap = new Map();
+
+      // A* pathfinding
+      function findPath(startC, startR, endC, endR) {
+        const openSet = [];
+        const closedSet = new Set();
+        const cameFrom = new Map();
+        const gScore = new Map();
+        const fScore = new Map();
+
+        const startKey = `${startC},${startR}`;
+        const endKey = `${endC},${endR}`;
+
+        openSet.push({ c: startC, r: startR });
+        gScore.set(startKey, 0);
+        fScore.set(startKey, heuristic(startC, startR, endC, endR));
+
+        while (openSet.length > 0) {
+          openSet.sort((a, b) => fScore.get(`${a.c},${a.r}`) - fScore.get(`${b.c},${b.r}`));
+          const current = openSet.shift();
+          const currentKey = `${current.c},${current.r}`;
+
+          if (currentKey === endKey) {
+            const path = [];
+            let temp = current;
+            while (cameFrom.has(`${temp.c},${temp.r}`)) {
+              path.unshift(temp);
+              temp = cameFrom.get(`${temp.c},${temp.r}`);
+            }
+            path.unshift({ c: startC, r: startR });
+            return path;
+          }
+
+          closedSet.add(currentKey);
+
+          const neighbors = [
+            { c: current.c + 1, r: current.r },
+            { c: current.c - 1, r: current.r },
+            { c: current.c, r: current.r + 1 },
+            { c: current.c, r: current.r - 1 },
+          ];
+
+          for (const neighbor of neighbors) {
+            const neighborKey = `${neighbor.c},${neighbor.r}`;
+            if (!isPath(neighbor.c, neighbor.r) || closedSet.has(neighborKey)) continue;
+
+            const tentativeG = gScore.get(currentKey) + 1;
+            if (!gScore.has(neighborKey) || tentativeG < gScore.get(neighborKey)) {
+              cameFrom.set(neighborKey, current);
+              gScore.set(neighborKey, tentativeG);
+              fScore.set(neighborKey, tentativeG + heuristic(neighbor.c, neighbor.r, endC, endR));
+              if (!openSet.some(n => n.c === neighbor.c && n.r === neighbor.r)) {
+                openSet.push(neighbor);
+              }
+            }
+          }
+        }
+
+        return [];
+      }
+
+      function heuristic(c1, r1, c2, r2) {
+        return Math.abs(c1 - c2) + Math.abs(r1 - r2);
+      }
+
+      // Generate zigzag lightning path between two points
+      function generateZigzag(x1, y1, x2, y2, segments = 6) {
+        const points = [{ x: x1, y: y1 }];
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const length = Math.sqrt(dx * dx + dy * dy);
+        
+        // Perpendicular direction
+        const perpX = -dy / length;
+        const perpY = dx / length;
+        
+        for (let i = 1; i < segments; i++) {
+          const t = i / segments;
+          const baseX = x1 + dx * t;
+          const baseY = y1 + dy * t;
+          
+          // Random offset perpendicular to direction
+          const offset = (Math.random() - 0.5) * 10;
+          points.push({
+            x: baseX + perpX * offset,
+            y: baseY + perpY * offset
+          });
+        }
+        
+        points.push({ x: x2, y: y2 });
+        return points;
+      }
+
+      // Draw functions
+      function drawFloor() {
+        floorGfx.clear();
+        floorGfx.rect(0, 0, GRID_W, GRID_H).fill({ color: C.void });
+
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            const t = TILE_MAP[r][c];
+            if (t !== "WL" && t !== "ES" && t !== "LE") {
+              floorGfx.rect(c * TILE_SIZE + 1, r * TILE_SIZE + 1, TILE_SIZE - 2, TILE_SIZE - 2)
+                .fill({ color: C.path, alpha: 0.5 });
+            }
+          }
+        }
+      }
+
+      function drawWalls() {
+        wallGfx.clear();
+
+        for (const w of wallTiles) {
+          // Check wall glow from lightning
+          let glowBoost = 0;
+          const key = `${w.c},${w.r}`;
+          const glowData = wallGlowMap.get(key);
+          if (glowData) {
+            const age = time - glowData.time;
+            if (age < WALL_GLOW_LIFE) {
+              glowBoost = ((WALL_GLOW_LIFE - age) / WALL_GLOW_LIFE) * glowData.strength;
+            }
+          }
+
+          const alpha = Math.min(1, 0.4 + glowBoost);
+
+          // Base wall
+          wallGfx.rect(w.bx, w.by, w.size, w.size).fill({ color: C.wall });
+          wallGfx.rect(w.bx + 1, w.by + 1, w.size - 2, w.size - 2)
+            .stroke({ color: C.wallEdge, width: 0.5, alpha: alpha * 0.4 });
+
+          // Full block lightning glow
+          if (glowBoost > 0.05) {
+            // Outer glow (soft)
+            wallGfx.rect(w.bx - 2, w.by - 2, w.size + 4, w.size + 4)
+              .fill({ color: 0x88ccff, alpha: glowBoost * 0.15 });
+            
+            // Inner glow (bright)
+            wallGfx.rect(w.bx, w.by, w.size, w.size)
+              .fill({ color: 0xaaddff, alpha: glowBoost * 0.25 });
+            
+            // Bright edge
+            wallGfx.rect(w.bx, w.by, w.size, w.size)
+              .stroke({ color: 0xffffff, width: 1.5, alpha: glowBoost * 0.6 });
+          }
+
+          // Base glow on edges
+          const edge = w.glowEdges;
+          const glowStrength = alpha * 0.5;
+          if (edge.top) {
+            wallGfx.moveTo(w.bx, w.by).lineTo(w.bx + w.size, w.by)
+              .stroke({ color: C.wallGlow, width: 1.2, alpha: glowStrength * 0.7 });
+            wallGfx.moveTo(w.bx, w.by).lineTo(w.bx + w.size, w.by)
+              .stroke({ color: C.wallGlow, width: 3, alpha: glowStrength * 0.15 });
+          }
+          if (edge.bottom) {
+            wallGfx.moveTo(w.bx, w.by + w.size).lineTo(w.bx + w.size, w.by + w.size)
+              .stroke({ color: C.wallGlow, width: 1.2, alpha: glowStrength * 0.7 });
+            wallGfx.moveTo(w.bx, w.by + w.size).lineTo(w.bx + w.size, w.by + w.size)
+              .stroke({ color: C.wallGlow, width: 3, alpha: glowStrength * 0.15 });
+          }
+          if (edge.left) {
+            wallGfx.moveTo(w.bx, w.by).lineTo(w.bx, w.by + w.size)
+              .stroke({ color: C.wallGlow, width: 1.2, alpha: glowStrength * 0.7 });
+            wallGfx.moveTo(w.bx, w.by).lineTo(w.bx, w.by + w.size)
+              .stroke({ color: C.wallGlow, width: 3, alpha: glowStrength * 0.15 });
+          }
+          if (edge.right) {
+            wallGfx.moveTo(w.bx + w.size, w.by).lineTo(w.bx + w.size, w.by + w.size)
+              .stroke({ color: C.wallGlow, width: 1.2, alpha: glowStrength * 0.7 });
+            wallGfx.moveTo(w.bx + w.size, w.by).lineTo(w.bx + w.size, w.by + w.size)
+              .stroke({ color: C.wallGlow, width: 3, alpha: glowStrength * 0.15 });
+          }
+        }
+      }
+
+      function drawDots() {
+        dotGfx.clear();
+        for (const dot of dots) {
+          if (dot.collected) continue;
+          dotGfx.circle(dot.cx, dot.cy, 2.5)
+            .fill({ color: C.dot, alpha: 0.7 });
+        }
+      }
+
+      function drawLairGates() {
+        lairGfx.clear();
+        for (const lair of lairTiles) {
+          const { bx, by, size, cx, cy } = lair;
+          lairGfx.rect(bx, by, size, size).fill({ color: C.void, alpha: 0.8 });
+          lairGfx.rect(bx + 1, by + 1, size - 2, size - 2)
+            .stroke({ color: C.wallEdge, width: 1, alpha: 0.6 });
+
+          const markColor = 0x334466;
+          const pad = size * 0.25;
+          lairGfx.poly([cx, by + pad, bx + size - pad, cy, cx, by + size - pad, bx + pad, cy])
+            .fill({ color: markColor, alpha: 0.6 })
+            .stroke({ color: markColor, width: 1.5, alpha: 0.7 });
+        }
+      }
+
+      function drawTeleports() {
+        while (teleGfx.children.length > 0) teleGfx.removeChildAt(0).destroy();
+        teleGfx.clear();
+
+        for (const tp of teleTiles) {
+          const { cx, cy, seed } = tp;
+          const maxR = TILE_SIZE * 0.4;
+          const breathe = 1 + Math.sin(time * 0.7 + seed) * 0.04;
+
+          teleGfx.circle(cx, cy, maxR * 1.1 * breathe)
+            .stroke({ color: 0x667888, width: 4, alpha: 0.08 });
+
+          const segments = 12;
+          const ringR = maxR * 0.75 * breathe;
+          for (let i = 0; i < segments; i++) {
+            const a0 = (i / segments) * Math.PI * 2 + time * 0.4;
+            const a1 = a0 + Math.PI / segments;
+            if (Math.sin(i * 2.5 + time * 2 + seed) <= -0.2) continue;
+            const startX = cx + Math.cos(a0) * ringR;
+            const startY = cy + Math.sin(a0) * ringR;
+            teleGfx.moveTo(startX, startY).arc(cx, cy, ringR, a0, a1)
+              .stroke({ color: 0xaabbcc, width: 1, alpha: 0.45 });
+          }
+
+          teleGfx.circle(cx, cy, maxR * 0.45 * breathe)
+            .stroke({ color: 0x334466, width: 1.5, alpha: 0.5 });
+          teleGfx.circle(cx, cy, maxR * 0.22 * breathe)
+            .fill({ color: 0x020408, alpha: 0.9 });
+        }
+      }
+
+      function drawLightningTrail() {
+        trailGfx.clear();
+        
+        // Remove old segments
+        while (lightningTrail.length > 0 && time - lightningTrail[0].birthTime > TRAIL_LIFE) {
+          lightningTrail.shift();
+        }
+
+        // Draw all segments
+        for (const seg of lightningTrail) {
+          const age = time - seg.birthTime;
+          const lifeRatio = 1 - age / TRAIL_LIFE;
+          if (lifeRatio <= 0) continue;
+
+          // Color interpolation
+          let color;
+          if (lifeRatio > 0.7) {
+            color = 0xffffff;
+          } else if (lifeRatio > 0.4) {
+            const t = (0.7 - lifeRatio) / 0.3;
+            const r = Math.round(255 - t * 120);
+            const g = Math.round(255 - t * 50);
+            const b = 255;
+            color = (r << 16) | (g << 8) | b;
+          } else {
+            const t = (0.4 - lifeRatio) / 0.4;
+            const r = Math.round(135 - t * 80);
+            const g = Math.round(204 - t * 100);
+            const b = Math.round(255 - t * 50);
+            color = (r << 16) | (g << 8) | b;
+          }
+
+          // Draw zigzag path
+          for (let i = 0; i < seg.points.length - 1; i++) {
+            const p1 = seg.points[i];
+            const p2 = seg.points[i + 1];
+
+            // Outer glow
+            trailGfx.moveTo(p1.x, p1.y).lineTo(p2.x, p2.y)
+              .stroke({ color: 0x88ccff, width: 10 * lifeRatio, alpha: lifeRatio * 0.12, cap: "round" });
+            
+            // Middle line
+            trailGfx.moveTo(p1.x, p1.y).lineTo(p2.x, p2.y)
+              .stroke({ color, width: 4 * lifeRatio, alpha: lifeRatio * 0.5, cap: "round" });
+            
+            // Bright core
+            trailGfx.moveTo(p1.x, p1.y).lineTo(p2.x, p2.y)
+              .stroke({ color: 0xffffff, width: 1.5 * lifeRatio, alpha: lifeRatio * 0.9, cap: "round" });
+          }
+
+          // Sparkles at zigzag points
+          if (lifeRatio > 0.3) {
+            for (let i = 1; i < seg.points.length - 1; i++) {
+              if (Math.random() < 0.4) {
+                const p = seg.points[i];
+                trailGfx.circle(p.x, p.y, 2 * lifeRatio)
+                  .fill({ color: 0xffffff, alpha: lifeRatio * 0.8 });
+              }
+            }
+          }
+        }
+      }
+
+      function drawLightningEffects() {
+        effectGfx.clear();
+        if (!lightningMode) return;
+
+        // Sparks around current position
+        const cx = pacman.x;
+        const cy = pacman.y;
+
+        for (let i = 0; i < 6; i++) {
+          const angle = (i / 6) * Math.PI * 2 + time * 8;
+          const dist = 12 + Math.sin(time * 12 + i) * 4;
+          const sx = cx + Math.cos(angle) * dist;
+          const sy = cy + Math.sin(angle) * dist;
+          const alpha = 0.6 + Math.sin(time * 18 + i * 2) * 0.3;
+
+          effectGfx.circle(sx, sy, 1.5)
+            .fill({ color: 0xffffff, alpha });
+          effectGfx.circle(sx, sy, 3)
+            .fill({ color: 0x88ccff, alpha: alpha * 0.4 });
+        }
+      }
+
+      function render() {
+        floorGfx.clear();
+        wallGfx.clear();
+        dotGfx.clear();
+        lairGfx.clear();
+        teleGfx.clear();
+        trailGfx.clear();
+        effectGfx.clear();
+
+        drawFloor();
+        drawWalls();
+        drawDots();
+        drawLairGates();
+        drawTeleports();
+        drawLightningTrail();
+        drawLightningEffects();
+      }
+
+      // Button handler
+      document.getElementById("btnLightning").addEventListener("click", () => {
+        if (lightningMode) return;
+
+        // Hide power-up
+        if (!powerUpCollected) {
+          powerUp.visible = false;
+          powerUpCollected = true;
+        }
+
+        // Find random target (max 30 steps)
+        const validTargets = dots.filter(d => !d.collected);
+        if (validTargets.length === 0) return;
+
+        const target = validTargets[Math.floor(Math.random() * validTargets.length)];
+        const currentPacTile = { 
+          c: Math.round((pacman.x - TILE_SIZE / 2) / TILE_SIZE), 
+          r: Math.round((pacman.y - TILE_SIZE / 2) / TILE_SIZE) 
+        };
+        const path = findPath(currentPacTile.c, currentPacTile.r, target.c, target.r);
+
+        if (path.length > 0 && path.length <= 30) {
+          lightningMode = true;
+          lightningPath = path;
+          lightningPathIndex = 0;
+          moveProgress = 0;
+          isMoving = false;
+          pacman.texture = SPARK_TEX;
+          document.getElementById("btnLightning").disabled = true;
+        }
+      });
+
+      // Main loop with 60fps lock
+      let lastTime = performance.now();
+      const TARGET_FPS = 60;
+      const FRAME_INTERVAL = 1000 / TARGET_FPS;
+
+      app.ticker.add(() => {
+        const now = performance.now();
+        const elapsed = now - lastTime;
+
+        if (elapsed >= FRAME_INTERVAL) {
+          lastTime = now - (elapsed % FRAME_INTERVAL);
+          const dt = 1 / TARGET_FPS;
+          time += dt;
+
+          // Animate power-up
+          if (!powerUpCollected) {
+            const pulse = 1 + Math.sin(time * 3) * 0.1;
+            powerUp.scale.set(pulse);
+            powerUp.rotation = Math.sin(time * 2) * 0.1;
+          }
+
+          // Smooth lightning movement
+          if (lightningMode) {
+            if (!isMoving && lightningPathIndex < lightningPath.length - 1) {
+              // Start moving to next tile
+              const currentTile = lightningPath[lightningPathIndex];
+              const nextTile = lightningPath[lightningPathIndex + 1];
+              
+              moveFrom = {
+                x: currentTile.c * TILE_SIZE + TILE_SIZE / 2,
+                y: currentTile.r * TILE_SIZE + TILE_SIZE / 2
+              };
+              moveTo = {
+                x: nextTile.c * TILE_SIZE + TILE_SIZE / 2,
+                y: nextTile.r * TILE_SIZE + TILE_SIZE / 2
+              };
+              
+              moveProgress = 0;
+              isMoving = true;
+            }
+
+            if (isMoving) {
+              moveProgress += dt / MOVE_DURATION;
+
+              if (moveProgress >= 1) {
+                // Reached next tile
+                moveProgress = 1;
+                isMoving = false;
+                lightningPathIndex++;
+
+                pacman.x = moveTo.x;
+                pacman.y = moveTo.y;
+
+                // Rotate to face direction
+                const dx = moveTo.x - moveFrom.x;
+                const dy = moveTo.y - moveFrom.y;
+                if (dx !== 0 || dy !== 0) {
+                  pacman.rotation = Math.atan2(dy, dx);
+                }
+
+                // Add zigzag trail segment
+                const zigzagPoints = generateZigzag(moveFrom.x, moveFrom.y, moveTo.x, moveTo.y, 6);
+                lightningTrail.push({
+                  points: zigzagPoints,
+                  birthTime: time
+                });
+
+                // Illuminate walls
+                const tile = lightningPath[lightningPathIndex];
+                const radius = 3;
+                for (let dr = -radius; dr <= radius; dr++) {
+                  for (let dc = -radius; dc <= radius; dc++) {
+                    const wc = tile.c + dc;
+                    const wr = tile.r + dr;
+                    if (wc < 0 || wc >= COLS || wr < 0 || wr >= ROWS) continue;
+                    const t = TILE_MAP[wr][wc];
+                    if (t !== "WL") continue;
+                    
+                    const dist = Math.sqrt(dc * dc + dr * dr);
+                    if (dist > radius) continue;
+                    
+                    const strength = 1 - dist / radius;
+                    const key = `${wc},${wr}`;
+                    wallGlowMap.set(key, { time, strength });
+                  }
+                }
+
+                // Collect dot
+                const dot = dots.find(d => d.c === tile.c && d.r === tile.r && !d.collected);
+                if (dot) dot.collected = true;
+
+                // Check if finished
+                if (lightningPathIndex >= lightningPath.length - 1) {
+                  lightningMode = false;
+                  pacman.texture = PACMAN_TEX;
+                  document.getElementById("btnLightning").disabled = false;
+                }
+              } else {
+                // Interpolate position
+                pacman.x = moveFrom.x + (moveTo.x - moveFrom.x) * moveProgress;
+                pacman.y = moveFrom.y + (moveTo.y - moveFrom.y) * moveProgress;
+              }
+            }
+          }
+
+          render();
+        }
+      });
+    </script>
+  </body>
+</html>

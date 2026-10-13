@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VOID SPIRITS v11 — Ball Lightning</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: #0a0a0f; 
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+        canvas { 
+            display: block; 
+        }
+        #ui { 
+            position: absolute; 
+            top: 15px; 
+            left: 15px; 
+            color: #aaccff; 
+            font-size: 13px; 
+            background: rgba(10, 10, 15, 0.85);
+            padding: 16px 20px;
+            border-radius: 8px;
+            border: 1px solid rgba(170, 204, 255, 0.25);
+            backdrop-filter: blur(8px);
+            line-height: 1.8;
+            min-width: 280px;
+        }
+        #ui h3 {
+            margin: 0 0 12px 0;
+            color: #fff;
+            font-size: 15px;
+            border-bottom: 1px solid rgba(170, 204, 255, 0.2);
+            padding-bottom: 8px;
+        }
+        #ui label {
+            display: block;
+            margin: 8px 0 4px 0;
+            color: #8899cc;
+            font-size: 12px;
+        }
+        #ui input[type="range"] {
+            width: 100%;
+            margin: 4px 0;
+        }
+        #ui .value-display {
+            color: #fff;
+            font-weight: 600;
+            float: right;
+        }
+        #ui button {
+            background: rgba(170, 204, 255, 0.15);
+            border: 1px solid rgba(170, 204, 255, 0.3);
+            color: #aaccff;
+            padding: 8px 16px;
+            margin: 4px 4px 4px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        #ui button:hover {
+            background: rgba(170, 204, 255, 0.25);
+            border-color: rgba(170, 204, 255, 0.5);
+        }
+        #ui button.active {
+            background: rgba(170, 204, 255, 0.35);
+            border-color: #aaccff;
+            color: #fff;
+        }
+        #stats {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            color: #667799;
+            font-size: 11px;
+            font-family: monospace;
+            background: rgba(10, 10, 15, 0.7);
+            padding: 8px 12px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <h3>VOID SPIRITS v11 — Ball Lightning</h3>
+        
+        <label>
+            Spin Speed
+            <span class="value-display" id="spinSpeedValue">0.20</span>
+        </label>
+        <input type="range" id="spinSpeed" min="0" max="1" step="0.01" value="0.20">
+        
+        <label>
+            Arm Steps (Quality)
+            <span class="value-display" id="armStepsValue">32</span>
+        </label>
+        <input type="range" id="armSteps" min="8" max="48" step="4" value="32">
+        
+        <label>
+            Trail Particles
+            <span class="value-display" id="maxParticlesValue">70</span>
+        </label>
+        <input type="range" id="maxParticles" min="20" max="150" step="10" value="70">
+        
+        <div style="margin-top: 16px;">
+            <button id="btnNormal" class="active">Normal</button>
+            <button id="btnFrightened">Frightened</button>
+            <button id="btnFlashing">Flashing</button>
+            <button id="btnEaten">Eaten</button>
+        </div>
+        
+        <div style="margin-top: 12px; font-size: 11px; color: #667799;">
+            <strong>v11 Changes:</strong><br>
+            ✓ Eaten: ball lightning (internal bolts)<br>
+            ✓ Lightning confined within sphere<br>
+            ✓ Chaotic internal movement<br>
+            ✓ Fading trail behind
+        </div>
+    </div>
+    
+    <div id="stats">
+        FPS: <span id="fps">0</span> |
+        Particles: <span id="particleCount">0</span>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+    <script type="module">
+        const DEFAULT_CONFIG = {
+            armCount: 3,
+            armBaseWidth: 3.5,
+            armTaper: 0.8,
+            armFillAlpha: 0.7,
+            centerLineAlpha: 0.45,
+            edgeHighlightAlpha: 0.25,
+            spinSpeed: 0.20,
+            spiralTurnsBase: 3,
+            spiralTurnsSpeedScale: 1.5,
+            dopplerStrength: 0.35,
+            armSteps: 32,
+            breatheFreq1: 0.004,
+            breatheAmp1: 0.06,
+            breatheFreq2: 0.009,
+            breatheAmp2: 0.04,
+            vortexRadiusScale: 0.85,
+            coreRadiusScale: 0.18,
+            corePulseFreq: 0.006,
+            corePulseAmp: 0.18,
+            coreFillAlpha: 0.88,
+            coreWhiteAlpha: 0.95,
+            frightenedArmShrink: 0.5,
+            frightenedSpinScale: 0.3,
+            frightenedChaosAmp: 0.15,
+            frightenedChaosFreq: 0.02,
+            flashFreq: 0.003,
+            eatenShrinkRate: 0.6,
+            eatenPulseFreq: 0.008,
+            eatenPulseAmp: 0.3,
+            eatenCoreAlpha: 0.7,
+            eatenGlowAlpha: 0.12,
+            maxParticles: 70,
+            trailSpawnAngleSpread: 1.0,
+            trailSpawnDistMin: 0.45,
+            trailSpawnDistMax: 0.45,
+            trailSpeedBase: 12,
+            trailSpeedMoveScale: 28,
+            trailLifeMin: 0.25,
+            trailLifeMax: 0.35,
+            trailSizeMin: 0.7,
+            trailSizeMax: 1.8,
+            trailDrag: 0.92,
+            trailGlowAlpha: 0.1,
+            trailCoreAlpha: 0.55,
+            trailFrightenedCount: 1,
+            trailNormalCount: 0,
+            glowAlpha0: 0.35,
+            glowAlpha1: 0.12,
+            glowAlpha2: 0.02,
+            glowScale: 2.5,
+            transitionDuration: 0.5,
+            armStartRadius: 0.35,
+            spiralGrowth: 0.15,
+            differentialRotation: 0.4,
+            thicknessPulseFreq: 0.008,
+            thicknessPulseAmp: 0.3,
+            sparkLifeMin: 0.15,
+            sparkLifeMax: 0.3,
+            sparkSpeed: 80,
+            sparkSize: 1.2,
+            eatenBallRadius: 0.18,
+            eatenLightningCount: 8,
+            eatenLightningSegments: 5,
+            eatenLightningJitter: 0.3,
+            eatenLightningUpdateInterval: 0.06,
+            eatenLightningMaxRadius: 0.7,
+            eatenTrailLife: 0.4,
+            eatenTrailSpeed: 25,
+            eatenTrailSize: 1.8,
+        };
+
+        const FRIGHTENED_CORE = 0x4466aa;
+        const FRIGHTENED_ARM = 0x1a3366;
+        const FRIGHTENED_TRAIL = 0x0d1a33;
+        const FLASH_CORE = 0xffffff;
+        const FLASH_ARM = 0x8899dd;
+        const FLASH_TRAIL = 0x6688bb;
+        const EATEN_CORE = 0x665544;
+        const EATEN_GLOW = 0x887766;
+
+        function lerpColor(a, b, t) {
+            const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
+            const br = (b >> 16) & 0xff, bg = (b >> 8) & 0xff, bb = b & 0xff;
+            const cr = Math.round(ar + (br - ar) * t);
+            const cg = Math.round(ag + (bg - ag) * t);
+            const cb = Math.round(ab + (bb - ab) * t);
+            return (cr << 16) | (cg << 8) | cb;
+        }
+
+        class GhostRenderer {
+            constructor(tileSize, hexColor, config = {}) {
+                this.cfg = { ...DEFAULT_CONFIG, ...config };
+                const base = this.derivePalette(hexColor);
+                this.coreColor = base.core;
+                this.armColor = base.arm;
+                this.trailColor = base.trail;
+                this.activeCore = this.coreColor;
+                this.activeArm = this.armColor;
+                this.activeTrail = this.trailColor;
+                this.targetCore = this.coreColor;
+                this.targetArm = this.armColor;
+                this.targetTrail = this.trailColor;
+                this.transitionProgress = 1;
+                this.container = new PIXI.Container();
+                this.armGfx = new PIXI.Graphics();
+                this.coreGfx = new PIXI.Graphics();
+                this.trailGfx = new PIXI.Graphics();
+                this.eatenGfx = new PIXI.Graphics();
+                this.glowSprite = new PIXI.Sprite();
+                this.trailGfx.blendMode = "add";
+                this.glowSprite.blendMode = "add";
+                this.eatenGfx.blendMode = "add";
+                this.container.addChild(this.trailGfx);
+                this.container.addChild(this.glowSprite);
+                this.container.addChild(this.armGfx);
+                this.container.addChild(this.eatenGfx);
+                this.container.addChild(this.coreGfx);
+                this.trail = Array.from({ length: this.cfg.maxParticles }, () => ({
+                    x: 0, y: 0, vx: 0, vy: 0,
+                    life: 0, maxLife: 0, size: 0,
+                    color: 0xffffff, active: false,
+                }));
+                this.vortexPhase = 0;
+                this.eatenLightning = [];
+                this.eatenLightningTimer = 0;
+                this.eatenTrail = [];
+                this.bakeGlow(tileSize);
+            }
+
+            derivePalette(hex) {
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                const core = (Math.min(255, Math.round(r * 1.4 + 60)) << 16) |
+                             (Math.min(255, Math.round(g * 1.4 + 60)) << 8) |
+                             Math.min(255, Math.round(b * 1.4 + 60));
+                const arm = (r << 16) | (g << 8) | b;
+                const trail = arm;
+                return { core, arm, trail };
+            }
+
+            bakeGlow(tileSize) {
+                const r = tileSize * 0.42;
+                const size = Math.ceil(r * 5);
+                const canvas = document.createElement("canvas");
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext("2d");
+                const center = size / 2;
+                const gradient = ctx.createRadialGradient(center, center, 0, center, center, size / 2);
+                gradient.addColorStop(0, `rgba(255,255,255,${this.cfg.glowAlpha0})`);
+                gradient.addColorStop(0.25, `rgba(255,255,255,${this.cfg.glowAlpha1})`);
+                gradient.addColorStop(0.6, `rgba(255,255,255,${this.cfg.glowAlpha2})`);
+                gradient.addColorStop(1, "rgba(0,0,0,0)");
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, size, size);
+                const texture = PIXI.Texture.from(canvas);
+                if (this.glowSprite.texture) this.glowSprite.texture.destroy(true);
+                this.glowSprite.texture = texture;
+                this.glowSprite.anchor.set(0.5);
+                this.glowSprite.scale.set((r * this.cfg.glowScale) / (size / 2));
+            }
+
+            setState(newState, isFlashing = false) {
+                this.transitionProgress = 0;
+                if (newState === "FRIGHTENED") {
+                    if (isFlashing) {
+                        this.targetCore = FLASH_CORE;
+                        this.targetArm = FLASH_ARM;
+                        this.targetTrail = FLASH_TRAIL;
+                    } else {
+                        this.targetCore = FRIGHTENED_CORE;
+                        this.targetArm = FRIGHTENED_ARM;
+                        this.targetTrail = FRIGHTENED_TRAIL;
+                    }
+                } else if (newState === "EATEN") {
+                    this.targetCore = EATEN_CORE;
+                    this.targetArm = EATEN_CORE;
+                    this.targetTrail = EATEN_GLOW;
+                } else {
+                    this.targetCore = this.coreColor;
+                    this.targetArm = this.armColor;
+                    this.targetTrail = this.trailColor;
+                }
+            }
+
+            update(state, dt) {
+                this.container.x = state.x;
+                this.container.y = state.y;
+                
+                const speedMult = state.state === "FRIGHTENED" ? this.cfg.frightenedSpinScale : 1;
+                this.vortexPhase += this.cfg.spinSpeed * dt * 60 * speedMult;
+                
+                if (this.transitionProgress < 1) {
+                    this.transitionProgress = Math.min(1, this.transitionProgress + dt / this.cfg.transitionDuration);
+                    const t = this.transitionProgress * this.transitionProgress * (3 - 2 * this.transitionProgress);
+                    this.activeCore = lerpColor(this.activeCore, this.targetCore, t);
+                    this.activeArm = lerpColor(this.activeArm, this.targetArm, t);
+                    this.activeTrail = lerpColor(this.activeTrail, this.targetTrail, t);
+                }
+
+                if (state.state === "FRIGHTENED" && state.isFlashing) {
+                    const pulse = Math.sin(state.time * this.cfg.flashFreq) * 0.5 + 0.5;
+                    const flashCore = lerpColor(FRIGHTENED_CORE, FLASH_CORE, pulse);
+                    const flashArm = lerpColor(FRIGHTENED_ARM, FLASH_ARM, pulse);
+                    const flashTrail = lerpColor(FRIGHTENED_TRAIL, FLASH_TRAIL, pulse);
+                    this.activeCore = flashCore;
+                    this.activeArm = flashArm;
+                    this.activeTrail = flashTrail;
+                }
+
+                this.glowSprite.tint = this.activeCore;
+                
+                this.updateTrail(dt);
+
+                if (state.state === "EATEN") {
+                    this.eatenLightningTimer += dt;
+                    if (this.eatenLightningTimer >= this.cfg.eatenLightningUpdateInterval) {
+                        this.eatenLightningTimer = 0;
+                        this.generateEatenLightning(state);
+                    }
+                    this.updateEatenTrail(dt, state);
+                    if (Math.random() < 0.6) {
+                        this.emitEatenTrail(state);
+                    }
+                }
+            }
+
+            generateEatenLightning(state) {
+                this.eatenLightning = [];
+                const r = state.tileSize * this.cfg.eatenBallRadius;
+                const maxDist = r * this.cfg.eatenLightningMaxRadius;
+                
+                for (let i = 0; i < this.cfg.eatenLightningCount; i++) {
+                    const startAngle = Math.random() * Math.PI * 2;
+                    const startDist = Math.random() * maxDist;
+                    const startX = Math.cos(startAngle) * startDist;
+                    const startY = Math.sin(startAngle) * startDist;
+                    
+                    const endAngle = Math.random() * Math.PI * 2;
+                    const endDist = Math.random() * maxDist;
+                    const endX = Math.cos(endAngle) * endDist;
+                    const endY = Math.sin(endAngle) * endDist;
+                    
+                    const bolt = [];
+                    const segments = this.cfg.eatenLightningSegments;
+                    for (let s = 0; s <= segments; s++) {
+                        const t = s / segments;
+                        const baseX = startX + (endX - startX) * t;
+                        const baseY = startY + (endY - startY) * t;
+                        
+                        const jitterAmount = (s === 0 || s === segments) ? 0 : this.cfg.eatenLightningJitter * r;
+                        const jitterX = (Math.random() - 0.5) * jitterAmount;
+                        const jitterY = (Math.random() - 0.5) * jitterAmount;
+                        
+                        let finalX = baseX + jitterX;
+                        let finalY = baseY + jitterY;
+                        
+                        const distFromCenter = Math.sqrt(finalX * finalX + finalY * finalY);
+                        if (distFromCenter > maxDist) {
+                            const scale = maxDist / distFromCenter;
+                            finalX *= scale;
+                            finalY *= scale;
+                        }
+                        
+                        bolt.push({ x: finalX, y: finalY });
+                    }
+                    this.eatenLightning.push(bolt);
+                }
+            }
+
+            updateEatenTrail(dt, state) {
+                for (let i = this.eatenTrail.length - 1; i >= 0; i--) {
+                    const spark = this.eatenTrail[i];
+                    spark.life -= dt;
+                    if (spark.life <= 0) {
+                        this.eatenTrail.splice(i, 1);
+                        continue;
+                    }
+                    spark.x += spark.vx * dt;
+                    spark.y += spark.vy * dt;
+                    spark.vx *= 0.95;
+                    spark.vy *= 0.95;
+                }
+            }
+
+            emitEatenTrail(state) {
+                const angle = Math.atan2(-state.displacementY, -state.displacementX) + (Math.random() - 0.5) * 0.8;
+                const r = state.tileSize * this.cfg.eatenBallRadius;
+                this.eatenTrail.push({
+                    x: 0,
+                    y: 0,
+                    vx: Math.cos(angle) * this.cfg.eatenTrailSpeed,
+                    vy: Math.sin(angle) * this.cfg.eatenTrailSpeed,
+                    life: this.cfg.eatenTrailLife,
+                    maxLife: this.cfg.eatenTrailLife,
+                    size: this.cfg.eatenTrailSize
+                });
+            }
+
+            draw(state) {
+                this.armGfx.clear();
+                this.coreGfx.clear();
+                this.trailGfx.clear();
+                this.eatenGfx.clear();
+                const r = state.tileSize * 0.42;
+                const t = state.time;
+                
+                if (state.state === "EATEN") {
+                    this.drawBallLightning(state, t);
+                    return;
+                }
+                
+                this.drawTrailNodes();
+                
+                const sr = Math.min(1, (Math.abs(state.displacementX) + Math.abs(state.displacementY)) / (state.tileSize * 4));
+                const frightened = state.state === "FRIGHTENED";
+                const breathe = 1 + Math.sin(t * this.cfg.breatheFreq1) * this.cfg.breatheAmp1 + Math.sin(t * this.cfg.breatheFreq2) * this.cfg.breatheAmp2;
+                const vortexR = r * this.cfg.vortexRadiusScale * breathe;
+                const coreR = r * this.cfg.coreRadiusScale;
+                
+                for (let a = 0; a < this.cfg.armCount; a++) {
+                    const baseAngle = (a / this.cfg.armCount) * Math.PI * 2 + this.vortexPhase;
+                    const headingDot = Math.cos(baseAngle - state.heading);
+                    const dopplerScale = 1 - sr * this.cfg.dopplerStrength * (headingDot * 0.5 + 0.5);
+                    let armLength = vortexR * dopplerScale;
+                    
+                    if (frightened) {
+                        armLength *= this.cfg.frightenedArmShrink;
+                    }
+                    
+                    const chaosAmount = frightened 
+                        ? Math.sin(t * this.cfg.frightenedChaosFreq + a) * this.cfg.frightenedChaosAmp 
+                        : 0;
+                    
+                    const pts = [];
+                    for (let s = 0; s <= this.cfg.armSteps; s++) {
+                        const frac = s / this.cfg.armSteps;
+                        
+                        const startDist = coreR * this.cfg.armStartRadius;
+                        const dist = startDist + frac * (armLength - startDist);
+                        
+                        const logSpiralAngle = Math.log(dist / startDist) / this.cfg.spiralGrowth;
+                        const differentialOffset = (1 - frac) * this.cfg.differentialRotation * Math.PI * 2;
+                        
+                        const spiralAngle = baseAngle + logSpiralAngle + differentialOffset + chaosAmount * Math.sin(frac * 8);
+                        
+                        const thicknessPulse = 1 + Math.sin(frac * Math.PI * 4 + t * this.cfg.thicknessPulseFreq) * this.cfg.thicknessPulseAmp;
+                        const baseWidth = this.cfg.armBaseWidth * (1 - frac * this.cfg.armTaper) * (1 + sr * 0.3);
+                        const w = baseWidth * thicknessPulse * (1 - frac * 0.5);
+                        
+                        pts.push({
+                            x: Math.cos(spiralAngle) * dist,
+                            y: Math.sin(spiralAngle) * dist,
+                            w: w,
+                        });
+                    }
+                    
+                    this.drawBezierArm(pts);
+                    
+                    if (pts.length > 0) {
+                        const tip = pts[pts.length - 1];
+                        const sparkChance = frightened ? 0.1 : 0.2;
+                        if (Math.random() < sparkChance) {
+                            this.emitSpark(tip.x, tip.y, state);
+                        }
+                    }
+                }
+                
+                const corePulseFreq = frightened ? this.cfg.corePulseFreq * 0.5 : this.cfg.corePulseFreq;
+                const corePulseAmp = frightened ? this.cfg.corePulseAmp * 0.5 : this.cfg.corePulseAmp;
+                const corePulse = 1 + Math.sin(t * corePulseFreq) * corePulseAmp + sr * 0.25;
+                const coreRDisplay = coreR * corePulse;
+                
+                this.coreGfx.circle(0, 0, coreRDisplay * 2.5).fill({ color: this.activeCore, alpha: 0.15 });
+                this.coreGfx.circle(0, 0, coreRDisplay * 1.3).fill({ color: this.activeCore, alpha: 0.32 });
+                this.coreGfx.circle(0, 0, coreRDisplay).fill({ color: this.activeCore, alpha: this.cfg.coreFillAlpha });
+                this.coreGfx.circle(0, 0, coreRDisplay * 0.35).fill({ color: 0xffffff, alpha: this.cfg.coreWhiteAlpha });
+            }
+
+            drawBallLightning(state, t) {
+                const r = state.tileSize * this.cfg.eatenBallRadius;
+                
+                this.eatenGfx.circle(0, 0, r * 1.5).fill({ color: EATEN_GLOW, alpha: 0.08 });
+                this.eatenGfx.circle(0, 0, r).fill({ color: EATEN_CORE, alpha: 0.12 });
+                
+                for (const bolt of this.eatenLightning) {
+                    if (bolt.length < 2) continue;
+                    
+                    this.eatenGfx.moveTo(bolt[0].x, bolt[0].y);
+                    for (let i = 1; i < bolt.length; i++) {
+                        this.eatenGfx.lineTo(bolt[i].x, bolt[i].y);
+                    }
+                    this.eatenGfx.stroke({
+                        color: EATEN_GLOW,
+                        width: 3,
+                        alpha: 0.4,
+                        cap: "round"
+                    });
+                    
+                    this.eatenGfx.moveTo(bolt[0].x, bolt[0].y);
+                    for (let i = 1; i < bolt.length; i++) {
+                        this.eatenGfx.lineTo(bolt[i].x, bolt[i].y);
+                    }
+                    this.eatenGfx.stroke({
+                        color: 0xffffff,
+                        width: 1.2,
+                        alpha: 0.8,
+                        cap: "round"
+                    });
+                }
+                
+                this.coreGfx.circle(0, 0, r * 0.25).fill({ color: 0xffffff, alpha: 0.7 });
+                
+                for (const spark of this.eatenTrail) {
+                    const alpha = spark.life / spark.maxLife;
+                    this.trailGfx.circle(spark.x, spark.y, spark.size * alpha).fill({ 
+                        color: EATEN_GLOW, 
+                        alpha: alpha * 0.5 
+                    });
+                    this.trailGfx.circle(spark.x, spark.y, spark.size * alpha * 0.4).fill({ 
+                        color: 0xffffff, 
+                        alpha: alpha * 0.7 
+                    });
+                }
+            }
+
+            drawBezierArm(pts) {
+                if (pts.length < 2) return;
+                
+                const leftPts = [];
+                const rightPts = [];
+                
+                for (let i = 0; i < pts.length; i++) {
+                    const p = pts[i];
+                    let nx, ny;
+                    
+                    if (i === 0) {
+                        const dx = pts[1].x - pts[0].x;
+                        const dy = pts[1].y - pts[0].y;
+                        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+                        nx = -dy / len;
+                        ny = dx / len;
+                    } else if (i === pts.length - 1) {
+                        const dx = pts[i].x - pts[i - 1].x;
+                        const dy = pts[i].y - pts[i - 1].y;
+                        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+                        nx = -dy / len;
+                        ny = dx / len;
+                    } else {
+                        const dx = pts[i + 1].x - pts[i - 1].x;
+                        const dy = pts[i + 1].y - pts[i - 1].y;
+                        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+                        nx = -dy / len;
+                        ny = dx / len;
+                    }
+                    
+                    const w = p.w * 0.5;
+                    leftPts.push({ x: p.x + nx * w, y: p.y + ny * w });
+                    rightPts.push({ x: p.x - nx * w, y: p.y - ny * w });
+                }
+                
+                this.armGfx.moveTo(leftPts[0].x, leftPts[0].y);
+                
+                for (let i = 1; i < leftPts.length - 2; i++) {
+                    const xc = (leftPts[i].x + leftPts[i + 1].x) / 2;
+                    const yc = (leftPts[i].y + leftPts[i + 1].y) / 2;
+                    this.armGfx.quadraticCurveTo(leftPts[i].x, leftPts[i].y, xc, yc);
+                }
+                
+                if (leftPts.length > 2) {
+                    this.armGfx.quadraticCurveTo(
+                        leftPts[leftPts.length - 2].x,
+                        leftPts[leftPts.length - 2].y,
+                        leftPts[leftPts.length - 1].x,
+                        leftPts[leftPts.length - 1].y
+                    );
+                } else {
+                    this.armGfx.lineTo(leftPts[leftPts.length - 1].x, leftPts[leftPts.length - 1].y);
+                }
+                
+                for (let i = rightPts.length - 1; i >= 2; i--) {
+                    const xc = (rightPts[i].x + rightPts[i - 1].x) / 2;
+                    const yc = (rightPts[i].y + rightPts[i - 1].y) / 2;
+                    this.armGfx.quadraticCurveTo(rightPts[i].x, rightPts[i].y, xc, yc);
+                }
+                
+                if (rightPts.length > 2) {
+                    this.armGfx.quadraticCurveTo(
+                        rightPts[1].x,
+                        rightPts[1].y,
+                        rightPts[0].x,
+                        rightPts[0].y
+                    );
+                } else {
+                    this.armGfx.lineTo(rightPts[0].x, rightPts[0].y);
+                }
+                
+                this.armGfx.closePath();
+                this.armGfx.fill({ color: this.activeArm, alpha: this.cfg.armFillAlpha });
+                
+                const centerPts = pts;
+                this.armGfx.moveTo(centerPts[0].x, centerPts[0].y);
+                for (let i = 1; i < centerPts.length - 2; i++) {
+                    const xc = (centerPts[i].x + centerPts[i + 1].x) / 2;
+                    const yc = (centerPts[i].y + centerPts[i + 1].y) / 2;
+                    this.armGfx.quadraticCurveTo(centerPts[i].x, centerPts[i].y, xc, yc);
+                }
+                if (centerPts.length > 2) {
+                    this.armGfx.quadraticCurveTo(
+                        centerPts[centerPts.length - 2].x,
+                        centerPts[centerPts.length - 2].y,
+                        centerPts[centerPts.length - 1].x,
+                        centerPts[centerPts.length - 1].y
+                    );
+                }
+                this.armGfx.stroke({ 
+                    color: this.activeCore, 
+                    width: pts[0].w * 0.35, 
+                    alpha: this.cfg.centerLineAlpha, 
+                    cap: "round" 
+                });
+            }
+
+            emitSpark(x, y, state) {
+                const tangentAngle = Math.atan2(y, x) + Math.PI / 2;
+                const speed = this.cfg.sparkSpeed * (0.5 + Math.random() * 0.5);
+                this.spawnParticle({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(tangentAngle) * speed,
+                    vy: Math.sin(tangentAngle) * speed,
+                    life: this.cfg.sparkLifeMin + Math.random() * (this.cfg.sparkLifeMax - this.cfg.sparkLifeMin),
+                    maxLife: this.cfg.sparkLifeMax,
+                    size: this.cfg.sparkSize,
+                    color: 0xffffff
+                });
+            }
+
+            spawnParticle(overrides) {
+                for (const p of this.trail) {
+                    if (!p.active) {
+                        Object.assign(p, {
+                            x: 0, y: 0, vx: 0, vy: 0,
+                            life: 1, maxLife: 1, size: 1.5,
+                            color: 0xffffff
+                        }, overrides, { active: true });
+                        return;
+                    }
+                }
+            }
+
+            updateTrail(dt) {
+                for (let i = 0; i < this.cfg.maxParticles; i++) {
+                    const p = this.trail[i];
+                    if (!p.active) continue;
+                    p.life -= dt;
+                    if (p.life <= 0) {
+                        p.active = false;
+                        continue;
+                    }
+                    p.x += p.vx * dt;
+                    p.y += p.vy * dt;
+                    p.vx *= this.cfg.trailDrag;
+                    p.vy *= this.cfg.trailDrag;
+                }
+            }
+
+            drawTrailNodes() {
+                for (let i = 0; i < this.cfg.maxParticles; i++) {
+                    const p = this.trail[i];
+                    if (!p.active) continue;
+                    const a = p.life / p.maxLife;
+                    const sz = p.size * a;
+                    if (sz < 0.2) continue;
+                    this.trailGfx.circle(p.x, p.y, sz * 1.7).fill({ color: p.color, alpha: a * this.cfg.trailGlowAlpha });
+                    this.trailGfx.circle(p.x, p.y, sz * 0.5).fill({ color: 0xffffff, alpha: a * this.cfg.trailCoreAlpha });
+                }
+            }
+
+            destroy() {
+                if (this.glowSprite.texture) this.glowSprite.texture.destroy(true);
+                this.container.destroy({ children: true });
+            }
+        }
+
+        async function main() {
+            const app = new PIXI.Application();
+            await app.init({
+                width: window.innerWidth,
+                height: window.innerHeight,
+                backgroundColor: 0x0a0a0f,
+                antialias: true,
+                resolution: window.devicePixelRatio || 1,
+                autoDensity: true,
+            });
+            document.body.appendChild(app.canvas);
+
+            const tileSize = 48;
+            const ghost = new GhostRenderer(tileSize, "#ff0000");
+            ghost.container.scale.set(3);
+            app.stage.addChild(ghost.container);
+
+            const state = {
+                x: window.innerWidth / 2,
+                y: window.innerHeight / 2,
+                tileSize: tileSize,
+                time: 0,
+                heading: 0,
+                displacementX: 0,
+                displacementY: 0,
+                state: "NORMAL",
+                isFlashing: false,
+            };
+
+            let demoTime = 0;
+            const radius = Math.min(window.innerWidth, window.innerHeight) * 0.15;
+
+            document.getElementById("spinSpeed").addEventListener("input", (e) => {
+                ghost.cfg.spinSpeed = parseFloat(e.target.value);
+                document.getElementById("spinSpeedValue").textContent = e.target.value;
+            });
+
+            document.getElementById("armSteps").addEventListener("input", (e) => {
+                ghost.cfg.armSteps = parseInt(e.target.value);
+                document.getElementById("armStepsValue").textContent = e.target.value;
+            });
+
+            document.getElementById("maxParticles").addEventListener("input", (e) => {
+                ghost.cfg.maxParticles = parseInt(e.target.value);
+                document.getElementById("maxParticlesValue").textContent = e.target.value;
+                ghost.trail = Array.from({ length: ghost.cfg.maxParticles }, () => ({
+                    x: 0, y: 0, vx: 0, vy: 0,
+                    life: 0, maxLife: 0, size: 0,
+                    color: 0xffffff, active: false,
+                }));
+            });
+
+            const buttons = {
+                btnNormal: () => { state.state = "NORMAL"; state.isFlashing = false; ghost.setState("NORMAL"); },
+                btnFrightened: () => { state.state = "FRIGHTENED"; state.isFlashing = false; ghost.setState("FRIGHTENED"); },
+                btnFlashing: () => { state.state = "FRIGHTENED"; state.isFlashing = true; ghost.setState("FRIGHTENED", true); },
+                btnEaten: () => { state.state = "EATEN"; state.isFlashing = false; ghost.setState("EATEN"); },
+            };
+
+            Object.keys(buttons).forEach(id => {
+                document.getElementById(id).addEventListener("click", () => {
+                    document.querySelectorAll("#ui button").forEach(b => b.classList.remove("active"));
+                    document.getElementById(id).classList.add("active");
+                    buttons[id]();
+                });
+            });
+
+            window.addEventListener("resize", () => {
+                app.renderer.resize(window.innerWidth, window.innerHeight);
+            });
+
+            let lastTime = performance.now();
+            let frameCount = 0;
+            let fpsTime = 0;
+
+            app.ticker.add(() => {
+                const now = performance.now();
+                const dt = (now - lastTime) / 1000;
+                lastTime = now;
+                frameCount++;
+                fpsTime += dt;
+                if (fpsTime >= 1) {
+                    document.getElementById("fps").textContent = frameCount;
+                    frameCount = 0;
+                    fpsTime = 0;
+                }
+
+                demoTime += dt;
+                state.time = demoTime;
+                state.x = window.innerWidth / 2 + Math.cos(demoTime * 0.8) * radius;
+                state.y = window.innerHeight / 2 + Math.sin(demoTime * 0.8) * radius;
+                state.heading = demoTime * 0.8 + Math.PI / 2;
+                state.displacementX = Math.cos(demoTime * 0.8) * 2;
+                state.displacementY = Math.sin(demoTime * 0.8) * 2;
+
+                ghost.update(state, dt);
+                ghost.draw(state);
+
+                let activeParticles = 0;
+                for (const p of ghost.trail) {
+                    if (p.active) activeParticles++;
+                }
+                document.getElementById("particleCount").textContent = activeParticles;
+            });
+        }
+
+        main();
+    </script>
+</body>
+</html>

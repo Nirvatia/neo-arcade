@@ -1,0 +1,1910 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stellar Cartography — v34</title>
+    <style>
+      :root {
+        --bg: #06080e;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: var(--bg);
+        font-family: "Courier New", monospace;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+      .main-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 24px;
+        padding: 20px;
+      }
+      .header {
+        text-align: center;
+      }
+      .title {
+        font-size: 22px;
+        color: #c8d4e0;
+        letter-spacing: 8px;
+        text-transform: uppercase;
+        text-shadow:
+          0 0 30px rgba(102, 120, 136, 0.5),
+          0 0 60px rgba(58, 79, 124, 0.3);
+        margin-bottom: 6px;
+      }
+      .subtitle {
+        font-size: 11px;
+        color: #667888;
+        letter-spacing: 5px;
+        opacity: 0.7;
+      }
+      .viewport {
+        position: relative;
+        border: 2px solid #1a2430;
+        box-shadow:
+          0 0 40px rgba(102, 120, 136, 0.15),
+          0 0 80px rgba(58, 79, 124, 0.08),
+          inset 0 0 60px rgba(0, 0, 0, 0.4);
+        border-radius: 4px;
+        overflow: hidden;
+        transition:
+          border-color 0.8s ease,
+          box-shadow 0.8s ease;
+      }
+      .viewport.lair-open {
+        border-color: #4466aa;
+        box-shadow:
+          0 0 40px rgba(68, 102, 170, 0.2),
+          0 0 80px rgba(58, 79, 124, 0.08),
+          0 0 30px rgba(68, 102, 170, 0.3),
+          inset 0 0 60px rgba(0, 0, 0, 0.4);
+      }
+      .viewport.death {
+        border-color: #3a1010;
+        box-shadow:
+          0 0 50px rgba(180, 40, 40, 0.2),
+          0 0 100px rgba(100, 20, 20, 0.1),
+          inset 0 0 80px rgba(0, 0, 0, 0.6);
+        animation: deathPulse 0.5s ease-in-out infinite;
+      }
+      .viewport.complete {
+        border-color: #cc8844;
+        box-shadow:
+          0 0 50px rgba(220, 160, 80, 0.3),
+          0 0 100px rgba(200, 140, 60, 0.12),
+          inset 0 0 60px rgba(180, 120, 40, 0.06);
+      }
+      @keyframes deathPulse {
+        0%,
+        100% {
+          border-color: #3a1010;
+        }
+        50% {
+          border-color: #5a1818;
+        }
+      }
+      canvas {
+        display: block;
+      }
+      .vignette {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        pointer-events: none;
+        background: radial-gradient(
+          ellipse at center,
+          transparent 40%,
+          rgba(0, 0, 0, 0.5) 100%
+        );
+        opacity: 0.7;
+        transition: opacity 0.8s ease;
+      }
+      .viewport.death .vignette {
+        background: radial-gradient(
+          ellipse at center,
+          transparent 20%,
+          rgba(40, 0, 0, 0.7) 100%
+        );
+        opacity: 1;
+      }
+      .viewport.complete .vignette {
+        opacity: 0;
+      }
+      .controls {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      .btn {
+        background: #111620;
+        color: #c8d4e0;
+        border: 1px solid #1a2430;
+        padding: 10px 20px;
+        font-family: inherit;
+        font-size: 12px;
+        letter-spacing: 3px;
+        cursor: pointer;
+        transition: all 0.25s ease;
+        text-transform: uppercase;
+        border-radius: 2px;
+      }
+      .btn:hover {
+        background: #19222e;
+        border-color: #556680;
+        box-shadow: 0 0 20px rgba(102, 120, 136, 0.2);
+        transform: translateY(-1px);
+      }
+      .btn:active {
+        transform: translateY(0);
+      }
+      .btn.active {
+        background: #1a2a3a;
+        border-color: #667888;
+        box-shadow: 0 0 25px rgba(102, 120, 136, 0.3);
+        color: #dde8f0;
+      }
+      .status-bar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: #667888;
+        font-size: 11px;
+        letter-spacing: 2px;
+      }
+      .status-indicator {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #667888;
+        box-shadow: 0 0 8px #667888;
+        animation: statusPulse 2s ease-in-out infinite;
+      }
+      .status-indicator.warn {
+        background: #884444;
+        box-shadow: 0 0 8px #884444;
+        animation: warnPulse 0.6s ease-in-out infinite;
+      }
+      @keyframes statusPulse {
+        0%,
+        100% {
+          opacity: 0.4;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+      @keyframes warnPulse {
+        0%,
+        100% {
+          opacity: 0.6;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="main-container">
+      <div class="header">
+        <div class="title">Stellar Cartography</div>
+        <div class="subtitle">Night Observatory · Singularity Edition</div>
+      </div>
+      <div class="viewport" id="viewport">
+        <div id="pixi-container"></div>
+        <div class="vignette"></div>
+      </div>
+      <div class="controls">
+        <button class="btn active" id="btnGameplay">◈ Gameplay</button>
+        <button class="btn" id="btnLair">◇ Lair Gate</button>
+        <button class="btn" id="btnDeath">◆ Singularity</button>
+        <button class="btn" id="btnComplete">◊ Complete</button>
+      </div>
+      <div class="status-bar">
+        <div class="status-indicator ok" id="statusDot"></div>
+        <span id="statusText">SYSTEM NOMINAL</span>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+    <script type="module">
+      const TILE_MAP = [
+        [
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "PP",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "PP",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+        ],
+        [
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "LE",
+          "LE",
+          "LE",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "LT",
+          "LT",
+          "LT",
+          "LT",
+          "LT",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "0A",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "BY",
+          "IY",
+          "LT",
+          "PY",
+          "CE",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "0A",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "LT",
+          "LT",
+          "LT",
+          "LT",
+          "LT",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+        ],
+        [
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "PM",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "PP",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "PP",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+        ],
+      ];
+      const COLS = 25,
+        ROWS = 26,
+        TILE_SIZE = 28;
+      const GRID_W = COLS * TILE_SIZE,
+        GRID_H = ROWS * TILE_SIZE;
+      const CENTER_X = GRID_W / 2,
+        CENTER_Y = GRID_H / 2;
+      const MAX_RADIUS = Math.hypot(GRID_W, GRID_H);
+
+      const C = {
+        void: 0x06080e,
+        path: 0x0c1018,
+        wall: 0x111620,
+        wallEdge: 0x1a2430,
+        wallGlow: 0x3a4f7c,
+        trace: 0x19222e,
+        silver: 0x556680,
+        lairVoid: 0x060a12,
+        lairAccent: 0x334466,
+        lairSigil: 0xccaa88, // более светлый
+        warpCore: 0x020408,
+        warpRing: 0x667888,
+        warpBrt: 0xaabbcc,
+        warpArc: 0x8899bb,
+        warpTip: 0xc8d4e0,
+        warpInner: 0x334466,
+        amberGlow: 0xeebb77,
+        singCore: 0x000000,
+        gravGlow: 0x3a4f7c,
+        ghostBy: 0xff4444,
+        ghostPy: 0xffaaaa,
+        ghostIy: 0x44dddd,
+        ghostCe: 0xffaa44,
+        spawn: 0x88cc88,
+        skyBg: 0x020408,
+        skyStar: 0xffffff,
+        skyLine: 0x6688aa,
+        skyConst: 0xaaccdd,
+      };
+
+      const wallTiles = [],
+        lairTiles = [],
+        teleTiles = [],
+        ghostTiles = [];
+      let spawnTile = { c: -1, r: -1 };
+
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const t = TILE_MAP[r][c];
+          const cx = c * TILE_SIZE + TILE_SIZE / 2;
+          const cy = r * TILE_SIZE + TILE_SIZE / 2;
+          const bx = c * TILE_SIZE + 1;
+          const by = r * TILE_SIZE + 1;
+          const size = TILE_SIZE - 2;
+
+          if (t === "WL")
+            wallTiles.push({
+              bx,
+              by,
+              size,
+              cx,
+              cy,
+              seed: c * 73 + r * 31,
+              c,
+              r,
+            });
+          else if (t === "LE") lairTiles.push({ bx, by, size, cx, cy, col: c });
+          else if (typeof t === "string" && t.startsWith("0"))
+            teleTiles.push({ cx, cy, seed: c * 0.7 + r * 1.1 });
+          else if (t === "BY" || t === "PY" || t === "IY" || t === "CE")
+            ghostTiles.push({ cx, cy, type: t });
+          else if (t === "PM") spawnTile = { c, r };
+        }
+      }
+
+      function isPath(c, r) {
+        if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return false;
+        const t = TILE_MAP[r][c];
+        return t !== "WL" && t !== "ES" && t !== "LE";
+      }
+
+      wallTiles.forEach((w) => {
+        w.glowEdges = {
+          top: isPath(w.c, w.r - 1),
+          bottom: isPath(w.c, w.r + 1),
+          left: isPath(w.c - 1, w.r),
+          right: isPath(w.c + 1, w.r),
+        };
+      });
+
+      const app = new PIXI.Application();
+      await app.init({
+        width: GRID_W,
+        height: GRID_H,
+        backgroundColor: C.void,
+        resolution: window.devicePixelRatio || 1,
+        antialias: true,
+      });
+      document.getElementById("pixi-container").appendChild(app.canvas);
+
+      const labyrinthContainer = new PIXI.Container();
+      app.stage.addChild(labyrinthContainer);
+
+      const floorGfx = new PIXI.Graphics();
+      const wallGfx = new PIXI.Graphics();
+      const lairGfx = new PIXI.Graphics();
+      const teleGfx = new PIXI.Graphics();
+
+      labyrinthContainer.addChild(floorGfx);
+      labyrinthContainer.addChild(wallGfx);
+      labyrinthContainer.addChild(lairGfx);
+      labyrinthContainer.addChild(teleGfx);
+
+      const effectGfx = new PIXI.Graphics();
+      app.stage.addChild(effectGfx);
+
+      const viewport = document.getElementById("viewport");
+      const statusDot = document.getElementById("statusDot");
+      const statusText = document.getElementById("statusText");
+
+      let mode = "gameplay";
+      let time = 0;
+      let lairOpen = 0,
+        targetLair = 0;
+      let deathT = 0,
+        completeT = 0;
+      let lastPulseTime = 0;
+      const pulseWaves = [];
+      const deathParticles = [];
+
+      const skyStars = [];
+      const constellations = [];
+      const shootingStars = [];
+      let skyInitialized = false;
+
+      function initSky() {
+        if (skyInitialized) return;
+        skyInitialized = true;
+
+        for (let i = 0; i < 300; i++) {
+          skyStars.push({
+            x: Math.random() * GRID_W,
+            y: Math.random() * GRID_H,
+            size: 0.3 + Math.random() * 1.5,
+            brightness: 0.3 + Math.random() * 0.7,
+            twinkleSpeed: 1 + Math.random() * 3,
+            twinklePhase: Math.random() * Math.PI * 2,
+            isConst: false,
+          });
+        }
+
+        const bigDipper = [
+          { x: 150, y: 180 },
+          { x: 200, y: 170 },
+          { x: 250, y: 175 },
+          { x: 290, y: 200 },
+          { x: 320, y: 240 },
+          { x: 360, y: 250 },
+          { x: 400, y: 230 },
+        ];
+        const bigDipperLines = [
+          [0, 1],
+          [1, 2],
+          [2, 3],
+          [3, 4],
+          [4, 5],
+          [5, 6],
+          [6, 3],
+        ];
+        constellations.push({
+          stars: bigDipper.map((p) => ({ x: p.x, y: p.y, size: 2.5 })),
+          lines: bigDipperLines,
+        });
+        bigDipper.forEach((p) => {
+          skyStars.push({
+            x: p.x,
+            y: p.y,
+            size: 2.5,
+            brightness: 1,
+            twinkleSpeed: 2,
+            twinklePhase: Math.random() * Math.PI * 2,
+            isConst: true,
+          });
+        });
+
+        const orion = [
+          { x: 500, y: 450 },
+          { x: 550, y: 480 },
+          { x: 520, y: 520 },
+          { x: 540, y: 520 },
+          { x: 560, y: 520 },
+          { x: 500, y: 570 },
+          { x: 580, y: 560 },
+        ];
+        const orionLines = [
+          [0, 1],
+          [1, 2],
+          [2, 3],
+          [3, 4],
+          [4, 1],
+          [2, 5],
+          [4, 6],
+        ];
+        constellations.push({
+          stars: orion.map((p) => ({ x: p.x, y: p.y, size: 2.5 })),
+          lines: orionLines,
+        });
+        orion.forEach((p) => {
+          skyStars.push({
+            x: p.x,
+            y: p.y,
+            size: 2.5,
+            brightness: 1,
+            twinkleSpeed: 2,
+            twinklePhase: Math.random() * Math.PI * 2,
+            isConst: true,
+          });
+        });
+
+        const cassiopeia = [
+          { x: 120, y: 550 },
+          { x: 160, y: 500 },
+          { x: 200, y: 540 },
+          { x: 240, y: 490 },
+          { x: 280, y: 530 },
+        ];
+        const cassiopeiaLines = [
+          [0, 1],
+          [1, 2],
+          [2, 3],
+          [3, 4],
+        ];
+        constellations.push({
+          stars: cassiopeia.map((p) => ({ x: p.x, y: p.y, size: 2.5 })),
+          lines: cassiopeiaLines,
+        });
+        cassiopeia.forEach((p) => {
+          skyStars.push({
+            x: p.x,
+            y: p.y,
+            size: 2.5,
+            brightness: 1,
+            twinkleSpeed: 2,
+            twinklePhase: Math.random() * Math.PI * 2,
+            isConst: true,
+          });
+        });
+      }
+
+      function drawFloor(horizon = null) {
+        floorGfx.clear();
+        floorGfx.rect(0, 0, GRID_W, GRID_H).fill({ color: C.void });
+
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            const t = TILE_MAP[r][c];
+            if (t !== "WL" && t !== "ES" && t !== "LE") {
+              const cx = c * TILE_SIZE + TILE_SIZE / 2;
+              const cy = r * TILE_SIZE + TILE_SIZE / 2;
+              if (
+                horizon !== null &&
+                Math.hypot(cx - CENTER_X, cy - CENTER_Y) < horizon
+              )
+                continue;
+              floorGfx
+                .rect(
+                  c * TILE_SIZE + 1,
+                  r * TILE_SIZE + 1,
+                  TILE_SIZE - 2,
+                  TILE_SIZE - 2,
+                )
+                .fill({ color: C.path, alpha: 0.5 });
+            }
+          }
+        }
+
+        const gc = {
+          BY: C.ghostBy,
+          PY: C.ghostPy,
+          IY: C.ghostIy,
+          CE: C.ghostCe,
+        };
+        for (const g of ghostTiles) {
+          if (
+            horizon !== null &&
+            Math.hypot(g.cx - CENTER_X, g.cy - CENTER_Y) < horizon
+          )
+            continue;
+          floorGfx
+            .circle(g.cx, g.cy, 5)
+            .fill({ color: gc[g.type], alpha: 0.5 });
+        }
+
+        if (spawnTile.c >= 0) {
+          const sx = spawnTile.c * TILE_SIZE + TILE_SIZE / 2;
+          const sy = spawnTile.r * TILE_SIZE + TILE_SIZE / 2;
+          if (
+            horizon === null ||
+            Math.hypot(sx - CENTER_X, sy - CENTER_Y) > horizon
+          ) {
+            floorGfx
+              .rect(sx - 5, sy - 5, 10, 10)
+              .stroke({ color: C.spawn, width: 1, alpha: 0.6 });
+          }
+        }
+      }
+
+      function drawWalls() {
+        wallGfx.clear();
+
+        for (const w of wallTiles) {
+          let pulseBoost = 0;
+          for (const wave of pulseWaves) {
+            const dist = Math.hypot(w.cx - wave.cx, w.cy - wave.cy);
+            const diff = Math.abs(dist - wave.radius);
+            if (diff < 40)
+              pulseBoost = Math.max(
+                pulseBoost,
+                (1 - diff / 40) * wave.strength,
+              );
+          }
+          const alpha = Math.min(1, 0.4 + pulseBoost);
+
+          wallGfx.rect(w.bx, w.by, w.size, w.size).fill({ color: C.wall });
+          wallGfx
+            .rect(w.bx + 1, w.by + 1, w.size - 2, w.size - 2)
+            .stroke({ color: C.wallEdge, width: 0.5, alpha: alpha * 0.4 });
+
+          const glowStrength = alpha * (0.5 + pulseBoost * 0.8);
+          const edge = w.glowEdges;
+
+          if (edge.top) {
+            wallGfx
+              .moveTo(w.bx, w.by)
+              .lineTo(w.bx + w.size, w.by)
+              .stroke({
+                color: C.wallGlow,
+                width: 1.2,
+                alpha: glowStrength * 0.7,
+              });
+            wallGfx
+              .moveTo(w.bx, w.by)
+              .lineTo(w.bx + w.size, w.by)
+              .stroke({
+                color: C.wallGlow,
+                width: 3,
+                alpha: glowStrength * 0.15,
+              });
+          }
+          if (edge.bottom) {
+            wallGfx
+              .moveTo(w.bx, w.by + w.size)
+              .lineTo(w.bx + w.size, w.by + w.size)
+              .stroke({
+                color: C.wallGlow,
+                width: 1.2,
+                alpha: glowStrength * 0.7,
+              });
+            wallGfx
+              .moveTo(w.bx, w.by + w.size)
+              .lineTo(w.bx + w.size, w.by + w.size)
+              .stroke({
+                color: C.wallGlow,
+                width: 3,
+                alpha: glowStrength * 0.15,
+              });
+          }
+          if (edge.left) {
+            wallGfx
+              .moveTo(w.bx, w.by)
+              .lineTo(w.bx, w.by + w.size)
+              .stroke({
+                color: C.wallGlow,
+                width: 1.2,
+                alpha: glowStrength * 0.7,
+              });
+            wallGfx
+              .moveTo(w.bx, w.by)
+              .lineTo(w.bx, w.by + w.size)
+              .stroke({
+                color: C.wallGlow,
+                width: 3,
+                alpha: glowStrength * 0.15,
+              });
+          }
+          if (edge.right) {
+            wallGfx
+              .moveTo(w.bx + w.size, w.by)
+              .lineTo(w.bx + w.size, w.by + w.size)
+              .stroke({
+                color: C.wallGlow,
+                width: 1.2,
+                alpha: glowStrength * 0.7,
+              });
+            wallGfx
+              .moveTo(w.bx + w.size, w.by)
+              .lineTo(w.bx + w.size, w.by + w.size)
+              .stroke({
+                color: C.wallGlow,
+                width: 3,
+                alpha: glowStrength * 0.15,
+              });
+          }
+        }
+      }
+
+      function drawTeleports() {
+        while (teleGfx.children.length > 0) teleGfx.removeChildAt(0).destroy();
+        teleGfx.clear();
+
+        for (const tp of teleTiles) {
+          const { cx, cy, seed } = tp;
+          const maxR = TILE_SIZE * 0.4;
+          const breathe = 1 + Math.sin(time * 0.7 + seed) * 0.04;
+
+          teleGfx
+            .circle(cx, cy, maxR * 1.1 * breathe)
+            .stroke({ color: C.warpRing, width: 4, alpha: 0.08 });
+
+          const segments = 12;
+          const ringR = maxR * 0.75 * breathe;
+          for (let i = 0; i < segments; i++) {
+            const a0 = (i / segments) * Math.PI * 2 + time * 0.4;
+            const a1 = a0 + Math.PI / segments;
+            if (Math.sin(i * 2.5 + time * 2 + seed) <= -0.2) continue;
+            const startX = cx + Math.cos(a0) * ringR;
+            const startY = cy + Math.sin(a0) * ringR;
+            teleGfx
+              .moveTo(startX, startY)
+              .arc(cx, cy, ringR, a0, a1)
+              .stroke({ color: C.warpBrt, width: 1, alpha: 0.45 });
+          }
+
+          teleGfx
+            .circle(cx, cy, maxR * 0.45 * breathe)
+            .stroke({ color: C.warpInner, width: 1.5, alpha: 0.5 });
+          teleGfx
+            .circle(cx, cy, maxR * 0.22 * breathe)
+            .fill({ color: C.warpCore, alpha: 0.9 });
+
+          for (let arm = 0; arm < 2; arm++) {
+            const baseAngle = time * 1.8 + arm * Math.PI + seed;
+            const points = [];
+            for (let i = 0; i <= 8; i++) {
+              const t = i / 8;
+              const r = maxR * (0.25 + t * 0.55) * breathe;
+              const a = baseAngle + t * Math.PI * 0.8;
+              points.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
+            }
+
+            const spiralGfx = new PIXI.Graphics();
+            spiralGfx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i++)
+              spiralGfx.lineTo(points[i].x, points[i].y);
+            spiralGfx.stroke({ color: C.warpArc, width: 1.2, alpha: 0.4 });
+            teleGfx.addChild(spiralGfx);
+
+            const tipR = maxR * 0.8 * breathe;
+            const tipA = baseAngle + Math.PI * 0.8;
+            const tipX = cx + Math.cos(tipA) * tipR;
+            const tipY = cy + Math.sin(tipA) * tipR;
+            const sparkAlpha = 0.3 + Math.sin(time * 5 + arm) * 0.2;
+            teleGfx
+              .circle(tipX, tipY, 2)
+              .fill({ color: C.warpTip, alpha: sparkAlpha });
+            teleGfx
+              .circle(tipX, tipY, 5)
+              .fill({ color: C.warpTip, alpha: sparkAlpha * 0.2 });
+          }
+
+          for (let i = 0; i < 5; i++) {
+            const phase = (i / 5) * Math.PI * 2 + time * 0.9 + seed;
+            const dist = maxR * (0.65 + Math.sin(time * 3 + i + seed) * 0.2);
+            const px = cx + Math.cos(phase) * dist;
+            const py = cy + Math.sin(phase) * dist;
+            const pAlpha = 0.3 + Math.sin(time * 4 + i * 2) * 0.2;
+            teleGfx
+              .circle(px, py, 0.8)
+              .fill({ color: C.warpBrt, alpha: pAlpha });
+          }
+        }
+      }
+
+      function drawLairGates(progress) {
+        lairGfx.clear();
+
+        for (const lair of lairTiles) {
+          const { bx, by, size, cx, cy } = lair;
+          const p = progress;
+
+          if (p < 0.5) {
+            const closeAlpha = 1 - p * 2;
+
+            // Тёмная основа
+            lairGfx
+              .rect(bx, by, size, size)
+              .fill({ color: C.void, alpha: closeAlpha });
+            lairGfx
+              .rect(bx + 1, by + 1, size - 2, size - 2)
+              .stroke({ color: C.wallEdge, width: 1, alpha: closeAlpha * 0.6 });
+
+            // Заполненный ромб (закрыто)
+            const markColor = C.lairAccent;
+            const markAlpha = closeAlpha * 0.6;
+            const pad = size * 0.25;
+
+            lairGfx
+              .poly([
+                cx,
+                by + pad, // верх
+                bx + size - pad,
+                cy, // право
+                cx,
+                by + size - pad, // низ
+                bx + pad,
+                cy, // лево
+              ])
+              .fill({ color: markColor, alpha: markAlpha })
+              .stroke({ color: markColor, width: 1.5, alpha: markAlpha * 1.2 });
+          } else {
+            const openAlpha = (p - 0.5) * 2;
+
+            // Чистая пустота
+            lairGfx.rect(bx, by, size, size).fill({ color: C.lairVoid });
+
+            // Только контур ромба (открыто)
+            const markColor = C.lairAccent;
+            const markAlpha = 0.5 * openAlpha;
+            const pad = size * 0.3;
+
+            lairGfx
+              .poly([
+                cx,
+                by + pad,
+                bx + size - pad,
+                cy,
+                cx,
+                by + size - pad,
+                bx + pad,
+                cy,
+              ])
+              .stroke({ color: markColor, width: 1.5, alpha: markAlpha });
+          }
+        }
+      }
+
+      function updateDeathParticles(dt) {
+        if (deathT < 0.9 && Math.random() < 0.3) {
+          const angle = Math.random() * Math.PI * 2;
+          const dist = GRID_W * 0.4 + Math.random() * GRID_W * 0.2;
+          deathParticles.push({
+            x: CENTER_X + Math.cos(angle) * dist,
+            y: CENTER_Y + Math.sin(angle) * dist,
+            angle,
+            dist,
+            speed: 0.5 + Math.random() * 0.5,
+            life: 1,
+          });
+        }
+
+        for (let i = deathParticles.length - 1; i >= 0; i--) {
+          const p = deathParticles[i];
+          p.dist -= p.speed * dt * 60;
+          p.angle += 0.02 * dt * 60;
+          p.life -= dt * 0.5;
+          p.x = CENTER_X + Math.cos(p.angle) * p.dist;
+          p.y = CENTER_Y + Math.sin(p.angle) * p.dist;
+          if (p.life <= 0 || p.dist < 20) deathParticles.splice(i, 1);
+        }
+      }
+      function drawDeathEffect(progress) {
+        effectGfx.clear();
+        if (progress <= 0) return;
+
+        const horizon = progress * MAX_RADIUS;
+
+        effectGfx.rect(0, 0, GRID_W, GRID_H).fill({ color: C.void });
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            const t = TILE_MAP[r][c];
+            if (t !== "WL" && t !== "ES" && t !== "LE") {
+              const cx = c * TILE_SIZE + TILE_SIZE / 2;
+              const cy = r * TILE_SIZE + TILE_SIZE / 2;
+              if (Math.hypot(cx - CENTER_X, cy - CENTER_Y) < horizon) continue;
+              effectGfx
+                .rect(
+                  c * TILE_SIZE + 1,
+                  r * TILE_SIZE + 1,
+                  TILE_SIZE - 2,
+                  TILE_SIZE - 2,
+                )
+                .fill({ color: C.path, alpha: 0.5 });
+            }
+          }
+        }
+
+        for (const w of wallTiles) {
+          const dx = w.cx - CENTER_X,
+            dy = w.cy - CENTER_Y;
+          const dist = Math.hypot(dx, dy);
+          if (dist < horizon) continue;
+
+          let drawX = w.cx,
+            drawY = w.cy,
+            alpha = 1,
+            sz = w.size;
+          const gravR = horizon + 120;
+          if (dist < gravR) {
+            const t = (gravR - dist) / 120;
+            drawX -= (dx / dist) * t * 28;
+            drawY -= (dy / dist) * t * 28;
+            sz = Math.max(1, sz * (1 - t * 0.65));
+            alpha = 1 - t * 0.85;
+          }
+
+          effectGfx
+            .rect(drawX - sz / 2, drawY - sz / 2, sz, sz)
+            .fill({ color: C.wall, alpha });
+          effectGfx
+            .rect(drawX - sz / 2 + 1, drawY - sz / 2 + 1, sz - 2, sz - 2)
+            .stroke({ color: C.wallEdge, width: 0.8, alpha: alpha * 0.5 });
+        }
+
+        for (const tp of teleTiles) {
+          const dx = tp.cx - CENTER_X,
+            dy = tp.cy - CENTER_Y;
+          const dist = Math.hypot(dx, dy);
+          if (dist < horizon) continue;
+
+          let drawX = tp.cx,
+            drawY = tp.cy,
+            alpha = 1,
+            scale = 1;
+          const gravR = horizon + 120;
+          if (dist < gravR) {
+            const t = (gravR - dist) / 120;
+            drawX -= (dx / dist) * t * 28;
+            drawY -= (dy / dist) * t * 28;
+            scale = Math.max(0.1, 1 - t * 0.85);
+            alpha = 1 - t * 0.85;
+          }
+
+          const r = TILE_SIZE * 0.4 * scale;
+          effectGfx
+            .circle(drawX, drawY, r)
+            .stroke({ color: C.warpRing, width: 1, alpha: alpha * 0.5 });
+          effectGfx
+            .circle(drawX, drawY, r * 0.3)
+            .fill({ color: C.warpCore, alpha: alpha * 0.8 });
+        }
+
+        lairGfx.clear();
+        for (const lair of lairTiles) {
+          const dx = lair.cx - CENTER_X,
+            dy = lair.cy - CENTER_Y;
+          const dist = Math.hypot(dx, dy);
+          if (dist < horizon) continue;
+
+          let drawX = lair.cx,
+            drawY = lair.cy,
+            alpha = 1,
+            scale = 1;
+          const gravR = horizon + 120;
+          if (dist < gravR) {
+            const t = (gravR - dist) / 120;
+            drawX -= (dx / dist) * t * 28;
+            drawY -= (dy / dist) * t * 28;
+            scale = Math.max(0.1, 1 - t * 0.85);
+            alpha = 1 - t * 0.85;
+          }
+
+          const sz = lair.size * scale;
+          effectGfx
+            .rect(drawX - sz / 2, drawY - sz / 2, sz, sz)
+            .fill({ color: C.wall, alpha });
+        }
+
+        for (const p of deathParticles) {
+          effectGfx
+            .circle(p.x, p.y, 1.5)
+            .fill({ color: C.silver, alpha: p.life * 0.6 });
+        }
+
+        if (progress < 0.95) {
+          effectGfx
+            .circle(CENTER_X, CENTER_Y, horizon + 10)
+            .fill({ color: C.gravGlow, alpha: 0.3 * (1 - progress) });
+          effectGfx
+            .circle(CENTER_X, CENTER_Y, horizon)
+            .fill({ color: C.singCore });
+        }
+      }
+      function drawComplete(progress) {
+        initSky();
+        effectGfx.clear();
+
+        // Удаляем дочерние элементы teleGfx (спирали)
+        while (teleGfx.children.length > 0) teleGfx.removeChildAt(0).destroy();
+
+        const fadeEnd = 0.5;
+        if (progress < fadeEnd) {
+          labyrinthContainer.alpha = 1 - progress / fadeEnd;
+        } else {
+          labyrinthContainer.alpha = 0;
+        }
+
+        const skyStart = 0.2;
+        if (progress > skyStart) {
+          const skyProgress = Math.min(
+            1,
+            (progress - skyStart) / (1 - skyStart),
+          );
+
+          effectGfx
+            .rect(0, 0, GRID_W, GRID_H)
+            .fill({ color: C.skyBg, alpha: skyProgress });
+
+          for (const star of skyStars) {
+            if (star.isConst) continue;
+            const twinkle =
+              0.5 +
+              0.5 * Math.sin(time * star.twinkleSpeed + star.twinklePhase);
+            const alpha = star.brightness * twinkle * skyProgress;
+            if (alpha < 0.05) continue;
+
+            effectGfx
+              .circle(star.x, star.y, star.size * 1.5)
+              .fill({ color: C.skyStar, alpha: alpha * 0.15 });
+            effectGfx
+              .circle(star.x, star.y, star.size * 0.5)
+              .fill({ color: C.skyStar, alpha: alpha * 0.9 });
+          }
+
+          if (Math.random() < 0.01 * skyProgress && shootingStars.length < 3) {
+            const startX = Math.random() * GRID_W;
+            const startY = Math.random() * GRID_H * 0.5;
+            const angle = Math.PI / 4 + (Math.random() - 0.5) * 0.5;
+            shootingStars.push({
+              x: startX,
+              y: startY,
+              vx: Math.cos(angle) * 400,
+              vy: Math.sin(angle) * 400,
+              life: 1,
+            });
+          }
+
+          for (let i = shootingStars.length - 1; i >= 0; i--) {
+            const s = shootingStars[i];
+            s.x += s.vx * 0.016;
+            s.y += s.vy * 0.016;
+            s.life -= 0.016 * 1.5;
+
+            if (s.life <= 0) {
+              shootingStars.splice(i, 1);
+              continue;
+            }
+
+            const tailX = s.x - s.vx * 0.05;
+            const tailY = s.y - s.vy * 0.05;
+
+            effectGfx
+              .moveTo(tailX, tailY)
+              .lineTo(s.x, s.y)
+              .stroke({
+                color: C.skyStar,
+                width: 1.5,
+                alpha: s.life * 0.8 * skyProgress,
+                cap: "round",
+              });
+            effectGfx
+              .moveTo(tailX, tailY)
+              .lineTo(s.x, s.y)
+              .stroke({
+                color: C.skyStar,
+                width: 4,
+                alpha: s.life * 0.2 * skyProgress,
+                cap: "round",
+              });
+            effectGfx
+              .circle(s.x, s.y, 1.5)
+              .fill({ color: C.skyStar, alpha: s.life * skyProgress });
+          }
+
+          const constFadeStart = 0.5;
+          if (skyProgress > constFadeStart) {
+            const constAlpha = Math.min(
+              1,
+              (skyProgress - constFadeStart) / 0.4,
+            );
+
+            for (let ci = 0; ci < constellations.length; ci++) {
+              const constellation = constellations[ci];
+              const delay = ci * 0.15;
+              const localAlpha = Math.max(
+                0,
+                Math.min(1, (constAlpha - delay) / (1 - delay)),
+              );
+              if (localAlpha <= 0) continue;
+
+              for (const [a, b] of constellation.lines) {
+                const p1 = constellation.stars[a];
+                const p2 = constellation.stars[b];
+
+                effectGfx
+                  .moveTo(p1.x, p1.y)
+                  .lineTo(p2.x, p2.y)
+                  .stroke({
+                    color: C.skyLine,
+                    width: 2.5,
+                    alpha: localAlpha * 0.1 * skyProgress,
+                    cap: "round",
+                  });
+                effectGfx
+                  .moveTo(p1.x, p1.y)
+                  .lineTo(p2.x, p2.y)
+                  .stroke({
+                    color: C.skyConst,
+                    width: 0.7,
+                    alpha: localAlpha * 0.35 * skyProgress,
+                    cap: "round",
+                  });
+              }
+
+              for (const star of constellation.stars) {
+                const twinkle = 0.7 + 0.3 * Math.sin(time * 2 + star.x * 0.01);
+                const starAlpha = localAlpha * twinkle * skyProgress;
+
+                effectGfx
+                  .circle(star.x, star.y, star.size * 2)
+                  .fill({ color: C.skyStar, alpha: starAlpha * 0.1 });
+                effectGfx
+                  .circle(star.x, star.y, star.size * 0.9)
+                  .fill({ color: C.skyStar, alpha: starAlpha * 0.4 });
+                effectGfx
+                  .circle(star.x, star.y, star.size * 0.4)
+                  .fill({ color: C.skyStar, alpha: starAlpha * 0.9 });
+              }
+            }
+          }
+        }
+      }
+
+      function updatePulseWaves(dt) {
+        if (time - lastPulseTime > 5) {
+          lastPulseTime = time;
+          pulseWaves.push({
+            cx: CENTER_X,
+            cy: CENTER_Y,
+            radius: 0,
+            speed: 200,
+            strength: 0.4,
+            life: 1,
+          });
+        }
+        for (let i = pulseWaves.length - 1; i >= 0; i--) {
+          const w = pulseWaves[i];
+          w.radius += w.speed * dt;
+          w.life -= dt * 0.3;
+          w.strength *= 0.98;
+          if (w.life <= 0 || w.radius > MAX_RADIUS) pulseWaves.splice(i, 1);
+        }
+      }
+
+      function render() {
+        floorGfx.clear();
+        wallGfx.clear();
+        lairGfx.clear();
+        teleGfx.clear();
+        effectGfx.clear();
+
+        if (mode === "gameplay" || mode === "lair") {
+          labyrinthContainer.alpha = 1;
+          drawFloor();
+          drawWalls();
+          drawLairGates(lairOpen);
+          drawTeleports();
+        } else if (mode === "death") {
+          labyrinthContainer.alpha = 0;
+          drawDeathEffect(deathT);
+        } else if (mode === "complete") {
+          drawComplete(completeT);
+        }
+      }
+
+      function setMode(m) {
+        mode = m;
+        deathT = 0;
+        completeT = 0;
+        deathParticles.length = 0;
+        shootingStars.length = 0;
+        if (m === "gameplay") targetLair = 0;
+        else if (m === "lair") targetLair = targetLair > 0.5 ? 0 : 1;
+        else {
+          targetLair = 0;
+          lairOpen = 0;
+        }
+
+        // Сбрасываем alpha контейнера при входе в complete
+        if (m === "complete") {
+          labyrinthContainer.alpha = 1;
+        }
+
+        document
+          .querySelectorAll(".btn")
+          .forEach((b) => b.classList.remove("active"));
+        document
+          .getElementById("btn" + m.charAt(0).toUpperCase() + m.slice(1))
+          .classList.add("active");
+
+        statusDot.className = "status-indicator";
+        viewport.className = "viewport";
+        switch (m) {
+          case "gameplay":
+            statusDot.classList.add("ok");
+            statusText.textContent = "SYSTEM NOMINAL";
+            break;
+          case "lair":
+            statusDot.classList.add("ok");
+            statusText.textContent =
+              targetLair > 0.5 ? "GATE UNSEALING" : "GATE SEALING";
+            viewport.classList.add("lair-open");
+            break;
+          case "death":
+            statusDot.classList.add("warn");
+            statusText.textContent = "SINGULARITY COLLAPSE";
+            viewport.classList.add("death");
+            break;
+          case "complete":
+            statusDot.classList.add("ok");
+            statusText.textContent = "STELLAR REVELATION";
+            viewport.classList.add("complete");
+            break;
+        }
+      }
+
+      document
+        .getElementById("btnGameplay")
+        .addEventListener("click", () => setMode("gameplay"));
+      document
+        .getElementById("btnLair")
+        .addEventListener("click", () => setMode("lair"));
+      document
+        .getElementById("btnDeath")
+        .addEventListener("click", () => setMode("death"));
+      document
+        .getElementById("btnComplete")
+        .addEventListener("click", () => setMode("complete"));
+
+      let lastTime = performance.now();
+      const TARGET_FPS = 60;
+      const FRAME_INTERVAL = 1000 / TARGET_FPS;
+
+      app.ticker.add(() => {
+        const now = performance.now();
+        const elapsed = now - lastTime;
+
+        if (elapsed >= FRAME_INTERVAL) {
+          lastTime = now - (elapsed % FRAME_INTERVAL);
+          const dt = 0.016;
+          time += dt;
+          updatePulseWaves(dt);
+
+          if (Math.abs(lairOpen - targetLair) > 0.001) {
+            const speed = 2.2;
+            lairOpen +=
+              Math.sign(targetLair - lairOpen) *
+              Math.min(speed * dt, Math.abs(targetLair - lairOpen));
+          }
+
+          if (mode === "death") {
+            if (deathT < 1) deathT = Math.min(1, deathT + dt * 0.4);
+            updateDeathParticles(dt);
+          }
+          if (mode === "complete" && completeT < 1) {
+            completeT = Math.min(1, completeT + dt * 0.12);
+          }
+
+          render();
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bonus Life — Cosmic Heart Polished</title>
+<style>
+    body { margin: 0; background: #06080e; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: 'Courier New', monospace; color: #c8d4e0; }
+    canvas { display: block; border: 1px solid #1a2430; border-radius: 4px; }
+    .title { margin-bottom: 20px; font-size: 14px; letter-spacing: 4px; opacity: 0.6; }
+</style>
+</head>
+<body>
+<div class="title">BONUS LIFE · COSMIC HEART POLISHED</div>
+<div id="pixi-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+<script type="module">
+const { Application, Container, Sprite, Texture, BlurFilter } = PIXI;
+
+function createCosmicHeartTexture() {
+    const size = 128;
+    const canvas = document.createElement("canvas");
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    const cx = size / 2, cy = size / 2;
+
+    // Многослойное внешнее свечение (туманность)
+    const layers = [
+        { r: size * 0.5, stops: [
+            [0, "rgba(120,255,200,0.4)"],
+            [0.3, "rgba(80,230,160,0.25)"],
+            [0.6, "rgba(40,180,120,0.12)"],
+            [1, "rgba(0,0,0,0)"]
+        ]},
+        { r: size * 0.35, stops: [
+            [0, "rgba(180,255,220,0.3)"],
+            [0.5, "rgba(100,255,180,0.15)"],
+            [1, "rgba(0,0,0,0)"]
+        ]}
+    ];
+
+    for (const layer of layers) {
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
+        for (const [offset, color] of layer.stops) {
+            g.addColorStop(offset, color);
+        }
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, size, size);
+    }
+
+    // Сердце — многослойный энергетический контур
+    const scale = size * 0.012;
+    ctx.save();
+    ctx.translate(cx, cy + scale * 8);
+    ctx.scale(scale, scale);
+
+    // Функция для рисования сердца
+    function drawHeartPath() {
+        ctx.beginPath();
+        ctx.moveTo(0, -10);
+        ctx.bezierCurveTo(-10, -22, -22, -12, -22, 0);
+        ctx.bezierCurveTo(-22, 12, -12, 22, 0, 28);
+        ctx.bezierCurveTo(12, 22, 22, 12, 22, 0);
+        ctx.bezierCurveTo(22, -12, 10, -22, 0, -10);
+    }
+
+    // Внешний контур (яркий, с сильным свечением)
+    ctx.strokeStyle = "rgba(150,255,200,0.95)";
+    ctx.lineWidth = 3;
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = "rgba(100,255,180,1)";
+    drawHeartPath();
+    ctx.stroke();
+
+    // Средний контур
+    ctx.strokeStyle = "rgba(180,255,220,0.7)";
+    ctx.lineWidth = 2;
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = "rgba(120,255,200,0.8)";
+    ctx.beginPath();
+    ctx.moveTo(0, -8);
+    ctx.bezierCurveTo(-8, -18, -18, -10, -18, 0);
+    ctx.bezierCurveTo(-18, 10, -10, 18, 0, 24);
+    ctx.bezierCurveTo(10, 18, 18, 10, 18, 0);
+    ctx.bezierCurveTo(18, -10, 8, -18, 0, -8);
+    ctx.stroke();
+
+    // Внутренний контур (более тусклый)
+    ctx.strokeStyle = "rgba(220,255,240,0.5)";
+    ctx.lineWidth = 1.5;
+    ctx.shadowBlur = 4;
+    ctx.shadowColor = "rgba(150,255,220,0.6)";
+    ctx.beginPath();
+    ctx.moveTo(0, -6);
+    ctx.bezierCurveTo(-7, -15, -15, -8, -15, 0);
+    ctx.bezierCurveTo(-15, 8, -8, 15, 0, 20);
+    ctx.bezierCurveTo(8, 15, 15, 8, 15, 0);
+    ctx.bezierCurveTo(15, -8, 7, -15, 0, -6);
+    ctx.stroke();
+
+    // Заполнение сердца (полупрозрачное)
+    ctx.shadowBlur = 0;
+    const fillGrad = ctx.createRadialGradient(0, 5, 0, 0, 5, 20);
+    fillGrad.addColorStop(0, "rgba(200,255,230,0.4)");
+    fillGrad.addColorStop(0.5, "rgba(120,255,180,0.2)");
+    fillGrad.addColorStop(1, "rgba(60,200,140,0.05)");
+    ctx.fillStyle = fillGrad;
+    drawHeartPath();
+    ctx.fill();
+
+    // Центральное ядро (многослойное)
+    const coreLayers = [
+        { r: 12, stops: [
+            [0, "rgba(255,255,255,0.95)"],
+            [0.2, "rgba(220,255,240,0.7)"],
+            [0.5, "rgba(150,255,200,0.3)"],
+            [1, "rgba(0,0,0,0)"]
+        ]},
+        { r: 8, stops: [
+            [0, "rgba(255,255,255,1)"],
+            [0.4, "rgba(240,255,250,0.8)"],
+            [1, "rgba(0,0,0,0)"]
+        ]}
+    ];
+
+    for (const layer of coreLayers) {
+        const g = ctx.createRadialGradient(0, 2, 0, 0, 2, layer.r);
+        for (const [offset, color] of layer.stops) {
+            g.addColorStop(offset, color);
+        }
+        ctx.fillStyle = g;
+        ctx.fillRect(-layer.r, -layer.r + 2, layer.r * 2, layer.r * 2);
+    }
+
+    // Лучи от ядра (4 тонких линии)
+    ctx.strokeStyle = "rgba(200,255,230,0.4)";
+    ctx.lineWidth = 0.8;
+    ctx.shadowBlur = 3;
+    ctx.shadowColor = "rgba(150,255,200,0.6)";
+    
+    for (let i = 0; i < 4; i++) {
+        const angle = (i / 4) * Math.PI * 2;
+        const length = 15;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(angle) * 3, 2 + Math.sin(angle) * 3);
+        ctx.lineTo(Math.cos(angle) * length, 2 + Math.sin(angle) * length);
+        ctx.stroke();
+    }
+
+    ctx.restore();
+
+    return Texture.from(canvas);
+}
+
+const HEART_TEX = createCosmicHeartTexture();
+
+const app = new Application();
+await app.init({
+    width: 400, height: 400,
+    backgroundColor: 0x06080e,
+    antialias: true,
+});
+document.getElementById('pixi-container').appendChild(app.canvas);
+
+const container = new Container();
+container.x = 200; container.y = 200;
+app.stage.addChild(container);
+
+// Основное сердце
+const heart = new Sprite(HEART_TEX);
+heart.anchor.set(0.5);
+heart.width = 100; heart.height = 100;
+container.addChild(heart);
+
+// Bloom слой 1 (мягкое свечение)
+const bloom1 = new Sprite(HEART_TEX);
+bloom1.anchor.set(0.5);
+bloom1.width = 140; bloom1.height = 140;
+bloom1.alpha = 0.5;
+bloom1.blendMode = "add";
+bloom1.filters = [new BlurFilter({ strength: 10, quality: 3 })];
+container.addChild(bloom1);
+
+// Bloom слой 2 (широкое свечение)
+const bloom2 = new Sprite(HEART_TEX);
+bloom2.anchor.set(0.5);
+bloom2.width = 180; bloom2.height = 180;
+bloom2.alpha = 0.25;
+bloom2.blendMode = "add";
+bloom2.filters = [new BlurFilter({ strength: 20, quality: 3 })];
+container.addChild(bloom2);
+
+// Орбитальные частицы
+const particles = [];
+for (let i = 0; i < 16; i++) {
+    const particle = new Sprite(Texture.WHITE);
+    particle.anchor.set(0.5);
+    particle.width = 2.5; particle.height = 2.5;
+    particle.tint = 0x88ffbb;
+    particle.blendMode = "add";
+    container.addChild(particle);
+    particles.push({
+        sprite: particle,
+        angle: (i / 16) * Math.PI * 2,
+        radius: 50 + Math.random() * 15,
+        speed: 0.6 + Math.random() * 0.4,
+        size: 0.6 + Math.random() * 0.4
+    });
+}
+
+let time = 0;
+app.ticker.add((ticker) => {
+    const dt = ticker.deltaMS / 1000;
+    time += dt;
+    
+    // Пульсация (сердцебиение)
+    const heartbeat = 1 + Math.sin(time * 2.5) * 0.06 + Math.pow(Math.sin(time * 2.5), 2) * 0.03;
+    container.scale.set(heartbeat);
+    
+    // Мерцание
+    const flicker = 0.88 + Math.sin(time * 10) * 0.06 + Math.sin(time * 18) * 0.03;
+    heart.alpha = flicker;
+    bloom1.alpha = 0.45 + Math.sin(time * 7) * 0.1;
+    bloom2.alpha = 0.2 + Math.sin(time * 5) * 0.08;
+    
+    // Лёгкое покачивание
+    container.rotation = Math.sin(time * 0.5) * 0.04;
+    
+    // Анимация частиц
+    for (const p of particles) {
+        p.angle += p.speed * dt;
+        const wobble = Math.sin(time * 3 + p.angle * 2) * 3;
+        p.sprite.x = Math.cos(p.angle) * (p.radius + wobble);
+        p.sprite.y = Math.sin(p.angle) * (p.radius + wobble) * 0.7; // Эллиптическая орбита
+        p.sprite.alpha = 0.5 + Math.sin(time * 6 + p.angle) * 0.3;
+        p.sprite.scale.set(p.size * (0.8 + Math.sin(time * 5 + p.angle * 2) * 0.3));
+    }
+});
+</script>
+</body>
+</html>

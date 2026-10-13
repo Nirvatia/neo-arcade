@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SNOW VORTEX v1.0 — Winter Whirlwind</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: #0a1520; 
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+        canvas { 
+            display: block; 
+        }
+        #ui { 
+            position: absolute; 
+            top: 15px; 
+            left: 15px; 
+            color: #c8d8e8; 
+            font-size: 13px; 
+            background: rgba(10, 21, 32, 0.85);
+            padding: 16px 20px;
+            border-radius: 8px;
+            border: 1px solid rgba(200, 216, 232, 0.25);
+            backdrop-filter: blur(8px);
+            line-height: 1.8;
+            min-width: 280px;
+        }
+        #ui h3 {
+            margin: 0 0 12px 0;
+            color: #fff;
+            font-size: 15px;
+            border-bottom: 1px solid rgba(200, 216, 232, 0.2);
+            padding-bottom: 8px;
+        }
+        #ui label {
+            display: block;
+            margin: 8px 0 4px 0;
+            color: #8ca8c8;
+            font-size: 12px;
+        }
+        #ui input[type="range"] {
+            width: 100%;
+            margin: 4px 0;
+        }
+        #ui .value-display {
+            color: #fff;
+            font-weight: 600;
+            float: right;
+        }
+        #ui button {
+            background: rgba(200, 216, 232, 0.15);
+            border: 1px solid rgba(200, 216, 232, 0.3);
+            color: #c8d8e8;
+            padding: 8px 16px;
+            margin: 4px 4px 4px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        #ui button:hover {
+            background: rgba(200, 216, 232, 0.25);
+            border-color: rgba(200, 216, 232, 0.5);
+        }
+        #ui button.active {
+            background: rgba(245, 248, 255, 0.35);
+            border-color: #f5f8ff;
+            color: #fff;
+        }
+        #stats {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            color: #8ca8c8;
+            font-size: 11px;
+            font-family: monospace;
+            background: rgba(10, 21, 32, 0.7);
+            padding: 8px 12px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <h3>SNOW VORTEX v1.0 — Winter Whirlwind</h3>
+        
+        <label>
+            Spin Speed
+            <span class="value-display" id="spinSpeedValue">0.20</span>
+        </label>
+        <input type="range" id="spinSpeed" min="0" max="1" step="0.01" value="0.20">
+        
+        <label>
+            Arm Complexity
+            <span class="value-display" id="armStepsValue">32</span>
+        </label>
+        <input type="range" id="armSteps" min="8" max="48" step="4" value="32">
+        
+        <label>
+            Snow Particles
+            <span class="value-display" id="maxParticlesValue">70</span>
+        </label>
+        <input type="range" id="maxParticles" min="20" max="150" step="10" value="70">
+        
+        <div style="margin-top: 16px;">
+            <button id="btnNormal" class="active">Normal</button>
+            <button id="btnFrightened">Frightened</button>
+            <button id="btnFlashing">Flashing</button>
+            <button id="btnEaten">Eaten</button>
+        </div>
+        
+        <div style="margin-top: 12px; font-size: 11px; color: #8ca8c8;">
+            <strong>Snow Vortex:</strong><br>
+            ✓ Swirling snow arms<br>
+            ✓ 6-pointed snowflakes<br>
+            ✓ Fluffy snowball core<br>
+            ✓ Winter trail behind
+        </div>
+    </div>
+    
+    <div id="stats">
+        FPS: <span id="fps">0</span> |
+        Particles: <span id="particleCount">0</span>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+    <script type="module">
+        // ──────────────────────────────────────────────
+        // SNOW VORTEX — Winter Whirlwind
+        // Snowy theme for Pac-Man ghosts
+        // ──────────────────────────────────────────────
+
+        const DEFAULT_CONFIG = {
+            armCount: 4,
+            armBaseWidth: 4.0,
+            armTaper: 0.85,
+            armFillAlpha: 0.65,
+            centerLineAlpha: 0.5,
+            spinSpeed: 0.20,
+            spiralTurnsBase: 2.5,
+            spiralTurnsSpeedScale: 1.2,
+            armSteps: 32,
+            breatheFreq1: 0.004,
+            breatheAmp1: 0.05,
+            breatheFreq2: 0.009,
+            breatheAmp2: 0.03,
+            vortexRadiusScale: 0.82,
+            coreRadiusScale: 0.22,
+            corePulseFreq: 0.006,
+            corePulseAmp: 0.15,
+            coreFillAlpha: 0.9,
+            coreWhiteAlpha: 0.95,
+            frightenedArmShrink: 0.55,
+            frightenedSpinScale: 0.35,
+            frightenedChaosAmp: 0.12,
+            frightenedChaosFreq: 0.02,
+            flashFreq: 0.003,
+            eatenShrinkRate: 0.6,
+            eatenPulseFreq: 0.008,
+            eatenPulseAmp: 0.25,
+            eatenCoreAlpha: 0.75,
+            eatenGlowAlpha: 0.15,
+            maxParticles: 70,
+            trailSpawnAngleSpread: 1.2,
+            trailSpeedBase: 15,
+            trailSpeedMoveScale: 25,
+            trailLifeMin: 0.3,
+            trailLifeMax: 0.45,
+            trailSizeMin: 0.8,
+            trailSizeMax: 2.2,
+            trailDrag: 0.93,
+            trailGlowAlpha: 0.12,
+            trailCoreAlpha: 0.6,
+            glowAlpha0: 0.35,
+            glowAlpha1: 0.15,
+            glowAlpha2: 0.03,
+            glowScale: 2.8,
+            transitionDuration: 0.5,
+            armStartRadius: 0.3,
+            spiralGrowth: 0.18,
+            differentialRotation: 0.35,
+            thicknessPulseFreq: 0.007,
+            thicknessPulseAmp: 0.25,
+            sparkLifeMin: 0.2,
+            sparkLifeMax: 0.4,
+            sparkSpeed: 70,
+            sparkSize: 1.5,
+            snowflakeSize: 1.2,
+            eatenEyeRadius: 0.12,
+            eatenEyeDistance: 0.25,
+            eatenTrailLife: 0.5,
+            eatenTrailSpeed: 20,
+            eatenTrailSize: 2.0,
+        };
+
+        // Snowy palette
+        const FRIGHTENED_CORE = 0x8ca8c8;
+        const FRIGHTENED_ARM = 0x5a7898;
+        const FRIGHTENED_TRAIL = 0x3a5878;
+        const FLASH_CORE = 0xffffff;
+        const FLASH_ARM = 0xd0d8e8;
+        const FLASH_TRAIL = 0xb8c8e0;
+        const EATEN_CORE = 0xa8c8e8;
+        const EATEN_GLOW = 0xc8d8e8;
+
+        function lerpColor(a, b, t) {
+            const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
+            const br = (b >> 16) & 0xff, bg = (b >> 8) & 0xff, bb = b & 0xff;
+            const cr = Math.round(ar + (br - ar) * t);
+            const cg = Math.round(ag + (bg - ag) * t);
+            const cb = Math.round(ab + (bb - ab) * t);
+            return (cr << 16) | (cg << 8) | cb;
+        }
+
+        class SnowVortexRenderer {
+            constructor(tileSize, hexColor, config = {}) {
+                this.cfg = { ...DEFAULT_CONFIG, ...config };
+                const base = this.derivePalette(hexColor);
+                this.coreColor = base.core;
+                this.armColor = base.arm;
+                this.trailColor = base.trail;
+                this.activeCore = this.coreColor;
+                this.activeArm = this.armColor;
+                this.activeTrail = this.trailColor;
+                this.targetCore = this.coreColor;
+                this.targetArm = this.armColor;
+                this.targetTrail = this.trailColor;
+                this.transitionProgress = 1;
+                
+                this.container = new PIXI.Container();
+                this.armGfx = new PIXI.Graphics();
+                this.coreGfx = new PIXI.Graphics();
+                this.trailGfx = new PIXI.Graphics();
+                this.eatenGfx = new PIXI.Graphics();
+                this.glowSprite = new PIXI.Sprite();
+                
+                this.trailGfx.blendMode = "normal";
+                this.glowSprite.blendMode = "add";
+                this.eatenGfx.blendMode = "add";
+                
+                this.container.addChild(this.trailGfx);
+                this.container.addChild(this.glowSprite);
+                this.container.addChild(this.armGfx);
+                this.container.addChild(this.eatenGfx);
+                this.container.addChild(this.coreGfx);
+                
+                this.trail = Array.from({ length: this.cfg.maxParticles }, () => ({
+                    x: 0, y: 0, vx: 0, vy: 0,
+                    life: 0, maxLife: 0, size: 0,
+                    type: "SNOWFLAKE", rotation: 0,
+                    color: 0xffffff, active: false,
+                }));
+                
+                this.vortexPhase = 0;
+                this.eatenTrail = [];
+                this.bakeGlow(tileSize);
+            }
+
+            derivePalette(hex) {
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                // Convert red ghost to snow white/blue
+                const core = 0xf5f8ff; // bright white
+                const arm = 0xd0d8e8;  // silver
+                const trail = 0xb8c8e0; // light blue
+                return { core, arm, trail };
+            }
+
+            bakeGlow(tileSize) {
+                const r = tileSize * 0.45;
+                const size = Math.ceil(r * 5);
+                const canvas = document.createElement("canvas");
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext("2d");
+                const center = size / 2;
+                const gradient = ctx.createRadialGradient(center, center, 0, center, center, size / 2);
+                gradient.addColorStop(0, `rgba(245,248,255,${this.cfg.glowAlpha0})`);
+                gradient.addColorStop(0.25, `rgba(200,216,232,${this.cfg.glowAlpha1})`);
+                gradient.addColorStop(0.6, `rgba(168,200,232,${this.cfg.glowAlpha2})`);
+                gradient.addColorStop(1, "rgba(0,0,0,0)");
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, size, size);
+                const texture = PIXI.Texture.from(canvas);
+                if (this.glowSprite.texture) this.glowSprite.texture.destroy(true);
+                this.glowSprite.texture = texture;
+                this.glowSprite.anchor.set(0.5);
+                this.glowSprite.scale.set((r * this.cfg.glowScale) / (size / 2));
+            }
+
+            setState(newState, isFlashing = false) {
+                this.transitionProgress = 0;
+                if (newState === "FRIGHTENED") {
+                    if (isFlashing) {
+                        this.targetCore = FLASH_CORE;
+                        this.targetArm = FLASH_ARM;
+                        this.targetTrail = FLASH_TRAIL;
+                    } else {
+                        this.targetCore = FRIGHTENED_CORE;
+                        this.targetArm = FRIGHTENED_ARM;
+                        this.targetTrail = FRIGHTENED_TRAIL;
+                    }
+                } else if (newState === "EATEN") {
+                    this.targetCore = EATEN_CORE;
+                    this.targetArm = EATEN_CORE;
+                    this.targetTrail = EATEN_GLOW;
+                } else {
+                    this.targetCore = this.coreColor;
+                    this.targetArm = this.armColor;
+                    this.targetTrail = this.trailColor;
+                }
+            }
+
+            update(state, dt) {
+                this.container.x = state.x;
+                this.container.y = state.y;
+                
+                const speedMult = state.state === "FRIGHTENED" ? this.cfg.frightenedSpinScale : 1;
+                this.vortexPhase += this.cfg.spinSpeed * dt * 60 * speedMult;
+                
+                if (this.transitionProgress < 1) {
+                    this.transitionProgress = Math.min(1, this.transitionProgress + dt / this.cfg.transitionDuration);
+                    const t = this.transitionProgress * this.transitionProgress * (3 - 2 * this.transitionProgress);
+                    this.activeCore = lerpColor(this.activeCore, this.targetCore, t);
+                    this.activeArm = lerpColor(this.activeArm, this.targetArm, t);
+                    this.activeTrail = lerpColor(this.activeTrail, this.targetTrail, t);
+                }
+
+                if (state.state === "FRIGHTENED" && state.isFlashing) {
+                    const pulse = Math.sin(state.time * this.cfg.flashFreq) * 0.5 + 0.5;
+                    const flashCore = lerpColor(FRIGHTENED_CORE, FLASH_CORE, pulse);
+                    const flashArm = lerpColor(FRIGHTENED_ARM, FLASH_ARM, pulse);
+                    const flashTrail = lerpColor(FRIGHTENED_TRAIL, FLASH_TRAIL, pulse);
+                    this.activeCore = flashCore;
+                    this.activeArm = flashArm;
+                    this.activeTrail = flashTrail;
+                }
+
+                this.glowSprite.tint = this.activeCore;
+                
+                this.updateTrail(dt);
+
+                if (state.state === "EATEN") {
+                    this.updateEatenTrail(dt, state);
+                    if (Math.random() < 0.5) {
+                        this.emitEatenTrail(state);
+                    }
+                }
+            }
+
+            updateEatenTrail(dt, state) {
+                for (let i = this.eatenTrail.length - 1; i >= 0; i--) {
+                    const spark = this.eatenTrail[i];
+                    spark.life -= dt;
+                    if (spark.life <= 0) {
+                        this.eatenTrail.splice(i, 1);
+                        continue;
+                    }
+                    spark.x += spark.vx * dt;
+                    spark.y += spark.vy * dt;
+                    spark.vx *= 0.95;
+                    spark.vy *= 0.95;
+                    spark.rotation += dt * 2;
+                }
+            }
+
+            emitEatenTrail(state) {
+                const angle = Math.atan2(-state.displacementY, -state.displacementX) + (Math.random() - 0.5) * 0.8;
+                const r = state.tileSize * this.cfg.eatenEyeRadius;
+                this.eatenTrail.push({
+                    x: 0,
+                    y: 0,
+                    vx: Math.cos(angle) * this.cfg.eatenTrailSpeed,
+                    vy: Math.sin(angle) * this.cfg.eatenTrailSpeed,
+                    life: this.cfg.eatenTrailLife,
+                    maxLife: this.cfg.eatenTrailLife,
+                    size: this.cfg.eatenTrailSize,
+                    rotation: Math.random() * Math.PI * 2
+                });
+            }
+
+            draw(state) {
+                this.armGfx.clear();
+                this.coreGfx.clear();
+                this.trailGfx.clear();
+                this.eatenGfx.clear();
+                const r = state.tileSize * 0.45;
+                const t = state.time;
+                
+                if (state.state === "EATEN") {
+                    this.drawEatenSnow(state, t);
+                    return;
+                }
+                
+                this.drawTrailNodes();
+                
+                const sr = Math.min(1, (Math.abs(state.displacementX) + Math.abs(state.displacementY)) / (state.tileSize * 4));
+                const frightened = state.state === "FRIGHTENED";
+                const breathe = 1 + Math.sin(t * this.cfg.breatheFreq1) * this.cfg.breatheAmp1 + Math.sin(t * this.cfg.breatheFreq2) * this.cfg.breatheAmp2;
+                const vortexR = r * this.cfg.vortexRadiusScale * breathe;
+                const coreR = r * this.cfg.coreRadiusScale;
+                
+                // Draw snow vortex arms
+                for (let a = 0; a < this.cfg.armCount; a++) {
+                    const baseAngle = (a / this.cfg.armCount) * Math.PI * 2 + this.vortexPhase;
+                    const headingDot = Math.cos(baseAngle - state.heading);
+                    const dopplerScale = 1 - sr * 0.3 * (headingDot * 0.5 + 0.5);
+                    let armLength = vortexR * dopplerScale;
+                    
+                    if (frightened) {
+                        armLength *= this.cfg.frightenedArmShrink;
+                    }
+                    
+                    const chaosAmount = frightened 
+                        ? Math.sin(t * this.cfg.frightenedChaosFreq + a) * this.cfg.frightenedChaosAmp 
+                        : 0;
+                    
+                    const pts = [];
+                    for (let s = 0; s <= this.cfg.armSteps; s++) {
+                        const frac = s / this.cfg.armSteps;
+                        
+                        const startDist = coreR * this.cfg.armStartRadius;
+                        const dist = startDist + frac * (armLength - startDist);
+                        
+                        const logSpiralAngle = Math.log(dist / startDist) / this.cfg.spiralGrowth;
+                        const differentialOffset = (1 - frac) * this.cfg.differentialRotation * Math.PI * 2;
+                        
+                        const spiralAngle = baseAngle + logSpiralAngle + differentialOffset + chaosAmount * Math.sin(frac * 8);
+                        
+                        const thicknessPulse = 1 + Math.sin(frac * Math.PI * 4 + t * this.cfg.thicknessPulseFreq) * this.cfg.thicknessPulseAmp;
+                        const baseWidth = this.cfg.armBaseWidth * (1 - frac * this.cfg.armTaper) * (1 + sr * 0.3);
+                        const w = baseWidth * thicknessPulse * (1 - frac * 0.5);
+                        
+                        pts.push({
+                            x: Math.cos(spiralAngle) * dist,
+                            y: Math.sin(spiralAngle) * dist,
+                            w: w,
+                        });
+                    }
+                    
+                    this.drawSnowArm(pts, state);
+                    
+                    if (pts.length > 0) {
+                        const tip = pts[pts.length - 1];
+                        const sparkChance = frightened ? 0.08 : 0.18;
+                        if (Math.random() < sparkChance) {
+                            this.emitSnowflake(tip.x, tip.y, state);
+                        }
+                    }
+                }
+                
+                // Draw fluffy snowball core
+                const corePulseFreq = frightened ? this.cfg.corePulseFreq * 0.5 : this.cfg.corePulseFreq;
+                const corePulseAmp = frightened ? this.cfg.corePulseAmp * 0.5 : this.cfg.corePulseAmp;
+                const corePulse = 1 + Math.sin(t * corePulseFreq) * corePulseAmp + sr * 0.2;
+                const coreRDisplay = coreR * corePulse;
+                
+                this.drawSnowCore(coreRDisplay, state);
+            }
+
+            drawSnowCore(coreR, state) {
+                // Outer glow (soft snow)
+                this.coreGfx.circle(0, 0, coreR * 2.2).fill({ color: this.activeCore, alpha: 0.12 });
+                
+                // Mid layer
+                this.coreGfx.circle(0, 0, coreR * 1.4).fill({ color: this.activeCore, alpha: 0.3 });
+                
+                // Main snowball
+                this.coreGfx.circle(0, 0, coreR).fill({ color: this.activeCore, alpha: this.cfg.coreFillAlpha });
+                
+                // Snow texture (small dots on surface)
+                for (let i = 0; i < 12; i++) {
+                    const angle = (i / 12) * Math.PI * 2 + state.time * 0.5;
+                    const dist = coreR * (0.5 + Math.sin(i * 2.3) * 0.3);
+                    const sx = Math.cos(angle) * dist;
+                    const sy = Math.sin(angle) * dist;
+                    this.coreGfx.circle(sx, sy, coreR * 0.08).fill({ 
+                        color: 0xffffff, 
+                        alpha: 0.4 
+                    });
+                }
+                
+                // Bright center highlight
+                this.coreGfx.circle(-coreR * 0.2, -coreR * 0.2, coreR * 0.35).fill({ 
+                    color: 0xffffff, 
+                    alpha: this.cfg.coreWhiteAlpha 
+                });
+                
+                // Small sparkle
+                this.coreGfx.circle(coreR * 0.15, coreR * 0.15, coreR * 0.12).fill({ 
+                    color: 0xffffff, 
+                    alpha: 0.7 
+                });
+            }
+
+            drawEatenSnow(state, t) {
+                const r = state.tileSize * this.cfg.eatenEyeRadius;
+                const dist = state.tileSize * this.cfg.eatenEyeDistance;
+                
+                // Two snowflake "eyes"
+                const eyePositions = [
+                    { x: -dist * 0.5, y: -r * 0.3 },
+                    { x: dist * 0.5, y: -r * 0.3 }
+                ];
+                
+                for (const eye of eyePositions) {
+                    // Eye glow
+                    this.eatenGfx.circle(eye.x, eye.y, r * 2).fill({ 
+                        color: EATEN_GLOW, 
+                        alpha: 0.15 
+                    });
+                    
+                    // Snowflake eye (6-pointed)
+                    for (let i = 0; i < 6; i++) {
+                        const angle = (i / 6) * Math.PI * 2 + t * 2;
+                        const x1 = eye.x + Math.cos(angle) * r * 0.3;
+                        const y1 = eye.y + Math.sin(angle) * r * 0.3;
+                        const x2 = eye.x + Math.cos(angle) * r;
+                        const y2 = eye.y + Math.sin(angle) * r;
+                        
+                        this.eatenGfx.moveTo(x1, y1).lineTo(x2, y2).stroke({
+                            color: 0xffffff,
+                            width: 1.2,
+                            alpha: 0.9
+                        });
+                    }
+                    
+                    // Center dot
+                    this.eatenGfx.circle(eye.x, eye.y, r * 0.25).fill({ 
+                        color: 0xffffff, 
+                        alpha: 0.95 
+                    });
+                }
+                
+                // Trail of snowflakes
+                for (const spark of this.eatenTrail) {
+                    const alpha = spark.life / spark.maxLife;
+                    const sz = spark.size * alpha;
+                    
+                    // Glow
+                    this.trailGfx.circle(spark.x, spark.y, sz * 2).fill({ 
+                        color: EATEN_GLOW, 
+                        alpha: alpha * 0.15 
+                    });
+                    
+                    // Snowflake
+                    for (let i = 0; i < 6; i++) {
+                        const angle = (i / 6) * Math.PI * 2 + spark.rotation;
+                        const x1 = spark.x + Math.cos(angle) * sz * 0.3;
+                        const y1 = spark.y + Math.sin(angle) * sz * 0.3;
+                        const x2 = spark.x + Math.cos(angle) * sz;
+                        const y2 = spark.y + Math.sin(angle) * sz;
+                        
+                        this.trailGfx.moveTo(x1, y1).lineTo(x2, y2).stroke({
+                            color: 0xffffff,
+                            width: 0.8,
+                            alpha: alpha * 0.8
+                        });
+                    }
+                }
+            }
+
+            drawSnowArm(pts, state) {
+                if (pts.length < 2) return;
+                
+                const leftPts = [];
+                const rightPts = [];
+                
+                for (let i = 0; i < pts.length; i++) {
+                    const p = pts[i];
+                    let nx, ny;
+                    
+                    if (i === 0) {
+                        const dx = pts[1].x - pts[0].x;
+                        const dy = pts[1].y - pts[0].y;
+                        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+                        nx = -dy / len;
+                        ny = dx / len;
+                    } else if (i === pts.length - 1) {
+                        const dx = pts[i].x - pts[i - 1].x;
+                        const dy = pts[i].y - pts[i - 1].y;
+                        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+                        nx = -dy / len;
+                        ny = dx / len;
+                    } else {
+                        const dx = pts[i + 1].x - pts[i - 1].x;
+                        const dy = pts[i + 1].y - pts[i - 1].y;
+                        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+                        nx = -dy / len;
+                        ny = dx / len;
+                    }
+                    
+                    const w = p.w * 0.5;
+                    leftPts.push({ x: p.x + nx * w, y: p.y + ny * w });
+                    rightPts.push({ x: p.x - nx * w, y: p.y - ny * w });
+                }
+                
+                // Draw fluffy snow arm
+                this.armGfx.moveTo(leftPts[0].x, leftPts[0].y);
+                
+                for (let i = 1; i < leftPts.length - 2; i++) {
+                    const xc = (leftPts[i].x + leftPts[i + 1].x) / 2;
+                    const yc = (leftPts[i].y + leftPts[i + 1].y) / 2;
+                    this.armGfx.quadraticCurveTo(leftPts[i].x, leftPts[i].y, xc, yc);
+                }
+                
+                if (leftPts.length > 2) {
+                    this.armGfx.quadraticCurveTo(
+                        leftPts[leftPts.length - 2].x,
+                        leftPts[leftPts.length - 2].y,
+                        leftPts[leftPts.length - 1].x,
+                        leftPts[leftPts.length - 1].y
+                    );
+                } else {
+                    this.armGfx.lineTo(leftPts[leftPts.length - 1].x, leftPts[leftPts.length - 1].y);
+                }
+                
+                for (let i = rightPts.length - 1; i >= 2; i--) {
+                    const xc = (rightPts[i].x + rightPts[i - 1].x) / 2;
+                    const yc = (rightPts[i].y + rightPts[i - 1].y) / 2;
+                    this.armGfx.quadraticCurveTo(rightPts[i].x, rightPts[i].y, xc, yc);
+                }
+                
+                if (rightPts.length > 2) {
+                    this.armGfx.quadraticCurveTo(
+                        rightPts[1].x,
+                        rightPts[1].y,
+                        rightPts[0].x,
+                        rightPts[0].y
+                    );
+                } else {
+                    this.armGfx.lineTo(rightPts[0].x, rightPts[0].y);
+                }
+                
+                this.armGfx.closePath();
+                this.armGfx.fill({ color: this.activeArm, alpha: this.cfg.armFillAlpha });
+                
+                // Center line (bright snow core)
+                const centerPts = pts;
+                this.armGfx.moveTo(centerPts[0].x, centerPts[0].y);
+                for (let i = 1; i < centerPts.length - 2; i++) {
+                    const xc = (centerPts[i].x + centerPts[i + 1].x) / 2;
+                    const yc = (centerPts[i].y + centerPts[i + 1].y) / 2;
+                    this.armGfx.quadraticCurveTo(centerPts[i].x, centerPts[i].y, xc, yc);
+                }
+                if (centerPts.length > 2) {
+                    this.armGfx.quadraticCurveTo(
+                        centerPts[centerPts.length - 2].x,
+                        centerPts[centerPts.length - 2].y,
+                        centerPts[centerPts.length - 1].x,
+                        centerPts[centerPts.length - 1].y
+                    );
+                }
+                this.armGfx.stroke({ 
+                    color: this.activeCore, 
+                    width: pts[0].w * 0.4, 
+                    alpha: this.cfg.centerLineAlpha, 
+                    cap: "round" 
+                });
+                
+                // Snowflake texture along arm
+                for (let i = 0; i < pts.length; i += 4) {
+                    const p = pts[i];
+                    const sz = p.w * 0.25;
+                    this.armGfx.circle(p.x, p.y, sz).fill({ 
+                        color: 0xffffff, 
+                        alpha: 0.3 * (1 - i / pts.length)
+                    });
+                }
+            }
+
+            emitSnowflake(x, y, state) {
+                const tangentAngle = Math.atan2(y, x) + Math.PI / 2;
+                const speed = this.cfg.sparkSpeed * (0.5 + Math.random() * 0.5);
+                this.spawnParticle({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(tangentAngle) * speed,
+                    vy: Math.sin(tangentAngle) * speed,
+                    life: this.cfg.sparkLifeMin + Math.random() * (this.cfg.sparkLifeMax - this.cfg.sparkLifeMin),
+                    maxLife: this.cfg.sparkLifeMax,
+                    size: this.cfg.sparkSize,
+                    type: "SNOWFLAKE",
+                    rotation: Math.random() * Math.PI * 2,
+                    color: 0xffffff
+                });
+            }
+
+            spawnParticle(overrides) {
+                for (const p of this.trail) {
+                    if (!p.active) {
+                        Object.assign(p, {
+                            x: 0, y: 0, vx: 0, vy: 0,
+                            life: 1, maxLife: 1, size: 1.5,
+                            type: "SNOWFLAKE",
+                            rotation: 0,
+                            color: 0xffffff
+                        }, overrides, { active: true });
+                        return;
+                    }
+                }
+            }
+
+            updateTrail(dt) {
+                for (let i = 0; i < this.cfg.maxParticles; i++) {
+                    const p = this.trail[i];
+                    if (!p.active) continue;
+                    p.life -= dt;
+                    if (p.life <= 0) {
+                        p.active = false;
+                        continue;
+                    }
+                    p.x += p.vx * dt;
+                    p.y += p.vy * dt;
+                    p.vx *= this.cfg.trailDrag;
+                    p.vy *= this.cfg.trailDrag;
+                    p.rotation += dt * 2;
+                }
+            }
+
+            drawTrailNodes() {
+                for (let i = 0; i < this.cfg.maxParticles; i++) {
+                    const p = this.trail[i];
+                    if (!p.active) continue;
+                    const a = p.life / p.maxLife;
+                    const sz = p.size * a;
+                    if (sz < 0.2) continue;
+                    
+                    // Glow
+                    this.trailGfx.circle(p.x, p.y, sz * 2).fill({ 
+                        color: p.color, 
+                        alpha: a * this.cfg.trailGlowAlpha 
+                    });
+                    
+                    // Snowflake
+                    for (let j = 0; j < 6; j++) {
+                        const angle = (j / 6) * Math.PI * 2 + p.rotation;
+                        const x1 = p.x + Math.cos(angle) * sz * 0.3;
+                        const y1 = p.y + Math.sin(angle) * sz * 0.3;
+                        const x2 = p.x + Math.cos(angle) * sz;
+                        const y2 = p.y + Math.sin(angle) * sz;
+                        
+                        this.trailGfx.moveTo(x1, y1).lineTo(x2, y2).stroke({
+                            color: 0xffffff,
+                            width: 0.6,
+                            alpha: a * this.cfg.trailCoreAlpha
+                        });
+                    }
+                }
+            }
+
+            destroy() {
+                if (this.glowSprite.texture) this.glowSprite.texture.destroy(true);
+                this.container.destroy({ children: true });
+            }
+        }
+
+        async function main() {
+            const app = new PIXI.Application();
+            await app.init({
+                width: window.innerWidth,
+                height: window.innerHeight,
+                backgroundColor: 0x0a1520,
+                antialias: true,
+                resolution: window.devicePixelRatio || 1,
+                autoDensity: true,
+            });
+            document.body.appendChild(app.canvas);
+
+            const tileSize = 48;
+            const vortex = new SnowVortexRenderer(tileSize, "#ff0000");
+            vortex.container.scale.set(3);
+            app.stage.addChild(vortex.container);
+
+            const state = {
+                x: window.innerWidth / 2,
+                y: window.innerHeight / 2,
+                tileSize: tileSize,
+                time: 0,
+                heading: 0,
+                displacementX: 0,
+                displacementY: 0,
+                state: "NORMAL",
+                isFlashing: false,
+            };
+
+            let demoTime = 0;
+            const radius = Math.min(window.innerWidth, window.innerHeight) * 0.15;
+
+            document.getElementById("spinSpeed").addEventListener("input", (e) => {
+                vortex.cfg.spinSpeed = parseFloat(e.target.value);
+                document.getElementById("spinSpeedValue").textContent = e.target.value;
+            });
+
+            document.getElementById("armSteps").addEventListener("input", (e) => {
+                vortex.cfg.armSteps = parseInt(e.target.value);
+                document.getElementById("armStepsValue").textContent = e.target.value;
+            });
+
+            document.getElementById("maxParticles").addEventListener("input", (e) => {
+                vortex.cfg.maxParticles = parseInt(e.target.value);
+                document.getElementById("maxParticlesValue").textContent = e.target.value;
+                vortex.trail = Array.from({ length: vortex.cfg.maxParticles }, () => ({
+                    x: 0, y: 0, vx: 0, vy: 0,
+                    life: 0, maxLife: 0, size: 0,
+                    type: "SNOWFLAKE", rotation: 0,
+                    color: 0xffffff, active: false,
+                }));
+            });
+
+            const buttons = {
+                btnNormal: () => { state.state = "NORMAL"; state.isFlashing = false; vortex.setState("NORMAL"); },
+                btnFrightened: () => { state.state = "FRIGHTENED"; state.isFlashing = false; vortex.setState("FRIGHTENED"); },
+                btnFlashing: () => { state.state = "FRIGHTENED"; state.isFlashing = true; vortex.setState("FRIGHTENED", true); },
+                btnEaten: () => { state.state = "EATEN"; state.isFlashing = false; vortex.setState("EATEN"); },
+            };
+
+            Object.keys(buttons).forEach(id => {
+                document.getElementById(id).addEventListener("click", () => {
+                    document.querySelectorAll("#ui button").forEach(b => b.classList.remove("active"));
+                    document.getElementById(id).classList.add("active");
+                    buttons[id]();
+                });
+            });
+
+            window.addEventListener("resize", () => {
+                app.renderer.resize(window.innerWidth, window.innerHeight);
+            });
+
+            let lastTime = performance.now();
+            let frameCount = 0;
+            let fpsTime = 0;
+
+            app.ticker.add(() => {
+                const now = performance.now();
+                const dt = (now - lastTime) / 1000;
+                lastTime = now;
+                frameCount++;
+                fpsTime += dt;
+                if (fpsTime >= 1) {
+                    document.getElementById("fps").textContent = frameCount;
+                    frameCount = 0;
+                    fpsTime = 0;
+                }
+
+                demoTime += dt;
+                state.time = demoTime;
+                state.x = window.innerWidth / 2 + Math.cos(demoTime * 0.8) * radius;
+                state.y = window.innerHeight / 2 + Math.sin(demoTime * 0.8) * radius;
+                state.heading = demoTime * 0.8 + Math.PI / 2;
+                state.displacementX = Math.cos(demoTime * 0.8) * 2;
+                state.displacementY = Math.sin(demoTime * 0.8) * 2;
+
+                vortex.update(state, dt);
+                vortex.draw(state);
+
+                let activeParticles = 0;
+                for (const p of vortex.trail) {
+                    if (p.active) activeParticles++;
+                }
+                document.getElementById("particleCount").textContent = activeParticles;
+            });
+        }
+
+        main();
+    </script>
+</body>
+</html>

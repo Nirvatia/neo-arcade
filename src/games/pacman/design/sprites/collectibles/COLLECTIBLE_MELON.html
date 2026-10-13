@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cosmic Melon — High Quality</title>
+<style>
+    body { 
+        margin: 0; 
+        background: #06080e; 
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: center; 
+        min-height: 100vh; 
+        font-family: 'Courier New', monospace; 
+        color: #c8d4e0; 
+        gap: 30px;
+    }
+    .title { 
+        font-size: 16px; 
+        letter-spacing: 5px; 
+        opacity: 0.7; 
+    }
+    canvas { 
+        display: block; 
+        border: 1px solid #1a2430; 
+        border-radius: 4px; 
+    }
+</style>
+</head>
+<body>
+<div class="title">COSMIC MELON · HIGH QUALITY</div>
+<div id="pixi-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+<script type="module">
+const { Application, Container, Sprite, Texture, BlurFilter } = PIXI;
+
+function createCosmicMelon() {
+    const size = 256;
+    const canvas = document.createElement("canvas");
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    const cx = size / 2, cy = size / 2;
+
+    // ═══════════════════════════════════════════════════════════
+    // 1. AMBIENT GLOW (3 слоя, зелёный)
+    // ═══════════════════════════════════════════════════════════
+    const glowLayers = [
+        { r: size * 0.48, stops: [[0, "rgba(100,255,150,0.35)"], [0.5, "rgba(60,200,100,0.15)"], [1, "rgba(0,0,0,0)"]] },
+        { r: size * 0.35, stops: [[0, "rgba(140,255,180,0.3)"], [0.5, "rgba(80,220,120,0.12)"], [1, "rgba(0,0,0,0)"]] },
+        { r: size * 0.25, stops: [[0, "rgba(180,255,200,0.25)"], [0.5, "rgba(100,240,140,0.1)"], [1, "rgba(0,0,0,0)"]] }
+    ];
+
+    for (const layer of glowLayers) {
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
+        for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, size, size);
+    }
+
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    const melonW = size * 0.26; // ширина (горизонтальная)
+    const melonH = size * 0.2;  // высота (вертикальная)
+
+    // ═══════════════════════════════════════════════════════════
+    // 2. MELON BODY (овальная форма)
+    // ═══════════════════════════════════════════════════════════
+    
+    // Тень под фруктом
+    const shadow = ctx.createRadialGradient(0, melonH * 0.4, 0, 0, melonH * 0.4, melonW * 1.2);
+    shadow.addColorStop(0, "rgba(20,80,40,0.4)");
+    shadow.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = shadow;
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.ellipse(0, melonH * 0.4, melonW * 1.2, melonH * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Основное тело (многослойный радиальный градиент)
+    const bodyGrad = ctx.createRadialGradient(
+        -melonW * 0.3, -melonH * 0.3, 0,
+        0, 0, melonW * 1.1
+    );
+    bodyGrad.addColorStop(0, "rgba(200,255,220,1)");
+    bodyGrad.addColorStop(0.2, "rgba(140,240,170,0.98)");
+    bodyGrad.addColorStop(0.5, "rgba(80,210,120,0.95)");
+    bodyGrad.addColorStop(0.75, "rgba(50,170,80,0.9)");
+    bodyGrad.addColorStop(1, "rgba(20,100,50,0.8)");
+    
+    ctx.fillStyle = bodyGrad;
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = "rgba(100,255,150,1)";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, melonW, melonH, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Внутреннее свечение (зелёный ореол)
+    const innerGlow = ctx.createRadialGradient(0, 0, melonW * 0.6, 0, 0, melonW);
+    innerGlow.addColorStop(0, "rgba(100,255,150,0)");
+    innerGlow.addColorStop(0.7, "rgba(60,220,100,0.2)");
+    innerGlow.addColorStop(1, "rgba(40,180,80,0.4)");
+    ctx.fillStyle = innerGlow;
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, melonW, melonH, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ═══════════════════════════════════════════════════════════
+    // 3. STRIPES (тёмно-зелёные полосы — как у арбуза)
+    // ═══════════════════════════════════════════════════════════
+    const stripeCount = 6;
+    for (let i = 0; i < stripeCount; i++) {
+        // Позиция полосы по горизонтали
+        const t = (i - (stripeCount - 1) / 2) / (stripeCount - 1); // от -0.5 до 0.5
+        const x = t * melonW * 1.6;
+        
+        // Проверяем, что полоса внутри эллипса
+        if (Math.abs(x) > melonW * 0.85) continue;
+
+        // Вычисляем высоту полосы в этой точке (по эллипсу)
+        const yTop = -melonH * Math.sqrt(1 - (x / melonW) * (x / melonW)) * 0.85;
+        const yBottom = melonH * Math.sqrt(1 - (x / melonW) * (x / melonW)) * 0.85;
+
+        // Градиент полосы (от прозрачного к тёмному и обратно)
+        const stripeGrad = ctx.createLinearGradient(x, yTop, x, yBottom);
+        stripeGrad.addColorStop(0, "rgba(20,80,40,0)");
+        stripeGrad.addColorStop(0.2, "rgba(30,100,50,0.6)");
+        stripeGrad.addColorStop(0.5, "rgba(20,80,40,0.75)");
+        stripeGrad.addColorStop(0.8, "rgba(30,100,50,0.6)");
+        stripeGrad.addColorStop(1, "rgba(20,80,40,0)");
+
+        ctx.strokeStyle = stripeGrad;
+        ctx.lineWidth = 3.5;
+        ctx.shadowBlur = 4;
+        ctx.shadowColor = "rgba(40,120,60,0.6)";
+        ctx.lineCap = "round";
+        
+        ctx.beginPath();
+        // Слегка изогнутая полоса (как на настоящем арбузе)
+        const curveAmount = 0.08;
+        ctx.moveTo(x, yTop);
+        ctx.quadraticCurveTo(x + x * curveAmount, 0, x, yBottom);
+        ctx.stroke();
+    }
+
+    // Нижний тёмный градиент (глубина)
+    const bottomDark = ctx.createLinearGradient(0, 0, 0, melonH);
+    bottomDark.addColorStop(0, "rgba(0,0,0,0)");
+    bottomDark.addColorStop(0.6, "rgba(10,40,20,0.15)");
+    bottomDark.addColorStop(1, "rgba(5,25,10,0.35)");
+    ctx.fillStyle = bottomDark;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, melonW, melonH, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ═══════════════════════════════════════════════════════════
+    // 4. HIGHLIGHTS (блики для объёма)
+    // ═══════════════════════════════════════════════════════════
+    
+    // Главный блик (белый, яркий, сверху-слева)
+    const highlight1 = ctx.createRadialGradient(
+        -melonW * 0.35, -melonH * 0.4, 0,
+        -melonW * 0.35, -melonH * 0.4, melonW * 0.25
+    );
+    highlight1.addColorStop(0, "rgba(255,255,255,0.95)");
+    highlight1.addColorStop(0.3, "rgba(230,255,240,0.6)");
+    highlight1.addColorStop(0.7, "rgba(180,255,200,0.2)");
+    highlight1.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = highlight1;
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.ellipse(-melonW * 0.35, -melonH * 0.4, melonW * 0.25, melonH * 0.15, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Второй блик (маленький, слабее)
+    const highlight2 = ctx.createRadialGradient(
+        melonW * 0.3, melonH * 0.15, 0,
+        melonW * 0.3, melonH * 0.15, melonW * 0.1
+    );
+    highlight2.addColorStop(0, "rgba(200,255,220,0.5)");
+    highlight2.addColorStop(0.5, "rgba(150,255,180,0.2)");
+    highlight2.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = highlight2;
+    ctx.beginPath();
+    ctx.arc(melonW * 0.3, melonH * 0.15, melonW * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Обводка (тонкая, светящаяся)
+    ctx.strokeStyle = "rgba(140,255,180,0.6)";
+    ctx.lineWidth = 1.5;
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = "rgba(100,255,150,0.8)";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, melonW, melonH, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // ═══════════════════════════════════════════════════════════
+    // 5. STEM (маленький хвостик сверху)
+    // ═══════════════════════════════════════════════════════════
+    
+    // Стебель
+    const stemGrad = ctx.createLinearGradient(0, -melonH, 0, -melonH * 1.3);
+    stemGrad.addColorStop(0, "rgba(100,255,200,0.9)");
+    stemGrad.addColorStop(0.5, "rgba(80,220,180,0.8)");
+    stemGrad.addColorStop(1, "rgba(60,180,150,0.6)");
+    
+    ctx.strokeStyle = stemGrad;
+    ctx.lineWidth = 3;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = "rgba(100,255,200,1)";
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(0, -melonH);
+    ctx.quadraticCurveTo(size * 0.02, -melonH * 1.15, size * 0.01, -melonH * 1.3);
+    ctx.stroke();
+
+    // Внутренняя линия стебля
+    ctx.strokeStyle = "rgba(200,255,230,0.7)";
+    ctx.lineWidth = 1.2;
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.moveTo(0, -melonH);
+    ctx.quadraticCurveTo(size * 0.02, -melonH * 1.15, size * 0.01, -melonH * 1.3);
+    ctx.stroke();
+
+    // Маленький листик
+    const leafGrad = ctx.createLinearGradient(0, -melonH * 1.15, size * 0.08, -melonH * 1.25);
+    leafGrad.addColorStop(0, "rgba(80,220,160,0.95)");
+    leafGrad.addColorStop(0.5, "rgba(100,240,180,0.9)");
+    leafGrad.addColorStop(1, "rgba(120,255,200,0.7)");
+    
+    ctx.fillStyle = leafGrad;
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = "rgba(100,255,200,0.8)";
+    ctx.beginPath();
+    ctx.ellipse(size * 0.05, -melonH * 1.2, size * 0.04, size * 0.015, Math.PI / 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Жилка листа
+    ctx.strokeStyle = "rgba(200,255,230,0.8)";
+    ctx.lineWidth = 0.8;
+    ctx.shadowBlur = 3;
+    ctx.beginPath();
+    ctx.moveTo(size * 0.02, -melonH * 1.18);
+    ctx.lineTo(size * 0.07, -melonH * 1.22);
+    ctx.stroke();
+
+    // ═══════════════════════════════════════════════════════════
+    // 6. ENERGY SPARKLES (космические искры вокруг)
+    // ═══════════════════════════════════════════════════════════
+    const sparkles = [
+        { x: size * 0.3, y: -size * 0.05, r: 2 },
+        { x: -size * 0.29, y: -size * 0.08, r: 1.5 },
+        { x: size * 0.27, y: size * 0.12, r: 1.8 },
+        { x: -size * 0.28, y: size * 0.1, r: 1.5 },
+        { x: size * 0.08, y: size * 0.26, r: 1.8 },
+        { x: -size * 0.1, y: -size * 0.26, r: 1.5 }
+    ];
+
+    for (const s of sparkles) {
+        // Свечение
+        const sparkleGlow = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r * 3);
+        sparkleGlow.addColorStop(0, "rgba(180,255,200,0.8)");
+        sparkleGlow.addColorStop(0.5, "rgba(120,255,160,0.3)");
+        sparkleGlow.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = sparkleGlow;
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r * 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Ядро
+        ctx.fillStyle = "rgba(255,255,255,0.95)";
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = "rgba(180,255,200,1)";
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.restore();
+    return Texture.from(canvas);
+}
+
+// ═══════════════════════════════════════════════════════════
+// SETUP
+// ═══════════════════════════════════════════════════════════
+async function setup() {
+    const app = new Application();
+    await app.init({
+        width: 400, height: 400,
+        backgroundColor: 0x06080e,
+        antialias: true,
+    });
+    document.getElementById('pixi-container').appendChild(app.canvas);
+
+    const container = new Container();
+    container.x = 200; container.y = 200;
+    app.stage.addChild(container);
+
+    const tex = createCosmicMelon();
+
+    const sprite = new Sprite(tex);
+    sprite.anchor.set(0.5);
+    sprite.width = 240; sprite.height = 240;
+    container.addChild(sprite);
+
+    const bloom1 = new Sprite(tex);
+    bloom1.anchor.set(0.5);
+    bloom1.width = 280; bloom1.height = 280;
+    bloom1.alpha = 0.4;
+    bloom1.blendMode = "add";
+    bloom1.filters = [new BlurFilter({ strength: 12, quality: 3 })];
+    container.addChild(bloom1);
+
+    const bloom2 = new Sprite(tex);
+    bloom2.anchor.set(0.5);
+    bloom2.width = 340; bloom2.height = 340;
+    bloom2.alpha = 0.2;
+    bloom2.blendMode = "add";
+    bloom2.filters = [new BlurFilter({ strength: 25, quality: 3 })];
+    container.addChild(bloom2);
+
+    let time = 0;
+    app.ticker.add(() => {
+        const dt = 0.016;
+        time += dt;
+
+        const pulse = 1 + Math.sin(time * 1.5) * 0.03;
+        container.scale.set(pulse);
+
+        container.rotation = Math.sin(time * 0.8) * 0.04;
+
+        bloom1.alpha = 0.4 + Math.sin(time * 2) * 0.05;
+        bloom2.alpha = 0.2 + Math.sin(time * 1.5) * 0.03;
+    });
+}
+
+setup();
+</script>
+</body>
+</html>

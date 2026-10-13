@@ -1,0 +1,1510 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Winter Labyrinth — Shader Cut</title>
+    <style>
+      :root {
+        --bg: #0a1520;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: var(--bg);
+        font-family: "Courier New", monospace;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        transition: background 1.5s ease;
+        overflow: hidden;
+      }
+      .main-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        padding: 20px;
+      }
+      .title {
+        font-size: 18px;
+        color: #c8d8e8;
+        letter-spacing: 6px;
+        text-transform: uppercase;
+        text-shadow: 0 0 20px rgba(168, 200, 232, 0.4);
+        transition: color 1.5s ease;
+      }
+      .viewport {
+        position: relative;
+        border: 1px solid rgba(168, 200, 232, 0.3);
+        box-shadow:
+          0 0 40px rgba(100, 140, 180, 0.15),
+          inset 0 0 60px rgba(0, 0, 0, 0.5);
+        border-radius: 4px;
+        overflow: hidden;
+        transition:
+          border-color 1.5s ease,
+          box-shadow 1.5s ease;
+      }
+      canvas {
+        display: block;
+      }
+      .controls {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      .btn {
+        background: rgba(15, 25, 35, 0.8);
+        color: #c8d8e8;
+        border: 1px solid rgba(168, 200, 232, 0.3);
+        padding: 8px 16px;
+        font-family: inherit;
+        font-size: 11px;
+        letter-spacing: 2px;
+        cursor: pointer;
+        text-transform: uppercase;
+        border-radius: 2px;
+        transition: all 0.3s;
+      }
+      .btn:hover {
+        background: rgba(25, 40, 55, 0.9);
+        border-color: rgba(200, 216, 232, 0.5);
+      }
+      .btn.active {
+        background: rgba(40, 60, 80, 0.9);
+        border-color: rgba(220, 235, 255, 0.6);
+        color: #fff;
+        box-shadow: 0 0 15px rgba(168, 200, 232, 0.3);
+      }
+      .separator {
+        width: 1px;
+        background: rgba(168, 200, 232, 0.2);
+        margin: 0 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="main-container">
+      <div class="title">Winter Labyrinth</div>
+      <div class="viewport" id="viewport"><div id="pixi-container"></div></div>
+      <div class="controls">
+        <button class="btn" id="btnDawn">☀ Dawn</button>
+        <button class="btn" id="btnNoon">◐ Noon</button>
+        <button class="btn" id="btnDusk">☾ Dusk</button>
+        <button class="btn active" id="btnNight">● Night</button>
+        <div class="separator"></div>
+        <button class="btn" id="btnBlizzard">❄ Blizzard</button>
+        <div class="separator"></div>
+        <button class="btn" id="btnLair">◇ Lair Gate</button>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+    <script type="module">
+      // ═══════════════════════════════════════════════
+      // WINTER LABYRINTH — Corrected Filter API
+      // ═══════════════════════════════════════════════
+      const { Filter } = PIXI;
+      const TILE_MAP = [
+        [
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "PP",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "PP",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+        ],
+        [
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "LE",
+          "LE",
+          "LE",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "LT",
+          "LT",
+          "LT",
+          "LT",
+          "LT",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "0A",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "BY",
+          "IY",
+          "LT",
+          "PY",
+          "CE",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "0A",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "LT",
+          "LT",
+          "LT",
+          "LT",
+          "LT",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+        ],
+        [
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "PM",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "PP",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "PP",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+        ],
+      ];
+
+      const COLS = 25,
+        ROWS = 26,
+        TILE = 28;
+      const GW = COLS * TILE,
+        GH = ROWS * TILE;
+
+      const PALS = {
+        dawn: {
+          void: 0x1e1a24,
+          floor: 0x24202a,
+          floorSnow: 0xddd8d4,
+          wallBase: 0x5e525e,
+          wallTop: 0x7a6e7a,
+          wallShadow: 0x3e323e,
+          wallEdge: 0x968a96,
+          wallCrack: 0x4e424e,
+          wallSnow: 0xdbd0cc,
+          wallFrost: 0xf4ecec,
+          icicle: 0xece0e0,
+          lairBase: 0x4e424e,
+          lairGlow: 0xb896a6,
+          lairRune: 0xd4b4c4,
+          teleCore: 0x1e1a24,
+          teleRing: 0x968896,
+          teleBright: 0xd4b4c4,
+          teleArc: 0xb896a6,
+          teleCrystal: 0xccb0c0,
+          snowflake: 0xddd8d4,
+          icePatch: 0xd0c8d0,
+          aoColor: 0x0e0a12,
+        },
+        noon: {
+          void: 0x182a38,
+          floor: 0x1e3040,
+          floorSnow: 0xe4eef8,
+          wallBase: 0x6a7a8a,
+          wallTop: 0x8696a6,
+          wallShadow: 0x3a4a5a,
+          wallEdge: 0x96a6b4,
+          wallCrack: 0x4a5a6a,
+          wallSnow: 0xeaf2fa,
+          wallFrost: 0xfafcfe,
+          icicle: 0xe4f0f8,
+          lairBase: 0x4a5a6a,
+          lairGlow: 0xb6d4e8,
+          lairRune: 0xd6eaf8,
+          teleCore: 0x182a38,
+          teleRing: 0x96b8cc,
+          teleBright: 0xd6eaf8,
+          teleArc: 0xb6d4e8,
+          teleCrystal: 0xc4d8ec,
+          snowflake: 0xe4eef8,
+          icePatch: 0xbcd0e4,
+          aoColor: 0x081420,
+        },
+        dusk: {
+          void: 0x201a18,
+          floor: 0x261e1c,
+          floorSnow: 0xe6d4c8,
+          wallBase: 0x66524a,
+          wallTop: 0x826e62,
+          wallShadow: 0x3a2a22,
+          wallEdge: 0xa28272,
+          wallCrack: 0x4a3a32,
+          wallSnow: 0xe0ccbc,
+          wallFrost: 0xf2e4dc,
+          icicle: 0xead8cc,
+          lairBase: 0x4a3a32,
+          lairGlow: 0xc4926a,
+          lairRune: 0xdeb484,
+          teleCore: 0x201a18,
+          teleRing: 0xb4826a,
+          teleBright: 0xdeb484,
+          teleArc: 0xc4926a,
+          teleCrystal: 0xcca080,
+          snowflake: 0xe6d4c8,
+          icePatch: 0xcab09c,
+          aoColor: 0x0e0806,
+        },
+        night: {
+          void: 0x0c1624,
+          floor: 0x101e2a,
+          floorSnow: 0xd8e4f4,
+          wallBase: 0x4a5a6a,
+          wallTop: 0x667686,
+          wallShadow: 0x2a3a4a,
+          wallEdge: 0x768696,
+          wallCrack: 0x3a4a5a,
+          wallSnow: 0xdce6f4,
+          wallFrost: 0xf8fcfe,
+          icicle: 0xe0ecf8,
+          lairBase: 0x3a4a5a,
+          lairGlow: 0xa4c4e4,
+          lairRune: 0xcce4fc,
+          teleCore: 0x0c1624,
+          teleRing: 0x84b4d4,
+          teleBright: 0xcce4fc,
+          teleArc: 0xa4c4e4,
+          teleCrystal: 0xb4d0e4,
+          snowflake: 0xd8e4f4,
+          icePatch: 0xacc4dc,
+          aoColor: 0x020810,
+        },
+      };
+      let pal = { ...PALS.night },
+        tPal = { ...PALS.night },
+        pTrans = 1,
+        mode = "night";
+      let blizzard = false,
+        lairO = 0,
+        tLair = 0,
+        T = 0;
+      let blizzardLerp = 0,
+        timeOfDay = 0.75;
+
+      const h2r = (h) => ({
+        r: (h >> 16) & 0xff,
+        g: (h >> 8) & 0xff,
+        b: h & 0xff,
+      });
+      const lerpH = (a, b, t) => {
+        const A = h2r(a),
+          B = h2r(b);
+        return (
+          (Math.round(A.r + (B.r - A.r) * t) << 16) |
+          (Math.round(A.g + (B.g - A.g) * t) << 8) |
+          Math.round(A.b + (B.b - A.b) * t)
+        );
+      };
+
+      function updPal(dt) {
+        if (pTrans < 1) {
+          pTrans = Math.min(1, pTrans + dt * 0.8);
+          for (const k in tPal) pal[k] = lerpH(pal[k], tPal[k], pTrans);
+          rebuild();
+        }
+      }
+      function setMode(m) {
+        if (m === mode && pTrans >= 1) return;
+        mode = m;
+        tPal = { ...PALS[m] };
+        pTrans = 0;
+        timeOfDay =
+          m === "dawn" ? 0 : m === "noon" ? 0.25 : m === "dusk" ? 0.5 : 0.75;
+        document
+          .querySelectorAll("#btnDawn,#btnNoon,#btnDusk,#btnNight")
+          .forEach((b) => b.classList.remove("active"));
+        document
+          .getElementById("btn" + m.charAt(0).toUpperCase() + m.slice(1))
+          .classList.add("active");
+      }
+
+      const wTiles = [],
+        lTiles = [],
+        tTiles = [];
+      for (let r = 0; r < ROWS; r++)
+        for (let c = 0; c < COLS; c++) {
+          const t = TILE_MAP[r][c],
+            cx = c * TILE + TILE / 2,
+            cy = r * TILE + TILE / 2,
+            bx = c * TILE + 1,
+            by = r * TILE + 1,
+            s = TILE - 2;
+          if (t === "WL")
+            wTiles.push({ bx, by, s, cx, cy, seed: c * 73 + r * 31, c, r });
+          else if (t === "LE") lTiles.push({ bx, by, s, cx, cy });
+          else if (t.startsWith("0"))
+            tTiles.push({ cx, cy, seed: c * 0.7 + r * 1.1 });
+        }
+      const isW = (c, r) =>
+        c >= 0 && c < COLS && r >= 0 && r < ROWS && TILE_MAP[r][c] === "WL";
+      const isP = (c, r) =>
+        c >= 0 &&
+        c < COLS &&
+        r >= 0 &&
+        r < ROWS &&
+        TILE_MAP[r][c] !== "WL" &&
+        TILE_MAP[r][c] !== "ES" &&
+        TILE_MAP[r][c] !== "LE";
+
+      const app = new PIXI.Application();
+      await app.init({
+        width: GW,
+        height: GH,
+        backgroundColor: 0x000000,
+        resolution: Math.min(window.devicePixelRatio || 1, 2),
+        antialias: true,
+      });
+      document.getElementById("pixi-container").appendChild(app.canvas);
+
+      const gameRT = PIXI.RenderTexture.create({ width: GW, height: GH });
+      const gameSprite = new PIXI.Sprite(gameRT);
+      app.stage.addChild(gameSprite);
+
+      const mainStage = new PIXI.Container();
+      const glowLayer = new PIXI.Container();
+      glowLayer.blendMode = "add";
+      const dynLayer = new PIXI.Container();
+      mainStage.addChild(glowLayer, dynLayer);
+
+      let statSp = null;
+      const lairG = new PIXI.Graphics();
+      dynLayer.addChild(lairG);
+      const teleG = new PIXI.Graphics();
+      dynLayer.addChild(teleG);
+      const teleGG = new PIXI.Graphics();
+      glowLayer.addChild(teleGG);
+      try {
+        glowLayer.filters = [new PIXI.BlurFilter({ strength: 4, quality: 3 })];
+        glowLayer.alpha = 0.7;
+      } catch (e) {}
+
+      const filter = PIXI.Filter.from({
+        gl: {
+          vertex: `in vec2 aPosition;
+out vec2 vTextureCoord;
+uniform vec4 uInputSize;
+uniform vec4 uOutputFrame;
+uniform vec4 uOutputTexture;
+vec4 filterVertexPosition(void){ vec2 position=aPosition*uOutputFrame.zw+uOutputFrame.xy; position.x=position.x*(2.0/uOutputTexture.x)-1.0; position.y=position.y*(2.0*uOutputTexture.z/uOutputTexture.y)-uOutputTexture.z; return vec4(position,0.0,1.0); }
+vec2 filterTextureCoord(void){ return aPosition*(uOutputFrame.zw*uInputSize.zw); }
+void main(void){ gl_Position=filterVertexPosition(); vTextureCoord=filterTextureCoord(); }`,
+          fragment: `
+varying vec2 vTextureCoord;
+uniform sampler2D uTexture;
+uniform float uTime;
+uniform float uBlizzard;
+uniform float uTimeOfDay;
+uniform float uWindStrength;
+
+float hash(vec2 p) { return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+float noise(vec2 p) { vec2 i=floor(p),f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y); }
+
+void main() {
+    vec4 color = texture2D(uTexture, vTextureCoord);
+    vec2 uv = vTextureCoord;
+    float t = uTime;
+    float bliz = uBlizzard;
+    float tod = uTimeOfDay;
+    float wind = uWindStrength;
+
+    // ── Time of day ──────────────────────────────
+    vec3 dawn  = mix(vec3(1.0), vec3(1.08,0.93,0.82), smoothstep(0.0,0.22,tod)*(1.0-smoothstep(0.22,0.35,tod)));
+    vec3 noon  = mix(vec3(1.0), vec3(0.96,0.98,1.04), smoothstep(0.28,0.35,tod)*(1.0-smoothstep(0.35,0.48,tod)));
+    vec3 dusk  = mix(vec3(1.0), vec3(1.08,0.86,0.68), smoothstep(0.48,0.58,tod)*(1.0-smoothstep(0.58,0.68,tod)));
+    vec3 night = mix(vec3(1.0), vec3(0.82,0.88,1.08), smoothstep(0.65,1.0,tod));
+    color.rgb *= dawn * noon * dusk * night;
+
+    // ── Vignette (softer blue, less saturation) ──
+    float dist = length(uv - 0.5) * 1.2;
+    float vig = 1.0 - dist;
+    vig = smoothstep(0.3, 0.85, vig);
+    vec3 coldEdge = vec3(0.08, 0.10, 0.16);
+    color.rgb = mix(color.rgb, coldEdge, (1.0 - vig) * 0.45);
+
+    // ── Snowfall ──────────────────────────────────
+    float snow = 0.0;
+    float sa = mix(0.6, 1.0, bliz);
+
+    for (int i = 0; i < 8; i++) {
+        vec2 p = fract(uv + vec2(float(i)*0.13, float(i)*0.09)
+            + vec2(sin(t*0.5+float(i))*wind*0.4, -t*(0.07+float(i)*0.012)));
+        snow += smoothstep(0.009, 0.0, length(p-0.5)) * 0.35 * sa;
+    }
+    for (int i = 0; i < 12; i++) {
+        vec2 p = fract(uv + vec2(float(i)*0.17, float(i)*0.11)
+            + vec2(sin(t*0.8+float(i)*2.0)*wind*0.7, -t*(0.12+float(i)*0.018)));
+        snow += smoothstep(0.007, 0.0, length(p-0.5)) * 0.45 * sa;
+    }
+    if (bliz > 0.05) {
+        for (int i = 0; i < 6; i++) {
+            vec2 p = fract(uv + vec2(float(i)*0.23, float(i)*0.19)
+                + vec2(sin(t*1.2+float(i)*3.0)*wind*1.1, -t*(0.2+float(i)*0.03)));
+            float flake = smoothstep(0.018, 0.0, length(p-0.5));
+            vec2 streak = p + vec2(0.0, 0.025);
+            float flakeStreak = smoothstep(0.01, 0.0, length(streak-0.5)) * 0.3;
+            snow += (flake + flakeStreak) * 0.4 * bliz;
+        }
+    }
+    color.rgb += snow * vec3(0.95, 0.97, 1.0);
+
+    // ── Wind streaks (softer, less dense) ────────
+    if (bliz > 0.05) {
+        float streaks = 0.0;
+        for (int i = 0; i < 8; i++) {
+            float fi = float(i);
+            float yP = fract(uv.y*14.0 + fi*0.5 + t*0.2);
+            float xP = fract(uv.x*3.0 + fi*0.3 - t*0.45);
+            float seg = sin(yP*60.0 + t*4.0 + fi)*0.5+0.5;
+            seg *= smoothstep(0.4, 0.8, seg);
+            seg *= smoothstep(0.15, 0.0, abs(xP-0.5));
+            seg *= smoothstep(0.3, 1.0, abs(yP-0.5)*2.0);
+            streaks += seg * 0.04 * bliz;
+        }
+        color.rgb += streaks * vec3(0.85,0.9,1.0);
+    }
+
+    // ── Breath ────────────────────────────────────
+    float breathZone = exp(-length(uv-vec2(0.5,0.85))*4.5)*0.6;
+    breathZone += exp(-length(uv-vec2(0.45,0.88))*6.0)*0.3;
+    breathZone += exp(-length(uv-vec2(0.55,0.88))*6.0)*0.3;
+    float breathPulse = pow(sin(t*2.3)*0.5+0.5, 3.0);
+    float breath = breathZone * breathPulse * 0.06 * (1.0+bliz*1.5);
+    color.rgb = mix(color.rgb, vec3(0.9,0.94,1.0), breath);
+
+    gl_FragColor = color;
+}`,
+        },
+        resources: {
+          filterUniforms: {
+            uTime: { value: 0, type: "f32" },
+            uBlizzard: { value: 0, type: "f32" },
+            uTimeOfDay: { value: 0.75, type: "f32" },
+            uWindStrength: { value: 0.3, type: "f32" },
+          },
+        },
+      });
+      gameSprite.filters = [filter];
+      let rebuilding = false;
+      // ── STATIC BUILD ────────────────────────────
+      function rebuild() {
+        if (rebuilding) return;
+        rebuilding = true;
+        requestAnimationFrame(() => {
+          if (statSp) {
+            mainStage.removeChild(statSp);
+            statSp.destroy();
+          }
+          const sc = new PIXI.Container(),
+            fg = new PIXI.Graphics(),
+            wg = new PIXI.Graphics(),
+            sg = new PIXI.Graphics(),
+            frg = new PIXI.Graphics();
+          floor(fg);
+          walls(wg);
+          caps(sg);
+          frost(frg);
+          sc.addChild(fg, wg, sg, frg);
+          statSp = new PIXI.Sprite(app.renderer.generateTexture(sc));
+          mainStage.addChildAt(statSp, 0);
+          sc.destroy({ children: true });
+          rebuilding = false;
+        });
+      }
+
+      function floor(g) {
+        g.rect(0, 0, GW, GH).fill({ color: pal.void });
+        for (let r = 0; r < ROWS; r++)
+          for (let c = 0; c < COLS; c++) {
+            const t = TILE_MAP[r][c];
+            if (t === "WL" || t === "ES" || t === "LE") continue;
+            const bx = c * TILE + 1,
+              by = r * TILE + 1,
+              s = TILE - 2,
+              cx = c * TILE + TILE / 2,
+              cy = r * TILE + TILE / 2,
+              seed = c * 31 + r * 17;
+            g.rect(bx, by, s, s).fill({ color: pal.floor, alpha: 0.95 });
+            if (isW(c, r - 1))
+              g.rect(bx, by, s, 4).fill({ color: pal.aoColor, alpha: 0.3 });
+            if (isW(c, r + 1))
+              g.rect(bx, by + s - 4, s, 4).fill({
+                color: pal.aoColor,
+                alpha: 0.3,
+              });
+            if (isW(c - 1, r))
+              g.rect(bx, by, 4, s).fill({ color: pal.aoColor, alpha: 0.3 });
+            if (isW(c + 1, r))
+              g.rect(bx + s - 4, by, 4, s).fill({
+                color: pal.aoColor,
+                alpha: 0.3,
+              });
+            if (seed % 3 === 0)
+              g.circle(
+                cx + Math.sin(seed) * 7,
+                cy + Math.cos(seed) * 7,
+                0.6,
+              ).fill({ color: pal.floorSnow, alpha: 0.3 });
+            if (seed % 7 === 0)
+              g.circle(
+                cx + Math.sin(seed + 3) * 9,
+                cy + Math.cos(seed + 3) * 9,
+                0.4,
+              ).fill({ color: pal.floorSnow, alpha: 0.2 });
+            if (seed % 11 === 0)
+              g.ellipse(
+                cx + Math.sin(seed) * 6,
+                cy + Math.cos(seed) * 6,
+                3,
+                1.5,
+              ).fill({ color: pal.floorSnow, alpha: 0.15 });
+            if (isW(c - 1, r) && isW(c, r - 1)) drift(g, bx, by, "tl");
+            if (isW(c + 1, r) && isW(c, r - 1)) drift(g, bx + s, by, "tr");
+            if (isW(c - 1, r) && isW(c, r + 1)) drift(g, bx, by + s, "bl");
+            if (isW(c + 1, r) && isW(c, r + 1)) drift(g, bx + s, by + s, "br");
+          }
+      }
+      function drift(g, x, y, cor) {
+        const s = 5;
+        g.beginPath();
+        switch (cor) {
+          case "tl":
+            g.moveTo(x, y);
+            g.quadraticCurveTo(x + s, y + s * 0.5, x + s, y);
+            g.quadraticCurveTo(x + s * 0.5, y + s, x, y + s);
+            break;
+          case "tr":
+            g.moveTo(x, y);
+            g.quadraticCurveTo(x - s, y + s * 0.5, x - s, y);
+            g.quadraticCurveTo(x - s * 0.5, y + s, x, y + s);
+            break;
+          case "bl":
+            g.moveTo(x, y);
+            g.quadraticCurveTo(x + s, y - s * 0.5, x + s, y);
+            g.quadraticCurveTo(x + s * 0.5, y - s, x, y - s);
+            break;
+          case "br":
+            g.moveTo(x, y);
+            g.quadraticCurveTo(x - s, y - s * 0.5, x - s, y);
+            g.quadraticCurveTo(x - s * 0.5, y - s, x, y - s);
+            break;
+        }
+        g.closePath();
+        g.fill({ color: pal.floorSnow, alpha: 0.35 });
+        if (cor === "tl" || cor === "bl")
+          g.moveTo(x, y - 2)
+            .lineTo(x, y + 2)
+            .stroke({ color: pal.floorSnow, width: 0.5, alpha: 0.25 });
+        if (cor === "tr" || cor === "br")
+          g.moveTo(x, y - 2)
+            .lineTo(x, y + 2)
+            .stroke({ color: pal.floorSnow, width: 0.5, alpha: 0.25 });
+      }
+
+      function walls(g) {
+        for (const w of wTiles) {
+          g.rect(w.bx + 1.5, w.by + 1.5, w.s, w.s).fill({
+            color: pal.wallShadow,
+            alpha: 0.5,
+          });
+          g.rect(w.bx, w.by, w.s, w.s).fill({ color: pal.wallBase });
+          g.rect(w.bx + 1, w.by + 1, w.s - 2, w.s * 0.22).fill({
+            color: pal.wallTop,
+            alpha: 0.4,
+          });
+          g.rect(w.bx + 1, w.by + w.s - w.s * 0.18, w.s - 2, w.s * 0.18).fill({
+            color: pal.wallShadow,
+            alpha: 0.3,
+          });
+          g.moveTo(w.bx + w.s * 0.5, w.by + 3)
+            .lineTo(w.bx + w.s * 0.5, w.by + w.s - 3)
+            .stroke({ color: pal.wallCrack, width: 0.5, alpha: 0.3 });
+          if (isP(w.c, w.r - 1))
+            g.moveTo(w.bx, w.by)
+              .lineTo(w.bx + w.s, w.by)
+              .stroke({ color: pal.wallEdge, width: 2.5, alpha: 0.15 });
+          if (isP(w.c, w.r + 1))
+            g.moveTo(w.bx, w.by + w.s)
+              .lineTo(w.bx + w.s, w.by + w.s)
+              .stroke({ color: pal.wallEdge, width: 2.5, alpha: 0.15 });
+          if (isP(w.c - 1, w.r))
+            g.moveTo(w.bx, w.by)
+              .lineTo(w.bx, w.by + w.s)
+              .stroke({ color: pal.wallEdge, width: 2.5, alpha: 0.15 });
+          if (isP(w.c + 1, w.r))
+            g.moveTo(w.bx + w.s, w.by)
+              .lineTo(w.bx + w.s, w.by + w.s)
+              .stroke({ color: pal.wallEdge, width: 2.5, alpha: 0.15 });
+          if (isP(w.c, w.r + 1)) {
+            const ix = w.bx + w.s / 2 + Math.sin(w.seed) * 3,
+              len = 2.5 + (w.seed % 3);
+            g.moveTo(ix - 0.6, w.by + w.s)
+              .lineTo(ix, w.by + w.s + len)
+              .lineTo(ix + 0.6, w.by + w.s)
+              .closePath()
+              .fill({ color: pal.icicle, alpha: 0.6 });
+            g.moveTo(ix - 0.25, w.by + w.s)
+              .lineTo(ix, w.by + w.s + len * 0.6)
+              .stroke({ color: 0xffffff, width: 0.25, alpha: 0.3 });
+          }
+        }
+      }
+
+      function caps(g) {
+        for (const w of wTiles) {
+          if (!isP(w.c, w.r - 1)) continue;
+          const H = 3 + (w.seed % 3);
+          g.moveTo(w.bx - 1, w.by + 1);
+          for (let i = 0; i <= 8; i++) {
+            const t = i / 8,
+              x = w.bx - 1 + t * (w.s + 2),
+              parabolic = 1 - 4 * (t - 0.5) * (t - 0.5);
+            g.lineTo(
+              x,
+              Math.max(
+                w.by - H - 1,
+                w.by - H * parabolic * (0.7 + 0.3 * Math.sin(w.seed + t * 4)),
+              ),
+            );
+          }
+          g.lineTo(w.bx + w.s + 1, w.by + 1);
+          g.closePath();
+          g.fill({ color: pal.wallSnow, alpha: 0.85 });
+          g.moveTo(w.bx + w.s / 2 - 4, w.by - H - 0.5 + 1)
+            .lineTo(w.bx + w.s / 2 + 4, w.by - H - 0.5 + 1)
+            .stroke({ color: 0xffffff, width: 0.5, alpha: 0.3 });
+        }
+      }
+
+      function frost(g) {
+        for (const w of wTiles) {
+          if (w.seed % 9 !== 0) continue;
+          for (let i = 0; i < 2 + (w.seed % 2); i++) {
+            const a = (w.seed * 0.3 + i * 2.1) % (Math.PI * 2),
+              len = 3 + ((w.seed + i * 7) % 5);
+            g.moveTo(w.cx + Math.cos(a) * 2, w.cy + Math.sin(a) * 2)
+              .lineTo(w.cx + Math.cos(a) * len, w.cy + Math.sin(a) * len)
+              .stroke({ color: pal.wallFrost, width: 0.3, alpha: 0.45 });
+          }
+        }
+      }
+
+      function drawTele() {
+        teleG.clear();
+        teleGG.clear();
+        for (const tp of tTiles) {
+          const { cx, cy, seed } = tp,
+            maxR = TILE * 0.44,
+            breathe = 1 + Math.sin(T * 0.8 + seed) * 0.04;
+          teleGG
+            .circle(cx, cy, maxR * 1.7 * breathe)
+            .fill({ color: pal.teleBright, alpha: 0.18 });
+          teleGG
+            .circle(cx, cy, maxR * 1.0 * breathe)
+            .fill({ color: pal.teleBright, alpha: 0.28 });
+          teleG
+            .circle(cx, cy, maxR * 0.9 * breathe)
+            .stroke({ color: pal.teleRing, width: 1, alpha: 0.5 });
+          for (let arm = 0; arm < 3; arm++) {
+            const baseA = (arm / 3) * Math.PI * 2 + T * 0.3;
+            teleG.beginPath();
+            for (let j = 0; j <= 20; j++) {
+              const t = j / 20,
+                a = baseA + t * Math.PI * 2.5,
+                r = maxR * t * 0.8 * breathe;
+              j === 0
+                ? teleG.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r)
+                : teleG.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+            }
+            teleG.stroke({
+              color: arm === 0 ? pal.teleBright : pal.teleArc,
+              width: 1.2 - arm * 0.2,
+              alpha: 0.6,
+            });
+          }
+          teleG
+            .circle(cx, cy, maxR * 0.16 * breathe)
+            .fill({ color: pal.teleBright, alpha: 0.9 });
+          teleG
+            .circle(cx, cy, maxR * 0.06 * breathe)
+            .fill({ color: 0xffffff, alpha: 1 });
+          for (let i = 0; i < 3; i++) {
+            const ph = (i / 3) * Math.PI * 2 + T * 1.3 + seed,
+              or = maxR * (0.5 + Math.sin(T * 2 + i) * 0.1);
+            teleG
+              .circle(cx + Math.cos(ph) * or, cy + Math.sin(ph) * or, 1)
+              .fill({ color: 0xffffff, alpha: 0.7 });
+          }
+        }
+      }
+
+      function drawLair(prog) {
+        lairG.clear();
+        for (const l of lTiles) {
+          const { bx, by, s, cx, cy } = l,
+            p = Math.max(0, Math.min(1, prog));
+          if (p < 0.5) {
+            const a = 1 - p * 2;
+            lairG.rect(bx, by, s, s).fill({ color: pal.lairBase, alpha: a });
+            for (let i = 1; i < 5; i++)
+              lairG
+                .moveTo(bx + (s / 5) * i, by + 2)
+                .lineTo(bx + (s / 5) * i, by + s - 2)
+                .stroke({ color: pal.wallShadow, width: 1.5, alpha: a * 0.7 });
+            lairG
+              .moveTo(bx + 2, cy)
+              .lineTo(bx + s - 2, cy)
+              .stroke({ color: pal.wallShadow, width: 1.5, alpha: a * 0.7 });
+            const lr = s * 0.12;
+            lairG
+              .circle(cx, cy - lr * 0.5, lr)
+              .stroke({ color: pal.lairRune, width: 1.2, alpha: a * 0.8 });
+            lairG
+              .rect(cx - lr * 0.6, cy - lr * 0.3, lr * 1.2, lr * 1.2)
+              .stroke({ color: pal.lairRune, width: 1, alpha: a * 0.8 });
+            lairG
+              .circle(cx, cy + lr * 0.9, 1.5)
+              .fill({ color: pal.lairRune, alpha: a * 0.9 });
+          } else {
+            const a = (p - 0.5) * 2;
+            lairG.rect(bx, by, s, s).fill({ color: 0x040a14, alpha: a * 0.85 });
+            lairG.beginPath();
+            lairG.moveTo(bx + 2, by + 2);
+            lairG.lineTo(bx + 2 + s * 0.4, by + 2 + s * 0.3);
+            lairG.lineTo(bx + 2, by + 2 + s);
+            lairG.closePath();
+            lairG
+              .fill({ color: pal.lairBase, alpha: a * 0.5 })
+              .stroke({ color: pal.lairGlow, width: 1, alpha: a * 0.6 });
+            lairG.beginPath();
+            lairG.moveTo(bx + s - 2, by + 2);
+            lairG.lineTo(bx + s - 2 - s * 0.4, by + 2 + s * 0.3);
+            lairG.lineTo(bx + s - 2, by + 2 + s);
+            lairG.closePath();
+            lairG
+              .fill({ color: pal.lairBase, alpha: a * 0.5 })
+              .stroke({ color: pal.lairGlow, width: 1, alpha: a * 0.6 });
+            lairG
+              .rect(bx + 3, by + s - 5, s - 6, 3)
+              .fill({ color: pal.lairGlow, alpha: a * 0.5 });
+            const ch = s * 0.25;
+            lairG
+              .moveTo(cx - ch, cy + ch * 0.3)
+              .lineTo(cx, cy - ch * 0.5)
+              .lineTo(cx + ch, cy + ch * 0.3)
+              .stroke({ color: pal.lairRune, width: 1.8, alpha: a * 0.8 });
+            for (let i = 0; i < 5; i++) {
+              const pt = (T * 0.6 + i * 0.5) % 3;
+              if (pt < 2)
+                lairG
+                  .circle(
+                    cx + Math.sin(T * 2 + i) * 6,
+                    by + s - pt * s * 0.2,
+                    1 + pt,
+                  )
+                  .fill({ color: pal.lairGlow, alpha: a * (1 - pt / 2) * 0.3 });
+            }
+          }
+        }
+      }
+
+      rebuild();
+      document.getElementById("btnDawn").onclick = () => setMode("dawn");
+      document.getElementById("btnNoon").onclick = () => setMode("noon");
+      document.getElementById("btnDusk").onclick = () => setMode("dusk");
+      document.getElementById("btnNight").onclick = () => setMode("night");
+      document.getElementById("btnBlizzard").onclick = () => {
+        blizzard = !blizzard;
+        document
+          .getElementById("btnBlizzard")
+          .classList.toggle("active", blizzard);
+      };
+      document.getElementById("btnLair").onclick = () => {
+        tLair = tLair > 0.5 ? 0 : 1;
+      };
+
+      let lt = performance.now();
+      app.ticker.add(() => {
+        const n = performance.now(),
+          dt = Math.min((n - lt) / 1000, 0.05);
+        lt = n;
+        T += dt;
+        updPal(dt);
+        blizzardLerp +=
+          ((blizzard ? 1 : 0) - blizzardLerp) * Math.min(1, dt * 3);
+        if (Math.abs(lairO - tLair) > 0.001)
+          lairO +=
+            Math.sign(tLair - lairO) *
+            Math.min(2.5 * dt, Math.abs(lairO - tLair));
+
+        // Update uniforms via .resources.groupName.uniforms.prop
+        filter.resources.filterUniforms.uniforms.uTime = T;
+        filter.resources.filterUniforms.uniforms.uBlizzard = blizzardLerp;
+        filter.resources.filterUniforms.uniforms.uTimeOfDay = timeOfDay;
+        filter.resources.filterUniforms.uniforms.uWindStrength =
+          0.3 + blizzardLerp * 1.2;
+        filter.resources.filterUniforms.uniforms.uFrostAmount =
+          0.08 + blizzardLerp * 0.08;
+
+        app.renderer.render({
+          container: mainStage,
+          target: gameRT,
+          clear: true,
+        });
+        drawTele();
+        drawLair(lairO);
+      });
+      window.addEventListener("resize", () => {
+        app.renderer.resize(GW, GH);
+      });
+    </script>
+  </body>
+</html>

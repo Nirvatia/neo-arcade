@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lightning Power-Up — Polished</title>
+<style>
+    body { 
+        margin: 0; 
+        background: #06080e; 
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: center; 
+        min-height: 100vh; 
+        font-family: 'Courier New', monospace; 
+        color: #c8d4e0; 
+        gap: 30px;
+    }
+    .title { 
+        font-size: 16px; 
+        letter-spacing: 5px; 
+        opacity: 0.7; 
+    }
+    canvas { 
+        display: block; 
+        border: 1px solid #1a2430; 
+        border-radius: 4px; 
+    }
+</style>
+</head>
+<body>
+<div class="title">LIGHTNING POWER-UP · POLISHED</div>
+<div id="pixi-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+<script type="module">
+const { Application, Container, Sprite, Texture, BlurFilter } = PIXI;
+
+function createPolishedRunicTexture() {
+    const size = 256; // Увеличен размер для лучшей детализации
+    const canvas = document.createElement("canvas");
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    const cx = size / 2, cy = size / 2;
+
+    // ═══════════════════════════════════════════════════════════
+    // 1. MEGA GLOW (3 слоя)
+    // ═══════════════════════════════════════════════════════════
+    const glowLayers = [
+        { r: size * 0.5, stops: [[0, "rgba(100,200,255,0.4)"], [0.5, "rgba(80,160,255,0.2)"], [1, "rgba(0,0,0,0)"]] },
+        { r: size * 0.4, stops: [[0, "rgba(120,210,255,0.35)"], [0.5, "rgba(90,180,255,0.18)"], [1, "rgba(0,0,0,0)"]] },
+        { r: size * 0.3, stops: [[0, "rgba(150,230,255,0.3)"], [0.5, "rgba(100,200,255,0.15)"], [1, "rgba(0,0,0,0)"]] }
+    ];
+
+    for (const layer of glowLayers) {
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
+        for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, size, size);
+    }
+
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    // ═══════════════════════════════════════════════════════════
+    // 2. ENHANCED CIRCLES (3 круга)
+    // ═══════════════════════════════════════════════════════════
+    
+    // Внешний круг (очень толстый)
+    ctx.strokeStyle = "rgba(150,220,255,0.9)";
+    ctx.lineWidth = 5;
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = "rgba(120,220,255,1)";
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.38, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Средний круг
+    ctx.strokeStyle = "rgba(180,235,255,0.7)";
+    ctx.lineWidth = 3;
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.28, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Внутренний круг (тонкий)
+    ctx.strokeStyle = "rgba(200,245,255,0.5)";
+    ctx.lineWidth = 1.5;
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.18, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // ═══════════════════════════════════════════════════════════
+    // 3. SIMPLIFIED RUNES (6 рун, 2 типа)
+    // ═══════════════════════════════════════════════════════════
+    ctx.strokeStyle = "rgba(180,230,255,0.7)";
+    ctx.lineWidth = 2.5;
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = "rgba(150,220,255,0.8)";
+
+    for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2;
+        const r = size * 0.33;
+        const x = Math.cos(angle) * r;
+        const y = Math.sin(angle) * r;
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle + Math.PI / 2);
+
+        // Только 2 типа рун
+        if (i % 2 === 0) {
+            // Тип 1: Вертикальная линия с поперечинами
+            ctx.beginPath();
+            ctx.moveTo(0, -5); ctx.lineTo(0, 5);
+            ctx.moveTo(-3, -2); ctx.lineTo(3, -2);
+            ctx.moveTo(-3, 2); ctx.lineTo(3, 2);
+            ctx.stroke();
+        } else {
+            // Тип 2: Треугольник
+            ctx.beginPath();
+            ctx.moveTo(0, -4);
+            ctx.lineTo(-3, 3);
+            ctx.lineTo(3, 3);
+            ctx.closePath();
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 4. MEGA LIGHTNING (увеличена и усилена)
+    // ═══════════════════════════════════════════════════════════
+    
+    // Внешнее свечение молнии (очень широкое)
+    ctx.strokeStyle = "rgba(150,220,255,0.4)";
+    ctx.lineWidth = 12;
+    ctx.shadowBlur = 25;
+    ctx.shadowColor = "rgba(120,220,255,1)";
+    ctx.beginPath();
+    ctx.moveTo(0, -size * 0.22);
+    ctx.lineTo(-size * 0.12, -size * 0.06);
+    ctx.lineTo(size * 0.08, -size * 0.03);
+    ctx.lineTo(-size * 0.08, size * 0.18);
+    ctx.stroke();
+
+    // Среднее свечение
+    ctx.strokeStyle = "rgba(200,240,255,0.7)";
+    ctx.lineWidth = 7;
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = "rgba(180,235,255,1)";
+    ctx.beginPath();
+    ctx.moveTo(0, -size * 0.22);
+    ctx.lineTo(-size * 0.12, -size * 0.06);
+    ctx.lineTo(size * 0.08, -size * 0.03);
+    ctx.lineTo(-size * 0.08, size * 0.18);
+    ctx.stroke();
+
+    // Яркая сердцевина (абсолютно белая)
+    ctx.strokeStyle = "rgba(255,255,255,1)";
+    ctx.lineWidth = 4;
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = "rgba(255,255,255,1)";
+    ctx.beginPath();
+    ctx.moveTo(0, -size * 0.22);
+    ctx.lineTo(-size * 0.12, -size * 0.06);
+    ctx.lineTo(size * 0.08, -size * 0.03);
+    ctx.lineTo(-size * 0.08, size * 0.18);
+    ctx.stroke();
+
+    // Яркие точки на изломах
+    const boltPoints = [
+        { x: 0, y: -size * 0.22 },
+        { x: -size * 0.12, y: -size * 0.06 },
+        { x: size * 0.08, y: -size * 0.03 },
+        { x: -size * 0.08, y: size * 0.18 }
+    ];
+
+    for (const point of boltPoints) {
+        // Внешнее свечение точки
+        const pointGlow = ctx.createRadialGradient(point.x, point.y, 0, point.x, point.y, 8);
+        pointGlow.addColorStop(0, "rgba(255,255,255,1)");
+        pointGlow.addColorStop(0.3, "rgba(220,245,255,0.8)");
+        pointGlow.addColorStop(0.7, "rgba(150,220,255,0.3)");
+        pointGlow.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = pointGlow;
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = "rgba(200,240,255,1)";
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 8, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.restore();
+    return Texture.from(canvas);
+}
+
+const RUNIC_TEX = createPolishedRunicTexture();
+
+const app = new Application();
+await app.init({
+    width: 300, height: 300,
+    backgroundColor: 0x06080e,
+    antialias: true,
+});
+document.getElementById('pixi-container').appendChild(app.canvas);
+
+const container = new Container();
+container.x = 150; container.y = 150;
+app.stage.addChild(container);
+
+// Основной спрайт
+const sprite = new Sprite(RUNIC_TEX);
+sprite.anchor.set(0.5);
+sprite.width = 200; sprite.height = 200;
+container.addChild(sprite);
+
+// Bloom слой 1 (мягкое свечение)
+const bloom1 = new Sprite(RUNIC_TEX);
+bloom1.anchor.set(0.5);
+bloom1.width = 240; bloom1.height = 240;
+bloom1.alpha = 0.5;
+bloom1.blendMode = "add";
+bloom1.filters = [new BlurFilter({ strength: 15, quality: 3 })];
+container.addChild(bloom1);
+
+// Bloom слой 2 (широкое свечение)
+const bloom2 = new Sprite(RUNIC_TEX);
+bloom2.anchor.set(0.5);
+bloom2.width = 280; bloom2.height = 280;
+bloom2.alpha = 0.25;
+bloom2.blendMode = "add";
+bloom2.filters = [new BlurFilter({ strength: 30, quality: 3 })];
+container.addChild(bloom2);
+
+let time = 0;
+app.ticker.add((ticker) => {
+    const dt = ticker.deltaMS / 1000;
+    time += dt;
+    
+    // Пульсация (сердцебиение)
+    const heartbeat = 1 + Math.sin(time * 3) * 0.08 + Math.pow(Math.sin(time * 3), 2) * 0.04;
+    container.scale.set(heartbeat);
+    
+    // Мерцание (быстрое, как электричество)
+    const flicker = 0.88 + Math.sin(time * 12) * 0.08 + Math.sin(time * 20) * 0.04;
+    sprite.alpha = flicker;
+    bloom1.alpha = 0.5 + Math.sin(time * 10) * 0.12;
+    bloom2.alpha = 0.22 + Math.sin(time * 8) * 0.08;
+    
+    // Медленное вращение контейнера
+    container.rotation = Math.sin(time * 0.3) * 0.1;
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cosmic Galaxian — High Quality</title>
+<style>
+    body { 
+        margin: 0; 
+        background: #06080e; 
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: center; 
+        min-height: 100vh; 
+        font-family: 'Courier New', monospace; 
+        color: #c8d4e0; 
+        gap: 30px;
+    }
+    .title { 
+        font-size: 16px; 
+        letter-spacing: 5px; 
+        opacity: 0.7; 
+    }
+    canvas { 
+        display: block; 
+        border: 1px solid #1a2430; 
+        border-radius: 4px; 
+    }
+</style>
+</head>
+<body>
+<div class="title">COSMIC GALAXIAN · HIGH QUALITY</div>
+<div id="pixi-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+<script type="module">
+const { Application, Container, Sprite, Texture, BlurFilter } = PIXI;
+
+function createCosmicGalaxian() {
+    const size = 256;
+    const canvas = document.createElement("canvas");
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    const cx = size / 2, cy = size / 2;
+
+    // ═══════════════════════════════════════════════════════════
+    // 1. AMBIENT GLOW (3 слоя, фиолетово-синий)
+    // ═══════════════════════════════════════════════════════════
+    const glowLayers = [
+        { r: size * 0.48, stops: [[0, "rgba(150,100,255,0.35)"], [0.5, "rgba(100,60,200,0.15)"], [1, "rgba(0,0,0,0)"]] },
+        { r: size * 0.35, stops: [[0, "rgba(180,130,255,0.3)"], [0.5, "rgba(120,80,220,0.12)"], [1, "rgba(0,0,0,0)"]] },
+        { r: size * 0.25, stops: [[0, "rgba(200,160,255,0.25)"], [0.5, "rgba(140,100,240,0.1)"], [1, "rgba(0,0,0,0)"]] }
+    ];
+
+    for (const layer of glowLayers) {
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
+        for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, size, size);
+    }
+
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    const shipW = size * 0.3;
+    const shipH = size * 0.35;
+
+    // ═══════════════════════════════════════════════════════════
+    // 2. WINGS (простые треугольные крылья)
+    // ═══════════════════════════════════════════════════════════
+    
+    // Левое крыло (простой треугольник)
+    function drawLeftWing() {
+        ctx.beginPath();
+        ctx.moveTo(-shipW * 0.15, -shipH * 0.1);
+        ctx.lineTo(-shipW * 0.9, shipH * 0.3);
+        ctx.lineTo(-shipW * 0.15, shipH * 0.15);
+        ctx.closePath();
+    }
+
+    // Правое крыло (зеркальное)
+    function drawRightWing() {
+        ctx.beginPath();
+        ctx.moveTo(shipW * 0.15, -shipH * 0.1);
+        ctx.lineTo(shipW * 0.9, shipH * 0.3);
+        ctx.lineTo(shipW * 0.15, shipH * 0.15);
+        ctx.closePath();
+    }
+
+    // Градиент крыльев
+    const wingGrad = ctx.createLinearGradient(0, -shipH * 0.2, 0, shipH * 0.3);
+    wingGrad.addColorStop(0, "rgba(160,120,240,1)");
+    wingGrad.addColorStop(0.5, "rgba(120,80,210,0.95)");
+    wingGrad.addColorStop(1, "rgba(60,40,150,0.9)");
+    
+    ctx.fillStyle = wingGrad;
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = "rgba(140,100,255,0.9)";
+    drawLeftWing();
+    ctx.fill();
+    drawRightWing();
+    ctx.fill();
+
+    // Обводка крыльев
+    ctx.strokeStyle = "rgba(200,180,255,0.8)";
+    ctx.lineWidth = 2;
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = "rgba(180,150,255,1)";
+    drawLeftWing();
+    ctx.stroke();
+    drawRightWing();
+    ctx.stroke();
+
+    // ═══════════════════════════════════════════════════════════
+    // 3. BODY (простой корпус — трапеция)
+    // ═══════════════════════════════════════════════════════════
+    function drawBody() {
+        ctx.beginPath();
+        ctx.moveTo(0, -shipH * 0.5); // вершина (нос)
+        ctx.lineTo(shipW * 0.2, -shipH * 0.1);
+        ctx.lineTo(shipW * 0.15, shipH * 0.35);
+        ctx.lineTo(-shipW * 0.15, shipH * 0.35);
+        ctx.lineTo(-shipW * 0.2, -shipH * 0.1);
+        ctx.closePath();
+    }
+
+    // Градиент корпуса
+    const bodyGrad = ctx.createRadialGradient(
+        0, -shipH * 0.2, 0,
+        0, 0, shipH * 0.5
+    );
+    bodyGrad.addColorStop(0, "rgba(220,200,255,1)");
+    bodyGrad.addColorStop(0.4, "rgba(180,150,240,0.98)");
+    bodyGrad.addColorStop(0.8, "rgba(120,90,210,0.95)");
+    bodyGrad.addColorStop(1, "rgba(80,50,160,0.9)");
+    
+    ctx.fillStyle = bodyGrad;
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = "rgba(180,150,255,1)";
+    drawBody();
+    ctx.fill();
+
+    // Обводка корпуса
+    ctx.strokeStyle = "rgba(220,210,255,0.9)";
+    ctx.lineWidth = 2;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = "rgba(200,180,255,1)";
+    drawBody();
+    ctx.stroke();
+
+    // ═══════════════════════════════════════════════════════════
+    // 4. COCKPIT (простой круглый кокпит)
+    // ═══════════════════════════════════════════════════════════
+    
+    // Кокпит (красно-розовый)
+    const cockpitGrad = ctx.createRadialGradient(
+        -shipH * 0.03, -shipH * 0.18, 0,
+        0, -shipH * 0.15, shipH * 0.08
+    );
+    cockpitGrad.addColorStop(0, "rgba(255,220,230,1)");
+    cockpitGrad.addColorStop(0.4, "rgba(255,140,170,0.98)");
+    cockpitGrad.addColorStop(0.8, "rgba(230,60,110,0.95)");
+    cockpitGrad.addColorStop(1, "rgba(180,30,80,0.9)");
+    
+    ctx.fillStyle = cockpitGrad;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = "rgba(255,100,150,1)";
+    ctx.beginPath();
+    ctx.arc(0, -shipH * 0.15, shipH * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Белый блик
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.arc(-shipH * 0.03, -shipH * 0.18, shipH * 0.025, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ═══════════════════════════════════════════════════════════
+    // 5. WING TIPS (красные точки на крыльях)
+    // ═══════════════════════════════════════════════════════════
+    
+    // Левый кончик
+    const leftTipGrad = ctx.createRadialGradient(
+        -shipW * 0.85, shipH * 0.25, 0,
+        -shipW * 0.85, shipH * 0.25, shipH * 0.05
+    );
+    leftTipGrad.addColorStop(0, "rgba(255,200,210,1)");
+    leftTipGrad.addColorStop(0.5, "rgba(255,100,140,0.95)");
+    leftTipGrad.addColorStop(1, "rgba(200,50,100,0.8)");
+    ctx.fillStyle = leftTipGrad;
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = "rgba(255,100,150,1)";
+    ctx.beginPath();
+    ctx.arc(-shipW * 0.85, shipH * 0.25, shipH * 0.05, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Правый кончик
+    const rightTipGrad = ctx.createRadialGradient(
+        shipW * 0.85, shipH * 0.25, 0,
+        shipW * 0.85, shipH * 0.25, shipH * 0.05
+    );
+    rightTipGrad.addColorStop(0, "rgba(255,200,210,1)");
+    rightTipGrad.addColorStop(0.5, "rgba(255,100,140,0.95)");
+    rightTipGrad.addColorStop(1, "rgba(200,50,100,0.8)");
+    ctx.fillStyle = rightTipGrad;
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = "rgba(255,100,150,1)";
+    ctx.beginPath();
+    ctx.arc(shipW * 0.85, shipH * 0.25, shipH * 0.05, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ═══════════════════════════════════════════════════════════
+    // 6. ENGINE (двигатель снизу)
+    // ═══════════════════════════════════════════════════════════
+    
+    const engGrad = ctx.createRadialGradient(0, shipH * 0.35, 0, 0, shipH * 0.35, shipH * 0.08);
+    engGrad.addColorStop(0, "rgba(255,240,180,0.95)");
+    engGrad.addColorStop(0.4, "rgba(255,180,80,0.7)");
+    engGrad.addColorStop(0.8, "rgba(255,120,40,0.3)");
+    engGrad.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = engGrad;
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.arc(0, shipH * 0.35, shipH * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Яркое ядро двигателя
+    ctx.fillStyle = "rgba(255,255,240,0.95)";
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = "rgba(255,200,120,1)";
+    ctx.beginPath();
+    ctx.arc(0, shipH * 0.35, shipH * 0.025, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+    return Texture.from(canvas);
+}
+
+// ═══════════════════════════════════════════════════════════
+// SETUP
+// ═══════════════════════════════════════════════════════════
+async function setup() {
+    const app = new Application();
+    await app.init({
+        width: 400, height: 400,
+        backgroundColor: 0x06080e,
+        antialias: true,
+    });
+    document.getElementById('pixi-container').appendChild(app.canvas);
+
+    const container = new Container();
+    container.x = 200; container.y = 200;
+    app.stage.addChild(container);
+
+    const tex = createCosmicGalaxian();
+
+    const sprite = new Sprite(tex);
+    sprite.anchor.set(0.5);
+    sprite.width = 240; sprite.height = 240;
+    container.addChild(sprite);
+
+    const bloom1 = new Sprite(tex);
+    bloom1.anchor.set(0.5);
+    bloom1.width = 280; bloom1.height = 280;
+    bloom1.alpha = 0.4;
+    bloom1.blendMode = "add";
+    bloom1.filters = [new BlurFilter({ strength: 12, quality: 3 })];
+    container.addChild(bloom1);
+
+    const bloom2 = new Sprite(tex);
+    bloom2.anchor.set(0.5);
+    bloom2.width = 340; bloom2.height = 340;
+    bloom2.alpha = 0.2;
+    bloom2.blendMode = "add";
+    bloom2.filters = [new BlurFilter({ strength: 25, quality: 3 })];
+    container.addChild(bloom2);
+
+    let time = 0;
+    app.ticker.add(() => {
+        const dt = 0.016;
+        time += dt;
+
+        const pulse = 1 + Math.sin(time * 1.5) * 0.03;
+        container.scale.set(pulse);
+
+        container.rotation = Math.sin(time * 0.8) * 0.04;
+
+        bloom1.alpha = 0.4 + Math.sin(time * 2) * 0.05;
+        bloom2.alpha = 0.2 + Math.sin(time * 1.5) * 0.03;
+    });
+}
+
+setup();
+</script>
+</body>
+</html>

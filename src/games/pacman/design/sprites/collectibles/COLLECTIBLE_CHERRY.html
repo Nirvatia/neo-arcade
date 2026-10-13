@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cosmic Cherry — High Quality</title>
+<style>
+    body { 
+        margin: 0; 
+        background: #06080e; 
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: center; 
+        min-height: 100vh; 
+        font-family: 'Courier New', monospace; 
+        color: #c8d4e0; 
+        gap: 30px;
+    }
+    .title { 
+        font-size: 16px; 
+        letter-spacing: 5px; 
+        opacity: 0.7; 
+    }
+    canvas { 
+        display: block; 
+        border: 1px solid #1a2430; 
+        border-radius: 4px; 
+    }
+</style>
+</head>
+<body>
+<div class="title">COSMIC CHERRY · HIGH QUALITY</div>
+<div id="pixi-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+<script type="module">
+const { Application, Container, Sprite, Texture, BlurFilter } = PIXI;
+
+function createCosmicCherry() {
+    const size = 256; // Высокое разрешение
+    const canvas = document.createElement("canvas");
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    const cx = size / 2, cy = size / 2;
+
+    // ═══════════════════════════════════════════════════════════
+    // 1. AMBIENT GLOW (3 слоя)
+    // ═══════════════════════════════════════════════════════════
+    const glowLayers = [
+        { r: size * 0.48, stops: [[0, "rgba(255,100,150,0.35)"], [0.5, "rgba(200,60,100,0.15)"], [1, "rgba(0,0,0,0)"]] },
+        { r: size * 0.35, stops: [[0, "rgba(255,140,180,0.3)"], [0.5, "rgba(220,80,120,0.12)"], [1, "rgba(0,0,0,0)"]] },
+        { r: size * 0.25, stops: [[0, "rgba(255,180,200,0.25)"], [0.5, "rgba(240,100,140,0.1)"], [1, "rgba(0,0,0,0)"]] }
+    ];
+
+    for (const layer of glowLayers) {
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
+        for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, size, size);
+    }
+
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    // ═══════════════════════════════════════════════════════════
+    // 2. STEMS (изогнутые, с градиентом)
+    // ═══════════════════════════════════════════════════════════
+    
+    // Правый стебель (к правой ягоде)
+    const stemGrad1 = ctx.createLinearGradient(0, -size * 0.3, size * 0.1, size * 0.05);
+    stemGrad1.addColorStop(0, "rgba(100,255,200,0.9)");
+    stemGrad1.addColorStop(0.5, "rgba(80,220,180,0.8)");
+    stemGrad1.addColorStop(1, "rgba(60,180,150,0.6)");
+    
+    ctx.strokeStyle = stemGrad1;
+    ctx.lineWidth = 3.5;
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = "rgba(100,255,200,1)";
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(0, -size * 0.3);
+    ctx.quadraticCurveTo(size * 0.08, -size * 0.15, size * 0.1, size * 0.05);
+    ctx.stroke();
+
+    // Внутренняя линия стебля (яркая сердцевина)
+    ctx.strokeStyle = "rgba(200,255,230,0.7)";
+    ctx.lineWidth = 1.5;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.moveTo(0, -size * 0.3);
+    ctx.quadraticCurveTo(size * 0.08, -size * 0.15, size * 0.1, size * 0.05);
+    ctx.stroke();
+
+    // Левый стебель (к левой ягоде)
+    const stemGrad2 = ctx.createLinearGradient(0, -size * 0.3, -size * 0.12, size * 0.1);
+    stemGrad2.addColorStop(0, "rgba(100,255,200,0.9)");
+    stemGrad2.addColorStop(0.5, "rgba(80,220,180,0.8)");
+    stemGrad2.addColorStop(1, "rgba(60,180,150,0.6)");
+    
+    ctx.strokeStyle = stemGrad2;
+    ctx.lineWidth = 3.5;
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = "rgba(100,255,200,1)";
+    ctx.beginPath();
+    ctx.moveTo(0, -size * 0.3);
+    ctx.quadraticCurveTo(-size * 0.1, -size * 0.1, -size * 0.12, size * 0.1);
+    ctx.stroke();
+
+    ctx.strokeStyle = "rgba(200,255,230,0.7)";
+    ctx.lineWidth = 1.5;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.moveTo(0, -size * 0.3);
+    ctx.quadraticCurveTo(-size * 0.1, -size * 0.1, -size * 0.12, size * 0.1);
+    ctx.stroke();
+
+    // ═══════════════════════════════════════════════════════════
+    // 3. LEAF (энергетический лист)
+    // ═══════════════════════════════════════════════════════════
+    
+    // Лист (основная форма)
+    const leafGrad = ctx.createLinearGradient(0, -size * 0.3, size * 0.12, -size * 0.2);
+    leafGrad.addColorStop(0, "rgba(120,255,200,0.9)");
+    leafGrad.addColorStop(0.5, "rgba(80,220,160,0.8)");
+    leafGrad.addColorStop(1, "rgba(60,180,140,0.6)");
+    
+    ctx.fillStyle = leafGrad;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = "rgba(100,255,200,0.9)";
+    ctx.beginPath();
+    ctx.moveTo(0, -size * 0.3);
+    ctx.quadraticCurveTo(size * 0.1, -size * 0.35, size * 0.12, -size * 0.25);
+    ctx.quadraticCurveTo(size * 0.08, -size * 0.2, 0, -size * 0.3);
+    ctx.fill();
+
+    // Жилка листа (яркая)
+    ctx.strokeStyle = "rgba(200,255,230,0.8)";
+    ctx.lineWidth = 1;
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.moveTo(0, -size * 0.3);
+    ctx.lineTo(size * 0.08, -size * 0.28);
+    ctx.stroke();
+
+    // ═══════════════════════════════════════════════════════════
+    // 4. RIGHT CHERRY (передняя, больше)
+    // ═══════════════════════════════════════════════════════════
+    const rightCherryX = size * 0.1;
+    const rightCherryY = size * 0.08;
+    const rightCherryR = size * 0.13;
+
+    // Тень под ягодой
+    const rightShadow = ctx.createRadialGradient(
+        rightCherryX, rightCherryY + rightCherryR * 0.3, 0,
+        rightCherryX, rightCherryY + rightCherryR * 0.3, rightCherryR * 1.2
+    );
+    rightShadow.addColorStop(0, "rgba(100,20,50,0.4)");
+    rightShadow.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = rightShadow;
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.arc(rightCherryX, rightCherryY + rightCherryR * 0.3, rightCherryR * 1.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Основное тело ягоды (многослойный градиент)
+    const rightBodyGrad = ctx.createRadialGradient(
+        rightCherryX - rightCherryR * 0.3, rightCherryY - rightCherryR * 0.3, 0,
+        rightCherryX, rightCherryY, rightCherryR
+    );
+    rightBodyGrad.addColorStop(0, "rgba(255,180,200,1)");
+    rightBodyGrad.addColorStop(0.3, "rgba(255,120,160,0.95)");
+    rightBodyGrad.addColorStop(0.6, "rgba(220,60,100,0.9)");
+    rightBodyGrad.addColorStop(0.85, "rgba(160,30,70,0.85)");
+    rightBodyGrad.addColorStop(1, "rgba(100,20,50,0.7)");
+    
+    ctx.fillStyle = rightBodyGrad;
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = "rgba(255,100,150,1)";
+    ctx.beginPath();
+    ctx.arc(rightCherryX, rightCherryY, rightCherryR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Внутреннее свечение (розовый ореол)
+    const rightInnerGlow = ctx.createRadialGradient(
+        rightCherryX, rightCherryY, rightCherryR * 0.5,
+        rightCherryX, rightCherryY, rightCherryR
+    );
+    rightInnerGlow.addColorStop(0, "rgba(255,150,180,0)");
+    rightInnerGlow.addColorStop(0.7, "rgba(255,120,160,0.3)");
+    rightInnerGlow.addColorStop(1, "rgba(255,100,150,0.5)");
+    ctx.fillStyle = rightInnerGlow;
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.arc(rightCherryX, rightCherryY, rightCherryR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Главный блик (белый, яркий)
+    const rightHighlight1 = ctx.createRadialGradient(
+        rightCherryX - rightCherryR * 0.35, rightCherryY - rightCherryR * 0.35, 0,
+        rightCherryX - rightCherryR * 0.35, rightCherryY - rightCherryR * 0.35, rightCherryR * 0.3
+    );
+    rightHighlight1.addColorStop(0, "rgba(255,255,255,0.95)");
+    rightHighlight1.addColorStop(0.3, "rgba(255,240,250,0.6)");
+    rightHighlight1.addColorStop(0.7, "rgba(255,200,220,0.2)");
+    rightHighlight1.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = rightHighlight1;
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.arc(rightCherryX - rightCherryR * 0.35, rightCherryY - rightCherryR * 0.35, rightCherryR * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Второй блик (меньше, слабее)
+    const rightHighlight2 = ctx.createRadialGradient(
+        rightCherryX + rightCherryR * 0.3, rightCherryY + rightCherryR * 0.2, 0,
+        rightCherryX + rightCherryR * 0.3, rightCherryY + rightCherryR * 0.2, rightCherryR * 0.15
+    );
+    rightHighlight2.addColorStop(0, "rgba(255,200,220,0.5)");
+    rightHighlight2.addColorStop(0.5, "rgba(255,150,180,0.2)");
+    rightHighlight2.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = rightHighlight2;
+    ctx.beginPath();
+    ctx.arc(rightCherryX + rightCherryR * 0.3, rightCherryY + rightCherryR * 0.2, rightCherryR * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Обводка (тонкая, светящаяся)
+    ctx.strokeStyle = "rgba(255,180,200,0.6)";
+    ctx.lineWidth = 1.5;
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = "rgba(255,150,180,0.8)";
+    ctx.beginPath();
+    ctx.arc(rightCherryX, rightCherryY, rightCherryR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // ═══════════════════════════════════════════════════════════
+    // 5. LEFT CHERRY (задняя, меньше, темнее)
+    // ═══════════════════════════════════════════════════════════
+    const leftCherryX = -size * 0.12;
+    const leftCherryY = size * 0.12;
+    const leftCherryR = size * 0.11;
+
+    // Тень
+    const leftShadow = ctx.createRadialGradient(
+        leftCherryX, leftCherryY + leftCherryR * 0.3, 0,
+        leftCherryX, leftCherryY + leftCherryR * 0.3, leftCherryR * 1.2
+    );
+    leftShadow.addColorStop(0, "rgba(80,15,40,0.4)");
+    leftShadow.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = leftShadow;
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.arc(leftCherryX, leftCherryY + leftCherryR * 0.3, leftCherryR * 1.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Основное тело (чуть темнее — дальше от зрителя)
+    const leftBodyGrad = ctx.createRadialGradient(
+        leftCherryX - leftCherryR * 0.3, leftCherryY - leftCherryR * 0.3, 0,
+        leftCherryX, leftCherryY, leftCherryR
+    );
+    leftBodyGrad.addColorStop(0, "rgba(240,160,180,0.95)");
+    leftBodyGrad.addColorStop(0.3, "rgba(230,100,140,0.9)");
+    leftBodyGrad.addColorStop(0.6, "rgba(200,50,90,0.85)");
+    leftBodyGrad.addColorStop(0.85, "rgba(140,25,60,0.8)");
+    leftBodyGrad.addColorStop(1, "rgba(90,15,40,0.65)");
+    
+    ctx.fillStyle = leftBodyGrad;
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = "rgba(230,80,130,0.9)";
+    ctx.beginPath();
+    ctx.arc(leftCherryX, leftCherryY, leftCherryR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Внутреннее свечение
+    const leftInnerGlow = ctx.createRadialGradient(
+        leftCherryX, leftCherryY, leftCherryR * 0.5,
+        leftCherryX, leftCherryY, leftCherryR
+    );
+    leftInnerGlow.addColorStop(0, "rgba(240,130,160,0)");
+    leftInnerGlow.addColorStop(0.7, "rgba(230,100,140,0.25)");
+    leftInnerGlow.addColorStop(1, "rgba(230,80,130,0.4)");
+    ctx.fillStyle = leftInnerGlow;
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.arc(leftCherryX, leftCherryY, leftCherryR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Главный блик
+    const leftHighlight1 = ctx.createRadialGradient(
+        leftCherryX - leftCherryR * 0.3, leftCherryY - leftCherryR * 0.3, 0,
+        leftCherryX - leftCherryR * 0.3, leftCherryY - leftCherryR * 0.3, leftCherryR * 0.25
+    );
+    leftHighlight1.addColorStop(0, "rgba(255,255,255,0.85)");
+    leftHighlight1.addColorStop(0.3, "rgba(255,230,240,0.5)");
+    leftHighlight1.addColorStop(0.7, "rgba(255,180,200,0.15)");
+    leftHighlight1.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = leftHighlight1;
+    ctx.beginPath();
+    ctx.arc(leftCherryX - leftCherryR * 0.3, leftCherryY - leftCherryR * 0.3, leftCherryR * 0.25, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Обводка
+    ctx.strokeStyle = "rgba(240,160,180,0.5)";
+    ctx.lineWidth = 1.2;
+    ctx.shadowBlur = 5;
+    ctx.shadowColor = "rgba(230,130,160,0.7)";
+    ctx.beginPath();
+    ctx.arc(leftCherryX, leftCherryY, leftCherryR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // ═══════════════════════════════════════════════════════════
+    // 6. ENERGY SPARKLES (космические искры)
+    // ═══════════════════════════════════════════════════════════
+    const sparkles = [
+        { x: size * 0.2, y: -size * 0.1, r: 2 },
+        { x: -size * 0.22, y: -size * 0.05, r: 1.5 },
+        { x: size * 0.15, y: size * 0.2, r: 1.8 },
+        { x: -size * 0.18, y: size * 0.22, r: 1.5 },
+        { x: 0, y: size * 0.25, r: 2 }
+    ];
+
+    for (const s of sparkles) {
+        // Свечение
+        const sparkleGlow = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r * 3);
+        sparkleGlow.addColorStop(0, "rgba(255,200,220,0.8)");
+        sparkleGlow.addColorStop(0.5, "rgba(255,150,180,0.3)");
+        sparkleGlow.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = sparkleGlow;
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r * 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Ядро
+        ctx.fillStyle = "rgba(255,255,255,0.95)";
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = "rgba(255,200,220,1)";
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.restore();
+    return Texture.from(canvas);
+}
+
+// ═══════════════════════════════════════════════════════════
+// SETUP
+// ═══════════════════════════════════════════════════════════
+async function setup() {
+    const app = new Application();
+    await app.init({
+        width: 400, height: 400,
+        backgroundColor: 0x06080e,
+        antialias: true,
+    });
+    document.getElementById('pixi-container').appendChild(app.canvas);
+
+    const container = new Container();
+    container.x = 200; container.y = 200;
+    app.stage.addChild(container);
+
+    const tex = createCosmicCherry();
+
+    // Основной спрайт
+    const sprite = new Sprite(tex);
+    sprite.anchor.set(0.5);
+    sprite.width = 240; sprite.height = 240;
+    container.addChild(sprite);
+
+    // Bloom слой 1 (мягкое свечение)
+    const bloom1 = new Sprite(tex);
+    bloom1.anchor.set(0.5);
+    bloom1.width = 280; bloom1.height = 280;
+    bloom1.alpha = 0.4;
+    bloom1.blendMode = "add";
+    bloom1.filters = [new BlurFilter({ strength: 12, quality: 3 })];
+    container.addChild(bloom1);
+
+    // Bloom слой 2 (широкое свечение)
+    const bloom2 = new Sprite(tex);
+    bloom2.anchor.set(0.5);
+    bloom2.width = 340; bloom2.height = 340;
+    bloom2.alpha = 0.2;
+    bloom2.blendMode = "add";
+    bloom2.filters = [new BlurFilter({ strength: 25, quality: 3 })];
+    container.addChild(bloom2);
+
+    let time = 0;
+    app.ticker.add(() => {
+        const dt = 0.016;
+        time += dt;
+
+        // Слабая пульсация (дыхание)
+        const pulse = 1 + Math.sin(time * 1.5) * 0.03;
+        container.scale.set(pulse);
+
+        // Лёгкое покачивание
+        container.rotation = Math.sin(time * 0.8) * 0.04;
+
+        // Медленное мерцание bloom
+        bloom1.alpha = 0.4 + Math.sin(time * 2) * 0.05;
+        bloom2.alpha = 0.2 + Math.sin(time * 1.5) * 0.03;
+    });
+}
+
+setup();
+</script>
+</body>
+</html>

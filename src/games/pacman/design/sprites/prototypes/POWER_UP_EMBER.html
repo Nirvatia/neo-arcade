@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Pill Visual — Ember & Sparks</title>
+<style>
+    body { margin: 0; background: #06080e; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: 'Courier New', monospace; color: #c8d4e0; }
+    canvas { display: block; border: 1px solid #1a2430; border-radius: 4px; }
+    .controls { margin-top: 20px; display: flex; gap: 12px; }
+    .btn { background: #111620; color: #c8d4e0; border: 1px solid #1a2430; padding: 10px 20px; font-family: inherit; font-size: 12px; letter-spacing: 3px; cursor: pointer; text-transform: uppercase; border-radius: 2px; transition: all 0.2s; }
+    .btn:hover { background: #19222e; border-color: #556680; }
+    .btn.active { background: #1a2a3a; border-color: #667888; color: #fff; }
+    .title { margin-bottom: 20px; font-size: 14px; letter-spacing: 4px; opacity: 0.6; }
+</style>
+</head>
+<body>
+<div class="title">PILL VISUAL · EMBER & SPARKS</div>
+<div id="pixi-container"></div>
+<div class="controls">
+    <button class="btn active" id="btnGameplay">◈ Gameplay</button>
+    <button class="btn" id="btnDeath">◆ Death</button>
+    <button class="btn" id="btnComplete">◊ Complete</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+<script type="module">
+const { Application, Container, Sprite, Texture, Graphics, BlurFilter } = PIXI;
+
+// ═══════════════════════════════════════════════════════════
+// TEXTURES
+// ═══════════════════════════════════════════════════════════
+function createEmberTexture() {
+    const res = 256;
+    const cx = res / 2, cy = res / 2, r = res * 0.36;
+    const canvas = document.createElement("canvas");
+    canvas.width = res; canvas.height = res;
+    const ctx = canvas.getContext("2d");
+
+    const g1 = ctx.createRadialGradient(cx, cy, r * 0.55, cx, cy, r * 1.4);
+    g1.addColorStop(0, "rgba(255,110,25,0.35)");
+    g1.addColorStop(0.45, "rgba(200,55,12,0.12)");
+    g1.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g1; ctx.fillRect(0, 0, res, res);
+
+    const g2 = ctx.createRadialGradient(cx, cy, r * 0.35, cx, cy, r * 0.9);
+    g2.addColorStop(0, "rgba(255,150,40,0.6)");
+    g2.addColorStop(0.5, "rgba(230,85,18,0.3)");
+    g2.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g2; ctx.fillRect(0, 0, res, res);
+
+    const g3 = ctx.createRadialGradient(cx - r * 0.06, cy - r * 0.08, 0, cx, cy, r * 0.65);
+    g3.addColorStop(0, "rgba(255,235,190,0.92)");
+    g3.addColorStop(0.2, "rgba(255,185,70,0.88)");
+    g3.addColorStop(0.5, "rgba(240,105,25,0.72)");
+    g3.addColorStop(0.78, "rgba(170,45,12,0.3)");
+    g3.addColorStop(1, "rgba(70,15,3,0)");
+    ctx.fillStyle = g3; ctx.fillRect(0, 0, res, res);
+
+    const g4 = ctx.createRadialGradient(cx - r * 0.12, cy - r * 0.14, 0, cx, cy, r * 0.16);
+    g4.addColorStop(0, "rgba(255,255,248,0.85)");
+    g4.addColorStop(0.4, "rgba(255,225,170,0.35)");
+    g4.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g4; ctx.fillRect(0, 0, res, res);
+
+    ctx.globalCompositeOperation = "overlay";
+    for (let i = 0; i < 50; i++) {
+        const sx = cx + (Math.random() - 0.5) * r * 0.9;
+        const sy = cy + (Math.random() - 0.5) * r * 0.9;
+        const sr = 1 + Math.random() * 3.5;
+        const spot = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr);
+        spot.addColorStop(0, "rgba(0,0,0,0.12)");
+        spot.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = spot;
+        ctx.fillRect(sx - sr, sy - sr, sr * 2, sr * 2);
+    }
+    ctx.globalCompositeOperation = "source-over";
+
+    return Texture.from(canvas);
+}
+
+function createSparkTexture() {
+    const s = 12;
+    const canvas = document.createElement("canvas");
+    canvas.width = s; canvas.height = s;
+    const ctx = canvas.getContext("2d");
+    const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+    g.addColorStop(0, "rgba(255,230,160,1)");
+    g.addColorStop(0.25, "rgba(255,160,45,0.75)");
+    g.addColorStop(0.6, "rgba(220,60,15,0.15)");
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+    return Texture.from(canvas);
+}
+
+const EMBER_TEX = createEmberTexture();
+const SPARK_TEX = createSparkTexture();
+
+// ═══════════════════════════════════════════════════════════
+// COLOR INTERPOLATION (белый → жёлтый → оранжевый → красный)
+// ═══════════════════════════════════════════════════════════
+function lerpColor(a, b, t) {
+    const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
+    const br = (b >> 16) & 0xff, bg = (b >> 8) & 0xff, bb = b & 0xff;
+    const r = Math.round(ar + (br - ar) * t);
+    const g = Math.round(ag + (bg - ag) * t);
+    const b2 = Math.round(ab + (bb - ab) * t);
+    return (r << 16) | (g << 8) | b2;
+}
+
+// Градиент жизни искры: белый → жёлтый → оранжевый → тёмно-красный
+const SPARK_COLOR_STEPS = [
+    { t: 1.0, color: 0xffffff },  // рождение: белый
+    { t: 0.7, color: 0xffdd66 },  // жёлтый
+    { t: 0.4, color: 0xff7722 },  // оранжевый
+    { t: 0.15, color: 0xaa2200 }, // тёмно-красный
+    { t: 0.0, color: 0x330000 },  // угасание
+];
+function getSparkColor(lifeRatio) {
+    for (let i = 0; i < SPARK_COLOR_STEPS.length - 1; i++) {
+        const a = SPARK_COLOR_STEPS[i], b = SPARK_COLOR_STEPS[i + 1];
+        if (lifeRatio <= a.t && lifeRatio >= b.t) {
+            const t = (a.t - lifeRatio) / (a.t - b.t);
+            return lerpColor(a.color, b.color, t);
+        }
+    }
+    return SPARK_COLOR_STEPS[SPARK_COLOR_STEPS.length - 1].color;
+}
+
+// ═══════════════════════════════════════════════════════════
+// PILL
+// ═══════════════════════════════════════════════════════════
+const MAX_SPARKS = 60;
+const EMBER_RADIUS = 22;
+
+class Pill {
+    constructor(x, y) {
+        this.x = x; this.y = y;
+        this.time = Math.random() * Math.PI * 2;
+        this.sparkTimer = 0;
+
+        this.container = new Container();
+        this.container.x = x; this.container.y = y;
+
+        // Основной ember
+        this.emberSprite = new Sprite(EMBER_TEX);
+        this.emberSprite.anchor.set(0.5);
+        this.emberSprite.width = EMBER_RADIUS * 2.8;
+        this.emberSprite.height = EMBER_RADIUS * 2.8;
+        this.container.addChild(this.emberSprite);
+
+        // Bloom слой: размытая копия с аддитивным смешиванием
+        this.bloomSprite = new Sprite(EMBER_TEX);
+        this.bloomSprite.anchor.set(0.5);
+        this.bloomSprite.width = EMBER_RADIUS * 4.2;
+        this.bloomSprite.height = EMBER_RADIUS * 4.2;
+        this.bloomSprite.alpha = 0.55;
+        this.bloomSprite.blendMode = "add";
+        const bloom = new BlurFilter({ strength: 8, quality: 3 });
+        this.bloomSprite.filters = [bloom];
+        this.container.addChild(this.bloomSprite);
+
+        // Искры
+        this.sparkContainer = new Container();
+        this.container.addChild(this.sparkContainer);
+        this.sparks = [];
+        for (let i = 0; i < MAX_SPARKS; i++) {
+            const sprite = new Sprite(SPARK_TEX);
+            sprite.anchor.set(0.5);
+            sprite.visible = false;
+            sprite.blendMode = "add";
+            this.sparkContainer.addChild(sprite);
+            this.sparks.push({
+                sprite, x: 0, y: 0, vx: 0, vy: 0,
+                life: 0, maxLife: 0, baseScale: 0, active: false,
+            });
+        }
+    }
+
+    spawnSpark() {
+        for (const s of this.sparks) {
+            if (s.active) continue;
+            const angle = Math.random() * Math.PI * 2;
+            const surfaceDist = EMBER_RADIUS * 0.6 * (0.8 + Math.random() * 0.2);
+            s.x = Math.cos(angle) * surfaceDist;
+            s.y = Math.sin(angle) * surfaceDist;
+            const speed = 10 + Math.random() * 25;
+            s.vx = Math.cos(angle) * speed * 0.6;
+            s.vy = Math.sin(angle) * speed * 0.6 - 12;
+            s.life = 0.25 + Math.random() * 0.45;
+            s.maxLife = s.life;
+            s.baseScale = 0.12 + Math.random() * 0.3;
+            s.active = true;
+            s.sprite.visible = true;
+            s.sprite.x = s.x; s.sprite.y = s.y;
+            s.sprite.scale.set(s.baseScale);
+            s.sprite.alpha = 0.8;
+            if (s.sprite.parent !== this.sparkContainer) {
+                this.sparkContainer.addChild(s.sprite);
+            }
+            return;
+        }
+    }
+
+    updateGameplay(dt) {
+        this.time += dt;
+        const t = this.time;
+
+        const breathe = 1 + Math.sin(t * 1.7) * 0.02 + Math.sin(t * 4.1) * 0.012;
+        this.container.scale.set(breathe);
+
+        const flicker = 0.85 + Math.sin(t * 12.0) * 0.08 + Math.sin(t * 22.0) * 0.04;
+        this.emberSprite.alpha = Math.max(0.7, Math.min(1, flicker));
+        this.bloomSprite.alpha = 0.45 + Math.sin(t * 8) * 0.1;
+
+        this.sparkTimer += dt;
+        const rate = 0.05 + Math.abs(Math.sin(t * 4.0)) * 0.03;
+        while (this.sparkTimer >= rate) {
+            this.sparkTimer -= rate;
+            this.spawnSpark();
+        }
+
+        for (const s of this.sparks) {
+            if (!s.active) continue;
+            s.life -= dt;
+            if (s.life <= 0) { s.active = false; s.sprite.visible = false; continue; }
+
+            // Турбулентность: лёгкое боковое колебание
+            s.vx += Math.sin(t * 8 + s.y * 0.1) * 20 * dt;
+            s.x += s.vx * dt;
+            s.y += s.vy * dt;
+            s.vy -= 8 * dt;
+
+            const lifeRatio = s.life / s.maxLife;
+            s.sprite.x = s.x; s.sprite.y = s.y;
+            s.sprite.scale.set(s.baseScale * lifeRatio);
+            s.sprite.alpha = lifeRatio * 0.65;
+            s.sprite.tint = getSparkColor(lifeRatio);
+        }
+    }
+
+    updateDeath(dt, progress, centerX, centerY) {
+        const dx = this.x - centerX;
+        const dy = this.y - centerY;
+        const dist = Math.hypot(dx, dy);
+        const maxR = progress * Math.hypot(700, 500);
+
+        if (dist < maxR) {
+            this.container.visible = false;
+            return;
+        }
+
+        const pullFactor = Math.min(1, Math.max(0, (maxR + 180 - dist) / 180));
+        const scale = Math.max(0, 1.0 - progress - pullFactor * 0.5);
+        this.container.scale.set(scale);
+        this.emberSprite.alpha = Math.max(0, 1.0 - progress * 1.2);
+        this.bloomSprite.alpha = Math.max(0, 0.45 - progress * 0.5);
+
+        for (const s of this.sparks) {
+            if (!s.active) continue;
+
+            if (s.sprite.parent === this.sparkContainer) {
+                const worldPos = this.sparkContainer.toGlobal({ x: s.x, y: s.y });
+                s.x = worldPos.x; s.y = worldPos.y;
+                this.container.parent.addChild(s.sprite);
+            }
+
+            s.life -= dt;
+            if (s.life <= 0) { s.active = false; s.sprite.visible = false; continue; }
+
+            const fdx = centerX - s.x;
+            const fdy = centerY - s.y;
+            const fdist = Math.hypot(fdx, fdy);
+            if (fdist < maxR) { s.active = false; s.sprite.visible = false; continue; }
+
+            const pull = 160 / (fdist + 15);
+            s.vx += (fdx / fdist) * pull + (-fdy / fdist) * pull * 1.5;
+            s.vy += (fdy / fdist) * pull + (fdx / fdist) * pull * 1.5;
+            s.x += s.vx * dt; s.y += s.vy * dt;
+            s.vx *= 0.95; s.vy *= 0.95;
+
+            const lifeRatio = s.life / s.maxLife;
+            s.sprite.x = s.x; s.sprite.y = s.y;
+            s.sprite.scale.set(s.baseScale * lifeRatio * scale);
+            s.sprite.alpha = lifeRatio * (1 - progress);
+            s.sprite.tint = getSparkColor(lifeRatio);
+        }
+    }
+
+    updateComplete(dt, progress) {
+        if (progress > 0 && this.emberSprite.visible) {
+            this.emberSprite.visible = false;
+            this.bloomSprite.visible = false;
+            for (const s of this.sparks) {
+                const angle = Math.random() * Math.PI * 2;
+                const force = 30 + Math.random() * 90;
+                s.x = 0; s.y = 0;
+                s.vx = Math.cos(angle) * force;
+                s.vy = Math.sin(angle) * force;
+                s.life = 0.6 + Math.random() * 0.9;
+                s.maxLife = s.life;
+                s.baseScale = 0.25 + Math.random() * 0.45;
+                s.active = true;
+                s.sprite.visible = true;
+                if (s.sprite.parent !== this.sparkContainer) {
+                    this.sparkContainer.addChild(s.sprite);
+                }
+            }
+        }
+
+        for (const s of this.sparks) {
+            if (!s.active) continue;
+            s.life -= dt;
+            if (s.life <= 0) { s.active = false; s.sprite.visible = false; continue; }
+            s.x += s.vx * dt; s.y += s.vy * dt;
+            s.vx *= 0.94; s.vy *= 0.94;
+
+            const lifeRatio = s.life / s.maxLife;
+            s.sprite.x = s.x; s.sprite.y = s.y;
+            s.sprite.scale.set(s.baseScale * lifeRatio);
+            s.sprite.alpha = lifeRatio * 0.9;
+            s.sprite.tint = getSparkColor(lifeRatio);
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// APP
+// ═══════════════════════════════════════════════════════════
+const app = new Application();
+await app.init({
+    width: 700, height: 500,
+    backgroundColor: 0x06080e,
+    antialias: true,
+});
+document.getElementById('pixi-container').appendChild(app.canvas);
+
+const scene = new Container();
+app.stage.addChild(scene);
+
+// Создаём несколько pill для красоты
+const pills = [];
+const positions = [
+    [180, 150], [350, 120], [520, 150],
+    [250, 280], [450, 280], [350, 380],
+];
+for (const [x, y] of positions) {
+    const pill = new Pill(x, y);
+    scene.addChild(pill.container);
+    pills.push(pill);
+}
+
+// Shockwave для complete
+const shockwaveGfx = new Graphics();
+scene.addChild(shockwaveGfx);
+
+let mode = 'gameplay';
+let modeTime = 0;
+
+function setMode(m) {
+    mode = m;
+    modeTime = 0;
+    shockwaveGfx.clear();
+    for (const p of pills) {
+        p.container.visible = true;
+        p.emberSprite.visible = true;
+        p.bloomSprite.visible = true;
+        p.container.scale.set(1);
+        for (const s of p.sparks) {
+            s.active = false;
+            s.sprite.visible = false;
+            if (s.sprite.parent !== p.sparkContainer) {
+                p.sparkContainer.addChild(s.sprite);
+            }
+        }
+    }
+    document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('btn' + m.charAt(0).toUpperCase() + m.slice(1)).classList.add('active');
+}
+
+document.getElementById('btnGameplay').onclick = () => setMode('gameplay');
+document.getElementById('btnDeath').onclick = () => setMode('death');
+document.getElementById('btnComplete').onclick = () => setMode('complete');
+
+app.ticker.add((ticker) => {
+    const dt = ticker.deltaMS / 1000;
+    modeTime += dt;
+
+    if (mode === 'gameplay') {
+        for (const p of pills) p.updateGameplay(dt);
+    } else if (mode === 'death') {
+        const progress = Math.min(1, modeTime / 3.5);
+        for (const p of pills) p.updateDeath(dt, progress, 350, 250);
+    } else if (mode === 'complete') {
+        const progress = Math.min(1, modeTime / 3.0);
+        for (const p of pills) p.updateComplete(dt, progress);
+
+        // Shockwave
+        shockwaveGfx.clear();
+        if (progress < 0.8) {
+            const waveR = progress * 400;
+            const waveAlpha = (1 - progress) * 0.6;
+            shockwaveGfx.circle(350, 250, waveR)
+                .stroke({ color: 0xffaa44, width: 3, alpha: waveAlpha });
+            shockwaveGfx.circle(350, 250, waveR * 0.85)
+                .stroke({ color: 0xffdd88, width: 1.5, alpha: waveAlpha * 0.5 });
+        }
+    }
+});
+</script>
+</body>
+</html>

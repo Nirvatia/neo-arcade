@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Icosahedron — Enhanced</title>
+<style>
+    body { 
+        margin: 0; 
+        background: #06080e; 
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: center; 
+        min-height: 100vh; 
+        font-family: 'Courier New', monospace; 
+        color: #c8d4e0; 
+        gap: 30px;
+    }
+    .title { 
+        font-size: 16px; 
+        letter-spacing: 5px; 
+        opacity: 0.7; 
+    }
+    canvas { 
+        display: block; 
+        border: 1px solid #1a2430; 
+        border-radius: 4px; 
+    }
+</style>
+</head>
+<body>
+<div class="title">ICOSAHEDRON · ENHANCED</div>
+<div id="pixi-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+<script type="module">
+const { Application, Container, Graphics, BlurFilter } = PIXI;
+
+// ═══════════════════════════════════════════════════════════
+// 3D PROJECTION
+// ═══════════════════════════════════════════════════════════
+function project3D(x, y, z, rotX, rotY, rotZ, scale, perspective = 4) {
+    let y1 = y * Math.cos(rotX) - z * Math.sin(rotX);
+    let z1 = y * Math.sin(rotX) + z * Math.cos(rotX);
+    
+    let x2 = x * Math.cos(rotY) + z1 * Math.sin(rotY);
+    let z2 = -x * Math.sin(rotY) + z1 * Math.cos(rotY);
+    
+    let x3 = x2 * Math.cos(rotZ) - y1 * Math.sin(rotZ);
+    let y3 = x2 * Math.sin(rotZ) + y1 * Math.cos(rotZ);
+    
+    const p = perspective / (perspective + z2);
+    
+    return { x: x3 * scale * p, y: y3 * scale * p, z: z2, scale: p };
+}
+
+// ═══════════════════════════════════════════════════════════
+// ICOSAHEDRON SETUP
+// ═══════════════════════════════════════════════════════════
+async function setup() {
+    const app = new Application();
+    await app.init({
+        width: 400, height: 400,
+        backgroundColor: 0x06080e,
+        antialias: true,
+    });
+    document.getElementById('pixi-container').appendChild(app.canvas);
+
+    const container = new Container();
+    container.x = 200; container.y = 200;
+    app.stage.addChild(container);
+
+    const icoGfx = new Graphics();
+    container.addChild(icoGfx);
+
+    const bloomContainer = new Container();
+    bloomContainer.filters = [new BlurFilter({ strength: 18, quality: 3 })];
+    bloomContainer.alpha = 0.5;
+    bloomContainer.blendMode = "add";
+    app.stage.addChild(bloomContainer);
+
+    const bloomGfx = new Graphics();
+    bloomContainer.addChild(bloomGfx);
+
+    let time = 0;
+
+    // Icosahedron geometry
+    const phi = (1 + Math.sqrt(5)) / 2;
+    const baseVertices = [
+        { x: -1, y: phi, z: 0 }, { x: 1, y: phi, z: 0 },
+        { x: -1, y: -phi, z: 0 }, { x: 1, y: -phi, z: 0 },
+        { x: 0, y: -1, z: phi }, { x: 0, y: 1, z: phi },
+        { x: 0, y: -1, z: -phi }, { x: 0, y: 1, z: -phi },
+        { x: phi, y: 0, z: -1 }, { x: phi, y: 0, z: 1 },
+        { x: -phi, y: 0, z: -1 }, { x: -phi, y: 0, z: 1 }
+    ];
+
+    const len = Math.sqrt(1 + phi * phi);
+    baseVertices.forEach(v => { v.x /= len; v.y /= len; v.z /= len; });
+
+    const edges = [
+        [0, 1], [0, 5], [0, 7], [0, 10], [0, 11],
+        [1, 5], [1, 7], [1, 8], [1, 9],
+        [2, 3], [2, 4], [2, 6], [2, 10], [2, 11],
+        [3, 4], [3, 6], [3, 8], [3, 9],
+        [4, 5], [4, 9], [4, 11],
+        [5, 9], [5, 11],
+        [6, 7], [6, 8], [6, 10],
+        [7, 8], [7, 10],
+        [8, 9],
+        [10, 11]
+    ];
+
+    // Faces (20 triangles)
+    const faces = [
+        [0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11],
+        [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
+        [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9],
+        [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]
+    ];
+
+    // Energy particles on edges
+    const particles = [];
+    for (const edge of edges) {
+        for (let i = 0; i < 2; i++) {
+            particles.push({
+                edge,
+                t: Math.random(),
+                speed: 0.3 + Math.random() * 0.4,
+                size: 1.5 + Math.random() * 1.5
+            });
+        }
+    }
+
+    function drawIcosahedron(gfx, isBloom = false) {
+        gfx.clear();
+
+        const scale = 100;
+        const breathe = 1 + Math.sin(time * 1.5) * 0.08;
+        
+        // Complex rotation (not just linear)
+        const rotX = time * 0.4 + Math.sin(time * 0.7) * 0.3;
+        const rotY = time * 0.6 + Math.cos(time * 0.5) * 0.2;
+        const rotZ = time * 0.3 + Math.sin(time * 0.9) * 0.15;
+
+        // ═══════════════════════════════════════════════════════════
+        // OUTER ICOSAHEDRON
+        // ═══════════════════════════════════════════════════════════
+        const outerVertices = baseVertices.map(v => ({
+            x: v.x * breathe,
+            y: v.y * breathe,
+            z: v.z * breathe
+        }));
+
+        const outerProjected = outerVertices.map(v => 
+            project3D(v.x, v.y, v.z, rotX, rotY, rotZ, scale)
+        );
+
+        // Draw semi-transparent faces
+        const facesWithDepth = faces.map(face => {
+            const avgZ = (outerProjected[face[0]].z + outerProjected[face[1]].z + outerProjected[face[2]].z) / 3;
+            return { face, avgZ };
+        }).sort((a, b) => a.avgZ - b.avgZ);
+
+        for (const { face, avgZ } of facesWithDepth) {
+            const p0 = outerProjected[face[0]];
+            const p1 = outerProjected[face[1]];
+            const p2 = outerProjected[face[2]];
+
+            const depthFactor = (avgZ + 1.5) / 3;
+            
+            if (isBloom) {
+                gfx.moveTo(p0.x, p0.y)
+                    .lineTo(p1.x, p1.y)
+                    .lineTo(p2.x, p2.y)
+                    .lineTo(p0.x, p0.y)
+                    .fill({ color: 0x64dcc8, alpha: depthFactor * 0.3 });
+            } else {
+                // Semi-transparent fill with depth-based color
+                const alpha = 0.15 + depthFactor * 0.25;
+                gfx.moveTo(p0.x, p0.y)
+                    .lineTo(p1.x, p1.y)
+                    .lineTo(p2.x, p2.y)
+                    .lineTo(p0.x, p0.y)
+                    .fill({ color: 0x64dcc8, alpha });
+            }
+        }
+
+        // Draw edges
+        const edgesWithDepth = edges.map(edge => {
+            const avgZ = (outerProjected[edge[0]].z + outerProjected[edge[1]].z) / 2;
+            return { edge, avgZ };
+        }).sort((a, b) => a.avgZ - b.avgZ);
+
+        for (const { edge, avgZ } of edgesWithDepth) {
+            const p1 = outerProjected[edge[0]];
+            const p2 = outerProjected[edge[1]];
+
+            const depthFactor = (avgZ + 1.5) / 3;
+            const alpha = isBloom 
+                ? 0.3 + depthFactor * 0.5 
+                : 0.5 + depthFactor * 0.5;
+            const width = isBloom 
+                ? 5 + depthFactor * 7 
+                : 2 + depthFactor * 2.5;
+
+            gfx.moveTo(p1.x, p1.y)
+                .lineTo(p2.x, p2.y)
+                .stroke({ color: 0x64dcc8, width, alpha, cap: "round" });
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // INNER ICOSAHEDRON (smaller, opposite rotation)
+        // ═══════════════════════════════════════════════════════════
+        const innerScale = 0.5;
+        const innerRotX = -rotX * 1.3;
+        const innerRotY = -rotY * 1.3;
+        const innerRotZ = -rotZ * 1.3;
+
+        const innerProjected = baseVertices.map(v => 
+            project3D(v.x * innerScale, v.y * innerScale, v.z * innerScale, 
+                     innerRotX, innerRotY, innerRotZ, scale * breathe)
+        );
+
+        // Inner edges (thinner, more transparent)
+        for (const { edge, avgZ } of edgesWithDepth) {
+            const p1 = innerProjected[edge[0]];
+            const p2 = innerProjected[edge[1]];
+
+            const depthFactor = (avgZ + 1.5) / 3;
+            const alpha = isBloom 
+                ? 0.15 + depthFactor * 0.25 
+                : 0.25 + depthFactor * 0.35;
+            const width = isBloom 
+                ? 3 + depthFactor * 4 
+                : 1 + depthFactor * 1.5;
+
+            gfx.moveTo(p1.x, p1.y)
+                .lineTo(p2.x, p2.y)
+                .stroke({ color: 0xb4f0e6, width, alpha, cap: "round" });
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // ENERGY PARTICLES (flowing along edges)
+        // ═══════════════════════════════════════════════════════════
+        if (!isBloom) {
+            for (const particle of particles) {
+                particle.t += particle.speed * 0.016;
+                if (particle.t > 1) particle.t -= 1;
+
+                const [i, j] = particle.edge;
+                const p1 = outerProjected[i];
+                const p2 = outerProjected[j];
+
+                const px = p1.x + (p2.x - p1.x) * particle.t;
+                const py = p1.y + (p2.y - p1.y) * particle.t;
+                const pz = p1.z + (p2.z - p1.z) * particle.t;
+
+                const depthFactor = (pz + 1.5) / 3;
+                const alpha = 0.6 + depthFactor * 0.4;
+                const size = particle.size * (0.8 + depthFactor * 0.4);
+
+                // Glow
+                gfx.circle(px, py, size * 2)
+                    .fill({ color: 0x64dcc8, alpha: alpha * 0.3 });
+                
+                // Core
+                gfx.circle(px, py, size)
+                    .fill({ color: 0xffffff, alpha });
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // PULSING VERTICES
+        // ═══════════════════════════════════════════════════════════
+        if (!isBloom) {
+            for (let i = 0; i < outerProjected.length; i++) {
+                const p = outerProjected[i];
+                const depthFactor = (p.z + 1.5) / 3;
+                
+                // Pulsation
+                const pulse = 1 + Math.sin(time * 4 + i * 0.5) * 0.3;
+                const size = (2 + depthFactor * 4) * pulse;
+                const alpha = 0.5 + depthFactor * 0.5;
+
+                // Outer glow
+                gfx.circle(p.x, p.y, size * 2)
+                    .fill({ color: 0x64dcc8, alpha: alpha * 0.3 });
+                
+                // Core
+                gfx.circle(p.x, p.y, size)
+                    .fill({ color: 0xffffff, alpha });
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // CENTRAL CORE
+        // ═══════════════════════════════════════════════════════════
+        const coreSize = isBloom ? 25 : 12;
+        const corePulse = 1 + Math.sin(time * 3) * 0.2;
+        
+        // Outer glow
+        gfx.circle(0, 0, coreSize * 2 * corePulse)
+            .fill({ color: 0x64dcc8, alpha: isBloom ? 0.2 : 0.15 });
+        
+        // Middle layer
+        gfx.circle(0, 0, coreSize * 1.3 * corePulse)
+            .fill({ color: 0xb4f0e6, alpha: isBloom ? 0.3 : 0.25 });
+        
+        // Bright core
+        gfx.circle(0, 0, coreSize * 0.6 * corePulse)
+            .fill({ color: 0xffffff, alpha: isBloom ? 0.7 : 0.9 });
+    }
+
+    app.ticker.add(() => {
+        time += 0.016;
+        drawIcosahedron(icoGfx, false);
+        drawIcosahedron(bloomGfx, true);
+        bloomContainer.x = 200;
+        bloomContainer.y = 200;
+        
+        const breathe = 1 + Math.sin(time * 1.5) * 0.05;
+        container.scale.set(breathe);
+        bloomContainer.scale.set(breathe);
+    });
+
+    return app;
+}
+
+setup();
+</script>
+</body>
+</html>

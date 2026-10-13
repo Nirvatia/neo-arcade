@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STARDUST HEART — Ms. Pacman Visual Demo</title>
+<style>
+    body { 
+        margin: 0; 
+        overflow: hidden; 
+        background: #080510; 
+        font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+    canvas { 
+        display: block; 
+    }
+    #ui { 
+        position: absolute; 
+        top: 15px; 
+        left: 15px; 
+        color: #ffaacc; 
+        font-size: 13px; 
+        pointer-events: none;
+        background: rgba(18, 2, 12, 0.6);
+        padding: 12px 16px;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 170, 204, 0.2);
+        backdrop-filter: blur(4px);
+        line-height: 1.6;
+    }
+    #ui kbd {
+        background: rgba(255, 170, 204, 0.15);
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: monospace;
+        color: #ffccdd;
+        border: 1px solid rgba(255, 170, 204, 0.3);
+    }
+</style>
+</head>
+<body>
+    <div id="ui">
+        <strong style="color: #fff;">STARDUST HEART v1.1</strong><br>
+        <kbd>Space</kbd> Toggle Buffed &nbsp;|&nbsp; 
+        <kbd>Click</kbd> Trigger Death<br>
+        <kbd>E</kbd> Simulate Eat &nbsp;|&nbsp; 
+        <kbd>W</kbd> Wormhole &nbsp;|&nbsp; 
+        <kbd>G</kbd> Ghost Absorb<br>
+        <kbd>R</kbd> Reset / Revive
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+    <script type="module">
+        // ──────────────────────────────────────────────
+        // STARDUST HEART v1.1 — Ms. Pacman Visual
+        // Brighter pink + gold cosmic aesthetic.
+        // ──────────────────────────────────────────────
+
+        // ── Palette ──────────────────────────────────
+        const ROSE_CORE       = 0x661133;  // Ярче!
+        const ROSE_EDGE       = 0xaa2255;  // Ярче!
+        const ROSE_INNER      = 0xff66aa;
+        const ROSE_OUTER      = 0xcc3377;
+        const ROSE_BUFFED     = 0xffbbdd;
+        const RIBBON_BASE     = 0xff3388;
+        const RIBBON_GLOW     = 0xffaacc;
+        const GOLD_ACCENT     = 0xffcc44;
+        const GOLD_BRIGHT     = 0xffee88;
+        const SPARKLE_BASE    = 0xff88aa;
+        const SPARKLE_GLOW    = 0xffddee;
+        const HEART_GLOW      = 0xff5599;
+        const MOUTH_GLOW      = 0x991144;  // Ярче!
+        const MOUTH_BUFFED    = 0xcc4488;  // Ярче!
+        const FLARE_WHITE     = 0xffffff;
+        const GHOST_STREAK    = 0xff88cc;
+
+        // ── Color Utils ───────────────────────────────
+        const lerpColor = (a, b, t) => {
+            const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
+            const br = (b >> 16) & 0xff, bg = (b >> 8) & 0xff, bb = b & 0xff;
+            const cr = Math.round(ar + (br - ar) * t);
+            const cg = Math.round(ag + (bg - ag) * t);
+            const cb = Math.round(ab + (bb - ab) * t);
+            return (cr << 16) | (cg << 8) | cb;
+        };
+
+        // ── Ms. Pacman Visual Class ───────────────────────
+        class MsPacmanVisual {
+            constructor() {
+                this.x = 0;
+                this.y = 0;
+                this.r = 24;
+                this.direction = { dx: 1, dy: 0 };
+                this.lastDirection = { dx: 1, dy: 0 };
+                this.state = "ALIVE";
+                this.isBuffed = false;
+                this.time = 0;
+
+                this.config = {
+                    mouthSpeed: 0.008,
+                    maxMouthAngle: Math.PI / 3,
+                    idleMouthAngle: Math.PI / 12,
+                    bowSize: 1.15,
+                    bowWiggle: 0.005,
+                };
+
+                this.container = new PIXI.Container();
+                this.container.isRenderGroup = true;
+                
+                this.trailGfx = new PIXI.Graphics();
+                this.auraGfx = new PIXI.Graphics();
+                this.bowGfx = new PIXI.Graphics();
+                this.bodyGfx = new PIXI.Graphics();
+                this.mouthGfx = new PIXI.Graphics();
+                this.particleGfx = new PIXI.Graphics();
+                this.ringVfxGfx = new PIXI.Graphics();
+                this.flashGfx = new PIXI.Graphics();
+                this.ghostStreakGfx = new PIXI.Graphics();
+                this.sparkleGfx = new PIXI.Graphics();
+
+                // Blend modes
+                this.trailGfx.blendMode = "add";
+                this.auraGfx.blendMode = "add";
+                this.bowGfx.blendMode = "add";
+                this.bodyGfx.blendMode = "normal";
+                this.mouthGfx.blendMode = "add";
+                this.particleGfx.blendMode = "add";
+                this.ringVfxGfx.blendMode = "add";
+                this.flashGfx.blendMode = "add";
+                this.ghostStreakGfx.blendMode = "add";
+                this.sparkleGfx.blendMode = "add";
+
+                this.container.addChild(
+                    this.trailGfx, this.auraGfx, this.bodyGfx, this.bowGfx, this.mouthGfx,
+                    this.particleGfx, this.ringVfxGfx, this.sparkleGfx, this.ghostStreakGfx, this.flashGfx
+                );
+
+                this.trail = [];
+                this.particles = [];
+                this.ringVfx = [];
+                this.sparkles = [];
+
+                this.lastTrailX = 0;
+                this.lastTrailY = 0;
+
+                this.deathTimer = 0;
+                this.deathParticleTimer = 0;
+                this.deathShrinkFactor = 0;
+                this.deathConvulsePhase = 0;
+
+                this.ghostStreakTimer = 0;
+                this.ghostStreakStartX = 0;
+                this.ghostStreakStartY = 0;
+                this.ghostTerminalFlash = 0;
+
+                this.eatFlashTimer = 0;
+                this.eatFlashType = null;
+
+                for (let i = 0; i < 300; i++) {
+                    this.particles.push({ x: 0, y: 0, vx: 0, vy: 0, life: 0, maxLife: 1, size: 0, active: false, rot: 0, rotSpeed: 0, type: "sparkle" });
+                }
+                for (let i = 0; i < 12; i++) {
+                    this.ringVfx.push({ x: 0, y: 0, radius: 0, maxRadius: 0, life: 0, maxLife: 1, type: "DOT_SWALLOW", rotation: 0 });
+                }
+                for (let i = 0; i < 40; i++) {
+                    this.sparkles.push({ x: 0, y: 0, life: 0, maxLife: 1, size: 1, angle: 0, active: false, twinkle: 0 });
+                }
+            }
+
+            update(dt) {
+                this.time += dt;
+
+                if (this.state === "DYING") {
+                    this.updateDeath(dt);
+                    this.updateParticles(dt);
+                    this.updateRingVfx(dt);
+                    this.updateSparkles(dt);
+                    this.draw();
+                    return;
+                }
+
+                this.updateTrail(dt);
+                this.updateParticles(dt);
+                this.updateRingVfx(dt);
+                this.updateGhostStreak(dt);
+                this.updateSparkles(dt);
+                if (this.eatFlashTimer > 0) this.eatFlashTimer -= dt;
+
+                const dx = this.x - this.lastTrailX;
+                const dy = this.y - this.lastTrailY;
+                const distSq = dx * dx + dy * dy;
+                
+                if (distSq > 16) { 
+                    this.trail.push({ 
+                        x: this.x, y: this.y, 
+                        life: this.isBuffed ? 0.7 : 0.5, 
+                        maxLife: this.isBuffed ? 0.7 : 0.5 
+                    });
+                    this.lastTrailX = this.x;
+                    this.lastTrailY = this.y;
+                    this.emitSparkles();
+                    this.emitRibbonParticles();
+                }
+
+                this.draw();
+            }
+
+            triggerDeath() {
+                if (this.state === "DYING") return;
+                this.state = "DYING";
+                this.deathTimer = 0;
+                this.deathParticleTimer = 0;
+                this.deathShrinkFactor = 0;
+                this.deathConvulsePhase = 0;
+            }
+
+            simulateEat(type) {
+                this.eatFlashTimer = type === "DOT" ? 0.1 : type === "PILL" ? 0.45 : 0.4;
+                this.eatFlashType = type;
+                if (type === "DOT") this.spawnDotSwallowVFX(this.x + 30, this.y);
+                if (type === "PILL") this.spawnPillExpandVFX();
+            }
+
+            simulateWormhole() {
+                this.spawnWormholeVFX(this.x - 60, this.y, false);
+                this.spawnWormholeVFX(this.x + 60, this.y, true);
+            }
+
+            simulateGhostAbsorb() {
+                this.ghostStreakTimer = 0.45;
+                this.ghostStreakStartX = this.x - 120;
+                this.ghostStreakStartY = this.y;
+                this.ghostTerminalFlash = 0;
+                this.eatFlashTimer = 0.4;
+                this.eatFlashType = "GHOST";
+                this.spawnStarburstVFX();
+            }
+
+            spawnRingVFX(x, y, maxR, life, type, rot = 0) {
+                for (const r of this.ringVfx) {
+                    if (r.life <= 0) {
+                        r.x = x; r.y = y;
+                        r.radius = type === "PILL_EXPAND" || type === "WORMHOLE_ENTRY" ? 0 : maxR;
+                        r.maxRadius = maxR;
+                        r.life = life;
+                        r.maxLife = life;
+                        r.type = type;
+                        r.rotation = rot;
+                        return;
+                    }
+                }
+            }
+
+            spawnDotSwallowVFX(wx, wy) {
+                this.spawnRingVFX(wx, wy, 9, 0.22, "DOT_SWALLOW");
+            }
+
+            spawnPillExpandVFX() {
+                this.spawnRingVFX(this.x, this.y, this.r * 3.5, 0.55, "PILL_EXPAND");
+            }
+
+            spawnWormholeVFX(wx, wy, isEntry) {
+                const type = isEntry ? "WORMHOLE_ENTRY" : "WORMHOLE_EXIT";
+                const life = isEntry ? 0.4 : 0.3;
+                const rot = Math.random() * Math.PI;
+                this.spawnRingVFX(wx, wy, this.r * 1.7, life, type, rot);
+            }
+
+            spawnStarburstVFX() {
+                for (let i = 0; i < 24; i++) {
+                    const angle = (i / 24) * Math.PI * 2;
+                    const speed = 80 + Math.random() * 120;
+                    this.spawnParticle({
+                        x: this.x, y: this.y,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        life: 0.5 + Math.random() * 0.4,
+                        maxLife: 0.9,
+                        size: 2 + Math.random() * 2.5,
+                        rot: Math.random() * Math.PI * 2,
+                        rotSpeed: (Math.random() - 0.5) * 8,
+                        type: "star",
+                    });
+                }
+            }
+
+            spawnParticle(overrides) {
+                for (const p of this.particles) {
+                    if (!p.active) {
+                        Object.assign(p, {
+                            x: 0, y: 0, vx: 0, vy: 0,
+                            life: 1, maxLife: 1, size: 1.5,
+                            rot: 0, rotSpeed: 0, type: "sparkle",
+                        }, overrides, { active: true });
+                        return;
+                    }
+                }
+            }
+
+            emitSparkles() {
+                if (Math.random() < (this.isBuffed ? 0.8 : 0.3)) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const dist = this.r * (0.5 + Math.random() * 0.8);
+                    for (const s of this.sparkles) {
+                        if (!s.active) {
+                            s.x = this.x + Math.cos(angle) * dist;
+                            s.y = this.y + Math.sin(angle) * dist;
+                            s.life = s.maxLife = 0.4 + Math.random() * 0.5;
+                            s.size = 1.5 + Math.random() * 2;
+                            s.angle = Math.random() * Math.PI * 2;
+                            s.active = true;
+                            s.twinkle = Math.random() * Math.PI * 2;
+                            return;
+                        }
+                    }
+                }
+            }
+
+            emitRibbonParticles() {
+                if (Math.random() < (this.isBuffed ? 0.5 : 0.15)) {
+                    const angle = this.getAngle() + Math.PI + (Math.random() - 0.5) * 0.8;
+                    const speed = 40 + Math.random() * 60;
+                    this.spawnParticle({
+                        x: this.x - Math.cos(this.getAngle()) * this.r * 0.7,
+                        y: this.y - Math.sin(this.getAngle()) * this.r * 0.7,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        life: 0.4 + Math.random() * 0.5,
+                        maxLife: 0.9,
+                        size: 1 + Math.random() * 2,
+                        type: "ribbon",
+                    });
+                }
+            }
+
+            emitDeathParticles() {
+                const count = 3 + Math.floor(this.deathShrinkFactor * 5);
+                for (let i = 0; i < count; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = 80 + Math.random() * 200;
+                    const type = Math.random() < 0.3 ? "heart" : (Math.random() < 0.5 ? "star" : "sparkle");
+                    this.spawnParticle({
+                        x: this.x + Math.cos(angle) * this.r * 0.3,
+                        y: this.y + Math.sin(angle) * this.r * 0.3,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        life: 0.5 + Math.random() * 0.8,
+                        maxLife: 1.3,
+                        size: 1 + Math.random() * 3,
+                        rot: Math.random() * Math.PI * 2,
+                        rotSpeed: (Math.random() - 0.5) * 10,
+                        type,
+                    });
+                }
+            }
+
+            updateTrail(dt) {
+                for (let i = this.trail.length - 1; i >= 0; i--) {
+                    this.trail[i].life -= dt;
+                    if (this.trail[i].life <= 0) this.trail.splice(i, 1);
+                }
+            }
+
+            updateParticles(dt) {
+                for (const p of this.particles) {
+                    if (!p.active) continue;
+                    p.life -= dt;
+                    if (p.life <= 0) { p.active = false; continue; }
+                    p.x += p.vx * dt;
+                    p.y += p.vy * dt;
+                    p.vx *= 0.94;
+                    p.vy *= 0.94;
+                    p.rot += p.rotSpeed * dt;
+                }
+            }
+
+            updateRingVfx(dt) {
+                for (const r of this.ringVfx) {
+                    if (r.life <= 0) continue;
+                    r.life -= dt;
+                    const progress = 1 - r.life / r.maxLife;
+                    if (r.type === "DOT_SWALLOW") {
+                        r.radius = r.maxRadius * (1 - progress);
+                    } else if (r.type === "PILL_EXPAND" || r.type === "WORMHOLE_ENTRY") {
+                        r.radius = r.maxRadius * progress;
+                    }
+                }
+            }
+
+            updateSparkles(dt) {
+                for (const s of this.sparkles) {
+                    if (!s.active) continue;
+                    s.life -= dt;
+                    s.twinkle += dt * 8;
+                    if (s.life <= 0) s.active = false;
+                }
+            }
+
+            updateGhostStreak(dt) {
+                if (this.ghostStreakTimer > 0) {
+                    this.ghostStreakTimer -= dt;
+                    if (this.ghostStreakTimer <= 0.1 && this.ghostTerminalFlash === 0) {
+                        this.ghostTerminalFlash = 0.15;
+                    }
+                }
+                if (this.ghostTerminalFlash > 0) this.ghostTerminalFlash -= dt;
+            }
+
+            updateDeath(dt) {
+                this.deathTimer += dt;
+                this.deathShrinkFactor = Math.min(1, Math.max(0, (this.deathTimer - 0.3) / 1.5));
+                if (this.deathTimer < 0.3) this.deathConvulsePhase += dt * 50;
+                if (this.deathTimer >= 0.3 && this.deathTimer < 1.8) {
+                    this.deathParticleTimer += dt;
+                    const interval = 0.06 - this.deathShrinkFactor * 0.04;
+                    while (this.deathParticleTimer > interval) {
+                        this.deathParticleTimer -= interval;
+                        this.emitDeathParticles();
+                    }
+                }
+            }
+
+            getAngle() {
+                const d = (this.direction.dx !== 0 || this.direction.dy !== 0)
+                    ? this.direction : this.lastDirection;
+                if (d.dx === 0 && d.dy === 0) return 0;
+                return Math.atan2(d.dy, d.dx);
+            }
+
+            getDisplayRadius() {
+                if (this.state === "DYING" && this.deathTimer < 0.3) {
+                    const convulse = 1 + Math.sin(this.deathConvulsePhase) * 0.12;
+                    return this.r * convulse;
+                }
+                if (this.state === "DYING") {
+                    return Math.max(0, this.r * (1 - this.deathShrinkFactor * 0.88));
+                }
+                return this.r;
+            }
+
+            draw() {
+                this.trailGfx.clear();
+                this.auraGfx.clear();
+                this.bowGfx.clear();
+                this.bodyGfx.clear();
+                this.mouthGfx.clear();
+                this.particleGfx.clear();
+                this.ringVfxGfx.clear();
+                this.flashGfx.clear();
+                this.ghostStreakGfx.clear();
+                this.sparkleGfx.clear();
+
+                const r = this.getDisplayRadius();
+                if (r <= 0.3) return;
+
+                if (this.state === "DYING") {
+                    this.drawDeathBody(r);
+                    this.drawParticles();
+                    this.drawRingVfx();
+                    this.drawSparkles();
+                    return;
+                }
+
+                this.drawTrail();
+                this.drawAura(r);
+                this.drawBody(r);
+                this.drawMouthGlow(r);
+                this.drawBow(r);
+                this.drawParticles();
+                this.drawSparkles();
+                this.drawRingVfx();
+                this.drawGhostStreak();
+                this.drawEatFlash(r);
+            }
+
+            drawTrail() {
+                if (this.trail.length < 2) return;
+                const baseWidth = this.r * (this.isBuffed ? 0.6 : 0.4);
+
+                for (let i = 1; i < this.trail.length; i++) {
+                    const p1 = this.trail[i - 1];
+                    const p2 = this.trail[i];
+                    const ratio = p2.life / p2.maxLife;
+                    if (ratio <= 0.01) continue;
+
+                    const x1 = p1.x - this.x;
+                    const y1 = p1.y - this.y;
+                    const x2 = p2.x - this.x;
+                    const y2 = p2.y - this.y;
+                    const width = baseWidth * ratio;
+
+                    this.trailGfx.moveTo(x1, y1);
+                    this.trailGfx.lineTo(x2, y2);
+                    this.trailGfx.stroke({
+                        color: RIBBON_BASE,
+                        width: width * 3.5,
+                        alpha: ratio * 0.22,
+                        cap: "round",
+                        join: "round",
+                    });
+
+                    this.trailGfx.moveTo(x1, y1);
+                    this.trailGfx.lineTo(x2, y2);
+                    this.trailGfx.stroke({
+                        color: this.isBuffed ? GOLD_BRIGHT : RIBBON_GLOW,
+                        width: width * (this.isBuffed ? 1.1 : 0.65),
+                        alpha: ratio * (this.isBuffed ? 0.75 : 0.55),
+                        cap: "round",
+                        join: "round",
+                    });
+                }
+            }
+
+            drawAura(r) {
+                const auraR = r * (this.isBuffed ? 1.6 : 1.3);
+                this.auraGfx.circle(0, 0, auraR);
+                this.auraGfx.fill({ color: ROSE_INNER, alpha: this.isBuffed ? 0.15 : 0.08 });
+                this.auraGfx.circle(0, 0, auraR * 0.75);
+                this.auraGfx.fill({ color: this.isBuffed ? GOLD_ACCENT : ROSE_INNER, alpha: 0.1 });
+            }
+
+            drawBody(r) {
+                const t = this.time * 1000;
+                const moving = this.direction.dx !== 0 || this.direction.dy !== 0;
+                const angle = this.getAngle();
+
+                let mouth;
+                if (moving) {
+                    const speedMult = this.isBuffed ? 1.35 : 1;
+                    mouth = Math.abs(Math.sin(t * this.config.mouthSpeed * speedMult)) * this.config.maxMouthAngle;
+                } else {
+                    mouth = this.config.idleMouthAngle;
+                }
+                mouth = Math.max(0.06, Math.min(mouth, Math.PI * 0.5));
+                if (this.isBuffed) mouth = Math.min(mouth * 1.15, Math.PI * 0.52);
+
+                const sa = angle + mouth;
+                const ea = angle + Math.PI * 2 - mouth;
+
+                // Яркое розовое тело
+                const gradSteps = 5;
+                for (let i = gradSteps; i >= 0; i--) {
+                    const frac = i / gradSteps;
+                    const gradR = r * (1 - frac * 0.12);
+                    if (gradR < 0.5) continue;
+                    
+                    const color = lerpColor(ROSE_EDGE, ROSE_CORE, frac);
+                    const alpha = 0.95;
+
+                    this.bodyGfx.moveTo(0, 0);
+                    this.bodyGfx.arc(0, 0, gradR, sa, ea, false);
+                    this.bodyGfx.lineTo(0, 0);
+                    this.bodyGfx.closePath();
+                    this.bodyGfx.fill({ color, alpha });
+                }
+
+                // Яркое розовое кольцо
+                this.bodyGfx.moveTo(0, 0);
+                this.bodyGfx.arc(0, 0, r, sa, ea, false);
+                this.bodyGfx.lineTo(0, 0);
+                this.bodyGfx.closePath();
+                this.bodyGfx.stroke({
+                    color: this.isBuffed ? GOLD_ACCENT : ROSE_INNER,
+                    width: this.isBuffed ? 7 : 5,
+                    alpha: this.isBuffed ? 0.7 : 0.6,
+                    alignment: 0.5,
+                });
+
+                this.drawRoseRing(r, sa, ea, angle);
+            }
+
+            drawRoseRing(r, sa, ea, angle) {
+                const segments = 48;
+                for (let i = 0; i < segments; i++) {
+                    const a1 = sa + ((ea - sa) / segments) * i;
+                    const a2 = sa + ((ea - sa) / segments) * (i + 1);
+                    const midAngle = (a1 + a2) / 2;
+                    const doppler = 0.5 + 0.5 * Math.cos(midAngle - angle);
+                    const brightness = 0.5 + doppler * 0.5;
+
+                    const cr = Math.round(255);
+                    const cg = Math.round(80 + doppler * 120);
+                    const cb = Math.round(140 + doppler * 60);
+                    const color = (cr << 16) | (cg << 8) | cb;
+
+                    this.bodyGfx.moveTo(Math.cos(a1) * r, Math.sin(a1) * r);
+                    this.bodyGfx.arc(0, 0, r, a1, a2, false);
+                    this.bodyGfx.stroke({
+                        color,
+                        width: this.isBuffed ? 3 : 2.5,
+                        alpha: brightness * (this.isBuffed ? 1.0 : 0.9),
+                        cap: "butt",
+                    });
+                }
+            }
+
+            drawBow(r) {
+                const angle = this.getAngle();
+                const t = this.time;
+                
+                const bowAngle = angle + Math.PI * 0.85;
+                const bowX = Math.cos(bowAngle) * r * 0.9;
+                const bowY = Math.sin(bowAngle) * r * 0.9;
+                
+                const wiggle = Math.sin(t * 1000 * this.config.bowWiggle) * 0.1;
+                const bowScale = this.config.bowSize * (this.isBuffed ? 1.15 : 1);
+                const pulse = 1 + Math.sin(t * 4) * 0.05;
+                
+                for (let side = -1; side <= 1; side += 2) {
+                    const petalAngle = bowAngle + side * (0.7 + wiggle);
+                    const petalLength = r * 0.9 * bowScale * pulse;
+                    const petalWidth = r * 0.55 * bowScale * pulse;
+                    
+                    const tipX = bowX + Math.cos(petalAngle) * petalLength;
+                    const tipY = bowY + Math.sin(petalAngle) * petalLength;
+                    
+                    const perpAngle = petalAngle + Math.PI / 2;
+                    const midX = bowX + Math.cos(petalAngle) * petalLength * 0.5;
+                    const midY = bowY + Math.sin(petalAngle) * petalLength * 0.5;
+                    
+                    const c1x = midX + Math.cos(perpAngle) * petalWidth * side;
+                    const c1y = midY + Math.sin(perpAngle) * petalWidth * side;
+                    const c2x = midX - Math.cos(perpAngle) * petalWidth * side * 0.3;
+                    const c2y = midY - Math.sin(perpAngle) * petalWidth * side * 0.3;
+                    
+                    this.bowGfx.moveTo(bowX, bowY);
+                    this.bowGfx.quadraticCurveTo(c1x, c1y, tipX, tipY);
+                    this.bowGfx.quadraticCurveTo(c2x, c2y, bowX, bowY);
+                    this.bowGfx.closePath();
+                    this.bowGfx.stroke({
+                        color: this.isBuffed ? GOLD_BRIGHT : RIBBON_GLOW,
+                        width: 8,
+                        alpha: 0.4,
+                    });
+                    
+                    this.bowGfx.moveTo(bowX, bowY);
+                    this.bowGfx.quadraticCurveTo(c1x, c1y, tipX, tipY);
+                    this.bowGfx.quadraticCurveTo(c2x, c2y, bowX, bowY);
+                    this.bowGfx.closePath();
+                    this.bowGfx.fill({ 
+                        color: this.isBuffed ? GOLD_ACCENT : RIBBON_BASE, 
+                        alpha: 0.85 
+                    });
+                    
+                    this.bowGfx.moveTo(bowX, bowY);
+                    this.bowGfx.quadraticCurveTo(c1x * 0.95 + bowX * 0.05, c1y * 0.95 + bowY * 0.05, tipX, tipY);
+                    this.bowGfx.stroke({
+                        color: FLARE_WHITE,
+                        width: 1.5,
+                        alpha: 0.7,
+                        cap: "round",
+                    });
+                }
+                
+                this.bowGfx.circle(bowX, bowY, r * 0.25 * bowScale * pulse);
+                this.bowGfx.fill({ color: this.isBuffed ? GOLD_BRIGHT : RIBBON_BASE, alpha: 0.95 });
+                this.bowGfx.circle(bowX, bowY, r * 0.15 * bowScale * pulse);
+                this.bowGfx.fill({ color: FLARE_WHITE, alpha: 0.8 });
+                
+                if (this.isBuffed) {
+                    for (let i = 0; i < 5; i++) {
+                        const starAngle = bowAngle + (i / 5) * Math.PI * 2 + t * 3;
+                        const starDist = r * 1.3;
+                        const starX = bowX + Math.cos(starAngle) * starDist;
+                        const starY = bowY + Math.sin(starAngle) * starDist;
+                        this.drawStar(starX, starY, r * 0.12, 4, GOLD_BRIGHT, 0.9);
+                    }
+                }
+            }
+
+            drawStar(cx, cy, size, points, color, alpha) {
+                for (let i = 0; i < points; i++) {
+                    const angle = (i / points) * Math.PI * 2;
+                    const x2 = cx + Math.cos(angle) * size;
+                    const y2 = cy + Math.sin(angle) * size;
+                    this.bowGfx.moveTo(cx, cy);
+                    this.bowGfx.lineTo(x2, y2);
+                    this.bowGfx.stroke({ color, width: 1.5, alpha, cap: "round" });
+                }
+                this.bowGfx.circle(cx, cy, size * 0.3);
+                this.bowGfx.fill({ color: FLARE_WHITE, alpha });
+            }
+
+            drawMouthGlow(r) {
+                const moving = this.direction.dx !== 0 || this.direction.dy !== 0;
+                const t = this.time * 1000;
+                const angle = this.getAngle();
+
+                let mouth;
+                if (moving) {
+                    const speedMult = this.isBuffed ? 1.35 : 1;
+                    mouth = Math.abs(Math.sin(t * this.config.mouthSpeed * speedMult)) * this.config.maxMouthAngle;
+                } else {
+                    mouth = this.config.idleMouthAngle;
+                }
+                mouth = Math.max(0.06, Math.min(mouth, Math.PI * 0.5));
+                if (this.isBuffed) mouth = Math.min(mouth * 1.15, Math.PI * 0.52);
+
+                const sa = angle + mouth;
+                const ea = angle + Math.PI * 2 - mouth;
+                const mouthSize = Math.PI * 2 - (ea - sa);
+                if (mouthSize < 0.05) return;
+
+                const glowR = r * 0.85;
+                let alpha = Math.min(1, mouthSize / 0.6) * (this.isBuffed ? 0.5 : 0.35);
+                if (!moving && !this.isBuffed) alpha *= 0.8 + 0.2 * Math.sin(this.time * 3);
+
+                this.mouthGfx.moveTo(0, 0);
+                this.mouthGfx.arc(0, 0, glowR, sa, ea, false);
+                this.mouthGfx.lineTo(0, 0);
+                this.mouthGfx.closePath();
+                this.mouthGfx.fill({ color: this.isBuffed ? MOUTH_BUFFED : MOUTH_GLOW, alpha });
+
+                const ringR = r * 0.48;
+                const ringSpan = Math.PI * 0.55;
+                const mouthCenter = sa + (ea - sa) / 2;
+                const ra1 = mouthCenter - ringSpan / 2;
+                const ra2 = mouthCenter + ringSpan / 2;
+
+                this.mouthGfx.moveTo(Math.cos(ra1) * ringR, Math.sin(ra1) * ringR);
+                this.mouthGfx.arc(0, 0, ringR, ra1, ra2, false);
+                this.mouthGfx.stroke({
+                    color: this.isBuffed ? GOLD_BRIGHT : RIBBON_GLOW,
+                    width: this.isBuffed ? 1.5 : 1.2,
+                    alpha: alpha * 1.8,
+                    cap: "round",
+                });
+
+                if (mouthSize > 0.2) {
+                    this.mouthGfx.circle(0, 0, r * 0.05);
+                    this.mouthGfx.fill({ color: FLARE_WHITE, alpha: alpha * 1.4 });
+                }
+            }
+
+            drawParticles() {
+                for (const p of this.particles) {
+                    if (!p.active || p.life <= 0.01) continue;
+                    const alpha = p.life / p.maxLife;
+                    const rx = p.x - this.x;
+                    const ry = p.y - this.y;
+
+                    if (p.type === "star") {
+                        this.particleGfx.circle(rx, ry, p.size * 2.5 * alpha);
+                        this.particleGfx.fill({ color: GOLD_ACCENT, alpha: alpha * 0.3 });
+                        
+                        for (let i = 0; i < 4; i++) {
+                            const a = p.rot + (i / 4) * Math.PI * 2;
+                            const ex = rx + Math.cos(a) * p.size * 1.5;
+                            const ey = ry + Math.sin(a) * p.size * 1.5;
+                            this.particleGfx.moveTo(rx, ry);
+                            this.particleGfx.lineTo(ex, ey);
+                            this.particleGfx.stroke({ color: GOLD_BRIGHT, width: 1, alpha: alpha, cap: "round" });
+                        }
+                        this.particleGfx.circle(rx, ry, p.size * 0.4);
+                        this.particleGfx.fill({ color: FLARE_WHITE, alpha });
+                    } else if (p.type === "heart") {
+                        this.drawHeart(rx, ry, p.size * alpha, alpha);
+                    } else if (p.type === "ribbon") {
+                        this.particleGfx.circle(rx, ry, p.size * 2 * alpha);
+                        this.particleGfx.fill({ color: RIBBON_BASE, alpha: alpha * 0.4 });
+                        this.particleGfx.circle(rx, ry, p.size * 0.5 * alpha);
+                        this.particleGfx.fill({ color: RIBBON_GLOW, alpha: alpha * 0.9 });
+                    } else {
+                        this.particleGfx.circle(rx, ry, p.size * 2 * alpha);
+                        this.particleGfx.fill({ color: SPARKLE_BASE, alpha: alpha * 0.3 });
+                        this.particleGfx.circle(rx, ry, p.size * 0.4 * alpha);
+                        this.particleGfx.fill({ color: SPARKLE_GLOW, alpha: alpha * 0.9 });
+                    }
+                }
+            }
+
+            drawHeart(cx, cy, size, alpha) {
+                const s = size * 0.8;
+                this.particleGfx.moveTo(cx, cy + s * 0.3);
+                this.particleGfx.bezierCurveTo(cx, cy - s * 0.3, cx - s, cy - s * 0.3, cx - s, cy + s * 0.1);
+                this.particleGfx.bezierCurveTo(cx - s, cy + s * 0.6, cx, cy + s, cx, cy + s);
+                this.particleGfx.bezierCurveTo(cx, cy + s, cx + s, cy + s * 0.6, cx + s, cy + s * 0.1);
+                this.particleGfx.bezierCurveTo(cx + s, cy - s * 0.3, cx, cy - s * 0.3, cx, cy + s * 0.3);
+                this.particleGfx.fill({ color: HEART_GLOW, alpha: alpha * 0.8 });
+                
+                this.particleGfx.circle(cx - s * 0.3, cy - s * 0.1, s * 0.2);
+                this.particleGfx.fill({ color: FLARE_WHITE, alpha: alpha * 0.7 });
+            }
+
+            drawSparkles() {
+                for (const s of this.sparkles) {
+                    if (!s.active) continue;
+                    const alpha = (s.life / s.maxLife);
+                    const twinkle = 0.5 + 0.5 * Math.sin(s.twinkle);
+                    const rx = s.x - this.x;
+                    const ry = s.y - this.y;
+                    const sz = s.size * alpha * twinkle;
+                    
+                    for (let i = 0; i < 4; i++) {
+                        const a = s.angle + (i / 4) * Math.PI * 2;
+                        const ex = rx + Math.cos(a) * sz * 1.2;
+                        const ey = ry + Math.sin(a) * sz * 1.2;
+                        this.sparkleGfx.moveTo(rx, ry);
+                        this.sparkleGfx.lineTo(ex, ey);
+                        this.sparkleGfx.stroke({
+                            color: i % 2 === 0 ? GOLD_BRIGHT : FLARE_WHITE,
+                            width: 0.8,
+                            alpha: alpha * twinkle,
+                            cap: "round",
+                        });
+                    }
+                    this.sparkleGfx.circle(rx, ry, sz * 0.3);
+                    this.sparkleGfx.fill({ color: FLARE_WHITE, alpha: alpha * twinkle });
+                }
+            }
+
+            drawRingVfx() {
+                for (const r of this.ringVfx) {
+                    if (r.life <= 0) continue;
+                    const alpha = Math.max(0, r.life / r.maxLife);
+                    const rx = r.x - this.x;
+                    const ry = r.y - this.y;
+
+                    if (r.type === "DOT_SWALLOW") {
+                        if (r.radius > 0.5) {
+                            this.ringVfxGfx.circle(rx, ry, r.radius);
+                            this.ringVfxGfx.stroke({ color: RIBBON_GLOW, width: 1.5 * alpha, alpha: alpha * 0.9 });
+                            this.ringVfxGfx.circle(rx, ry, r.radius * 0.6);
+                            this.ringVfxGfx.stroke({ color: FLARE_WHITE, width: 0.8 * alpha, alpha: alpha * 0.8 });
+                        }
+                    } else if (r.type === "PILL_EXPAND") {
+                        this.ringVfxGfx.circle(rx, ry, r.radius);
+                        this.ringVfxGfx.stroke({ color: GOLD_BRIGHT, width: 3 * alpha, alpha: alpha * 0.9 });
+                        this.ringVfxGfx.circle(rx, ry, r.radius * 0.85);
+                        this.ringVfxGfx.stroke({ color: RIBBON_GLOW, width: 5 * alpha, alpha: alpha * 0.4 });
+                        this.ringVfxGfx.circle(rx, ry, r.radius * 0.3);
+                        this.ringVfxGfx.stroke({ color: FLARE_WHITE, width: 1.5 * alpha, alpha: alpha * 0.7 });
+                    } else if (r.type === "WORMHOLE_EXIT" || r.type === "WORMHOLE_ENTRY") {
+                        const isEntry = r.type === "WORMHOLE_ENTRY";
+                        const progress = 1 - alpha;
+                        const ringR = isEntry ? r.radius : r.maxRadius;
+
+                        this.ringVfxGfx.circle(rx, ry, ringR);
+                        this.ringVfxGfx.stroke({
+                            color: isEntry ? GOLD_BRIGHT : RIBBON_GLOW,
+                            width: 4 * alpha,
+                            alpha: alpha * 0.8,
+                        });
+                        this.ringVfxGfx.circle(rx, ry, ringR * 0.65);
+                        this.ringVfxGfx.stroke({ color: FLARE_WHITE, width: 2.5 * alpha, alpha: alpha * 0.9 });
+
+                        const streakCount = 12;
+                        const baseTwist = Math.PI * 1.8;
+                        const twist = isEntry 
+                            ? progress * baseTwist * (0.8 + 0.4 * Math.sin(progress * 10)) 
+                            : (1 - progress) * baseTwist;
+
+                        for (let s = 0; s < streakCount; s++) {
+                            const baseAngle = (s / streakCount) * Math.PI * 2 + r.rotation;
+                            const innerAngle = baseAngle + twist;
+                            const outerAngle = baseAngle - twist * 0.5;
+                            const innerDist = ringR * 0.15 * alpha;
+                            const outerDist = ringR * (0.9 + alpha * 0.1);
+
+                            this.ringVfxGfx.moveTo(
+                                rx + Math.cos(innerAngle) * innerDist,
+                                ry + Math.sin(innerAngle) * innerDist,
+                            );
+                            this.ringVfxGfx.lineTo(
+                                rx + Math.cos(outerAngle) * outerDist,
+                                ry + Math.sin(outerAngle) * outerDist,
+                            );
+                            this.ringVfxGfx.stroke({
+                                color: s % 3 === 0 ? GOLD_BRIGHT : RIBBON_GLOW,
+                                width: (s % 3 === 0 ? 1.8 : 0.8) * alpha,
+                                alpha: alpha * 0.7,
+                            });
+                        }
+                    }
+                }
+            }
+
+            drawGhostStreak() {
+                if (this.ghostStreakTimer <= 0 && this.ghostTerminalFlash <= 0) return;
+
+                if (this.ghostStreakTimer > 0) {
+                    const progress = 1 - this.ghostStreakTimer / 0.45;
+                    const startX = this.ghostStreakStartX - this.x;
+                    const startY = this.ghostStreakStartY - this.y;
+                    const t = Math.min(1, progress * 2.5);
+                    const cx = startX + (0 - startX) * t;
+                    const cy = startY + (0 - startY) * t;
+                    const alpha = 1 - progress;
+
+                    this.ghostStreakGfx.moveTo(startX, startY);
+                    this.ghostStreakGfx.lineTo(cx, cy);
+                    this.ghostStreakGfx.stroke({
+                        color: GHOST_STREAK,
+                        width: 3.5 * alpha,
+                        alpha: alpha * 0.4,
+                        cap: "round",
+                    });
+                    this.ghostStreakGfx.moveTo(startX, startY);
+                    this.ghostStreakGfx.lineTo(cx, cy);
+                    this.ghostStreakGfx.stroke({
+                        color: FLARE_WHITE,
+                        width: 1.2 * alpha,
+                        alpha: alpha * 0.8,
+                        cap: "round",
+                    });
+                }
+
+                if (this.ghostTerminalFlash > 0) {
+                    const flashAlpha = this.ghostTerminalFlash / 0.15;
+                    const flashR = this.r * (0.5 + flashAlpha * 1.5);
+                    this.ghostStreakGfx.circle(0, 0, flashR);
+                    this.ghostStreakGfx.fill({ color: FLARE_WHITE, alpha: flashAlpha * 0.7 });
+                    this.ghostStreakGfx.circle(0, 0, flashR * 1.6);
+                    this.ghostStreakGfx.fill({ color: GHOST_STREAK, alpha: flashAlpha * 0.3 });
+                }
+            }
+
+            drawEatFlash(r) {
+                if (this.eatFlashTimer <= 0) return;
+                const maxTime = this.eatFlashType === "DOT" ? 0.1
+                    : this.eatFlashType === "PILL" ? 0.45 : 0.4;
+                const alpha = this.eatFlashTimer / maxTime;
+
+                if (this.eatFlashType === "GHOST") {
+                    this.flashGfx.circle(0, 0, r);
+                    this.flashGfx.stroke({ color: FLARE_WHITE, width: 3.5 * alpha, alpha: alpha * 0.7 });
+                    this.flashGfx.circle(0, 0, r + 8);
+                    this.flashGfx.stroke({ color: GOLD_ACCENT, width: 6 * alpha, alpha: alpha * 0.35 });
+                } else if (this.eatFlashType === "PILL") {
+                    this.flashGfx.circle(0, 0, r);
+                    this.flashGfx.stroke({ color: GOLD_BRIGHT, width: 2.5 * alpha, alpha: alpha * 0.9 });
+                }
+                if (this.eatFlashType === "DOT") {
+                    this.flashGfx.circle(0, 0, r * 0.25);
+                    this.flashGfx.fill({ color: FLARE_WHITE, alpha: alpha * 0.3 });
+                }
+            }
+
+            drawDeathBody(r) {
+                const alpha = this.deathTimer < 1.8 ? 1 : Math.max(0, 1 - (this.deathTimer - 1.8) / 0.2);
+                if (alpha <= 0) return;
+
+                this.bodyGfx.circle(0, 0, r);
+                this.bodyGfx.fill({ color: ROSE_CORE, alpha });
+
+                const shrink = this.deathShrinkFactor;
+                const rimWidth = 1.5 + shrink * 1.5;
+
+                if (this.deathTimer < 0.3) {
+                    const flicker = 0.5 + 0.5 * Math.sin(this.deathConvulsePhase);
+                    const color = flicker > 0.7 ? FLARE_WHITE : RIBBON_GLOW;
+                    this.bodyGfx.circle(0, 0, r);
+                    this.bodyGfx.stroke({
+                        color,
+                        width: 2 + flicker * 3,
+                        alpha: (0.5 + flicker * 0.5) * alpha,
+                    });
+                } else {
+                    const color = shrink > 0.7 ? GOLD_BRIGHT : ROSE_BUFFED;
+                    this.bodyGfx.circle(0, 0, r);
+                    this.bodyGfx.stroke({
+                        color,
+                        width: rimWidth,
+                        alpha: (0.5 + shrink * 0.5) * alpha,
+                    });
+
+                    const haloR = r * (1.2 + shrink * 2.5);
+                    this.bodyGfx.circle(0, 0, haloR);
+                    this.bodyGfx.stroke({
+                        color: RIBBON_GLOW,
+                        width: 1,
+                        alpha: shrink * alpha * 0.4,
+                    });
+                }
+
+                if (this.deathTimer >= 1.5 && this.deathTimer < 1.8) {
+                    const popProgress = (this.deathTimer - 1.5) / 0.3;
+                    this.flashGfx.circle(0, 0, this.r * 0.2 * (1 + popProgress * 3));
+                    this.flashGfx.fill({ color: FLARE_WHITE, alpha: (1 - popProgress) * 0.9 });
+                }
+
+                if (this.deathTimer >= 1.8 && this.deathTimer < 1.95) {
+                    const flashAlpha = Math.max(0, 1 - (this.deathTimer - 1.8) / 0.15);
+                    this.flashGfx.circle(0, 0, this.r * 2 * (2 - flashAlpha));
+                    this.flashGfx.fill({ color: FLARE_WHITE, alpha: flashAlpha * 0.6 });
+                }
+            }
+        }
+
+        async function main() {
+            const app = new PIXI.Application();
+            await app.init({
+                width: window.innerWidth,
+                height: window.innerHeight,
+                backgroundColor: 0x080510,
+                antialias: true,
+                resolution: window.devicePixelRatio || 1,
+                autoDensity: true,
+            });
+            document.body.appendChild(app.canvas);
+
+            const pacman = new MsPacmanVisual();
+            app.stage.addChild(pacman.container);
+
+            let demoTime = 0;
+            const radius = Math.min(window.innerWidth, window.innerHeight) * 0.25;
+            const speed = 1.0;
+
+            window.addEventListener('keydown', (e) => {
+                if (e.code === 'Space') {
+                    pacman.isBuffed = !pacman.isBuffed;
+                } else if (e.code === 'KeyE') {
+                    pacman.simulateEat("PILL");
+                } else if (e.code === 'KeyW') {
+                    pacman.simulateWormhole();
+                } else if (e.code === 'KeyG') {
+                    pacman.simulateGhostAbsorb();
+                } else if (e.code === 'KeyR') {
+                    if (pacman.state === "DYING") {
+                        pacman.state = "ALIVE";
+                        pacman.deathTimer = 0;
+                    }
+                }
+            });
+
+            window.addEventListener('click', () => {
+                if (pacman.state === "ALIVE") pacman.triggerDeath();
+            });
+
+            window.addEventListener('resize', () => {
+                app.renderer.resize(window.innerWidth, window.innerHeight);
+            });
+
+            app.ticker.add((ticker) => {
+                const dt = ticker.deltaMS / 1000;
+                demoTime += dt * speed;
+                
+                pacman.x = window.innerWidth / 2 + Math.cos(demoTime) * radius;
+                pacman.y = window.innerHeight / 2 + Math.sin(demoTime) * radius;
+                pacman.direction.dx = -Math.sin(demoTime);
+                pacman.direction.dy = Math.cos(demoTime);
+                pacman.lastDirection = { ...pacman.direction };
+                pacman.container.position.set(pacman.x, pacman.y);
+                pacman.update(dt);
+            });
+        }
+
+        main();
+    </script>
+</body>
+</html>

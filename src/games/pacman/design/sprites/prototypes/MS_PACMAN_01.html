@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ICE ROSE — Power Glow</title>
+<style>
+    body { 
+        margin: 0; 
+        overflow: hidden; 
+        background: #0a1520; 
+        font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+    canvas { display: block; }
+    #ui { 
+        position: absolute; 
+        top: 15px; 
+        left: 15px; 
+        color: #ffaacc; 
+        font-size: 13px; 
+        pointer-events: none;
+        background: rgba(18, 10, 20, 0.75);
+        padding: 12px 16px;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 170, 204, 0.25);
+        backdrop-filter: blur(8px);
+        line-height: 1.8;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        z-index: 10;
+    }
+    #ui strong { color: #fff; font-size: 15px; text-shadow: 0 0 10px rgba(255, 170, 204, 0.6); }
+    #ui kbd {
+        background: rgba(255, 170, 204, 0.15); padding: 2px 8px; border-radius: 3px;
+        font-family: 'Courier New', monospace; color: #ffccdd;
+        border: 1px solid rgba(255, 170, 204, 0.3); font-size: 12px;
+    }
+    #ui .divider { height: 1px; background: rgba(255, 170, 204, 0.2); margin: 8px 0; }
+    #tile-info {
+        position: absolute; bottom: 15px; right: 15px;
+        color: rgba(200, 220, 240, 0.5); font-size: 11px;
+        font-family: 'Courier New', monospace; pointer-events: none; z-index: 10;
+    }
+</style>
+</head>
+<body>
+    <div id="ui">
+        <strong style="color: #fff;">✨ ICE ROSE — Power Glow</strong>
+        <div class="divider"></div>
+        <kbd>Space</kbd> Toggle Buffed<br>
+        <kbd>G</kbd> Trigger Death<br>
+        <kbd>R</kbd> Reset / Revive
+    </div>
+    <div id="tile-info">TILE: 128px | R: 44.8px</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+    <script type="module">
+        const TILE_SIZE = 128;
+        const PAC_RADIUS = TILE_SIZE * 0.35;
+        const FLARE_WHITE = 0xffffff;
+
+        const N_CORE      = 0xaa2255;
+        const N_EDGE      = 0xcc3377;
+        const N_INNER     = 0xff66aa;
+        const N_OUTER     = 0xdd4488;
+        const N_SHADOW    = 0x661133;
+        const N_HIGHLIGHT = 0xffaacc;
+        const N_BOW       = 0xff3388;
+        const N_BOW_LIGHT = 0xff88bb;
+        const N_MOUTH     = 0x991144;
+        const N_RIBBON    = 0xff3388;
+        const N_RIBBON_GL = 0xffaacc;
+        const N_SPARKLE   = 0xff88aa;
+        const N_HEART     = 0xff5599;
+
+        const B_BOW       = 0xff66aa;
+        const B_BOW_LIGHT = 0xffaacc;
+        const B_RIM       = 0xffffff;
+        const B_AURA      = 0xffddee;
+
+        const lerpColor = (a, b, t) => {
+            const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
+            const br = (b >> 16) & 0xff, bg = (b >> 8) & 0xff, bb = b & 0xff;
+            return (Math.round(ar + (br - ar) * t) << 16) |
+                   (Math.round(ag + (bg - ag) * t) << 8) |
+                    Math.round(ab + (bb - ab) * t);
+        };
+
+        class IceRosePacVisual {
+            constructor() {
+                this.x = 0;
+                this.y = 0;
+                this.r = PAC_RADIUS;
+                this.direction = { dx: 1, dy: 0 };
+                this.lastDirection = { dx: 1, dy: 0 };
+                this.state = "ALIVE";
+                this.isBuffed = false;
+                this.buffT = 0;
+                this.time = 0;
+
+                this.config = {
+                    mouthSpeed: 0.008,
+                    maxMouth: Math.PI / 3,
+                    idleMouth: Math.PI / 12,
+                    bowSize: 1.15,
+                    bowWiggle: 0.005,
+                };
+
+                this.container = new PIXI.Container();
+
+                this.trailGfx    = new PIXI.Graphics();
+                this.auraGfx     = new PIXI.Graphics();
+                this.bodyGfx     = new PIXI.Graphics();
+                this.rimGfx      = new PIXI.Graphics();
+                this.bowGfx      = new PIXI.Graphics();
+                this.bowGlowGfx  = new PIXI.Graphics();
+                this.mouthGfx    = new PIXI.Graphics();
+                this.particleGfx = new PIXI.Graphics();
+                this.sparkleGfx  = new PIXI.Graphics();
+
+                this.trailGfx.blendMode    = "add";
+                this.auraGfx.blendMode     = "add";
+                this.bodyGfx.blendMode     = "normal";
+                this.rimGfx.blendMode      = "add";
+                this.bowGfx.blendMode      = "normal";
+                this.bowGlowGfx.blendMode  = "add";
+                this.mouthGfx.blendMode    = "add";
+                this.particleGfx.blendMode = "add";
+                this.sparkleGfx.blendMode  = "add";
+
+                this.container.addChild(
+                    this.trailGfx, this.auraGfx, this.bodyGfx, this.rimGfx,
+                    this.bowGfx, this.bowGlowGfx, this.mouthGfx,
+                    this.particleGfx, this.sparkleGfx
+                );
+
+                this.trail = [];
+                this.particles = [];
+                this.sparkles = [];
+                this.lastTrailX = 0;
+                this.lastTrailY = 0;
+
+                this.deathTimer = 0;
+                this.deathParticleTimer = 0;
+                this.deathShrink = 0;
+                this.deathConvulse = 0;
+
+                for (let i = 0; i < 200; i++) {
+                    this.particles.push({
+                        x: 0, y: 0, vx: 0, vy: 0,
+                        life: 0, maxLife: 1, size: 0,
+                        active: false, rot: 0, rotSpeed: 0, type: "sparkle"
+                    });
+                }
+                for (let i = 0; i < 30; i++) {
+                    this.sparkles.push({
+                        x: 0, y: 0, life: 0, maxLife: 1,
+                        size: 1, angle: 0, active: false, twinkle: 0
+                    });
+                }
+            }
+
+            update(dt) {
+                this.time += dt;
+
+                const target = this.isBuffed ? 1 : 0;
+                this.buffT += (target - this.buffT) * Math.min(1, dt * 4);
+                if (Math.abs(this.buffT - target) < 0.001) this.buffT = target;
+
+                if (this.state === "DYING") {
+                    this.updateDeath(dt);
+                    this.updateParticles(dt);
+                    this.updateSparkles(dt);
+                    this.draw();
+                    return;
+                }
+
+                this.updateTrail(dt);
+                this.updateParticles(dt);
+                this.updateSparkles(dt);
+
+                const dx = this.x - this.lastTrailX;
+                const dy = this.y - this.lastTrailY;
+                if (dx * dx + dy * dy > TILE_SIZE * TILE_SIZE * 0.004) {
+                    this.trail.push({
+                        x: this.x, y: this.y,
+                        life: this.isBuffed ? 0.6 : 0.45,
+                        maxLife: this.isBuffed ? 0.6 : 0.45
+                    });
+                    this.lastTrailX = this.x;
+                    this.lastTrailY = this.y;
+                    this.emitSparkles();
+                    this.emitTrailParticles();
+                }
+
+                this.draw();
+            }
+
+            triggerDeath() {
+                if (this.state === "DYING") return;
+                this.state = "DYING";
+                this.deathTimer = 0;
+                this.deathParticleTimer = 0;
+                this.deathShrink = 0;
+                this.deathConvulse = 0;
+            }
+
+            spawnParticle(o) {
+                for (const p of this.particles) {
+                    if (!p.active) {
+                        Object.assign(p, {
+                            x: 0, y: 0, vx: 0, vy: 0,
+                            life: 1, maxLife: 1, size: 1.5,
+                            rot: 0, rotSpeed: 0, type: "sparkle"
+                        }, o, { active: true });
+                        return;
+                    }
+                }
+            }
+
+            emitSparkles() {
+                const rate = this.isBuffed ? 0.6 : 0.25;
+                if (Math.random() < rate) {
+                    const a = Math.random() * Math.PI * 2;
+                    const d = this.r * (0.4 + Math.random() * 0.6);
+                    for (const s of this.sparkles) {
+                        if (!s.active) {
+                            s.x = this.x + Math.cos(a) * d;
+                            s.y = this.y + Math.sin(a) * d;
+                            s.life = s.maxLife = 0.35 + Math.random() * 0.4;
+                            s.size = (this.isBuffed ? 2 : 1.5) + Math.random() * (this.isBuffed ? 2 : 1.5);
+                            s.angle = Math.random() * Math.PI * 2;
+                            s.active = true;
+                            s.twinkle = Math.random() * Math.PI * 2;
+                            return;
+                        }
+                    }
+                }
+            }
+
+            emitTrailParticles() {
+                const rate = this.isBuffed ? 0.2 : 0.12;
+                if (Math.random() < rate) {
+                    const a = this.getAngle() + Math.PI + (Math.random() - 0.5) * 0.6;
+                    const spd = 30 + Math.random() * 40;
+                    this.spawnParticle({
+                        x: this.x - Math.cos(this.getAngle()) * this.r * 0.6,
+                        y: this.y - Math.sin(this.getAngle()) * this.r * 0.6,
+                        vx: Math.cos(a) * spd, vy: Math.sin(a) * spd,
+                        life: 0.35 + Math.random() * 0.4, maxLife: 0.75,
+                        size: 1 + Math.random() * 1.5,
+                        rot: Math.random() * Math.PI * 2,
+                        rotSpeed: (Math.random() - 0.5) * 4,
+                        type: "ribbon"
+                    });
+                }
+            }
+
+            emitDeathParticles() {
+                const count = 3 + Math.floor(this.deathShrink * 4);
+                for (let i = 0; i < count; i++) {
+                    const a = Math.random() * Math.PI * 2;
+                    const spd = 60 + Math.random() * 150;
+                    const type = Math.random() < 0.3 ? "heart"
+                        : (Math.random() < 0.5 ? "star" : "sparkle");
+                    this.spawnParticle({
+                        x: this.x + Math.cos(a) * this.r * 0.3,
+                        y: this.y + Math.sin(a) * this.r * 0.3,
+                        vx: Math.cos(a) * spd, vy: Math.sin(a) * spd,
+                        life: 0.4 + Math.random() * 0.7, maxLife: 1.1,
+                        size: 1 + Math.random() * 2.5,
+                        rot: Math.random() * Math.PI * 2,
+                        rotSpeed: (Math.random() - 0.5) * 8, type
+                    });
+                }
+            }
+
+            updateTrail(dt) {
+                for (let i = this.trail.length - 1; i >= 0; i--) {
+                    this.trail[i].life -= dt;
+                    if (this.trail[i].life <= 0) this.trail.splice(i, 1);
+                }
+            }
+
+            updateParticles(dt) {
+                for (const p of this.particles) {
+                    if (!p.active) continue;
+                    p.life -= dt;
+                    if (p.life <= 0) { p.active = false; continue; }
+                    p.x += p.vx * dt; p.y += p.vy * dt;
+                    p.vx *= 0.94; p.vy *= 0.94;
+                    p.rot += p.rotSpeed * dt;
+                }
+            }
+
+            updateSparkles(dt) {
+                for (const s of this.sparkles) {
+                    if (!s.active) continue;
+                    s.life -= dt;
+                    s.twinkle += dt * 8;
+                    if (s.life <= 0) s.active = false;
+                }
+            }
+
+            updateDeath(dt) {
+                this.deathTimer += dt;
+                this.deathShrink = Math.min(1, Math.max(0, (this.deathTimer - 0.3) / 1.5));
+                if (this.deathTimer < 0.3) this.deathConvulse += dt * 50;
+                if (this.deathTimer >= 0.3 && this.deathTimer < 1.8) {
+                    this.deathParticleTimer += dt;
+                    const interval = 0.06 - this.deathShrink * 0.04;
+                    while (this.deathParticleTimer > interval) {
+                        this.deathParticleTimer -= interval;
+                        this.emitDeathParticles();
+                    }
+                }
+            }
+
+            getAngle() {
+                const d = (this.direction.dx !== 0 || this.direction.dy !== 0)
+                    ? this.direction : this.lastDirection;
+                return (d.dx === 0 && d.dy === 0) ? 0 : Math.atan2(d.dy, d.dx);
+            }
+
+            getDisplayRadius() {
+                if (this.state === "DYING" && this.deathTimer < 0.3)
+                    return this.r * (1 + Math.sin(this.deathConvulse) * 0.12);
+                if (this.state === "DYING")
+                    return Math.max(0, this.r * (1 - this.deathShrink * 0.88));
+                return this.r * (1 + this.buffT * 0.04);
+            }
+
+            getMouth() {
+                const moving = this.direction.dx !== 0 || this.direction.dy !== 0;
+                let m;
+                if (moving) {
+                    const sm = this.isBuffed ? 1.35 : 1;
+                    m = Math.abs(Math.sin(this.time * 1000 * this.config.mouthSpeed * sm))
+                        * this.config.maxMouth;
+                } else {
+                    m = this.config.idleMouth;
+                }
+                m = Math.max(0.06, Math.min(m, Math.PI * 0.5));
+                if (this.isBuffed) m = Math.min(m * 1.15, Math.PI * 0.52);
+                return m;
+            }
+
+            // Helper: check if a point (hx, hy) is inside the mouth zone
+            isInMouthZone(hx, hy, angle, mouth) {
+                const highlightAngle = Math.atan2(hy, hx);
+                let diff = highlightAngle - angle;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                return Math.abs(diff) < mouth * 1.1;
+            }
+
+            draw() {
+                this.trailGfx.clear();
+                this.auraGfx.clear();
+                this.bodyGfx.clear();
+                this.rimGfx.clear();
+                this.bowGfx.clear();
+                this.bowGlowGfx.clear();
+                this.mouthGfx.clear();
+                this.particleGfx.clear();
+                this.sparkleGfx.clear();
+
+                const r = this.getDisplayRadius();
+                if (r <= 0.3) return;
+
+                if (this.state === "DYING") {
+                    this.drawDeath(r);
+                    this.drawParticles();
+                    this.drawSparkles();
+                    return;
+                }
+
+                this.drawTrail();
+                this.drawAura(r);
+                this.drawBody(r);
+                if (this.buffT > 0.01) this.drawRimLight(r);
+                this.drawBow(r);
+                if (this.buffT > 0.01) this.drawBowGlow(r);
+                this.drawMouth(r);
+                this.drawParticles();
+                this.drawSparkles();
+            }
+
+            drawTrail() {
+                if (this.trail.length < 2) return;
+                const baseW = this.r * (this.isBuffed ? 0.3 : 0.25);
+
+                for (let i = 1; i < this.trail.length; i++) {
+                    const p1 = this.trail[i - 1], p2 = this.trail[i];
+                    const ratio = p2.life / p2.maxLife;
+                    if (ratio <= 0.01) continue;
+
+                    const x1 = p1.x - this.x, y1 = p1.y - this.y;
+                    const x2 = p2.x - this.x, y2 = p2.y - this.y;
+                    const w = baseW * ratio;
+
+                    this.trailGfx.moveTo(x1, y1);
+                    this.trailGfx.lineTo(x2, y2);
+                    this.trailGfx.stroke({
+                        color: N_RIBBON,
+                        width: w * 2.5, alpha: ratio * 0.18,
+                        cap: "round", join: "round"
+                    });
+
+                    this.trailGfx.moveTo(x1, y1);
+                    this.trailGfx.lineTo(x2, y2);
+                    this.trailGfx.stroke({
+                        color: N_RIBBON_GL,
+                        width: w * 0.8, alpha: ratio * 0.5,
+                        cap: "round", join: "round"
+                    });
+                }
+            }
+
+            drawAura(r) {
+                if (this.buffT > 0.01) {
+                    const aR = r * 1.1;
+                    this.auraGfx.circle(0, 0, aR);
+                    this.auraGfx.fill({ color: B_AURA, alpha: 0.12 * this.buffT });
+                    
+                    this.auraGfx.circle(0, 0, aR * 0.85);
+                    this.auraGfx.fill({ color: FLARE_WHITE, alpha: 0.08 * this.buffT });
+                }
+            }
+
+            drawBody(r) {
+                const angle = this.getAngle();
+                const mouth = this.getMouth();
+                const sa = angle + mouth;
+                const ea = angle + Math.PI * 2 - mouth;
+
+                const brightness = 1 + this.buffT * 0.15;
+
+                const layers = [
+                    { frac: 1.0,  color: N_SHADOW,   alpha: 1.0 },
+                    { frac: 0.92, color: N_CORE,      alpha: 0.95 },
+                    { frac: 0.82, color: N_EDGE,      alpha: 0.9 },
+                    { frac: 0.70, color: N_OUTER,     alpha: 0.85 },
+                    { frac: 0.55, color: N_INNER,     alpha: 0.8 },
+                    { frac: 0.38, color: N_HIGHLIGHT, alpha: 0.6 * brightness },
+                ];
+
+                for (const L of layers) {
+                    const gR = r * L.frac;
+                    if (gR < 0.5) continue;
+                    this.bodyGfx.moveTo(0, 0);
+                    this.bodyGfx.arc(0, 0, gR, sa, ea, false);
+                    this.bodyGfx.lineTo(0, 0);
+                    this.bodyGfx.closePath();
+                    this.bodyGfx.fill({ color: L.color, alpha: L.alpha });
+                }
+
+                // Highlights — only draw if NOT in mouth zone
+                const hlX1 = -r * 0.32, hlY1 = -r * 0.32;
+                const hlX2 = -r * 0.38, hlY2 = -r * 0.38;
+
+                if (!this.isInMouthZone(hlX1, hlY1, angle, mouth)) {
+                    this.bodyGfx.circle(hlX1, hlY1, r * 0.28);
+                    this.bodyGfx.fill({ color: FLARE_WHITE, alpha: 0.2 * brightness });
+                }
+
+                if (!this.isInMouthZone(hlX2, hlY2, angle, mouth)) {
+                    this.bodyGfx.circle(hlX2, hlY2, r * 0.12);
+                    this.bodyGfx.fill({ color: FLARE_WHITE, alpha: 0.35 * brightness });
+                }
+
+                // Bottom shadow — always safe (opposite side of typical mouth direction)
+                this.bodyGfx.ellipse(0, r * 0.35, r * 0.7, r * 0.25);
+                this.bodyGfx.fill({ color: N_SHADOW, alpha: 0.2 });
+
+                this.bodyGfx.moveTo(0, 0);
+                this.bodyGfx.arc(0, 0, r, sa, ea, false);
+                this.bodyGfx.lineTo(0, 0);
+                this.bodyGfx.closePath();
+                this.bodyGfx.stroke({
+                    color: N_INNER,
+                    width: 2, alpha: 0.5, alignment: 0.5
+                });
+            }
+
+            drawRimLight(r) {
+                const alpha = this.buffT;
+                const angle = this.getAngle();
+                const mouth = this.getMouth();
+                const sa = angle + mouth + 0.08;
+                const ea = angle + Math.PI * 2 - mouth - 0.08;
+
+                this.rimGfx.arc(0, 0, r + 2, sa, ea, false);
+                this.rimGfx.stroke({ 
+                    color: B_RIM, width: 6, alpha: 0.2 * alpha 
+                });
+
+                this.rimGfx.arc(0, 0, r + 1, sa, ea, false);
+                this.rimGfx.stroke({ 
+                    color: B_RIM, width: 3.5, alpha: 0.35 * alpha 
+                });
+
+                this.rimGfx.arc(0, 0, r, sa, ea, false);
+                this.rimGfx.stroke({ 
+                    color: B_RIM, width: 1.5, alpha: 0.8 * alpha 
+                });
+            }
+
+            drawBow(r) {
+                const angle = this.getAngle();
+                const t = this.time;
+                const bowA = angle + Math.PI * 0.85;
+                const bowX = Math.cos(bowA) * r * 0.9;
+                const bowY = Math.sin(bowA) * r * 0.9;
+                const wiggle = Math.sin(t * 1000 * this.config.bowWiggle) * 0.1;
+                const scale = this.config.bowSize;
+                const pulse = 1 + Math.sin(t * 4) * 0.05;
+
+                const bowColor = lerpColor(N_BOW, B_BOW, this.buffT);
+                const bowLightColor = lerpColor(N_BOW_LIGHT, B_BOW_LIGHT, this.buffT);
+                const highlightAlpha = 0.6 + this.buffT * 0.3;
+
+                for (let side = -1; side <= 1; side += 2) {
+                    const pa = bowA + side * (0.7 + wiggle);
+                    const pL = r * 0.85 * scale * pulse;
+                    const pW = r * 0.5 * scale * pulse;
+                    const tipX = bowX + Math.cos(pa) * pL;
+                    const tipY = bowY + Math.sin(pa) * pL;
+                    const perp = pa + Math.PI / 2;
+                    const mx = bowX + Math.cos(pa) * pL * 0.5;
+                    const my = bowY + Math.sin(pa) * pL * 0.5;
+                    const c1x = mx + Math.cos(perp) * pW * side;
+                    const c1y = my + Math.sin(perp) * pW * side;
+                    const c2x = mx - Math.cos(perp) * pW * side * 0.3;
+                    const c2y = my - Math.sin(perp) * pW * side * 0.3;
+
+                    this.bowGfx.moveTo(bowX, bowY);
+                    this.bowGfx.quadraticCurveTo(c1x, c1y, tipX, tipY);
+                    this.bowGfx.quadraticCurveTo(c2x, c2y, bowX, bowY);
+                    this.bowGfx.closePath();
+                    this.bowGfx.stroke({ 
+                        color: bowLightColor, 
+                        width: 6, 
+                        alpha: 0.3 + this.buffT * 0.2 
+                    });
+
+                    this.bowGfx.moveTo(bowX, bowY);
+                    this.bowGfx.quadraticCurveTo(c1x, c1y, tipX, tipY);
+                    this.bowGfx.quadraticCurveTo(c2x, c2y, bowX, bowY);
+                    this.bowGfx.closePath();
+                    this.bowGfx.fill({ color: bowColor, alpha: 0.85 });
+
+                    this.bowGfx.moveTo(bowX, bowY);
+                    this.bowGfx.quadraticCurveTo(
+                        c1x * 0.95 + bowX * 0.05, 
+                        c1y * 0.95 + bowY * 0.05, 
+                        tipX, tipY
+                    );
+                    this.bowGfx.stroke({ 
+                        color: FLARE_WHITE, 
+                        width: 1.5, 
+                        alpha: highlightAlpha, 
+                        cap: "round" 
+                    });
+                }
+
+                this.bowGfx.circle(bowX, bowY, r * 0.22 * scale * pulse);
+                this.bowGfx.fill({ color: bowColor, alpha: 0.95 });
+                this.bowGfx.circle(bowX, bowY, r * 0.12 * scale * pulse);
+                this.bowGfx.fill({ color: FLARE_WHITE, alpha: 0.7 + this.buffT * 0.2 });
+            }
+
+            drawBowGlow(r) {
+                const alpha = this.buffT;
+                const angle = this.getAngle();
+                const bowA = angle + Math.PI * 0.85;
+                const bowX = Math.cos(bowA) * r * 0.9;
+                const bowY = Math.sin(bowA) * r * 0.9;
+                const pulse = 1 + Math.sin(this.time * 3) * 0.1;
+
+                this.bowGlowGfx.circle(bowX, bowY, r * 0.45 * pulse);
+                this.bowGlowGfx.fill({ color: FLARE_WHITE, alpha: 0.1 * alpha });
+
+                this.bowGlowGfx.circle(bowX, bowY, r * 0.35 * pulse);
+                this.bowGlowGfx.fill({ color: B_AURA, alpha: 0.15 * alpha });
+
+                this.bowGlowGfx.circle(bowX, bowY, r * 0.25 * pulse);
+                this.bowGlowGfx.fill({ color: FLARE_WHITE, alpha: 0.2 * alpha });
+            }
+
+            drawMouth(r) {
+                const angle = this.getAngle();
+                const mouth = this.getMouth();
+                const sa = angle + mouth;
+                const ea = angle + Math.PI * 2 - mouth;
+                const mSize = Math.PI * 2 - (ea - sa);
+                if (mSize < 0.05) return;
+
+                let a = Math.min(1, mSize / 0.6) * (this.isBuffed ? 0.45 : 0.3);
+                const moving = this.direction.dx !== 0 || this.direction.dy !== 0;
+                if (!moving && !this.isBuffed) a *= 0.8 + 0.2 * Math.sin(this.time * 3);
+
+                this.mouthGfx.moveTo(0, 0);
+                this.mouthGfx.arc(0, 0, r * 0.85, sa, ea, false);
+                this.mouthGfx.lineTo(0, 0);
+                this.mouthGfx.closePath();
+                this.mouthGfx.fill({ color: N_MOUTH, alpha: a });
+
+                const rR = r * 0.45;
+                const span = Math.PI * 0.5;
+                const mc = sa + (ea - sa) / 2;
+                this.mouthGfx.arc(0, 0, rR, mc - span / 2, mc + span / 2, false);
+                this.mouthGfx.stroke({
+                    color: N_RIBBON_GL,
+                    width: 1.2, alpha: a * 1.5, cap: "round"
+                });
+
+                if (mSize > 0.2) {
+                    this.mouthGfx.circle(0, 0, r * 0.04);
+                    this.mouthGfx.fill({ color: FLARE_WHITE, alpha: a * 1.2 });
+                }
+            }
+
+            drawParticles() {
+                for (const p of this.particles) {
+                    if (!p.active || p.life <= 0.01) continue;
+                    const a = p.life / p.maxLife;
+                    const rx = p.x - this.x, ry = p.y - this.y;
+
+                    if (p.type === "star") {
+                        this.particleGfx.circle(rx, ry, p.size * 2 * a);
+                        this.particleGfx.fill({ color: N_HIGHLIGHT, alpha: a * 0.25 });
+                        for (let i = 0; i < 4; i++) {
+                            const ang = p.rot + (i / 4) * Math.PI * 2;
+                            this.particleGfx.moveTo(rx, ry);
+                            this.particleGfx.lineTo(
+                                rx + Math.cos(ang) * p.size * 1.2,
+                                ry + Math.sin(ang) * p.size * 1.2
+                            );
+                            this.particleGfx.stroke({ color: FLARE_WHITE, width: 0.8, alpha: a, cap: "round" });
+                        }
+                        this.particleGfx.circle(rx, ry, p.size * 0.3);
+                        this.particleGfx.fill({ color: FLARE_WHITE, alpha: a });
+                    } else if (p.type === "heart") {
+                        this.drawHeart(rx, ry, p.size * a, a);
+                    } else if (p.type === "ribbon") {
+                        this.particleGfx.circle(rx, ry, p.size * 1.5 * a);
+                        this.particleGfx.fill({ color: N_RIBBON, alpha: a * 0.3 });
+                        this.particleGfx.circle(rx, ry, p.size * 0.4 * a);
+                        this.particleGfx.fill({ color: N_RIBBON_GL, alpha: a * 0.8 });
+                    } else {
+                        this.particleGfx.circle(rx, ry, p.size * 1.5 * a);
+                        this.particleGfx.fill({ color: N_SPARKLE, alpha: a * 0.25 });
+                        this.particleGfx.circle(rx, ry, p.size * 0.35 * a);
+                        this.particleGfx.fill({ color: FLARE_WHITE, alpha: a * 0.8 });
+                    }
+                }
+            }
+
+            drawHeart(cx, cy, size, alpha) {
+                const s = size * 0.8;
+                this.particleGfx.moveTo(cx, cy + s * 0.3);
+                this.particleGfx.bezierCurveTo(cx, cy - s * 0.3, cx - s, cy - s * 0.3, cx - s, cy + s * 0.1);
+                this.particleGfx.bezierCurveTo(cx - s, cy + s * 0.6, cx, cy + s, cx, cy + s);
+                this.particleGfx.bezierCurveTo(cx, cy + s, cx + s, cy + s * 0.6, cx + s, cy + s * 0.1);
+                this.particleGfx.bezierCurveTo(cx + s, cy - s * 0.3, cx, cy - s * 0.3, cx, cy + s * 0.3);
+                this.particleGfx.fill({ color: N_HEART, alpha: alpha * 0.7 });
+                this.particleGfx.circle(cx - s * 0.3, cy - s * 0.1, s * 0.15);
+                this.particleGfx.fill({ color: FLARE_WHITE, alpha: alpha * 0.6 });
+            }
+
+            drawSparkles() {
+                for (const s of this.sparkles) {
+                    if (!s.active) continue;
+                    const a = s.life / s.maxLife;
+                    const tw = 0.5 + 0.5 * Math.sin(s.twinkle);
+                    const rx = s.x - this.x, ry = s.y - this.y;
+                    const sz = s.size * a * tw;
+
+                    for (let i = 0; i < 4; i++) {
+                        const ang = s.angle + (i / 4) * Math.PI * 2;
+                        this.sparkleGfx.moveTo(rx, ry);
+                        this.sparkleGfx.lineTo(rx + Math.cos(ang) * sz, ry + Math.sin(ang) * sz);
+                        this.sparkleGfx.stroke({
+                            color: i % 2 === 0 ? N_HIGHLIGHT : FLARE_WHITE,
+                            width: 0.7, alpha: a * tw, cap: "round"
+                        });
+                    }
+                    this.sparkleGfx.circle(rx, ry, sz * 0.25);
+                    this.sparkleGfx.fill({ color: FLARE_WHITE, alpha: a * tw });
+                }
+            }
+
+            drawDeath(r) {
+                const alpha = this.deathTimer < 1.8 ? 1 : Math.max(0, 1 - (this.deathTimer - 1.8) / 0.2);
+                if (alpha <= 0) return;
+                this.bodyGfx.circle(0, 0, r);
+                this.bodyGfx.fill({ color: N_SHADOW, alpha });
+                const shrink = this.deathShrink;
+                if (this.deathTimer < 0.3) {
+                    const fl = 0.5 + 0.5 * Math.sin(this.deathConvulse);
+                    this.bodyGfx.circle(0, 0, r);
+                    this.bodyGfx.stroke({
+                        color: fl > 0.7 ? FLARE_WHITE : N_RIBBON_GL,
+                        width: 2 + fl * 3, alpha: (0.5 + fl * 0.5) * alpha
+                    });
+                } else {
+                    this.bodyGfx.circle(0, 0, r);
+                    this.bodyGfx.stroke({
+                        color: shrink > 0.7 ? FLARE_WHITE : N_HIGHLIGHT,
+                        width: 1.5 + shrink * 1.5, alpha: (0.5 + shrink * 0.5) * alpha
+                    });
+                }
+                if (this.deathTimer >= 1.8 && this.deathTimer < 1.95) {
+                    const fa = Math.max(0, 1 - (this.deathTimer - 1.8) / 0.15);
+                    this.bodyGfx.circle(0, 0, this.r * 2 * (2 - fa));
+                    this.bodyGfx.fill({ color: FLARE_WHITE, alpha: fa * 0.5 });
+                }
+            }
+        }
+
+        async function main() {
+            const app = new PIXI.Application();
+            await app.init({
+                width: window.innerWidth,
+                height: window.innerHeight,
+                backgroundColor: 0x0a1520,
+                antialias: true,
+                resolution: window.devicePixelRatio || 1,
+                autoDensity: true,
+            });
+            document.body.appendChild(app.canvas);
+
+            const pacman = new IceRosePacVisual();
+            app.stage.addChild(pacman.container);
+
+            let demoTime = 0;
+            const speed = 1.0;
+            const orbitTiles = 3;
+
+            function updateLayout() {
+                app.renderer.resize(window.innerWidth, window.innerHeight);
+            }
+            window.addEventListener('resize', updateLayout);
+            updateLayout();
+
+            window.addEventListener('keydown', (e) => {
+                if (e.code === 'Space') pacman.isBuffed = !pacman.isBuffed;
+                if (e.code === 'KeyG') pacman.triggerDeath();
+                if (e.code === 'KeyR' && pacman.state === "DYING") {
+                    pacman.state = "ALIVE";
+                    pacman.deathTimer = 0;
+                }
+            });
+
+            app.ticker.add((ticker) => {
+                const dt = ticker.deltaMS / 1000;
+                demoTime += dt * speed;
+
+                const cx = window.innerWidth / 2;
+                const cy = window.innerHeight / 2;
+                const orbitR = TILE_SIZE * orbitTiles;
+
+                pacman.x = cx + Math.cos(demoTime) * orbitR;
+                pacman.y = cy + Math.sin(demoTime * 0.7) * orbitR * 0.5;
+                pacman.direction.dx = -Math.sin(demoTime);
+                pacman.direction.dy = Math.cos(demoTime * 0.7) * 0.7;
+                pacman.lastDirection = { ...pacman.direction };
+                
+                pacman.container.x = pacman.x;
+                pacman.container.y = pacman.y;
+                
+                pacman.update(dt);
+            });
+        }
+
+        main();
+    </script>
+</body>
+</html>

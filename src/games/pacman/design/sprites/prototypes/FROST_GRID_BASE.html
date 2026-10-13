@@ -1,0 +1,2143 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Winter Labyrinth — Art Director Cut</title>
+    <style>
+      :root {
+        --bg: #0a1520;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: var(--bg);
+        font-family: "Courier New", monospace;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        transition: background 1.5s ease;
+        overflow: hidden;
+      }
+      .main-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        padding: 20px;
+      }
+      .title {
+        font-size: 18px;
+        color: #c8d8e8;
+        letter-spacing: 6px;
+        text-transform: uppercase;
+        text-shadow: 0 0 20px rgba(168, 200, 232, 0.4);
+        transition: color 1.5s ease;
+      }
+      .viewport {
+        position: relative;
+        border: 1px solid rgba(168, 200, 232, 0.3);
+        box-shadow:
+          0 0 40px rgba(100, 140, 180, 0.15),
+          inset 0 0 60px rgba(0, 0, 0, 0.5);
+        border-radius: 4px;
+        overflow: hidden;
+        transition:
+          filter 1.5s ease,
+          border-color 1.5s ease,
+          box-shadow 1.5s ease;
+      }
+      .viewport.dawn {
+        filter: contrast(1.05) saturate(1.2) brightness(1) sepia(0.08);
+      }
+      .viewport.noon {
+        filter: contrast(1.15) saturate(1.1) brightness(1.08);
+      }
+      .viewport.dusk {
+        filter: contrast(1.1) saturate(1.3) brightness(0.92) sepia(0.15);
+      }
+      .viewport.night {
+        filter: contrast(1.1) saturate(0.9) brightness(0.95);
+      }
+      .viewport.blizzard {
+        filter: contrast(1.05) saturate(0.7) brightness(1.05);
+      }
+
+      canvas {
+        display: block;
+      }
+      .vignette {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(
+          ellipse at center,
+          transparent 30%,
+          rgba(5, 10, 18, 0.6) 100%
+        );
+        transition: opacity 1.5s ease;
+      }
+      .viewport.blizzard .vignette {
+        background: radial-gradient(
+          ellipse at center,
+          transparent 20%,
+          rgba(10, 20, 30, 0.5) 100%
+        );
+      }
+      .color-grade {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        mix-blend-mode: overlay;
+        opacity: 0;
+        transition:
+          opacity 1.5s ease,
+          background 1.5s ease;
+      }
+      .viewport.dawn .color-grade {
+        opacity: 0.15;
+        background: linear-gradient(
+          180deg,
+          rgba(255, 180, 140, 0.3) 0%,
+          transparent 50%,
+          rgba(100, 80, 120, 0.2) 100%
+        );
+      }
+      .viewport.noon .color-grade {
+        opacity: 0.08;
+        background: linear-gradient(
+          180deg,
+          rgba(200, 230, 255, 0.2) 0%,
+          transparent 60%
+        );
+      }
+      .viewport.dusk .color-grade {
+        opacity: 0.25;
+        background: linear-gradient(
+          180deg,
+          rgba(255, 140, 60, 0.4) 0%,
+          rgba(200, 80, 40, 0.2) 40%,
+          rgba(40, 60, 100, 0.3) 100%
+        );
+      }
+      .viewport.night .color-grade {
+        opacity: 0.1;
+        background: linear-gradient(
+          180deg,
+          rgba(80, 120, 180, 0.15) 0%,
+          transparent 60%,
+          rgba(20, 30, 60, 0.2) 100%
+        );
+      }
+      .blizzard-overlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: rgba(220, 235, 250, 0);
+        transition: background 3s ease;
+      }
+      .viewport.blizzard .blizzard-overlay {
+        background: rgba(220, 235, 250, 0.12);
+      }
+
+      .controls {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      .btn {
+        background: rgba(15, 25, 35, 0.8);
+        color: #c8d8e8;
+        border: 1px solid rgba(168, 200, 232, 0.3);
+        padding: 8px 16px;
+        font-family: inherit;
+        font-size: 11px;
+        letter-spacing: 2px;
+        cursor: pointer;
+        text-transform: uppercase;
+        border-radius: 2px;
+        transition: all 0.3s;
+      }
+      .btn:hover {
+        background: rgba(25, 40, 55, 0.9);
+        border-color: rgba(200, 216, 232, 0.5);
+      }
+      .btn.active {
+        background: rgba(40, 60, 80, 0.9);
+        border-color: rgba(220, 235, 255, 0.6);
+        color: #ffffff;
+        box-shadow: 0 0 15px rgba(168, 200, 232, 0.3);
+      }
+      .btn.dawn-btn.active {
+        background: rgba(80, 50, 40, 0.9);
+        border-color: rgba(255, 180, 140, 0.6);
+      }
+      .btn.noon-btn.active {
+        background: rgba(40, 60, 80, 0.9);
+        border-color: rgba(200, 230, 255, 0.6);
+      }
+      .btn.dusk-btn.active {
+        background: rgba(80, 40, 30, 0.9);
+        border-color: rgba(255, 140, 60, 0.6);
+      }
+      .btn.night-btn.active {
+        background: rgba(20, 30, 50, 0.9);
+        border-color: rgba(100, 140, 200, 0.6);
+      }
+      .btn.blizzard-btn.active {
+        background: rgba(60, 70, 80, 0.9);
+        border-color: rgba(220, 235, 250, 0.7);
+        box-shadow: 0 0 20px rgba(200, 220, 240, 0.4);
+      }
+      .separator {
+        width: 1px;
+        background: rgba(168, 200, 232, 0.2);
+        margin: 0 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="main-container">
+      <div class="title">Winter Labyrinth</div>
+      <div class="viewport night" id="viewport">
+        <div id="pixi-container"></div>
+        <div class="color-grade"></div>
+        <div class="vignette"></div>
+        <div class="blizzard-overlay"></div>
+      </div>
+      <div class="controls">
+        <button class="btn dawn-btn" id="btnDawn">☀ Dawn</button>
+        <button class="btn noon-btn" id="btnNoon">◐ Noon</button>
+        <button class="btn dusk-btn" id="btnDusk">☾ Dusk</button>
+        <button class="btn night-btn active" id="btnNight">● Night</button>
+        <div class="separator"></div>
+        <button class="btn blizzard-btn" id="btnBlizzard">❄ Blizzard</button>
+        <div class="separator"></div>
+        <button class="btn" id="btnLair">◇ Lair Gate</button>
+        <button class="btn" id="btnBloom">✦ Bloom</button>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+    <script type="module">
+      const TILE_MAP = [
+        [
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "PP",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "PP",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+        ],
+        [
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "LE",
+          "LE",
+          "LE",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "LT",
+          "LT",
+          "LT",
+          "LT",
+          "LT",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "0A",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "BY",
+          "IY",
+          "LT",
+          "PY",
+          "CE",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "0A",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "LT",
+          "LT",
+          "LT",
+          "LT",
+          "LT",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+        ],
+        [
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "PM",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "DT",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "DT",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "PP",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "DT",
+          "PP",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "WL",
+          "ES",
+        ],
+        [
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+          "ES",
+        ],
+      ];
+
+      const COLS = 25,
+        ROWS = 26,
+        TILE_SIZE = 28;
+      const GRID_W = COLS * TILE_SIZE,
+        GRID_H = ROWS * TILE_SIZE;
+
+      const PALETTES = {
+        dawn: {
+          void: 0x1a1520,
+          floor: 0x201a25,
+          floorSnow: 0xf0e0d8,
+          wallBase: 0x5a4a5a,
+          wallTop: 0x8a6a7a,
+          wallShadow: 0x3a2a3a,
+          wallEdge: 0xaa8899,
+          wallCrack: 0x4a3a4a,
+          wallSnow: 0xe8d8d0,
+          wallFrost: 0xfff0f0,
+          icicle: 0xf8e8e0,
+          lairBase: 0x4a3a4a,
+          lairGlow: 0xcc99aa,
+          lairRune: 0xffccdd,
+          teleCore: 0x1a1520,
+          teleRing: 0xaa8899,
+          teleBright: 0xffccdd,
+          teleArc: 0xcc99aa,
+          teleCrystal: 0xeec8d8,
+          snowflake: 0xf0e0d8,
+          fogColor: 0xc8a8b8,
+          godRay: 0xffccbb,
+          icePatch: 0xe0d0d8,
+          aoColor: 0x0a0510,
+        },
+        noon: {
+          void: 0x152535,
+          floor: 0x1a3040,
+          floorSnow: 0xe8f0ff,
+          wallBase: 0x6a7a8a,
+          wallTop: 0x8a9aaa,
+          wallShadow: 0x3a4a5a,
+          wallEdge: 0x9aaabb,
+          wallCrack: 0x4a5a6a,
+          wallSnow: 0xf0f8ff,
+          wallFrost: 0xffffff,
+          icicle: 0xe0f0ff,
+          lairBase: 0x4a5a6a,
+          lairGlow: 0xbbddee,
+          lairRune: 0xe0f0ff,
+          teleCore: 0x152535,
+          teleRing: 0x99bbdd,
+          teleBright: 0xe0f0ff,
+          teleArc: 0xbbddee,
+          teleCrystal: 0xc8e0f8,
+          snowflake: 0xe8f0ff,
+          fogColor: 0xa8c8e8,
+          godRay: 0xbbddff,
+          icePatch: 0xc0d8f0,
+          aoColor: 0x051020,
+        },
+        dusk: {
+          void: 0x2a1510,
+          floor: 0x301a15,
+          floorSnow: 0xf0d8c0,
+          wallBase: 0x7a5a4a,
+          wallTop: 0xaa7a5a,
+          wallShadow: 0x3a2a20,
+          wallEdge: 0xcc8866,
+          wallCrack: 0x4a3a30,
+          wallSnow: 0xe8c8b0,
+          wallFrost: 0xffe8d8,
+          icicle: 0xf0d8c0,
+          lairBase: 0x4a3a30,
+          lairGlow: 0xdd9966,
+          lairRune: 0xffcc99,
+          teleCore: 0x2a1510,
+          teleRing: 0xcc8866,
+          teleBright: 0xffaa77,
+          teleArc: 0xdd9966,
+          teleCrystal: 0xe8b898,
+          snowflake: 0xf0d8c0,
+          fogColor: 0xc89878,
+          godRay: 0xffbb88,
+          icePatch: 0xd0b8a0,
+          aoColor: 0x150808,
+        },
+        night: {
+          void: 0x0a1520,
+          floor: 0x0f1a25,
+          floorSnow: 0xd8e8f8,
+          wallBase: 0x4a5a6a,
+          wallTop: 0x6a7a8a,
+          wallShadow: 0x2a3a4a,
+          wallEdge: 0x7a8a9a,
+          wallCrack: 0x3a4a5a,
+          wallSnow: 0xe0ecf8,
+          wallFrost: 0xffffff,
+          icicle: 0xe8f4ff,
+          lairBase: 0x3a4a5a,
+          lairGlow: 0xa8c8e8,
+          lairRune: 0xd0e8ff,
+          teleCore: 0x0a1520,
+          teleRing: 0x88b8d8,
+          teleBright: 0xd0e8ff,
+          teleArc: 0xa8c8e8,
+          teleCrystal: 0xb8d0e8,
+          snowflake: 0xd8e8f8,
+          fogColor: 0x8aa8c8,
+          godRay: 0x88aadd,
+          icePatch: 0xb0c8e0,
+          aoColor: 0x000810,
+        },
+      };
+
+      let currentPalette = { ...PALETTES.night };
+      let targetPalette = { ...PALETTES.night };
+      let paletteTransition = 1.0;
+      let currentMode = "night";
+      let isBlizzard = false;
+      let bloomEnabled = true;
+
+      function hexToRgb(hex) {
+        return { r: (hex >> 16) & 0xff, g: (hex >> 8) & 0xff, b: hex & 0xff };
+      }
+      function rgbToHex(r, g, b) {
+        return (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b);
+      }
+      function lerpColor(c1, c2, t) {
+        const a = hexToRgb(c1),
+          b = hexToRgb(c2);
+        return rgbToHex(
+          a.r + (b.r - a.r) * t,
+          a.g + (b.g - a.g) * t,
+          a.b + (b.b - a.b) * t,
+        );
+      }
+      function updatePalette(dt) {
+        if (paletteTransition < 1.0) {
+          paletteTransition = Math.min(1.0, paletteTransition + dt * 0.8);
+          const t = paletteTransition;
+          for (const key in targetPalette) {
+            currentPalette[key] = lerpColor(
+              currentPalette[key],
+              targetPalette[key],
+              t,
+            );
+          }
+          rebuildStaticCache();
+        }
+      }
+      function setPaletteMode(mode) {
+        if (mode === currentMode && paletteTransition >= 1.0) return;
+        currentMode = mode;
+        targetPalette = { ...PALETTES[mode] };
+        paletteTransition = 0;
+        const vp = document.getElementById("viewport");
+        vp.classList.remove("dawn", "noon", "dusk", "night");
+        vp.classList.add(mode);
+        document.querySelectorAll(".btn").forEach((b) => {
+          if (
+            b.id !== "btnBlizzard" &&
+            b.id !== "btnLair" &&
+            b.id !== "btnBloom"
+          )
+            b.classList.remove("active");
+        });
+        document
+          .getElementById("btn" + mode.charAt(0).toUpperCase() + mode.slice(1))
+          .classList.add("active");
+      }
+
+      // === Parse map ===
+      const wallTiles = [],
+        lairTiles = [],
+        teleTiles = [];
+      let spawnTile = { c: -1, r: -1 };
+
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const t = TILE_MAP[r][c];
+          const cx = c * TILE_SIZE + TILE_SIZE / 2;
+          const cy = r * TILE_SIZE + TILE_SIZE / 2;
+          const bx = c * TILE_SIZE + 1;
+          const by = r * TILE_SIZE + 1;
+          const size = TILE_SIZE - 2;
+          if (t === "WL") {
+            wallTiles.push({
+              bx,
+              by,
+              size,
+              cx,
+              cy,
+              seed: c * 73 + r * 31,
+              c,
+              r,
+            });
+          } else if (t === "LE") {
+            lairTiles.push({ bx, by, size, cx, cy, col: c });
+          } else if (typeof t === "string" && t.startsWith("0")) {
+            teleTiles.push({ cx, cy, seed: c * 0.7 + r * 1.1 });
+          } else if (t === "PM") {
+            spawnTile = { c, r };
+          }
+        }
+      }
+
+      function isPath(c, r) {
+        if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return false;
+        const t = TILE_MAP[r][c];
+        return t !== "WL" && t !== "ES" && t !== "LE";
+      }
+      function isWall(c, r) {
+        if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return false;
+        return TILE_MAP[r][c] === "WL";
+      }
+
+      // Compute wall neighbors
+      wallTiles.forEach((w) => {
+        w.glowEdges = {
+          top: isPath(w.c, w.r - 1),
+          bottom: isPath(w.c, w.r + 1),
+          left: isPath(w.c - 1, w.r),
+          right: isPath(w.c + 1, w.r),
+        };
+        w.snowEdges = {
+          top: isPath(w.c, w.r - 1),
+          bottom: isPath(w.c, w.r + 1),
+          left: isPath(w.c - 1, w.r),
+          right: isPath(w.c + 1, w.r),
+        };
+        // corner snowdrifts: where two walls meet a path at a corner
+        w.cornerDrifts = {
+          topLeft:
+            isWall(w.c - 1, w.r) &&
+            isWall(w.c, w.r - 1) &&
+            !isPath(w.c - 1, w.r - 1)
+              ? false
+              : isPath(w.c - 1, w.r) || isPath(w.c, w.r - 1),
+        };
+      });
+
+      // === PIXI setup ===
+      const app = new PIXI.Application();
+      await app.init({
+        width: GRID_W,
+        height: GRID_H,
+        backgroundColor: currentPalette.void,
+        resolution: window.devicePixelRatio || 1,
+        antialias: true,
+      });
+      document.getElementById("pixi-container").appendChild(app.canvas);
+
+      // === Layer structure ===
+      const mainStage = new PIXI.Container();
+      app.stage.addChild(mainStage);
+
+      // Static cache (floor + walls, rendered once)
+      let staticSprite = null;
+
+      // Dynamic layers
+      const glowLayer = new PIXI.Container(); // bloom source
+      const dynamicLayer = new PIXI.Container(); // non-glowing dynamics
+      const snowLayer = new PIXI.Container();
+      const atmosphereLayer = new PIXI.Container();
+
+      mainStage.addChild(glowLayer);
+      mainStage.addChild(dynamicLayer);
+      mainStage.addChild(snowLayer);
+      mainStage.addChild(atmosphereLayer);
+
+      // Graphics for dynamic content
+      const lairGfx = new PIXI.Graphics();
+      const teleGfx = new PIXI.Graphics();
+      const teleGlowGfx = new PIXI.Graphics();
+      const snowGfx = new PIXI.Graphics();
+      const fogGfx = new PIXI.Graphics();
+      const godRaysGfx = new PIXI.Graphics();
+
+      dynamicLayer.addChild(lairGfx);
+      glowLayer.addChild(teleGlowGfx);
+      dynamicLayer.addChild(teleGfx);
+      snowLayer.addChild(snowGfx);
+      atmosphereLayer.addChild(fogGfx);
+      atmosphereLayer.addChild(godRaysGfx);
+
+      // Bloom via blur filter on glowLayer
+      try {
+        const blurFilter = new PIXI.BlurFilter({ strength: 6, quality: 4 });
+        glowLayer.filters = [blurFilter];
+        glowLayer.blendMode = "add";
+        glowLayer.alpha = 0.65;
+      } catch (e) {
+        console.warn("BlurFilter not available:", e);
+      }
+
+      // === Static rendering ===
+      function rebuildStaticCache() {
+        if (staticSprite) {
+          mainStage.removeChild(staticSprite);
+          staticSprite.destroy();
+          staticSprite = null;
+        }
+
+        const staticContainer = new PIXI.Container();
+        const floorGfx = new PIXI.Graphics();
+        const wallGfx = new PIXI.Graphics();
+        const snowCapGfx = new PIXI.Graphics();
+        const frostGfx = new PIXI.Graphics();
+
+        drawFloorStatic(floorGfx);
+        drawWallsStatic(wallGfx);
+        drawSnowCaps(snowCapGfx);
+        drawFrostPatterns(frostGfx);
+
+        staticContainer.addChild(floorGfx);
+        staticContainer.addChild(wallGfx);
+        staticContainer.addChild(snowCapGfx);
+        staticContainer.addChild(frostGfx);
+
+        staticSprite = new PIXI.Sprite(
+          app.renderer.generateTexture(staticContainer),
+        );
+        mainStage.addChildAt(staticSprite, 0);
+
+        staticContainer.destroy({ children: true });
+      }
+
+      function drawFloorStatic(gfx) {
+        gfx.rect(0, 0, GRID_W, GRID_H).fill({ color: currentPalette.void });
+
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            const t = TILE_MAP[r][c];
+            if (t !== "WL" && t !== "ES" && t !== "LE") {
+              const bx = c * TILE_SIZE + 1;
+              const by = r * TILE_SIZE + 1;
+              const size = TILE_SIZE - 2;
+              const cx = c * TILE_SIZE + TILE_SIZE / 2;
+              const cy = r * TILE_SIZE + TILE_SIZE / 2;
+
+              gfx
+                .rect(bx, by, size, size)
+                .fill({ color: currentPalette.floor, alpha: 0.95 });
+
+              // Ambient occlusion at wall bases
+              const seed = c * 31 + r * 17;
+              if (isWall(c, r - 1)) {
+                gfx
+                  .rect(bx, by, size, 4)
+                  .fill({ color: currentPalette.aoColor, alpha: 0.35 });
+              }
+              if (isWall(c, r + 1)) {
+                gfx
+                  .rect(bx, by + size - 4, size, 4)
+                  .fill({ color: currentPalette.aoColor, alpha: 0.35 });
+              }
+              if (isWall(c - 1, r)) {
+                gfx
+                  .rect(bx, by, 4, size)
+                  .fill({ color: currentPalette.aoColor, alpha: 0.35 });
+              }
+              if (isWall(c + 1, r)) {
+                gfx
+                  .rect(bx + size - 4, by, 4, size)
+                  .fill({ color: currentPalette.aoColor, alpha: 0.35 });
+              }
+
+              // Ice patches (random)
+              if (seed % 23 === 0) {
+                const ix = cx + Math.sin(seed) * 5;
+                const iy = cy + Math.cos(seed) * 5;
+                const iw = 8 + (seed % 6);
+                const ih = 4 + (seed % 3);
+                gfx
+                  .ellipse(ix, iy, iw, ih)
+                  .fill({ color: currentPalette.icePatch, alpha: 0.15 });
+                gfx
+                  .ellipse(ix - 1, iy - 1, iw * 0.6, ih * 0.4)
+                  .fill({ color: 0xffffff, alpha: 0.08 });
+              }
+
+              // Snow flakes on floor
+              if (seed % 5 === 0) {
+                const sx = cx + Math.sin(seed) * 8;
+                const sy = cy + Math.cos(seed) * 8;
+                gfx
+                  .circle(sx, sy, 0.8)
+                  .fill({ color: currentPalette.floorSnow, alpha: 0.3 });
+              }
+              if (seed % 11 === 0) {
+                const sx = cx + Math.sin(seed + 5) * 10;
+                const sy = cy + Math.cos(seed + 5) * 10;
+                gfx
+                  .circle(sx, sy, 0.5)
+                  .fill({ color: currentPalette.floorSnow, alpha: 0.25 });
+              }
+
+              // Footprints (rare, thematic)
+              if (seed % 47 === 0) {
+                const fx = cx + Math.sin(seed) * 6;
+                const fy = cy + Math.cos(seed) * 6;
+                gfx
+                  .ellipse(fx, fy, 2.5, 1.5)
+                  .fill({ color: currentPalette.aoColor, alpha: 0.3 });
+                gfx
+                  .ellipse(fx + 1, fy + 0.5, 1.8, 1)
+                  .fill({ color: currentPalette.aoColor, alpha: 0.25 });
+              }
+
+              // Corner snowdrifts (where two walls meet diagonally)
+              const topWall = isWall(c, r - 1);
+              const leftWall = isWall(c - 1, r);
+              const rightWall = isWall(c + 1, r);
+              const bottomWall = isWall(c, r + 1);
+
+              if (topWall && leftWall) {
+                drawDrift(gfx, bx, by, "tl");
+              }
+              if (topWall && rightWall) {
+                drawDrift(gfx, bx + size, by, "tr");
+              }
+              if (bottomWall && leftWall) {
+                drawDrift(gfx, bx, by + size, "bl");
+              }
+              if (bottomWall && rightWall) {
+                drawDrift(gfx, bx + size, by + size, "br");
+              }
+            }
+          }
+        }
+
+        if (spawnTile.c >= 0) {
+          const sx = spawnTile.c * TILE_SIZE + TILE_SIZE / 2;
+          const sy = spawnTile.r * TILE_SIZE + TILE_SIZE / 2;
+          gfx
+            .rect(sx - 5, sy - 5, 10, 10)
+            .stroke({ color: currentPalette.lairGlow, width: 1, alpha: 0.4 });
+        }
+      }
+
+      function drawDrift(gfx, x, y, corner) {
+        const size = 6;
+        gfx.beginPath();
+        switch (corner) {
+          case "tl":
+            gfx.moveTo(x, y);
+            gfx.quadraticCurveTo(x + size, y + size * 0.5, x + size, y);
+            gfx.quadraticCurveTo(x + size * 0.5, y + size, x, y + size);
+            break;
+          case "tr":
+            gfx.moveTo(x, y);
+            gfx.quadraticCurveTo(x - size, y + size * 0.5, x - size, y);
+            gfx.quadraticCurveTo(x - size * 0.5, y + size, x, y + size);
+            break;
+          case "bl":
+            gfx.moveTo(x, y);
+            gfx.quadraticCurveTo(x + size, y - size * 0.5, x + size, y);
+            gfx.quadraticCurveTo(x + size * 0.5, y - size, x, y - size);
+            break;
+          case "br":
+            gfx.moveTo(x, y);
+            gfx.quadraticCurveTo(x - size, y - size * 0.5, x - size, y);
+            gfx.quadraticCurveTo(x - size * 0.5, y - size, x, y - size);
+            break;
+        }
+        gfx.closePath();
+        gfx.fill({ color: currentPalette.floorSnow, alpha: 0.4 });
+      }
+
+      function drawWallsStatic(gfx) {
+        for (const w of wallTiles) {
+          // Shadow
+          gfx
+            .rect(w.bx + 1.5, w.by + 1.5, w.size, w.size)
+            .fill({ color: currentPalette.wallShadow, alpha: 0.5 });
+
+          // Base
+          gfx
+            .rect(w.bx, w.by, w.size, w.size)
+            .fill({ color: currentPalette.wallBase, alpha: 1.0 });
+
+          // Top highlight
+          gfx
+            .rect(w.bx + 1, w.by + 1, w.size - 2, w.size * 0.22)
+            .fill({ color: currentPalette.wallTop, alpha: 0.45 });
+
+          // Bottom shadow
+          gfx
+            .rect(
+              w.bx + 1,
+              w.by + w.size - w.size * 0.18,
+              w.size - 2,
+              w.size * 0.18,
+            )
+            .fill({ color: currentPalette.wallShadow, alpha: 0.35 });
+
+          // Vertical seam
+          const seamX = w.bx + w.size * 0.5;
+          gfx
+            .moveTo(seamX, w.by + 3)
+            .lineTo(seamX, w.by + w.size - 3)
+            .stroke({
+              color: currentPalette.wallCrack,
+              width: 0.6,
+              alpha: 0.35,
+            });
+
+          // Horizontal seams (brick pattern)
+          const seamY1 = w.by + w.size * 0.35;
+          const seamY2 = w.by + w.size * 0.65;
+          gfx
+            .moveTo(w.bx + 2, seamY1)
+            .lineTo(w.bx + w.size - 2, seamY1)
+            .stroke({
+              color: currentPalette.wallCrack,
+              width: 0.4,
+              alpha: 0.2,
+            });
+          gfx
+            .moveTo(w.bx + 2, seamY2)
+            .lineTo(w.bx + w.size - 2, seamY2)
+            .stroke({
+              color: currentPalette.wallCrack,
+              width: 0.4,
+              alpha: 0.2,
+            });
+
+          // Random cracks
+          if (w.seed % 4 === 0) {
+            const x1 = w.bx + 4 + Math.abs(Math.sin(w.seed)) * (w.size - 8);
+            const y1 = w.by + 4 + Math.abs(Math.cos(w.seed)) * (w.size * 0.4);
+            const x2 = x1 + (Math.sin(w.seed + 1) - 0.5) * 12;
+            const y2 = y1 + 6 + Math.abs(Math.cos(w.seed + 1)) * 8;
+            gfx
+              .moveTo(x1, y1)
+              .lineTo(x2, y2)
+              .stroke({
+                color: currentPalette.wallCrack,
+                width: 0.5,
+                alpha: 0.3,
+              });
+          }
+
+          // Small snow spots
+          if (w.seed % 5 === 0) {
+            const sx = w.bx + w.size * 0.5 + Math.sin(w.seed) * 4;
+            const sy = w.by + w.size * 0.3 + Math.cos(w.seed) * 3;
+            gfx
+              .circle(sx, sy, 1.2)
+              .fill({ color: currentPalette.wallSnow, alpha: 0.3 });
+          }
+
+          // Edge glow (where path is adjacent)
+          const edge = w.glowEdges;
+          const edgeColor = currentPalette.wallEdge;
+
+          if (edge.top) {
+            gfx
+              .moveTo(w.bx, w.by)
+              .lineTo(w.bx + w.size, w.by)
+              .stroke({ color: edgeColor, width: 1.2, alpha: 0.5 });
+            gfx
+              .moveTo(w.bx, w.by)
+              .lineTo(w.bx + w.size, w.by)
+              .stroke({ color: edgeColor, width: 3, alpha: 0.12 });
+          }
+          if (edge.bottom) {
+            gfx
+              .moveTo(w.bx, w.by + w.size)
+              .lineTo(w.bx + w.size, w.by + w.size)
+              .stroke({ color: edgeColor, width: 1.2, alpha: 0.5 });
+            gfx
+              .moveTo(w.bx, w.by + w.size)
+              .lineTo(w.bx + w.size, w.by + w.size)
+              .stroke({ color: edgeColor, width: 3, alpha: 0.12 });
+          }
+          if (edge.left) {
+            gfx
+              .moveTo(w.bx, w.by)
+              .lineTo(w.bx, w.by + w.size)
+              .stroke({ color: edgeColor, width: 1.2, alpha: 0.5 });
+            gfx
+              .moveTo(w.bx, w.by)
+              .lineTo(w.bx, w.by + w.size)
+              .stroke({ color: edgeColor, width: 3, alpha: 0.12 });
+          }
+          if (edge.right) {
+            gfx
+              .moveTo(w.bx + w.size, w.by)
+              .lineTo(w.bx + w.size, w.by + w.size)
+              .stroke({ color: edgeColor, width: 1.2, alpha: 0.5 });
+            gfx
+              .moveTo(w.bx + w.size, w.by)
+              .lineTo(w.bx + w.size, w.by + w.size)
+              .stroke({ color: edgeColor, width: 3, alpha: 0.12 });
+          }
+
+          // Icicles (bottom edge if path below)
+          if (edge.bottom) {
+            const icicleCount = 2 + (w.seed % 3);
+            for (let i = 0; i < icicleCount; i++) {
+              const ix =
+                w.bx +
+                3 +
+                (i / icicleCount) * (w.size - 6) +
+                Math.sin(w.seed + i) * 2;
+              const iLength = 2 + ((w.seed + i * 7) % 4);
+              const iWidth = 0.8 + ((w.seed + i) % 3) * 0.2;
+              gfx.moveTo(ix - iWidth, w.by + w.size);
+              gfx.lineTo(ix, w.by + w.size + iLength);
+              gfx.lineTo(ix + iWidth, w.by + w.size);
+              gfx.closePath();
+              gfx.fill({ color: currentPalette.icicle, alpha: 0.7 });
+              // icicle highlight
+              gfx.moveTo(ix - iWidth * 0.5, w.by + w.size);
+              gfx.lineTo(ix, w.by + w.size + iLength * 0.8);
+              gfx.stroke({ color: 0xffffff, width: 0.3, alpha: 0.3 });
+            }
+          }
+
+          // Side snow (left/right if path)
+          if (edge.left) {
+            const snowCount = 1 + (w.seed % 2);
+            for (let i = 0; i < snowCount; i++) {
+              const sy = w.by + 4 + (i / snowCount) * (w.size - 8);
+              const sLength = 2 + ((w.seed + i * 5) % 3);
+              gfx
+                .ellipse(w.bx - sLength * 0.5, sy, sLength, 1.5)
+                .fill({ color: currentPalette.wallSnow, alpha: 0.4 });
+            }
+          }
+          if (edge.right) {
+            const snowCount = 1 + ((w.seed + 3) % 2);
+            for (let i = 0; i < snowCount; i++) {
+              const sy = w.by + 4 + (i / snowCount) * (w.size - 8);
+              const sLength = 2 + ((w.seed + i * 5 + 2) % 3);
+              gfx
+                .ellipse(w.bx + w.size + sLength * 0.5, sy, sLength, 1.5)
+                .fill({ color: currentPalette.wallSnow, alpha: 0.4 });
+            }
+          }
+        }
+      }
+
+      function drawSnowCaps(gfx) {
+        for (const w of wallTiles) {
+          if (!w.snowEdges.top) continue;
+          // wavy snowcap on top of wall
+          const capBase = w.by;
+          const capHeight = 3 + (w.seed % 4);
+          gfx.moveTo(w.bx - 1, capBase + 1);
+          const steps = 6;
+          for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            const x = w.bx - 1 + t * (w.size + 2);
+            const y =
+              capBase -
+              capHeight * (0.4 + 0.6 * Math.sin(w.seed * 0.5 + t * 6));
+            if (i === 0) gfx.moveTo(x, y);
+            else gfx.lineTo(x, y);
+          }
+          gfx.lineTo(w.bx + w.size + 1, capBase + 1);
+          gfx.closePath();
+          gfx.fill({ color: currentPalette.wallSnow, alpha: 0.9 });
+          // highlight
+          gfx.moveTo(w.bx, capBase);
+          for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            const x = w.bx + t * w.size;
+            const y =
+              capBase -
+              capHeight * (0.4 + 0.6 * Math.sin(w.seed * 0.5 + t * 6)) +
+              1;
+            if (i === 0) gfx.moveTo(x, y);
+            else gfx.lineTo(x, y);
+          }
+          gfx.stroke({ color: 0xffffff, width: 0.5, alpha: 0.4 });
+        }
+      }
+
+      function drawFrostPatterns(gfx) {
+        for (const w of wallTiles) {
+          if (w.seed % 7 !== 0) continue;
+          const branches = 3 + (w.seed % 3);
+          for (let i = 0; i < branches; i++) {
+            const angle = (w.seed * 0.3 + i * 2.1) % (Math.PI * 2);
+            const length = 4 + ((w.seed + i * 7) % 6);
+            const x1 = w.cx + Math.cos(angle) * 3;
+            const y1 = w.cy + Math.sin(angle) * 3;
+            const x2 = w.cx + Math.cos(angle) * length;
+            const y2 = w.cy + Math.sin(angle) * length;
+            gfx
+              .moveTo(x1, y1)
+              .lineTo(x2, y2)
+              .stroke({
+                color: currentPalette.wallFrost,
+                width: 0.4,
+                alpha: 0.5,
+              });
+            // branch tips
+            for (let j = -1; j <= 1; j += 2) {
+              const ba = angle + j * 0.6;
+              const bx = x2 + Math.cos(ba) * 2;
+              const by = y2 + Math.sin(ba) * 2;
+              gfx
+                .moveTo(x2, y2)
+                .lineTo(bx, by)
+                .stroke({
+                  color: currentPalette.wallFrost,
+                  width: 0.3,
+                  alpha: 0.3,
+                });
+            }
+          }
+        }
+      }
+
+      // === Dynamic: Teleport crystals ===
+      function drawTeleports(dt) {
+        teleGfx.clear();
+        teleGlowGfx.clear();
+
+        for (const tp of teleTiles) {
+          const { cx, cy, seed } = tp;
+          const maxR = TILE_SIZE * 0.45;
+          const breathe = 1 + Math.sin(time * 0.8 + seed) * 0.05;
+
+          // Glow source (for bloom)
+          teleGlowGfx
+            .circle(cx, cy, maxR * 1.8 * breathe)
+            .fill({ color: currentPalette.teleBright, alpha: 0.25 });
+          teleGlowGfx
+            .circle(cx, cy, maxR * 1.2 * breathe)
+            .fill({ color: currentPalette.teleBright, alpha: 0.35 });
+
+          // Outer pulsing ring
+          const outerR = maxR * 0.95 * breathe;
+          teleGfx
+            .circle(cx, cy, outerR)
+            .stroke({ color: currentPalette.teleRing, width: 1.2, alpha: 0.6 });
+
+          // Hexagonal crystal structure
+          const hexR = maxR * 0.75 * breathe;
+          const rotation = time * 0.4 + seed;
+          teleGfx.beginPath();
+          for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * Math.PI * 2 + rotation;
+            const x = cx + Math.cos(a) * hexR;
+            const y = cy + Math.sin(a) * hexR;
+            if (i === 0) teleGfx.moveTo(x, y);
+            else teleGfx.lineTo(x, y);
+          }
+          teleGfx.closePath();
+          teleGfx.stroke({
+            color: currentPalette.teleBright,
+            width: 1.5,
+            alpha: 0.7,
+          });
+          teleGfx.fill({ color: currentPalette.teleCrystal, alpha: 0.08 });
+
+          // Crystal facets (inner hexagon, counter-rotating)
+          const innerHexR = maxR * 0.45 * breathe;
+          const innerRot = -time * 0.7 + seed;
+          teleGfx.beginPath();
+          for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * Math.PI * 2 + innerRot;
+            const x = cx + Math.cos(a) * innerHexR;
+            const y = cy + Math.sin(a) * innerHexR;
+            if (i === 0) teleGfx.moveTo(x, y);
+            else teleGfx.lineTo(x, y);
+          }
+          teleGfx.closePath();
+          teleGfx.stroke({
+            color: currentPalette.teleArc,
+            width: 1,
+            alpha: 0.6,
+          });
+
+          // Crystal spikes from center
+          for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * Math.PI * 2 + rotation + Math.PI / 6;
+            const spikeLen =
+              maxR * (0.55 + Math.sin(time * 2 + i + seed) * 0.1);
+            const x1 = cx + Math.cos(a) * innerHexR * 0.5;
+            const y1 = cy + Math.sin(a) * innerHexR * 0.5;
+            const x2 = cx + Math.cos(a) * spikeLen;
+            const y2 = cy + Math.sin(a) * spikeLen;
+            teleGfx
+              .moveTo(x1, y1)
+              .lineTo(x2, y2)
+              .stroke({
+                color: currentPalette.teleBright,
+                width: 1,
+                alpha: 0.7,
+              });
+            // spike tip dot
+            teleGfx.circle(x2, y2, 1.5).fill({ color: 0xffffff, alpha: 0.9 });
+          }
+
+          // Core
+          teleGfx
+            .circle(cx, cy, maxR * 0.18 * breathe)
+            .fill({ color: currentPalette.teleBright, alpha: 0.95 });
+          teleGfx
+            .circle(cx, cy, maxR * 0.08 * breathe)
+            .fill({ color: 0xffffff, alpha: 1.0 });
+
+          // Orbiting particles
+          for (let i = 0; i < 4; i++) {
+            const phase = (i / 4) * Math.PI * 2 + time * 1.5 + seed;
+            const orbitR = maxR * (0.6 + Math.sin(time * 2 + i) * 0.1);
+            const px = cx + Math.cos(phase) * orbitR;
+            const py = cy + Math.sin(phase) * orbitR;
+            teleGfx.circle(px, py, 1.5).fill({ color: 0xffffff, alpha: 0.8 });
+          }
+        }
+      }
+
+      // === Dynamic: Lair Gates ===
+      function drawLairGates(progress) {
+        lairGfx.clear();
+
+        for (const lair of lairTiles) {
+          const { bx, by, size, cx, cy } = lair;
+          const p = progress;
+
+          if (p < 0.5) {
+            // CLOSED: icy door with rune
+            const closeAlpha = 1 - p * 2;
+
+            lairGfx
+              .rect(bx, by, size, size)
+              .fill({ color: currentPalette.lairBase, alpha: closeAlpha });
+
+            lairGfx
+              .rect(bx + 1, by + 1, size - 2, size * 0.2)
+              .fill({ color: currentPalette.wallTop, alpha: closeAlpha * 0.4 });
+
+            // Ice crystal rune (snowflake)
+            const runeAlpha = closeAlpha * 0.7;
+            const runeR = size * 0.3;
+            for (let i = 0; i < 6; i++) {
+              const a = (i / 6) * Math.PI * 2;
+              lairGfx
+                .moveTo(
+                  cx + Math.cos(a) * runeR * 0.3,
+                  cy + Math.sin(a) * runeR * 0.3,
+                )
+                .lineTo(cx + Math.cos(a) * runeR, cy + Math.sin(a) * runeR)
+                .stroke({
+                  color: currentPalette.lairRune,
+                  width: 1,
+                  alpha: runeAlpha,
+                });
+
+              const bx2 = cx + Math.cos(a) * runeR * 0.65;
+              const by2 = cy + Math.sin(a) * runeR * 0.65;
+              for (let branch = -1; branch <= 1; branch += 2) {
+                const ba = a + branch * 0.6;
+                lairGfx
+                  .moveTo(bx2, by2)
+                  .lineTo(
+                    bx2 + Math.cos(ba) * runeR * 0.2,
+                    by2 + Math.sin(ba) * runeR * 0.2,
+                  )
+                  .stroke({
+                    color: currentPalette.lairRune,
+                    width: 0.7,
+                    alpha: runeAlpha * 0.8,
+                  });
+              }
+            }
+
+            lairGfx
+              .circle(cx, cy, size * 0.08)
+              .fill({ color: currentPalette.lairGlow, alpha: runeAlpha });
+            lairGfx
+              .circle(cx, cy, size * 0.04)
+              .fill({ color: 0xffffff, alpha: runeAlpha });
+
+            lairGfx
+              .rect(bx + 2, by + 2, size - 4, size - 4)
+              .stroke({
+                color: currentPalette.lairGlow,
+                width: 1,
+                alpha: runeAlpha * 0.5,
+              });
+          } else {
+            // OPEN: dark portal with cold mist
+            const openAlpha = (p - 0.5) * 2;
+
+            // Dark portal
+            lairGfx
+              .rect(bx + 2, by + 2, size - 4, size - 4)
+              .fill({ color: 0x050810, alpha: openAlpha });
+            lairGfx
+              .rect(bx + 4, by + 4, size - 8, size - 8)
+              .fill({ color: 0x020408, alpha: openAlpha * 0.8 });
+
+            // Glowing frame
+            lairGfx
+              .rect(bx + 2, by + 2, size - 4, size - 4)
+              .stroke({
+                color: currentPalette.lairGlow,
+                width: 2.5,
+                alpha: openAlpha * 0.9,
+              });
+            lairGfx
+              .rect(bx, by, size, size)
+              .stroke({
+                color: currentPalette.lairGlow,
+                width: 4,
+                alpha: openAlpha * 0.2,
+              });
+
+            // Descent arrow
+            const arrowY = cy + 2;
+            const arrowSize = size * 0.2;
+            lairGfx.moveTo(cx - arrowSize, arrowY - arrowSize * 0.5);
+            lairGfx.lineTo(cx, arrowY + arrowSize * 0.5);
+            lairGfx.lineTo(cx + arrowSize, arrowY - arrowSize * 0.5);
+            lairGfx.stroke({
+              color: currentPalette.lairRune,
+              width: 2,
+              alpha: openAlpha * 0.8,
+            });
+
+            // Stairs
+            for (let i = 0; i < 3; i++) {
+              const stepY = by + 6 + (i * (size - 12)) / 3;
+              const stepWidth = size * 0.6 * (1 - i * 0.2);
+              const stepX = cx - stepWidth / 2;
+              lairGfx
+                .moveTo(stepX, stepY)
+                .lineTo(stepX + stepWidth, stepY)
+                .stroke({
+                  color: currentPalette.lairGlow,
+                  width: 1,
+                  alpha: openAlpha * 0.4,
+                });
+            }
+
+            // Cold mist particles
+            for (let i = 0; i < 4; i++) {
+              const particleTime = (time * 0.5 + i * 0.7) % 3;
+              if (particleTime < 2) {
+                const px = cx + Math.sin(time + i * 2) * 5;
+                const py = by + size - particleTime * size * 0.3;
+                const pAlpha = openAlpha * (1 - particleTime / 2) * 0.3;
+                const pSize = 2 + particleTime * 2;
+                lairGfx
+                  .circle(px, py, pSize)
+                  .fill({ color: currentPalette.lairGlow, alpha: pAlpha });
+              }
+            }
+          }
+        }
+      }
+
+      // === Snowfall ===
+      const snowflakesBack = [],
+        snowflakesMid = [],
+        snowflakesFront = [];
+      const windStreaks = [];
+
+      for (let i = 0; i < 200; i++) {
+        snowflakesBack.push({
+          x: Math.random() * GRID_W,
+          y: Math.random() * GRID_H,
+          size: 0.4 + Math.random() * 0.6,
+          speed: 5 + Math.random() * 8,
+          drift: (Math.random() - 0.5) * 3,
+          phase: Math.random() * Math.PI * 2,
+          alpha: 0.1 + Math.random() * 0.15,
+        });
+      }
+      for (let i = 0; i < 300; i++) {
+        snowflakesMid.push({
+          x: Math.random() * GRID_W,
+          y: Math.random() * GRID_H,
+          size: 0.8 + Math.random() * 1.2,
+          speed: 12 + Math.random() * 18,
+          drift: (Math.random() - 0.5) * 8,
+          phase: Math.random() * Math.PI * 2,
+          alpha: 0.2 + Math.random() * 0.25,
+        });
+      }
+      for (let i = 0; i < 100; i++) {
+        snowflakesFront.push({
+          x: Math.random() * GRID_W,
+          y: Math.random() * GRID_H,
+          size: 2 + Math.random() * 3,
+          speed: 30 + Math.random() * 40,
+          drift: 15 + Math.random() * 25,
+          phase: Math.random() * Math.PI * 2,
+          alpha: 0.4 + Math.random() * 0.4,
+        });
+      }
+      for (let i = 0; i < 30; i++) {
+        windStreaks.push({
+          x: Math.random() * GRID_W,
+          y: Math.random() * GRID_H,
+          length: 40 + Math.random() * 80,
+          speed: 80 + Math.random() * 120,
+          alpha: 0.1 + Math.random() * 0.15,
+          life: Math.random(),
+        });
+      }
+
+      function drawSnowfall(dt) {
+        snowGfx.clear();
+
+        for (const sf of snowflakesBack) {
+          sf.y += sf.speed * dt * (isBlizzard ? 2 : 1);
+          sf.x += sf.drift * dt + Math.sin(time * 0.3 + sf.phase) * 0.2;
+          if (sf.y > GRID_H) {
+            sf.y = -5;
+            sf.x = Math.random() * GRID_W;
+          }
+          if (sf.x < 0) sf.x = GRID_W;
+          if (sf.x > GRID_W) sf.x = 0;
+          snowGfx
+            .circle(sf.x, sf.y, sf.size)
+            .fill({ color: currentPalette.snowflake, alpha: sf.alpha });
+        }
+
+        for (const sf of snowflakesMid) {
+          sf.y += sf.speed * dt * (isBlizzard ? 2.5 : 1);
+          sf.x +=
+            sf.drift * dt * (isBlizzard ? 3 : 1) +
+            Math.sin(time * 0.5 + sf.phase) * 0.3;
+          if (sf.y > GRID_H) {
+            sf.y = -5;
+            sf.x = Math.random() * GRID_W;
+          }
+          if (sf.x < 0) sf.x = GRID_W;
+          if (sf.x > GRID_W) sf.x = 0;
+          snowGfx
+            .circle(sf.x, sf.y, sf.size * 1.5)
+            .fill({ color: currentPalette.snowflake, alpha: sf.alpha * 0.15 });
+          snowGfx
+            .circle(sf.x, sf.y, sf.size)
+            .fill({ color: currentPalette.snowflake, alpha: sf.alpha });
+        }
+
+        if (isBlizzard) {
+          for (const sf of snowflakesFront) {
+            sf.y += sf.speed * dt;
+            sf.x += sf.drift * dt + Math.sin(time * 2 + sf.phase) * 2;
+            if (sf.y > GRID_H) {
+              sf.y = -10;
+              sf.x = Math.random() * GRID_W;
+            }
+            if (sf.x > GRID_W) {
+              sf.x = -10;
+              sf.y = Math.random() * GRID_H;
+            }
+            if (sf.x < -20) sf.x = GRID_W;
+            snowGfx
+              .circle(sf.x, sf.y, sf.size * 2)
+              .fill({ color: 0xffffff, alpha: sf.alpha * 0.2 });
+            snowGfx
+              .circle(sf.x, sf.y, sf.size)
+              .fill({ color: 0xffffff, alpha: sf.alpha * 0.7 });
+          }
+
+          for (const streak of windStreaks) {
+            streak.x += streak.speed * dt;
+            streak.life += dt * 0.5;
+            if (streak.x > GRID_W + streak.length || streak.life > 2) {
+              streak.x = -streak.length;
+              streak.y = Math.random() * GRID_H;
+              streak.life = 0;
+            }
+            const alpha = streak.alpha * Math.sin(streak.life * Math.PI);
+            snowGfx
+              .moveTo(streak.x, streak.y)
+              .lineTo(streak.x + streak.length, streak.y)
+              .stroke({ color: 0xffffff, width: 0.5, alpha: alpha });
+          }
+        }
+      }
+
+      // === Atmosphere: Fog + God Rays ===
+      const fogParticles = [];
+      for (let i = 0; i < 10; i++) {
+        fogParticles.push({
+          x: Math.random() * GRID_W,
+          y: Math.random() * GRID_H,
+          size: 80 + Math.random() * 160,
+          vx: (Math.random() - 0.5) * 6,
+          vy: (Math.random() - 0.5) * 2,
+          phase: Math.random() * Math.PI * 2,
+          alpha: 0.04 + Math.random() * 0.04,
+        });
+      }
+
+      function drawAtmosphere(dt) {
+        fogGfx.clear();
+        godRaysGfx.clear();
+
+        // Fog
+        for (const f of fogParticles) {
+          f.x += f.vx * dt;
+          f.y += f.vy * dt;
+          if (f.x < -f.size) f.x = GRID_W + f.size;
+          if (f.x > GRID_W + f.size) f.x = -f.size;
+          if (f.y < -f.size) f.y = GRID_H + f.size;
+          if (f.y > GRID_H + f.size) f.y = -f.size;
+
+          const pulseAlpha =
+            f.alpha * (0.7 + 0.3 * Math.sin(time * 0.3 + f.phase));
+          fogGfx
+            .circle(f.x, f.y, f.size)
+            .fill({ color: currentPalette.fogColor, alpha: pulseAlpha });
+          fogGfx
+            .circle(f.x, f.y, f.size * 0.6)
+            .fill({ color: currentPalette.fogColor, alpha: pulseAlpha * 0.8 });
+        }
+
+        // God rays (diagonal light shafts from top-left)
+        const rayCount = 6;
+        for (let i = 0; i < rayCount; i++) {
+          const baseX = -100 + i * (GRID_W / rayCount);
+          const offset = Math.sin(time * 0.2 + i * 1.3) * 20;
+          const rayAlpha = 0.025 + Math.sin(time * 0.15 + i * 0.8) * 0.015;
+
+          // Each ray is a parallelogram
+          godRaysGfx.beginPath();
+          godRaysGfx.moveTo(baseX + offset, -10);
+          godRaysGfx.lineTo(baseX + 40 + offset, -10);
+          godRaysGfx.lineTo(baseX + 40 + GRID_H * 0.3 + offset, GRID_H + 10);
+          godRaysGfx.lineTo(baseX + GRID_H * 0.3 + offset, GRID_H + 10);
+          godRaysGfx.closePath();
+          godRaysGfx.fill({ color: currentPalette.godRay, alpha: rayAlpha });
+        }
+
+        // Cold shimmer: subtle distortion via overlay
+        const shimmerAlpha = 0.015 + Math.sin(time * 0.5) * 0.005;
+        fogGfx
+          .rect(0, 0, GRID_W, GRID_H)
+          .fill({ color: 0xffffff, alpha: shimmerAlpha });
+      }
+
+      // === Init ===
+      rebuildStaticCache();
+
+      // === Events ===
+      document
+        .getElementById("btnDawn")
+        .addEventListener("click", () => setPaletteMode("dawn"));
+      document
+        .getElementById("btnNoon")
+        .addEventListener("click", () => setPaletteMode("noon"));
+      document
+        .getElementById("btnDusk")
+        .addEventListener("click", () => setPaletteMode("dusk"));
+      document
+        .getElementById("btnNight")
+        .addEventListener("click", () => setPaletteMode("night"));
+
+      document.getElementById("btnBlizzard").addEventListener("click", () => {
+        isBlizzard = !isBlizzard;
+        document
+          .getElementById("btnBlizzard")
+          .classList.toggle("active", isBlizzard);
+        const vp = document.getElementById("viewport");
+        vp.classList.toggle("blizzard", isBlizzard);
+      });
+
+      document.getElementById("btnLair").addEventListener("click", () => {
+        targetLair = targetLair > 0.5 ? 0 : 1;
+      });
+
+      document.getElementById("btnBloom").addEventListener("click", () => {
+        bloomEnabled = !bloomEnabled;
+        document
+          .getElementById("btnBloom")
+          .classList.toggle("active", bloomEnabled);
+        glowLayer.visible = bloomEnabled;
+      });
+      document.getElementById("btnBloom").classList.add("active");
+
+      // === Main loop ===
+      let time = 0;
+      let lairOpen = 0,
+        targetLair = 0;
+      let lastTime = performance.now();
+
+      app.ticker.add(() => {
+        const now = performance.now();
+        const dt = Math.min((now - lastTime) / 1000, 0.05);
+        lastTime = now;
+        time += dt;
+
+        updatePalette(dt);
+        app.renderer.background.color = currentPalette.void;
+
+        if (Math.abs(lairOpen - targetLair) > 0.001) {
+          lairOpen +=
+            Math.sign(targetLair - lairOpen) *
+            Math.min(2.0 * dt, Math.abs(targetLair - lairOpen));
+        }
+
+        drawTeleports(dt);
+        drawLairGates(lairOpen);
+        drawSnowfall(dt);
+        drawAtmosphere(dt);
+      });
+    </script>
+  </body>
+</html>

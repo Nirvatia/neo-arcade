@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Pill Visual — Living Ember</title>
+<style>
+    body { margin: 0; background: #06080e; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: 'Courier New', monospace; color: #c8d4e0; }
+    canvas { display: block; border: 1px solid #1a2430; border-radius: 4px; }
+    .title { margin-bottom: 20px; font-size: 14px; letter-spacing: 4px; opacity: 0.6; }
+</style>
+</head>
+<body>
+<div class="title">PILL VISUAL · LIVING EMBER</div>
+<div id="pixi-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+<script type="module">
+const { Application, Container, Sprite, Texture, Graphics, BlurFilter } = PIXI;
+
+function createEmberTexture() {
+    const res = 256, cx = res/2, cy = res/2, r = res*0.36;
+    const canvas = document.createElement("canvas");
+    canvas.width = res; canvas.height = res;
+    const ctx = canvas.getContext("2d");
+
+    const g1 = ctx.createRadialGradient(cx, cy, r*0.55, cx, cy, r*1.4);
+    g1.addColorStop(0, "rgba(255,110,25,0.35)"); g1.addColorStop(0.45, "rgba(200,55,12,0.12)"); g1.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g1; ctx.fillRect(0,0,res,res);
+
+    const g2 = ctx.createRadialGradient(cx, cy, r*0.35, cx, cy, r*0.9);
+    g2.addColorStop(0, "rgba(255,150,40,0.6)"); g2.addColorStop(0.5, "rgba(230,85,18,0.3)"); g2.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g2; ctx.fillRect(0,0,res,res);
+
+    const g3 = ctx.createRadialGradient(cx-r*0.06, cy-r*0.08, 0, cx, cy, r*0.65);
+    g3.addColorStop(0, "rgba(255,235,190,0.92)"); g3.addColorStop(0.2, "rgba(255,185,70,0.88)"); g3.addColorStop(0.5, "rgba(240,105,25,0.72)"); g3.addColorStop(0.78, "rgba(170,45,12,0.3)"); g3.addColorStop(1, "rgba(70,15,3,0)");
+    ctx.fillStyle = g3; ctx.fillRect(0,0,res,res);
+
+    const g4 = ctx.createRadialGradient(cx-r*0.12, cy-r*0.14, 0, cx, cy, r*0.16);
+    g4.addColorStop(0, "rgba(255,255,248,0.85)"); g4.addColorStop(0.4, "rgba(255,225,170,0.35)"); g4.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g4; ctx.fillRect(0,0,res,res);
+
+    ctx.globalCompositeOperation = "overlay";
+    for (let i=0; i<50; i++) {
+        const sx=cx+(Math.random()-0.5)*r*0.9, sy=cy+(Math.random()-0.5)*r*0.9, sr=1+Math.random()*3.5;
+        const spot=ctx.createRadialGradient(sx,sy,0,sx,sy,sr);
+        spot.addColorStop(0,"rgba(0,0,0,0.12)"); spot.addColorStop(1,"rgba(0,0,0,0)");
+        ctx.fillStyle=spot; ctx.fillRect(sx-sr,sy-sr,sr*2,sr*2);
+    }
+    ctx.globalCompositeOperation = "source-over";
+    return Texture.from(canvas);
+}
+
+function createSparkTexture() {
+    const s=12;
+    const canvas=document.createElement("canvas");
+    canvas.width=s; canvas.height=s;
+    const ctx=canvas.getContext("2d");
+    const g=ctx.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);
+    g.addColorStop(0,"rgba(255,230,160,1)"); g.addColorStop(0.25,"rgba(255,160,45,0.75)"); g.addColorStop(0.6,"rgba(220,60,15,0.15)"); g.addColorStop(1,"rgba(0,0,0,0)");
+    ctx.fillStyle=g; ctx.fillRect(0,0,s,s);
+    return Texture.from(canvas);
+}
+
+function createAshTexture() {
+    const s=8;
+    const canvas=document.createElement("canvas");
+    canvas.width=s; canvas.height=s;
+    const ctx=canvas.getContext("2d");
+    const g=ctx.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);
+    g.addColorStop(0,"rgba(80,50,30,0.7)"); g.addColorStop(0.5,"rgba(40,25,15,0.4)"); g.addColorStop(1,"rgba(0,0,0,0)");
+    ctx.fillStyle=g; ctx.fillRect(0,0,s,s);
+    return Texture.from(canvas);
+}
+
+const EMBER_TEX = createEmberTexture();
+const SPARK_TEX = createSparkTexture();
+const ASH_TEX = createAshTexture();
+
+function lerpColor(a,b,t){const ar=(a>>16)&0xff,ag=(a>>8)&0xff,ab=a&0xff,br=(b>>16)&0xff,bg=(b>>8)&0xff,bb=b&0xff;return(Math.round(ar+(br-ar)*t)<<16)|(Math.round(ag+(bg-ag)*t)<<8)|Math.round(ab+(bb-ab)*t);}
+
+const SPARK_COLOR_STEPS=[{t:1.0,color:0xffffff},{t:0.7,color:0xffdd66},{t:0.4,color:0xff7722},{t:0.15,color:0xaa2200},{t:0.0,color:0x330000}];
+function getSparkColor(lr){for(let i=0;i<SPARK_COLOR_STEPS.length-1;i++){const a=SPARK_COLOR_STEPS[i],b=SPARK_COLOR_STEPS[i+1];if(lr<=a.t&&lr>=b.t){const t=(a.t-lr)/(a.t-b.t);return lerpColor(a.color,b.color,t);}}return SPARK_COLOR_STEPS[SPARK_COLOR_STEPS.length-1].color;}
+
+const MAX_SPARKS=60, MAX_ASH=30, EMBER_RADIUS=22;
+
+class Pill {
+    constructor(x,y){
+        this.x=x;this.y=y;this.time=Math.random()*Math.PI*2;this.sparkTimer=0;this.ashTimer=0;
+        this.container=new Container();this.container.x=x;this.container.y=y;
+
+        this.emberSprite=new Sprite(EMBER_TEX);
+        this.emberSprite.anchor.set(0.5);this.emberSprite.width=EMBER_RADIUS*2.8;this.emberSprite.height=EMBER_RADIUS*2.8;
+        this.container.addChild(this.emberSprite);
+
+        this.shimmerGfx=new Graphics();this.shimmerGfx.blendMode="add";
+        this.container.addChild(this.shimmerGfx);
+
+        this.bloomSprite=new Sprite(EMBER_TEX);
+        this.bloomSprite.anchor.set(0.5);this.bloomSprite.width=EMBER_RADIUS*4.2;this.bloomSprite.height=EMBER_RADIUS*4.2;
+        this.bloomSprite.alpha=0.55;this.bloomSprite.blendMode="add";
+        this.bloomSprite.filters=[new BlurFilter({strength:8,quality:3})];
+        this.container.addChild(this.bloomSprite);
+
+        this.sparkContainer=new Container();this.container.addChild(this.sparkContainer);
+        this.ashContainer=new Container();this.container.addChild(this.ashContainer);
+
+        this.sparks=[];
+        for(let i=0;i<MAX_SPARKS;i++){
+            const sprite=new Sprite(SPARK_TEX);sprite.anchor.set(0.5);sprite.visible=false;sprite.blendMode="add";
+            this.sparkContainer.addChild(sprite);
+            this.sparks.push({sprite,x:0,y:0,vx:0,vy:0,life:0,maxLife:0,baseScale:0,active:false});
+        }
+        this.ashes=[];
+        for(let i=0;i<MAX_ASH;i++){
+            const sprite=new Sprite(ASH_TEX);sprite.anchor.set(0.5);sprite.visible=false;
+            this.ashContainer.addChild(sprite);
+            this.ashes.push({sprite,x:0,y:0,vx:0,vy:0,life:0,maxLife:0,baseScale:0,active:false});
+        }
+    }
+
+    spawnSpark(){
+        for(const s of this.sparks){if(s.active)continue;
+            const angle=Math.random()*Math.PI*2,surfDist=EMBER_RADIUS*0.6*(0.8+Math.random()*0.2);
+            s.x=Math.cos(angle)*surfDist;s.y=Math.sin(angle)*surfDist;
+            const speed=10+Math.random()*25;
+            s.vx=Math.cos(angle)*speed*0.6;s.vy=Math.sin(angle)*speed*0.6-12;
+            s.life=0.25+Math.random()*0.45;s.maxLife=s.life;s.baseScale=0.12+Math.random()*0.3;s.active=true;
+            s.sprite.visible=true;s.sprite.x=s.x;s.sprite.y=s.y;s.sprite.scale.set(s.baseScale);s.sprite.alpha=0.8;
+            return;
+        }
+    }
+
+    spawnAsh(){
+        for(const a of this.ashes){if(a.active)continue;
+            const angle=Math.random()*Math.PI*2,surfDist=EMBER_RADIUS*0.5;
+            a.x=Math.cos(angle)*surfDist;a.y=Math.sin(angle)*surfDist;
+            a.vx=(Math.random()-0.5)*6;a.vy=-8-Math.random()*15;
+            a.life=0.6+Math.random()*0.8;a.maxLife=a.life;a.baseScale=0.15+Math.random()*0.35;a.active=true;
+            a.sprite.visible=true;a.sprite.x=a.x;a.sprite.y=a.y;a.sprite.scale.set(a.baseScale);a.sprite.alpha=0.5;
+            return;
+        }
+    }
+
+    update(dt){
+        this.time+=dt;const t=this.time;
+
+        const beat=Math.pow(Math.sin(t*2.3)*0.5+0.5,3);
+        const breathe=1+beat*0.045+Math.sin(t*2.3)*0.02;
+        this.container.scale.set(breathe);
+
+        const temp=0.5+Math.sin(t*2.3)*0.3+beat*0.2;
+        const hot=lerpColor(0xff8822,0xffdd88,temp);
+        const cold=lerpColor(0xdd4400,0xff6611,temp);
+        this.emberSprite.tint=lerpColor(cold,hot,beat);
+
+        const flicker=0.85+Math.sin(t*12)*0.08+Math.sin(t*22)*0.04;
+        this.emberSprite.alpha=Math.max(0.7,Math.min(1,flicker));
+        this.bloomSprite.alpha=0.45+Math.sin(t*8)*0.1;
+
+        this.shimmerGfx.clear();
+        const shimmerR=EMBER_RADIUS*1.05*breathe;
+        const segments=48;
+        this.shimmerGfx.moveTo(Math.cos(0)*shimmerR,Math.sin(0)*shimmerR);
+        for(let i=1;i<=segments;i++){
+            const a=(i/segments)*Math.PI*2;
+            const wobble=Math.sin(t*9+a*4)*2+Math.sin(t*14+a*7)*1.5;
+            const r=shimmerR+2+wobble;
+            this.shimmerGfx.lineTo(Math.cos(a)*r,Math.sin(a)*r);
+        }
+        this.shimmerGfx.closePath();
+        this.shimmerGfx.stroke({color:0xffcc66,width:1.2,alpha:0.35+beat*0.2});
+
+        this.sparkTimer+=dt;
+        const rate=0.05+Math.abs(Math.sin(t*4))*0.03;
+        while(this.sparkTimer>=rate){this.sparkTimer-=rate;this.spawnSpark();}
+        for(const s of this.sparks){if(!s.active)continue;s.life-=dt;if(s.life<=0){s.active=false;s.sprite.visible=false;continue;}
+            s.vx+=Math.sin(t*8+s.y*0.1)*20*dt;s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy-=8*dt;
+            const lr=s.life/s.maxLife;s.sprite.x=s.x;s.sprite.y=s.y;s.sprite.scale.set(s.baseScale*lr);s.sprite.alpha=lr*0.65;s.sprite.tint=getSparkColor(lr);
+        }
+
+        this.ashTimer+=dt;
+        if(this.ashTimer>0.15+Math.random()*0.1){this.ashTimer=0;this.spawnAsh();}
+        for(const a of this.ashes){if(!a.active)continue;a.life-=dt;if(a.life<=0){a.active=false;a.sprite.visible=false;continue;}
+            a.vx+=Math.sin(t*5+a.y*0.05)*3*dt;a.x+=a.vx*dt;a.y+=a.vy*dt;
+            const lr=a.life/a.maxLife;a.sprite.x=a.x;a.sprite.y=a.y;a.sprite.scale.set(a.baseScale*lr);a.sprite.alpha=lr*0.4;
+        }
+
+        this.container.rotation=Math.sin(t*0.4)*0.05;
+    }
+}
+
+const app=new Application();
+await app.init({width:700,height:500,backgroundColor:0x06080e,antialias:true});
+document.getElementById('pixi-container').appendChild(app.canvas);
+
+const scene=new Container();app.stage.addChild(scene);
+const pills=[];
+const positions=[[180,150],[350,120],[520,150],[250,280],[450,280],[350,380]];
+for(const [x,y] of positions){const pill=new Pill(x,y);scene.addChild(pill.container);pills.push(pill);}
+
+app.ticker.add((ticker)=>{
+    const dt=ticker.deltaMS/1000;
+    for(const p of pills)p.update(dt);
+});
+</script>
+</body>
+</html>
