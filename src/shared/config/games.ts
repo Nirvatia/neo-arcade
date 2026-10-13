@@ -29,7 +29,6 @@ export const games: GameConfig[] = [
 		route: '/games/tetris',
 		defaultScore: 0
 	},
-	{ id: 'simon-says', title: 'SIMON SAYS', genre: 'PUZZLE', status: 'soon', defaultScore: 0 }
 ];
 
 export function rankLabel(index: number): string {
