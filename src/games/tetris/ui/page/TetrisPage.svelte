@@ -69,6 +69,16 @@
 		z-index: 1;
 	}
 
+	@media (max-width: 768px) {
+		.tetris-page__stage {
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			gap: 14px;
+			padding: 12px 10px;
+		}
+	}
+
 	@media (max-width: 1100px) {
 		.tetris-page__banner {
 			display: none;
