@@ -1,4 +1,3 @@
-// src/shared/config/games.ts
 import { getSavedScore } from '../utils/scoreStore';
 
 export interface GameConfig {
@@ -20,7 +19,13 @@ export const games: GameConfig[] = [
 		route: '/games/snake',
 		defaultScore: 0
 	},
-	{ id: 'pacman', title: 'PAC-MAN', genre: 'MAZE', status: 'soon', defaultScore: 0 },
+	{
+		id: 'pacman',
+		title: 'PAC-MAN',
+		genre: 'MAZE',
+		status: 'soon',
+		defaultScore: 0
+	},
 	{
 		id: 'tetris',
 		title: 'TETRIS',
@@ -29,6 +34,15 @@ export const games: GameConfig[] = [
 		route: '/games/tetris',
 		defaultScore: 0
 	},
+	{
+		id: 'simon',
+		title: 'SIMON 1C',
+		genre: 'MEMORY',
+		status: 'ready',
+		progress: 80,
+		route: '/games/simon',
+		defaultScore: 0
+	}
 ];
 
 export function rankLabel(index: number): string {
@@ -37,12 +51,21 @@ export function rankLabel(index: number): string {
 }
 
 export function statusLabel(game: GameConfig): string {
-	if (game.status === 'ready') return 'PLAY';
-	if (game.status === 'dev') return `DEV ${game.progress ?? 0}%`;
+	if (game.status === 'ready') {
+		return 'PLAY';
+	}
+
+	if (game.status === 'dev') {
+		return `DEV ${game.progress ?? 0}%`;
+	}
+
 	return 'SOON';
 }
 
 export function getGameScore(game: GameConfig): string {
-	if (game.status === 'soon') return '------';
+	if (game.status === 'soon') {
+		return '------';
+	}
+
 	return getSavedScore(game.id, game.defaultScore ?? '000000');
 }
