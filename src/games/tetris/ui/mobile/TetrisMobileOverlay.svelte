@@ -321,6 +321,110 @@
 		text-transform: uppercase;
 	}
 
+	.tetris-mobile-overlay {
+	padding: 18px;
+	padding-bottom: calc(18px + env(safe-area-inset-bottom));
+	backdrop-filter: blur(2px);
+}
+
+.tetris-mobile-overlay--start {
+	background:
+		radial-gradient(700px 360px at 82% 6%, rgba(227, 167, 47, 0.24), transparent 60%),
+		linear-gradient(112deg, #9a1d24 0 56%, #651016 56% 100%);
+}
+
+.tetris-mobile-overlay__star {
+	width: 82px;
+	right: 8px;
+	top: 10px;
+	opacity: 0.8;
+}
+
+.tetris-mobile-overlay__poster {
+	max-width: 520px;
+	padding: 5vh 18px 28px;
+}
+
+.tetris-mobile-overlay__poster-stamp {
+	top: 1vh;
+	right: 16px;
+	font-size: 11px;
+}
+
+.tetris-mobile-overlay__kicker {
+	font-size: 10px;
+	letter-spacing: 0.28em;
+	margin-bottom: 14px;
+}
+
+.tetris-mobile-overlay__title-main {
+	font-size: clamp(46px, 15vw, 88px);
+	text-shadow:
+		5px 5px 0 var(--tetris-ink),
+		10px 10px 0 rgba(0, 0, 0, 0.22);
+}
+
+.tetris-mobile-overlay__title-sub {
+	font-size: clamp(14px, 4vw, 20px);
+	margin-top: 12px;
+	padding: 4px 12px;
+	box-shadow: 4px 4px 0 var(--tetris-ink);
+}
+
+.tetris-mobile-overlay__subtitle {
+	margin: 18px 0 22px;
+	font-size: 10px;
+	letter-spacing: 0.22em;
+}
+
+.tetris-mobile-overlay__fineprint {
+	display: none;
+}
+
+.tetris-mobile-overlay__card {
+	width: 100%;
+	max-width: 420px;
+	padding: 24px 18px;
+	border-width: 3px;
+	box-shadow: 10px 10px 0 rgba(0, 0, 0, 0.45);
+	transform: none;
+}
+
+.tetris-mobile-overlay__card-title {
+	font-size: clamp(26px, 7vw, 36px);
+}
+
+.tetris-mobile-overlay__card-text {
+	font-size: 13px;
+	margin: 8px 0 18px;
+}
+
+.tetris-mobile-overlay__stats {
+	margin: 4px 0 18px;
+	border-width: 2px;
+}
+
+.tetris-mobile-overlay__stat {
+	padding: 10px 6px;
+	border-right-width: 2px;
+}
+
+.tetris-mobile-overlay__stat-value {
+	font-size: 20px;
+}
+
+.tetris-mobile-overlay__actions {
+	display: grid;
+	gap: 10px;
+}
+
+.tetris-mobile-overlay__actions .tetris-btn,
+.tetris-mobile-overlay__actions a {
+	width: 100%;
+	text-align: center;
+	box-sizing: border-box;
+}
+
 	@keyframes tetris-mobile-overlay-spin {
 		to {
 			transform: rotate(360deg);
