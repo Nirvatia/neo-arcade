@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import '../../styles/tetris.css';
 	import TetrisBackdrop from './TetrisBackdrop.svelte';
 	import TetrisTopbar from './TetrisTopbar.svelte';
@@ -7,26 +8,55 @@
 	import TetrisSupplyPanel from './TetrisSupplyPanel.svelte';
 	import TetrisTicker from './TetrisTicker.svelte';
 	import TetrisOverlay from '../overlay/TetrisOverlay.svelte';
+	import TetrisMobileShell from '../mobile/TetrisMobileShell.svelte';
+
+	let isMobile = $state(false);
+
+	onMount(() => {
+		const checkMobile = (): void => {
+			isMobile = window.innerWidth <= 768;
+		};
+
+		checkMobile();
+
+		const onResize = (): void => {
+			checkMobile();
+		};
+
+		window.addEventListener('resize', onResize);
+		window.addEventListener('orientationchange', onResize);
+
+		return () => {
+			window.removeEventListener('resize', onResize);
+			window.removeEventListener('orientationchange', onResize);
+		};
+	});
 </script>
 
 <svelte:head>
 	<title>ТЕТРИС «ПЯТИЛЕТКА» · NEO ARCADE</title>
 </svelte:head>
 
-<div class="tetris-page">
-	<TetrisBackdrop />
-	<TetrisTopbar />
-	<main class="tetris-page__stage">
-		<div class="tetris-page__banner" aria-hidden="true">
-			СТРОЙКА ВЕКА ★ КАЖДЫЙ РЯД — ШАГ К КОММУНИЗМУ ★ СТРОЙКА ВЕКА
-		</div>
-		<TetrisHud />
-		<TetrisPlayfield />
-		<TetrisSupplyPanel />
-	</main>
-	<TetrisTicker />
-	<TetrisOverlay />
-</div>
+{#if isMobile}
+	<div class="tetris-page tetris-page--mobile">
+		<TetrisMobileShell />
+	</div>
+{:else}
+	<div class="tetris-page">
+		<TetrisBackdrop />
+		<TetrisTopbar />
+		<main class="tetris-page__stage">
+			<div class="tetris-page__banner" aria-hidden="true">
+				СТРОЙКА ВЕКА ★ КАЖДЫЙ РЯД — ШАГ К КОММУНИЗМУ ★ СТРОЙКА ВЕКА
+			</div>
+			<TetrisHud />
+			<TetrisPlayfield />
+			<TetrisSupplyPanel />
+		</main>
+		<TetrisTicker />
+		<TetrisOverlay />
+	</div>
+{/if}
 
 <style>
 	.tetris-page {
@@ -41,6 +71,22 @@
 		overflow-x: hidden;
 		overscroll-behavior: none;
 		touch-action: manipulation;
+	}
+
+	.tetris-page--mobile {
+		min-height: 0;
+		height: 100vh;
+		height: 100dvh;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: linear-gradient(#7c1313, #5a0c0c 55%, #4a0909);
+		overflow: hidden;
+	}
+
+	.tetris-page--mobile::before,
+	.tetris-page--mobile::after {
+		content: none;
 	}
 
 	.tetris-page__stage {

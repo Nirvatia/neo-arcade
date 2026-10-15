@@ -1,8 +1,9 @@
-// src/games/tetris/ui/actions/actionsStore.svelte.ts
+import type { TetrisCommand } from '../../core/types';
 
 export interface TetrisActions {
 	start: () => void;
 	togglePause: () => void;
+	press: (command: TetrisCommand) => void;
 }
 
 let _actions = $state<TetrisActions | null>(null);

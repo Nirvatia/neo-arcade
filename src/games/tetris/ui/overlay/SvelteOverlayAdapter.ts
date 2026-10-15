@@ -1,7 +1,6 @@
-// src/games/tetris/ui/overlay/SvelteOverlayAdapter.ts
 import { setOverlayState } from './overlayStore.svelte.ts';
 import { setTetrisActions } from '../actions/actionsStore.svelte.ts';
-import type { GamePhase } from '../../core/types';
+import type { GamePhase, TetrisCommand } from '../../core/types';
 
 export interface OverlayUpdate {
 	phase: GamePhase;
@@ -13,6 +12,7 @@ export interface OverlayUpdate {
 export interface OverlayActions {
 	start: () => void;
 	togglePause: () => void;
+	press: (command: TetrisCommand) => void;
 }
 
 export class SvelteOverlayAdapter {

@@ -21,7 +21,8 @@ export class GameMain implements GameModule {
 		this.pipeline = new RenderPipeline(canvasParent);
 		this.pipeline.setActions({
 			start: () => this.director.start(),
-			togglePause: () => this.director.togglePause()
+			togglePause: () => this.director.togglePause(),
+			press: (command: TetrisCommand) => this.press(command)
 		});
 		this.loop = new GameLoop(60, this.update.bind(this), this.render.bind(this));
 		this.input = new InputController(this.director, this.inputSystem);

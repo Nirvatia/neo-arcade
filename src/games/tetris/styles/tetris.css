@@ -7,6 +7,9 @@
 	--tetris-well: #241b14;
 	--tetris-font-display: 'Russo One', sans-serif;
 	--tetris-font-body: 'Oswald', sans-serif;
+	--tetris-gold-hi: #f7d98b;
+	--tetris-gold-dim: rgba(232, 184, 75, 0.55);
+	--tetris-red-hot: #a3201d;
 }
 
 :focus-visible {
@@ -167,3 +170,12 @@
 		justify-content: center;
 	}
 }
+<<<<<<< Updated upstream
+=======
+
+@media (max-width: 768px) {
+	.tetris-column {
+		display: none;
+	}
+}
+>>>>>>> Stashed changes
