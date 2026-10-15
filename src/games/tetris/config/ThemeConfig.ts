@@ -17,9 +17,9 @@ export interface TetrisTheme {
 }
 
 export const THEME: TetrisTheme = {
-	frame: '#171210',
-	playfield: '#241B14',
-	gridLine: 'rgba(233, 223, 198, 0.05)',
+	frame: '#150505',
+	playfield: '#230909',
+	gridLine: 'rgba(238, 220, 180, 0.07)',
 	overlay: 'rgba(22, 11, 8, 0.84)',
 	textPrimary: '#EDE3CB',
 	textDim: 'rgba(237, 227, 203, 0.6)',

@@ -7,6 +7,19 @@
 	--tetris-well: #241b14;
 	--tetris-font-display: 'Russo One', sans-serif;
 	--tetris-font-body: 'Oswald', sans-serif;
+	--tetris-gold-hi: #f7d98b;
+	--tetris-gold-dim: rgba(232, 184, 75, 0.55);
+	--tetris-red-hot: #a3201d;
+
+		--tm-border: rgba(232, 184, 75, 0.34);
+	--tm-border-strong: rgba(247, 217, 139, 0.62);
+	--tm-panel-a: #420909;
+	--tm-panel-b: #230404;
+	--tm-glass-a: #1b0606;
+	--tm-glass-b: #100202;
+	--tm-gold-glow: rgba(247, 217, 139, 0.22);
+	--tm-radius-lg: 16px;
+	--tm-radius-md: 10px;
 }
 
 :focus-visible {
@@ -146,6 +159,12 @@
 	transform: rotate(9deg);
 }
 
+@media (max-width: 768px) {
+	.tetris-column {
+		display: none;
+	}
+}
+
 @media (max-width: 1100px) {
 	.tetris-column {
 		width: 212px;
@@ -159,5 +178,11 @@
 		flex-wrap: wrap;
 		width: auto;
 		justify-content: center;
+	}
+}
+
+@media (max-width: 768px) {
+	.tetris-column {
+		display: none;
 	}
 }

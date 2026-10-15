@@ -22,52 +22,118 @@
 	let gestureStartX = 0;
 	let gestureStartY = 0;
 
+	function parseMetric(value: string): number {
+		const parsed = Number.parseFloat(value);
+		return Number.isFinite(parsed) ? parsed : 0;
+	}
+
 	function fit(): void {
 		if (!centerEl || !frameEl || !frameWrapEl) {
 			return;
 		}
+
 		const w = frameEl.offsetWidth;
 		const h = frameEl.offsetHeight;
+
 		if (w <= 0 || h <= 0) {
 			return;
 		}
 
-		const root = centerEl.closest('.tetris-page');
-		let chromeHeight = 0;
-		if (root) {
-			for (const el of Array.from(root.querySelectorAll('[data-tetris-chrome]'))) {
-				chromeHeight += (el as HTMLElement).offsetHeight;
-			}
-		}
+		const viewportWidth = window.visualViewport ? window.visualViewport.width : window.innerWidth;
+		const viewportHeight = window.visualViewport
+			? window.visualViewport.height
+			: window.innerHeight;
 
-		const narrow = window.matchMedia('(max-width: 980px)').matches;
-		const stage = centerEl.parentElement;
-		let availW: number;
-		if (narrow || !stage) {
-			availW = window.innerWidth - 32;
-		} else {
-			let reserved = 0;
-			for (const child of Array.from(stage.children)) {
-				if (child !== centerEl) {
-					reserved += (child as HTMLElement).offsetWidth + 28;
+		const pageEl = centerEl.closest('.tetris-page');
+		let chromeHeight = 0;
+
+		if (pageEl) {
+			for (const el of Array.from(pageEl.querySelectorAll('[data-tetris-chrome]'))) {
+				if (el instanceof HTMLElement) {
+					chromeHeight += el.offsetHeight;
 				}
 			}
-			availW = stage.clientWidth - reserved;
 		}
 
-		let availH = window.innerHeight - chromeHeight - 64;
-		if (narrow) {
-			availH = Math.min(availH, window.innerHeight * 0.6);
+		let availW = viewportWidth - 32;
+		let availH = viewportHeight - chromeHeight - 48;
+
+		const stage = centerEl.parentElement;
+
+		if (stage instanceof HTMLElement) {
+			const styles = getComputedStyle(stage);
+			const paddingTop = parseMetric(styles.paddingTop);
+			const paddingBottom = parseMetric(styles.paddingBottom);
+			const paddingLeft = parseMetric(styles.paddingLeft);
+			const paddingRight = parseMetric(styles.paddingRight);
+			const gap = parseMetric(
+				styles.getPropertyValue('column-gap') ||
+					styles.getPropertyValue('row-gap') ||
+					styles.getPropertyValue('gap') ||
+					'0'
+			);
+
+			const compact = window.matchMedia('(max-width: 980px)').matches;
+
+			let reservedWidth = 0;
+			let reservedVertical = 0;
+			let visibleSides = 0;
+
+			for (const child of Array.from(stage.children)) {
+				if (!(child instanceof HTMLElement) || child === centerEl) {
+					continue;
+				}
+
+				if (
+					child.hasAttribute('data-tetris-chrome') ||
+					child.classList.contains('tetris-page__banner')
+				) {
+					continue;
+				}
+
+				if (child.offsetWidth <= 0 && child.offsetHeight <= 0) {
+					continue;
+				}
+
+				if (compact) {
+					reservedVertical += child.offsetHeight;
+				} else {
+					reservedWidth += child.offsetWidth;
+				}
+
+				visibleSides += 1;
+			}
+
+			if (compact) {
+				availW = stage.clientWidth - paddingLeft - paddingRight;
+				availH =
+					viewportHeight -
+					chromeHeight -
+					paddingTop -
+					paddingBottom -
+					reservedVertical -
+					gap * visibleSides -
+					24;
+			} else {
+				availW =
+					stage.clientWidth - paddingLeft - paddingRight - reservedWidth - gap * visibleSides;
+				availH = viewportHeight - chromeHeight - paddingTop - paddingBottom - 24;
+			}
 		}
-		if (touchbarEl) {
-			availH -= touchbarEl.offsetHeight;
+
+		if (window.matchMedia('(max-width: 768px)').matches) {
+			availH = Math.min(availH, viewportHeight * 0.66);
+		}
+
+		if (touchbarEl && touchbarEl.offsetHeight > 0) {
+			availH -= touchbarEl.offsetHeight + 14;
 		}
 
 		availW = Math.max(160, availW);
-		availH = Math.max(160, availH);
+		availH = Math.max(220, availH);
 
 		const scale = Math.min(1, availW / w, availH / h);
-		const clamped = Number.isFinite(scale) ? Math.max(0.4, scale) : 1;
+		const clamped = Number.isFinite(scale) ? Math.max(0.28, scale) : 1;
 
 		frameEl.style.transformOrigin = 'top left';
 		frameEl.style.transform = `scale(${clamped})`;
@@ -440,6 +506,19 @@
 		touch-action: none;
 		user-select: none;
 		padding-bottom: env(safe-area-inset-bottom);
+	}
+
+	.tetris-field__box {
+		width: max-content;
+		height: max-content;
+	}
+
+	.tetris-field__frame {
+		width: max-content;
+	}
+
+	.tetris-field__host {
+		width: max-content;
 	}
 
 	@keyframes tetris-field-shake {
