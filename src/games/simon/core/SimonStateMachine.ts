@@ -97,6 +97,51 @@ const transitions: ReadonlyArray<StateTransition<SimonStateId, SimonTransitionEv
 		from: SimonState.GameOver,
 		event: SimonEvent.RestartRequested,
 		to: SimonState.Menu
+	},
+	{
+		from: SimonState.ShowingPattern,
+		event: SimonEvent.RestartRequested,
+		to: SimonState.Menu
+	},
+	{
+		from: SimonState.AwaitingInput,
+		event: SimonEvent.RestartRequested,
+		to: SimonState.Menu
+	},
+	{
+		from: SimonState.RoundTransition,
+		event: SimonEvent.RestartRequested,
+		to: SimonState.Menu
+	},
+	{
+		from: SimonState.OrdersIssuing,
+		event: SimonEvent.RestartRequested,
+		to: SimonState.Menu
+	},
+	{
+		from: SimonState.OrdersAwaiting,
+		event: SimonEvent.RestartRequested,
+		to: SimonState.Menu
+	},
+	{
+		from: SimonState.OrdersFeedback,
+		event: SimonEvent.RestartRequested,
+		to: SimonState.Menu
+	},
+	{
+		from: SimonState.Failure,
+		event: SimonEvent.RestartRequested,
+		to: SimonState.Menu
+	},
+	{
+		from: SimonState.FailureOrders,
+		event: SimonEvent.RestartRequested,
+		to: SimonState.Menu
+	},
+	{
+		from: SimonState.FailureClassic,
+		event: SimonEvent.RestartRequested,
+		to: SimonState.Menu
 	}
 ];
 

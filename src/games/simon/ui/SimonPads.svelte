@@ -142,20 +142,21 @@
 		transform: scale(0.98);
 	}
 
-	.pad-btn[data-active='true'] {
-		filter: brightness(1.45) saturate(1.2);
-		transform: scale(1.02);
+	.pad-btn:disabled {
+		cursor: not-allowed;
+		filter: brightness(0.72) saturate(0.65);
+	}
+
+	.pad-btn[data-active='true'],
+	.pad-btn[data-active='true']:disabled {
+		filter: brightness(1.12) saturate(1.05);
+		transform: scale(1.01);
 		box-shadow: 0 0 18px rgba(255, 255, 255, 0.35);
 	}
 
 	.pad-btn:focus-visible {
 		outline: 3px solid #ffd24d;
 		outline-offset: 2px;
-	}
-
-	.pad-btn:disabled {
-		cursor: not-allowed;
-		filter: brightness(0.72) saturate(0.65);
 	}
 
 	[data-tone='green'] {

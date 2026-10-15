@@ -4,96 +4,120 @@ import { EventBus } from '../engine/EventBus';
 import { SimonEvent, type SimonEventPayloads, type SimonUiSnapshot } from './Events';
 import { SimonRuntime } from './SimonRuntime';
 import {
-  SimonState,
-  type SimonDifficultyId,
-  type SimonPadId,
-  type SimonStateId
+	SimonState,
+	type SimonDifficultyId,
+	type SimonModeId,
+	type SimonPadId,
+	type SimonStateId
 } from './SimonTypes';
 
 export class SimonGame implements GameModule {
-  private readonly events = new EventBus<SimonEventPayloads>();
-  private readonly runtime: SimonRuntime;
-  private readonly audio: SimonAudioPlayer;
-  private container: HTMLDivElement | null = null;
-  private destroyed = false;
+	private readonly events = new EventBus<SimonEventPayloads>();
+	private readonly runtime: SimonRuntime;
+	private readonly audio: SimonAudioPlayer;
+	private container: HTMLDivElement | null = null;
+	private destroyed = false;
 
-  constructor() {
-    this.runtime = new SimonRuntime(this.events);
-    this.audio = new SimonAudioPlayer(this);
-  }
+	constructor() {
+		this.runtime = new SimonRuntime(this.events);
+		this.audio = new SimonAudioPlayer(this);
+	}
 
-  async init(container: HTMLDivElement): Promise<void> {
-    this.assertNotDestroyed();
+	async init(container: HTMLDivElement): Promise<void> {
+		this.assertNotDestroyed();
 
-    if (!container) {
-      throw new Error('[SimonGame] Container is required');
-    }
+		if (!container) {
+			throw new Error('[SimonGame] Container is required');
+		}
 
-    if (this.runtime.state !== SimonState.Boot) {
-      throw new Error('[SimonGame] Game is already initialized');
-    }
+		if (this.runtime.state !== SimonState.Boot) {
+			throw new Error('[SimonGame] Game is already initialized');
+		}
 
-    this.container = container;
-    this.runtime.boot();
-    this.runtime.start();
-  }
+		this.container = container;
+		this.runtime.boot();
+		this.runtime.start();
+	}
 
-  destroy(): void {
-    if (this.destroyed) {
-      return;
-    }
+	destroy(): void {
+		if (this.destroyed) {
+			return;
+		}
 
-    this.destroyed = true;
-    this.container = null;
+		this.destroyed = true;
+		this.container = null;
+		this.audio.destroy();
+		this.runtime.destroy();
+		this.events.clear();
+	}
 
-    this.audio.destroy();
-    this.runtime.destroy();
-    this.events.clear();
-  }
+	get state(): SimonStateId {
+		return this.runtime.state;
+	}
 
-  get state(): SimonStateId {
-    return this.runtime.state;
-  }
+	get selectedDifficulty(): SimonDifficultyId {
+		return this.runtime.selectedDifficulty;
+	}
 
-  get selectedDifficulty(): SimonDifficultyId {
-    return this.runtime.selectedDifficulty;
-  }
+	get selectedMode(): SimonModeId {
+		return this.runtime.selectedMode;
+	}
 
-  get uiSnapshot(): SimonUiSnapshot {
-    return this.runtime.getSnapshot();
-  }
+	get uiSnapshot(): SimonUiSnapshot {
+		return this.runtime.getSnapshot();
+	}
 
-  on<K extends keyof SimonEventPayloads>(
-    event: K,
-    listener: (payload: SimonEventPayloads[K]) => void
-  ): () => void {
-    this.assertNotDestroyed();
-    return this.events.on(event, listener);
-  }
+	on<K extends keyof SimonEventPayloads>(
+		event: K,
+		listener: (payload: SimonEventPayloads[K]) => void
+	): () => void {
+		this.assertNotDestroyed();
+		return this.events.on(event, listener);
+	}
 
-  selectDifficulty(difficulty: SimonDifficultyId): void {
-    this.assertNotDestroyed();
-    this.runtime.selectDifficulty(difficulty);
-  }
+	selectDifficulty(difficulty: SimonDifficultyId): void {
+		this.assertNotDestroyed();
+		this.runtime.selectDifficulty(difficulty);
+	}
 
-  requestStart(): void {
-    this.assertNotDestroyed();
-    this.runtime.requestStart();
-  }
+	selectMode(mode: SimonModeId): void {
+		this.assertNotDestroyed();
+		this.runtime.selectMode(mode);
+	}
 
-  requestRestart(): void {
-    this.assertNotDestroyed();
-    this.runtime.requestRestart();
-  }
+	requestStart(): void {
+		this.assertNotDestroyed();
+		this.runtime.requestStart();
+	}
 
-  pressPad(pad: SimonPadId): void {
-    this.assertNotDestroyed();
-    this.runtime.pressPad(pad);
-  }
+	requestStartMode(mode: SimonModeId): void {
+		this.assertNotDestroyed();
+		this.runtime.requestStartMode(mode);
+	}
 
-  private assertNotDestroyed(): void {
-    if (this.destroyed) {
-      throw new Error('[SimonGame] Game is destroyed');
-    }
-  }
+	requestRestart(): void {
+		this.assertNotDestroyed();
+		this.runtime.requestRestart();
+	}
+
+	pressPad(pad: SimonPadId): void {
+		this.assertNotDestroyed();
+		this.runtime.pressPad(pad);
+	}
+
+	skip(): void {
+		this.assertNotDestroyed();
+		this.runtime.skip();
+	}
+
+	private assertNotDestroyed(): void {
+		if (this.destroyed) {
+			throw new Error('[SimonGame] Game is destroyed');
+		}
+	}
+
+  	acknowledgeFailure(): void {
+		this.assertNotDestroyed();
+		this.runtime.acknowledgeFailure();
+	}
 }

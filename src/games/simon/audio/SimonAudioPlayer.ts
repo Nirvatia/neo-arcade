@@ -53,13 +53,43 @@ export class SimonAudioPlayer {
 		);
 
 		this.disposers.push(
+			this.source.on(SimonEvent.ClassicInputRejected, () => {
+				this.playError();
+			})
+		);
+
+		this.disposers.push(
+			this.source.on(SimonEvent.OrderRejected, () => {
+				this.playError();
+			})
+		);
+
+		this.disposers.push(
 			this.source.on(SimonEvent.InputSequenceCompleted, () => {
 				this.playSuccess();
 			})
 		);
 
 		this.disposers.push(
+			this.source.on(SimonEvent.OrderAccepted, () => {
+				this.playSuccess();
+			})
+		);
+
+		this.disposers.push(
 			this.source.on(SimonEvent.StartRequested, () => {
+				this.unlock();
+			})
+		);
+
+		this.disposers.push(
+			this.source.on(SimonEvent.StartOrdersRequested, () => {
+				this.unlock();
+			})
+		);
+
+		this.disposers.push(
+			this.source.on(SimonEvent.StartClassicRequested, () => {
 				this.unlock();
 			})
 		);

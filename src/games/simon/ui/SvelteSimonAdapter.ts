@@ -3,31 +3,38 @@ import { SimonEvent } from '../core/Events';
 import type { SimonUiStore } from './simonUiStore.svelte';
 
 export class SvelteSimonAdapter {
-  private readonly game: SimonGame;
-  private readonly store: SimonUiStore;
-  private readonly disposers: Array<() => void> = [];
+	private readonly game: SimonGame;
+	private readonly store: SimonUiStore;
+	private readonly disposers: Array<() => void> = [];
 
-  constructor(game: SimonGame, store: SimonUiStore) {
-    this.game = game;
-    this.store = store;
-  }
+	constructor(game: SimonGame, store: SimonUiStore) {
+		this.game = game;
+		this.store = store;
+	}
 
-  connect(): void {
-    this.disposers.push(
-      this.game.on(SimonEvent.UiSync, (snapshot) => {
-        this.store.apply(snapshot);
-      })
-    );
+	connect(): void {
+		this.disposers.push(
+			this.game.on(SimonEvent.UiSync, (snapshot) => {
+				this.store.apply(snapshot);
+			})
+		);
 
-    this.store.apply(this.game.uiSnapshot);
-  }
+		this.disposers.push(
+			this.game.on(SimonEvent.ConsoleMessageReceived, (payload) => {
+				this.store.addLine(payload.text, payload.kind);
+			})
+		);
 
-  disconnect(): void {
-    for (const dispose of this.disposers) {
-      dispose();
-    }
+		this.store.apply(this.game.uiSnapshot);
+		this.store.bootIfNeeded();
+	}
 
-    this.disposers.length = 0;
-    this.store.reset();
-  }
+	disconnect(): void {
+		for (const dispose of this.disposers) {
+			dispose();
+		}
+
+		this.disposers.length = 0;
+		this.store.reset();
+	}
 }
