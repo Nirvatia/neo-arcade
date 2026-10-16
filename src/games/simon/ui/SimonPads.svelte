@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { SimonPad, type SimonPadId } from '../core/SimonTypes';
-	import type { SimonUiStore } from './simonUiStore.svelte';
+	import type { SimonUiStore } from './SimonUiStore.svelte';
 
 	interface PadDef {
 		readonly id: SimonPadId;
@@ -179,10 +179,35 @@
 		border-color: #a87605;
 	}
 
-	@media (max-width: 820px) {
-		.pad-btn {
-			min-height: 92px;
-			font-size: 16px;
-		}
+@media (max-width: 820px) {
+	.pad {
+		width: 100%;
+		gap: 8px;
 	}
+
+	.pad-btn {
+		min-height: 72px;
+		font-size: 14px;
+		gap: 2px;
+	}
+
+	.pad-btn small {
+		display: none;
+	}
+
+	.key {
+		display: none;
+	}
+
+	.icon {
+		font-size: 18px;
+	}
+}
+
+@media (max-width: 480px) {
+	.pad-btn {
+		min-height: 64px;
+		font-size: 13px;
+	}
+}
 </style>

@@ -1,6 +1,6 @@
 import type { SimonGame } from '../core/GameMain';
 import { SimonEvent } from '../core/Events';
-import type { SimonUiStore } from './simonUiStore.svelte';
+import type { SimonUiStore } from './SimonUiStore.svelte';
 
 export class SvelteSimonAdapter {
 	private readonly game: SimonGame;

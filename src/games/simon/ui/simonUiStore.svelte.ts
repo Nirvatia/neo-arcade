@@ -1,11 +1,6 @@
 import type { SimonUiSnapshot } from '../core/Events';
 import { SimonConsoleKind, type SimonConsoleKindId } from '../core/Events';
-import {
-	SimonDifficulty,
-	SimonFailureReason,
-	SimonMode,
-	SimonState
-} from '../core/SimonTypes';
+import { SimonDifficulty, SimonFailureReason, SimonMode, SimonState } from '../core/SimonTypes';
 import type {
 	SimonDifficultyId,
 	SimonFailureReasonId,
@@ -28,7 +23,6 @@ export class SimonUiStore {
 	mode = $state<SimonModeId>(SimonMode.Orders);
 
 	round = $state(0);
-	clicksTotal = $state(0);
 	score = $state(0);
 	combo = $state(0);
 	level = $state(1);
@@ -57,8 +51,7 @@ export class SimonUiStore {
 		this.mode = snapshot.mode ?? SimonMode.Orders;
 
 		this.round = snapshot.round;
-		this.clicksTotal = snapshot.clicksTotal;
-		this.score = snapshot.score ?? snapshot.clicksTotal;
+		this.score = snapshot.score;
 		this.combo = snapshot.combo ?? 0;
 		this.level = snapshot.level ?? 1;
 		this.lives = snapshot.lives ?? 3;
@@ -83,7 +76,6 @@ export class SimonUiStore {
 		this.mode = SimonMode.Orders;
 
 		this.round = 0;
-		this.clicksTotal = 0;
 		this.score = 0;
 		this.combo = 0;
 		this.level = 1;
@@ -108,11 +100,7 @@ export class SimonUiStore {
 	addLine(text: string, kind: SimonConsoleKindId): void {
 		const now = new Date();
 
-		const time = [
-			now.getHours(),
-			now.getMinutes(),
-			now.getSeconds()
-		]
+		const time = [now.getHours(), now.getMinutes(), now.getSeconds()]
 			.map((value) => String(value).padStart(2, '0'))
 			.join(':');
 
@@ -135,10 +123,7 @@ export class SimonUiStore {
 			return;
 		}
 
-		this.addLine(
-			'Конфигурация «Симон говорит» загружена. Демо-режим.',
-			SimonConsoleKind.Command
-		);
+		this.addLine('Конфигурация «Симон говорит» загружена. Демо-режим.', SimonConsoleKind.Command);
 
 		this.addLine(
 			'Добро пожаловать, Стажёр. Вас заставят нажимать кнопки. Легально.',
@@ -206,7 +191,6 @@ export class SimonUiStore {
 				return 'Ожидание реакции пользователя…';
 			case SimonState.OrdersFeedback:
 				return 'Проведение документа…';
-			case SimonState.Failure:
 			case SimonState.FailureOrders:
 			case SimonState.FailureClassic:
 				return 'Ошибка. Подробности в журнале регистрации.';
@@ -225,8 +209,7 @@ export class SimonUiStore {
 		switch (this.failureReason) {
 			case SimonFailureReason.WrongPad:
 				return 'Нарушена последовательность шагов обновления конфигурации.';
-			case SimonFailureReason.LockedInput:
-				return 'Попытка изменения конфигурации внутри заблокированной транзакции.';
+
 			case SimonFailureReason.IncompleteSequence:
 				return 'Транзакция обновления завершена не полностью. База повреждена.';
 			case SimonFailureReason.Timeout:

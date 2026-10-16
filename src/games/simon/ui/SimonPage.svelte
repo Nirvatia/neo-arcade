@@ -2,10 +2,10 @@
 	import { onMount } from 'svelte';
 	import { SimonGame } from '../core/GameMain';
 	import { SimonConsoleKind, type SimonConsoleKindId } from '../core/Events';
-	import { SimonMode, SimonPadList, SimonState, type SimonPadId } from '../core/SimonTypes';
+	import { SimonMode, SimonState, type SimonPadId } from '../core/SimonTypes';
 	import SimonPads from './SimonPads.svelte';
 	import { SvelteSimonAdapter } from './SvelteSimonAdapter';
-	import { SimonUiStore } from './simonUiStore.svelte';
+	import { SimonUiStore } from './SimonUiStore.svelte';
 
 	const store = new SimonUiStore();
 
@@ -263,62 +263,6 @@
 		}
 	}
 
-	function handleKeydown(event: KeyboardEvent): void {
-		if (event.repeat) {
-			return;
-		}
-
-		const target = event.target;
-
-		if (target instanceof HTMLSelectElement || target instanceof HTMLInputElement) {
-			return;
-		}
-
-		if (store.isGameOver) {
-			if (event.key === 'Enter') {
-				event.preventDefault();
-				restartAndStart();
-			}
-
-			return;
-		}
-
-		if (failureVisible) {
-			if (event.key === 'Enter' || event.key === 'Escape') {
-				event.preventDefault();
-				acknowledgeFailure();
-			}
-
-			return;
-		}
-
-		if (event.key >= '1' && event.key <= '4') {
-			const index = Number(event.key) - 1;
-			const pad = SimonPadList[index];
-
-			if (pad) {
-				press(pad);
-			}
-
-			return;
-		}
-
-		if (event.key === ' ') {
-			event.preventDefault();
-
-			if (store.canSkip) {
-				skip();
-			}
-
-			return;
-		}
-
-		if (event.key === 'Enter' && store.isMenu && store.canStart) {
-			event.preventDefault();
-			start();
-		}
-	}
-
 	function toggleMenu(title: string, event: MouseEvent): void {
 		event.stopPropagation();
 		menuOpen = menuOpen === title ? null : title;
@@ -355,7 +299,7 @@
 	}
 </script>
 
-<svelte:window onclick={closeMenu} onkeydown={handleKeydown} />
+<svelte:window onclick={closeMenu} />
 <div class="simon-app">
 	<div class="desktop" aria-hidden="true">
 		<div class="desktop-icons">
@@ -1461,4 +1405,139 @@
 			height: min(780px, calc(100dvh - 32px));
 		}
 	}
+
+	@media (max-width: 820px) {
+	.simon-app {
+		padding: 8px 8px 48px;
+	}
+
+	.desktop-icons,
+	.desktop-logo,
+	.scanlines,
+	.vignette,
+	.taskbar,
+	.nav,
+	.menubar,
+	.toolbar,
+	.form-head .ver,
+	.hint,
+	.legend {
+		display: none;
+	}
+
+	.window {
+		width: 100%;
+		height: calc(100dvh - 56px);
+		max-height: none;
+		border-radius: 4px;
+	}
+
+	.titlebar {
+		padding: 4px 8px;
+	}
+
+	.tb-title {
+		font-size: 11px;
+	}
+
+	.tb-btns {
+		display: none;
+	}
+
+	.workspace {
+		padding: 8px;
+		gap: 8px;
+	}
+
+	.form-head h1 {
+		font-size: 13px;
+	}
+
+	.hud {
+		gap: 4px;
+	}
+
+	.hud .cell {
+		padding: 3px 6px;
+		font-size: 11px;
+	}
+
+	.hud .cell b {
+		font-size: 12px;
+	}
+
+	.console-lines {
+		height: 56px;
+		font-size: 11px;
+	}
+
+	.order {
+		min-height: 60px;
+		padding: 8px 10px;
+	}
+
+	.order-text {
+		font-size: 15px;
+	}
+
+	.actions {
+		gap: 6px;
+	}
+
+	.btn {
+		padding: 6px 12px;
+		font-size: 12px;
+	}
+
+	.statusbar {
+		font-size: 10px;
+		padding: 3px 8px;
+	}
+
+	.overlay .modal {
+		width: 94vw;
+	}
+
+	.modal-body {
+		font-size: 12px;
+		padding: 12px 10px;
+	}
+}
+
+@media (max-width: 480px) {
+	.hud {
+		display: grid;
+		grid-template-columns: 1fr 1fr 1fr;
+	}
+
+	.order-text {
+		font-size: 13px;
+	}
+
+	.console-lines {
+		height: 44px;
+	}
+}
+
+@media (max-height: 560px) {
+	.taskbar {
+		display: none;
+	}
+
+	.simon-app {
+		padding-bottom: 8px;
+	}
+
+	.window {
+		height: calc(100dvh - 16px);
+	}
+
+	.console-lines {
+		height: 40px;
+	}
+
+	.order {
+		min-height: 48px;
+	}
+}
 </style>

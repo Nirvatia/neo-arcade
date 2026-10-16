@@ -47,12 +47,6 @@ export class SimonAudioPlayer {
 		);
 
 		this.disposers.push(
-			this.source.on(SimonEvent.InputRejected, () => {
-				this.playError();
-			})
-		);
-
-		this.disposers.push(
 			this.source.on(SimonEvent.ClassicInputRejected, () => {
 				this.playError();
 			})
@@ -75,24 +69,6 @@ export class SimonAudioPlayer {
 				this.playSuccess();
 			})
 		);
-
-		this.disposers.push(
-			this.source.on(SimonEvent.StartRequested, () => {
-				this.unlock();
-			})
-		);
-
-		this.disposers.push(
-			this.source.on(SimonEvent.StartOrdersRequested, () => {
-				this.unlock();
-			})
-		);
-
-		this.disposers.push(
-			this.source.on(SimonEvent.StartClassicRequested, () => {
-				this.unlock();
-			})
-		);
 	}
 
 	destroy(): void {
@@ -101,7 +77,6 @@ export class SimonAudioPlayer {
 		for (const dispose of this.disposers) {
 			dispose();
 		}
-
 		this.disposers.length = 0;
 
 		if (this.context) {
@@ -116,7 +91,6 @@ export class SimonAudioPlayer {
 		}
 
 		const context = this.ensureContext();
-
 		if (!context) {
 			return;
 		}
@@ -151,13 +125,11 @@ export class SimonAudioPlayer {
 
 	private playPad(pad: SimonPadId): void {
 		const context = this.ensureContext();
-
 		if (!context || context.state !== 'running') {
 			return;
 		}
 
 		const frequency = SimonPadFrequencies[pad];
-
 		if (!Number.isFinite(frequency) || frequency <= 0) {
 			return;
 		}
@@ -173,13 +145,11 @@ export class SimonAudioPlayer {
 
 	private playSuccess(): void {
 		const context = this.ensureContext();
-
 		if (!context || context.state !== 'running') {
 			return;
 		}
 
 		const time = context.currentTime;
-
 		this.scheduleTone(context, {
 			frequency: 523.25,
 			time,
@@ -187,7 +157,6 @@ export class SimonAudioPlayer {
 			peak: 0.08,
 			type: 'triangle'
 		});
-
 		this.scheduleTone(context, {
 			frequency: 784.0,
 			time: time + 0.1,
@@ -199,7 +168,6 @@ export class SimonAudioPlayer {
 
 	private playError(): void {
 		const context = this.ensureContext();
-
 		if (!context || context.state !== 'running') {
 			return;
 		}
@@ -255,7 +223,6 @@ export class SimonAudioPlayer {
 		if (typeof window === 'undefined') {
 			return;
 		}
-
 		window.removeEventListener('pointerdown', this.unlockListener);
 		window.removeEventListener('keydown', this.unlockListener);
 	}
