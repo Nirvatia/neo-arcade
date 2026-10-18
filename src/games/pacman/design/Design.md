@@ -1,19 +1,401 @@
-# Game Design Document: Pac-Man REIMAGINED
-**Architectural Style:** High-Juice, Deterministic Event-Driven 2D Simulation  
-**Visual & Atmospheric Paradigm:** Cosmic Minimalist Vector Style (*Gris*, *Katana Zero*, *Ori*)
+---
+
+# Pac-Man REIMAGINED — Game Design Document
+
+## 0. Назначение документа
+
+Этот документ описывает геймплейный дизайн: правила, решения игрока, режимы, очки, объекты и структуру уровня.
+
+Технические детали реализации — рендер, внутренние шины, алгоритмы поиска пути, аудио-пайплайн, точные библиотеки — не являются частью этого документа.
+
+Матрица уровня и токены тайлов сохранены, потому что они нужны для:
+
+- рендера лабиринта;
+
+- редактирования уровней;
+
+- однозначной привязки игровых объектов к клеткам;
+
+- быстрого прототипирования.
 
 ---
 
-## 1. System Foundations & Grid Architecture
+## 1. Ключевая дизайнерская идея
 
-The game simulation executes on a strict, high-performance static 2D grid where logical spatial data is completely decoupled from Pixi.js visual representation.
+Игрок управляет Золотой Сингулярностью внутри космического лабиринта.
 
-### 1.1 Spatial Grid Constraints
-* **Tile Dimensions:** 36px by 36px uniform bounding boxes.
-* **Entity Scale Constraints:** All logical entity bounding boxes and interaction fields are confined to a single tile footprint (1.0 by 1.0 grid units). Spatial presentation arrays (visual trails, warp distortion fields, consumption vortexes) are permitted to overflow bounding boundaries via the presentation layer.
+Основные сущности:
 
-### 1.2 Grid Node Specification
-The map matrix compiles from an array of strict structural tokens:
+- точки — ресурс и условие победы;
+
+- призраки — динамическая угроза;
+
+- энерджайзеры — смена роли игрока и призраков;
+
+- фрукты — рискованные бонусы;
+
+- телепорты — маршрутные решения;
+
+- ловушка / лабиринтный переключатель — опциональный вызов;
+
+- золотое яйцо — альтернативный способ завершить уровень.
+
+Главный принцип:
+
+> Каждая механика должна менять решение игрока: маршрут, темп, риск или жадность.
+
+Если механика просто происходит и не влияет на выбор игрока, она должна быть либо упрощена, либо превращена в презентационный эффект.
+
+---
+
+## 2. Основные дизайн-правила
+
+1. Событие должно быть добавлением, а не событием ради события.
+
+Каждый мощный момент должен давать игроку новую возможность или новый риск.
+
+2. Случайные угрозы не должны ломать контроль.
+
+Ultra Ghost появляется не случайно, а как осознанный или системно обусловленный риск.
+
+3. Игрок должен понимать причину смерти.
+
+Смерть должна быть результатом ошибки в маршруте, тайминге или жадности.
+
+4. Пауэр-апы должны создавать выбор.
+
+Энерджайзер, молния, золотое яйцо и фрукты должны менять поведение игрока, а не просто проигрываться автоматически.
+
+5. Режимы должны отличаться не только персонажем, но и отношением к призракам.
+
+Pac-Man — охота на призраков.
+
+Ms. Pac-Man — временное управление призраками.
+
+---
+
+## 3. Основной игровой цикл
+
+1. Игрок очищает лабиринт от точек.
+
+2. Следит за движением призраков и выбирает безопасный маршрут.
+
+3. Использует энерджайзеры в зависимости от режима.
+
+4. Решает, рисковать ли ради фруктов и редких бонусов.
+
+5. Использует телепорты для побега, перемещения или агрессивной игры.
+
+6. При желании активирует опциональный вызов с Ultra Ghost.
+
+7. Завершает уровень или погибает.
+
+---
+
+## 4. Режимы игры
+
+Перед началом уровня игрок выбирает профиль.
+
+---
+
+## 4.1 Профиль A: Pac-Man — Classic Predator
+
+### Фантазия
+
+Игрок — классический хищник.
+
+Он охотится на призраков, когда они уязвимы, и возвращает их в логово.
+
+### Основное правило
+
+Обычный энерджайзер активирует Power Pill.
+
+Во время Power Pill:
+
+- призраки становятся уязвимыми;
+
+- контакт с призраком уничтожает его;
+
+- съеденный призрак возвращается в логово;
+
+- игрок получает очки по цепочке.
+
+### Цепочка поедания призраков
+
+| Порядок | Очки |
+
+|---|---:|
+
+| 1-й призрак | 200 |
+
+| 2-й призрак | 400 |
+
+| 3-й призрак | 800 |
+
+| 4-й призрак | 1600 |
+
+Цепочка сбрасывается:
+
+- при смерти игрока;
+
+- при завершении уровня;
+
+- при активации нового энерджайзера.
+
+### Игровой смысл режима
+
+Игрок постоянно выбирает:
+
+- безопасно собирать точки;
+
+- охотиться за призраками ради цепочки;
+
+- идти за фруктом в опасную зону;
+
+- использовать телепорт для побега или атаки.
+
+Pac-Man — это режим про контроль пространства и тайминг охоты.
+
+---
+
+## 4.2 Профиль B: Ms. Pac-Man — Hypnotic Conductor
+
+### Фантазия
+
+Игрок — дирижёр угроз.
+
+Он не просто убегает от призраков, а временно превращает их в полезный инструмент.
+
+### Основное правило
+
+Стандартный энерджайзер заменяется на Hypnotic Overdrive.
+
+Во время Hypnotic Overdrive:
+
+- призраки становятся нелетальными;
+
+- призраки пытаются избегать игрока;
+
+- игрок может коснуться призрака, чтобы загипнотизировать его.
+
+### Гипноз
+
+Одновременно может быть активен только один загипнотизированный призрак.
+
+Когда игрок касается призрака во время Overdrive:
+
+- призрак становится союзником на hypnosisDuration;
+
+- он начинает мирно двигаться по лабиринту;
+
+- он собирает ближайшие точки;
+
+- очки за собранные им точки получает игрок;
+
+- он не собирает фрукты и энерджайзеры.
+
+### Передача гипноза
+
+Если во время Overdrive игрок касается другого призрака:
+
+- гипноз переходит к новому призраку;
+
+- предыдущий призрак немедленно просыпается в текущей позиции;
+
+- игрок получает бонус за передачу гипноза.
+
+### Пробуждение призрака
+
+Когда таймер гипноза заканчивается:
+
+- призрак снова становится смертельным;
+
+- он появляется там, где находился;
+
+- он получает состояние Enraged на короткий срок.
+
+Состояние Enraged:
+
+- длится 2 секунды;
+
+- увеличивает скорость призрака на 20%;
+
+- делает его особенно опасным рядом с игроком.
+
+### Игровой смысл режима
+
+Игрок выбирает:
+
+- какого призрака загипнотизировать;
+
+- использовать ли гипноз для зачистки опасной зоны;
+
+- рисковать ли передачей гипноза;
+
+- принимать ли отложенную угрозу ради немедленной выгоды.
+
+Ms. Pac-Man — это режим про временный контроль угроз и отложенную цену.
+
+---
+
+## 5. Уровни и сетка
+
+Уровень представлен как двумерный массив токенов.
+
+Каждый токен занимает один тайл.
+
+Эта структура нужна для:
+
+- рендера;
+
+- редактирования карт;
+
+- размещения объектов;
+
+- навигации;
+
+- проверки коллизий;
+
+- привязки событий к конкретным клеткам.
+
+---
+
+## 6. Токены тайлов
+
+### Базовые тайлы
+
+| Токен | Название | Значение |
+
+|---|---|---|
+
+| WL | Wall | Стена. Блокирует движение. |
+
+| DT | Dot | Обычная точка. Даёт очки. |
+
+| EU | Energizer | Энерджайзер. Активирует режим. |
+
+| ES | Empty Space | Пустое пространство. Непроходимо, не интерактивно. |
+
+### Фрукты
+
+| Токен | Фрукт | Значение |
+
+|---|---|---|
+
+| CF | Cherry Fruit | Вишня. Низкий бонус. |
+
+| SF | Strawberry Fruit | Клубника. Средний бонус. |
+
+| OF | Orange Fruit | Апельсин. Средне-высокий бонус. |
+
+| AF | Apple Fruit | Яблоко. Высокий бонус. |
+
+| MF | Melon Fruit | Дыня. Очень высокий бонус. |
+
+| GF | Galaxian Fruit | Galaxian-фрукт. Редкий высокий бонус. |
+
+| BF | Bell Fruit | Колокол. Премиальный бонус. |
+
+| KF | Key Fruit | Ключ. Максимальный бонус. |
+
+### Силовые объекты
+
+| Токен | Название | Значение |
+
+|---|---|---|
+
+| SU | Speed Lightning Bolt | Молния. Активирует усиленный рывок. |
+
+| GU | Golden Cosmic Egg | Золотое яйцо. Открывает альтернативный выход. |
+
+| LU | Extra Life | Дополнительная жизнь. |
+
+### Логово и ловушка
+
+| Токен | Название | Значение |
+
+|---|---|---|
+
+| LE | Lair Entrance | Вход в логово призраков. |
+
+| LT | Lair Tile | Внутренняя зона логова. |
+
+| SW | Lair Switch | Переключатель контракта с Ultra Ghost. |
+
+| RT | Rune Trap | Видимая ловушка для Ultra Ghost. |
+
+### Спавны
+
+| Токен | Название | Значение |
+
+|---|---|---|
+
+| PM | Player Spawn | Точка появления игрока. |
+
+| BY | Blinky Spawn | Точка появления Blinky. |
+
+| PY | Pinky Spawn | Точка появления Pinky. |
+
+| IY | Inky Spawn | Точка появления Inky. |
+
+| CE | Clyde Spawn | Точка появления Clyde. |
+
+### Телепорты
+
+| Токен | Название | Значение |
+
+|---|---|---|
+
+| 0A | Teleport A | Пара телепорта 0A. |
+
+| 0B | Teleport B | Пара телепорта 0B. |
+
+| 0C | Teleport C | Пара телепорта 0C. |
+
+Телепорты работают парами: два одинаковых токена связаны между собой.
+
+Пример:
+
+- вход в 0A мгновенно перемещает игрока к другому 0A;
+
+- вход в 0B мгновенно перемещает игрока к другому 0B.
+
+---
+
+## 7. Пример матрицы уровня для рендера
+
+Это пример токенов на карте. Он не обязательно является финальным боевым уровнем, но показывает полный набор используемых сущностей.
+
+````ts
+
+        const GRID_01 = [
+            ["ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES"],
+            ["ES","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","ES"],
+            ["ES","WL","EU","DT","DT","DT","DT","DT","DT","DT","DT","DT","WL","DT","DT","DT","DT","DT","DT","DT","DT","DT","EU","WL","ES"],
+            ["ES","WL","DT","WL","WL","WL","DT","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","DT","WL","WL","WL","DT","WL","ES"],
+            ["ES","WL","DT","WL","WL","WL","DT","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","DT","WL","WL","WL","DT","WL","ES"],
+            ["ES","WL","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","WL","ES"],
+            ["ES","WL","DT","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","DT","WL","ES"],
+            ["ES","WL","DT","DT","DT","DT","DT","WL","DT","DT","DT","DT","WL","DT","DT","DT","DT","WL","DT","DT","DT","DT","DT","WL","ES"],
+            ["ES","WL","WL","WL","WL","WL","DT","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","DT","WL","WL","WL","WL","WL","ES"],
+            ["ES","ES","ES","ES","ES","WL","DT","WL","DT","DT","DT","DT","DT","DT","DT","DT","DT","WL","DT","WL","ES","ES","ES","ES","ES"],
+            ["ES","ES","ES","ES","ES","WL","DT","WL","DT","WL","WL","LE","LE","LE","WL","WL","DT","WL","DT","WL","ES","ES","ES","ES","ES"],
+            ["ES","WL","WL","WL","WL","WL","DT","WL","DT","WL","LT","LT","LT","LT","LT","WL","DT","WL","DT","WL","WL","WL","WL","WL","ES"],
+            ["ES","0A","DT","DT","DT","DT","DT","DT","DT","WL","BY","IY","LT","PY","CE","WL","DT","DT","DT","DT","DT","DT","DT","0A","ES"],
+            ["ES","WL","WL","WL","WL","WL","DT","WL","DT","WL","LT","LT","LT","LT","LT","WL","DT","WL","DT","WL","WL","WL","WL","WL","ES"],
+            ["ES","ES","ES","ES","ES","WL","DT","WL","DT","WL","WL","WL","WL","WL","WL","WL","DT","WL","DT","WL","ES","ES","ES","ES","ES"],
+            ["ES","ES","ES","ES","ES","WL","DT","WL","DT","DT","DT","DT","DT","DT","DT","DT","DT","WL","DT","WL","ES","ES","ES","ES","ES"],
+            ["ES","WL","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","WL","ES"],
+            ["ES","WL","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","WL","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","WL","ES"],
+            ["ES","WL","DT","WL","WL","WL","DT","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","DT","WL","WL","WL","DT","WL","ES"],
+            ["ES","WL","DT","DT","DT","WL","DT","DT","DT","DT","DT","DT","PM","DT","DT","DT","DT","DT","DT","WL","DT","DT","DT","WL","ES"],
+            ["ES","WL","WL","WL","DT","WL","DT","WL","DT","WL","WL","WL","WL","WL","WL","WL","DT","WL","DT","WL","DT","WL","WL","WL","ES"],
+            ["ES","WL","DT","DT","DT","DT","DT","WL","DT","DT","DT","DT","WL","DT","DT","DT","DT","WL","DT","DT","DT","DT","DT","WL","ES"],
+            ["ES","WL","DT","WL","WL","WL","WL","WL","WL","WL","WL","DT","WL","DT","WL","WL","WL","WL","WL","WL","WL","WL","DT","WL","ES"],
+            ["ES","WL","EU","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","DT","EU","WL","ES"],
+            ["ES","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","WL","ES"],
+            ["ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES","ES"],
+        ];
 
 ```typescript
 export type TeleportType = `0${string}`;
@@ -33,7 +415,7 @@ export type TileType =
   | "SU" // Speed Lightning Bolt Power Up
   | "GU" // Golden Egg Power Up
   | "LU" // Extra Life Power Up
-  | "ES" // Empty Space (Unwalkable, non-interactive node)
+  | "ES" // Empty Space (walkable, should be?)
   | "LE" // Lair Entrance (One-way directional ghost gate)
   | "LT" // Lair Tile (Internal ghost spawning enclosure)
   | "PM" // Player Spawn Point (Initial vector origin)
@@ -41,123 +423,1269 @@ export type TileType =
   | "PY" // Pinky Spawn Point (Pinky initial coordinate)
   | "IY" // Inky Spawn Point (Inky initial coordinate)
   | "CE" // Clyde Spawn Point (Clyde initial coordinate)
-  | "SW" // Lair Switch Tile (Active trap mechanics for Ultra Ghost)
+  | "RT" // Lair Switch Tile (Active trap mechanics for Ultra Ghost)
   | TeleportType; // Dynamic Token Pair (e.g., "0A", "0B" for grouped wormholes)
   // more tile types to come
-```
+````
 
-### 1.3 Kinematic Teleportation Launch System
-The grid engine supports unlimited, arbitrarily linked pairs of TeleportType nodes. When an actor cross-references a teleport boundary, the system executes an instantaneous spatial translation paired with a high-velocity momentum curve:
+---
 
-Coordinate Swap: The player's coordinate vectors instantly overwrite to the matching exit node's exit vector.
+## 8. Таблица очков
 
-Buff Application: Spawns a temporal InvincibilityBuff and a VelocityPropel modifier. Player sprite exits rotating like a spinning ball and stabilizes when propel acceleration ends.
+### Базовые объекты
 
-Kinematic Blast: Forces player velocity to peak maximum forward acceleration along the exiting directional vector, overwriting normal directional speed controls.
+| Объект | Токен | Очки | Комментарий |
 
-Friction Decay: Over successive frames, a friction coefficient decays velocity down to standard baseline speeds (or active buff baselines) while preserving responsive cornering calculations.
+|---|---:|---:|---|
 
-### 1.4 Level Configuration
-There must be a helper function to generate persistent level configuration, such as {currentGrid, currentGridColor, powerPillDuration, powerPillThreshold, etc} based on level.
+| Точка | DT | 10 | Базовый ресурс уровня. |
 
-## 2. Entity Specifications & Capabilities
-Entities are designed as lightweight data structural instances driven by stateless processing systems.
+| Энерджайзер | EU | 50 | Также активирует режим. |
 
-### 2.1 The Player (Golden Singularity)
-Mechanics: Retro grid navigation modified by high-frequency input buffering.
+| Молния | SU | 0 | Сама по себе не даёт очков, но помогает собрать точки. |
 
-Input Buffering: Captures directional commands milliseconds before intersection arrival, executing pixel-perfect corner clipping and minimizing friction dead-zones.
+| Золотое яйцо | GU | 500 | Даёт очки при подборе и открывает выход. |
 
-### 2.2 The Sub-Boss (Ultra Ghost)
-Spawning Trigger: 15% occurrence probability on any level sequence greater than Level 1.
+| Дополнительная жизнь | LU | 0 | Не даёт очков, даёт жизнь. |
 
-Orchestration Phase (The Event Horizon):
+---
 
-The simulation loop freezes all active systems.
+### Фрукты
 
-The Renderer applies a global ColorMatrixFilter to shift the environment hue to deep, atmospheric reds.
+| Токен | Фрукт | Очки | Роль в уровне |
 
-The four active ghosts surrender independent AI logic and execute a forced linear convergence toward a designated tile intersection.
+|---|---:|---|---|
 
-Upon spatial convergence, a fusion animation plays to form the ultra ghost.
+| CF | Cherry | 100 | Ранний низкорисковый бонус. |
 
-The separate entities are purged from the EntityManager, spawning the singular UltraGhost.
+| SF | Strawberry | 300 | Ранний/средний рисковый бонус. |
 
-Behavioral Engine: Swaps standard lookahead vector steering for a continuous, high-frequency A* graph-search routine. The entity actively hunts the player while consuming available star dots on the grid.
+| OF | Orange | 500 | Средний бонус рядом с маршрутами призраков. |
 
-Active Trap Lair Resolution Mechanic: The player must survive an active survival countdown (X seconds). Once the countdown expires, the Ghost Lair entrance switches to an accessible state, and the "Rune Trap" (RT) tile on the grid becomes armed. To defeat the threat, Pac-Man must actively bait the relentless Ultra Ghost toward the RT tile (clearly visible on the grid). This seals the Ultra Ghost, resulting in a proactive micro-victory, a unique collapse animation, and a 3000 point milestone bounty.
+| AF | Apple | 700 | Повышенный бонус в более опасной зоне. |
 
-### 2.3 Character Selection & Dynamic AI Profiles
+| MF | Melon | 1000 | Высокий бонус, требует отклонения от безопасного маршрута. |
 
-At the start of the simulation, the player selects their operational profile, directly shifting the core gameplay loops and threat matrix behaviors.
+| GF | Galaxian | 2000 | Редкий бонус, часто рядом с телепортом или логовом. |
 
-#### Profile A: Standard Pac-Man (Classic Predator-Prey)
-*   Standard core execution rules, fixed power-up durations, and traditional ghost pathfinding configurations.
+| BF | Bell | 3000 | Премиальный бонус в зоне высокого давления. |
 
-#### Profile B: Ms. Pac-Man (The Hypnotic Conductor)
-*   **Core Trait:** The standard "Energizer / Power Pill" mechanic is replaced by the **Hypnotic Overdrive** state.
-*   **Threat Matrix & Competition:** 
-    *   While un-hypnotized, Ghost entities are fully lethal upon direct contact.
-    *   Active hostile Ghosts actively flee from Ms. Pac-Man but route themselves to consume dots at **2.0x baseline speed**, aggressively draining map resources and threatening a low-score penalty.
-*   **Hypnosis Lifecycle:**
-    *   Upon Ms. Pac-Man successfully making contact with a hostile Ghost during an active Overdrive window, the target entity does not return to the Ghost House.
-    *   The Ghost's behavioral AI profile temporarily switches to a `DotConsumerComponent`.
-    *   For a duration of $T$ seconds, the hypnotized Ghost roams the corridors peacefully, assisting the player by eating remaining dots (points are credited directly to the player).
-*   **Reversion Sequence:** 
-    *   Upon expiration of the hypnosis cooldown timer ($T$), the `DotConsumerComponent` is detached.
-    *   The Ghost instantly regains its lethal collision state and hostile pathfinding profile at its current spatial coordinate (bypassing the respawn chamber pipeline).
+| KF | Key | 5000 | Максимальный фруктовый бонус, самая рискованная цель. |
 
-## 3. The Collectible Data Ledger
-Collectibles exist as modular components bound to grid spatial locations.
+---
 
-### 3.1 Star Dot (DT)
-Static placement. Standard inert state; listens for localized tractor-beam suction interpolation when within player collection range. Disintegrates programmatically during Death Waves.
+### Очки за призраков
 
-### 3.2 Energizer (EU)
-Static placement. Continuously loops an internal parametric scale animation loop. Supports standard suction properties.
+#### Pac-Man
 
-### 3.3 Quest Fruit / Keys
-Static placement. Standard design; triggers custom UI scoring widgets upon deletion.
-TODO: fill the points reward data here.
+| Действие | Очки |
 
-### 3.4 Extra Life (EU)
-Static placement. Spawns unpredictably at a calculated safe vector distance from the player's current location. Enforces a rigid time-to-live countdown window. Validates path routing layout during generation to guarantee physical accessibility at baseline player speed.
+|---|---:|
 
-### 3.5 Lightning Bolt Power Up (LU)
-*   **Placement Type:** Static environment placement; instantiated during grid generation.
-*   **Activation Trigger:** Instantaneous upon Pac-Man overlapping the power-up tile.
+| 1-й призрак за один Power Pill | 200 |
 
-Mechanics & Lifecycle
-*   **Input Lock:** Immediate suspension of user directional controls upon activation (`controlsLocked = true`).
-*   **Pathfinding Modification:** The engine calculates a deterministic, autonomous trajectory spanning exactly $N$ tiles from the activation origin.
-*   **Optimization Vector:** The routing algorithm overrides standard shortest-path logic, prioritizing the trajectory branch that yields the maximum concentration of consumable dots.
-*   **Kinematics:** Linear translation velocity is scaled up significantly relative to the baseline simulation speed.
-*   **Lifecycle Termination:** Upon reaching the destination tile index, the state flags dissolve, control hooks are restored to the user, and standard movement parameters resume.
+| 2-й призрак за один Power Pill | 400 |
 
-Collision & State Flags
-*   **Ghost Immunity:** Temporary invincibility flag applied to the Player entity (`isImmune = true`). 
-*   **Interactions:** Standard collision resolution with Ghost entities is bypassed entirely during the execution sequence. 
+| 3-й призрак за один Power Pill | 800 |
 
-Visual & FX Specifications
-*   **Entity Transformation:** The standard Pac-Man mesh/sprite is substituted with a dynamic "Lightning Spark" asset.
-*   **Grid Illumination:** Active tile blocks along the calculated trajectory dynamically shift their emissive layer or color matrix upon traversal.
-*   **Particle Systems:** The execution loop instantiates a temporary, self-fading particle trail ("Lightning Trail") trailing the entity's sub-pixel coordinate history. 
+| 4-й призрак за один Power Pill | 1600 |
 
-### 3.6 Golden Cosmic Egg Power Up (GU)
-Static placement. Ultra-rare structural spawn anomaly with a strict 10 second persistence duration. To preserve gameplay balance, the system runs an internal level timer gate: the egg is strictly blocked from spawning until the player has survived at least 30 to 45 seconds of active gameplay on that specific level. Once collected, it instantly forces a level complete transition phase, calculating remaining level dots/collectibles and adding their exact values directly to the player's session point score.
+#### Ms. Pac-Man
 
-## 4. Global State Transitions & Presentation Sequences
-Macro flow changes are strictly managed by a decoupled Director State Machine that routes game states cleanly through separate lifecycle phases.
+| Действие | Очки |
 
-### 4.1 The Cosmic Disintegration Wave (Global Death Event)
-When a lethal collision is validated, the Director freezes the gameplay simulation loops and initiates the centralized death timeline sequence. A radial mathematical boundary propagates outward from the coordinates of Pac-Man's death based on a wave-speed equation: Radius = Velocity * Delta Time. Every entity on the map continuously evaluates its distance vector from the origin. The exact frame the expanding shockwave radius crosses an entity's coordinates, the entity stops rendering its base sprite and triggers its procedural vector-shattering animation, ensuring a perfectly synchronized outward disintegration sequence.
+|---|---:|
 
-### 4.2 Level Complete Sequence
-Triggers when all dots are cleared or when a Golden Egg condition resolves. It bypasses classic uniform screen flashing in favor of an artistic vector transition where ambient cosmic background grids perform an elegant mathematical vector warp or collapse animation sequence, smoothly transitioning the camera viewport toward the intermission stage layout.
+| Гипноз призрака | 200 |
 
-## 5. Control & Sound Specifications
-### 5.1 Input Management
-Default configuration utilizes dual WASD and Keyboard Arrow binding maps. Features an abstracted Input Mapper layer capable of reading and applying custom hardware configuration files directly from localStorage for custom user remapping.
+| Передача гипноза на другого призрака | 200 |
 
-### 5.2 Audio Pipeline (Deterministic SFX Engine)
-Strict monophonic style management for retro audio channels to prevent overlapping waveforms from creating audio distortion. When a sound plays via the CentralEventBus, it checks the current active audio registry slot. If a sound is already playing on that slot, it is immediately cut off or mixed down to prioritize the new high-priority gameplay feedback cue. Integrates system volume accessors supporting linear, non-logarithmic gain adjustments (Mute, Volume Up, Volume Down).
+| Точки, собранные загипнотизированным призраком | 10 за точку |
+
+---
+
+### Очки за события уровня
+
+| Событие | Очки | Комментарий |
+
+|---|---:|---|
+
+| Обычное завершение уровня | 1000 | Все точки собраны без использования Golden Egg. |
+
+| Perfect Clear | 2000 | Уровень завершён без смерти и без потерянных очков из-за Ultra Ghost. |
+
+| Ultra Ghost запечатан | 3000 | Игрок заманил Ultra Ghost в Rune Trap. |
+
+| Golden Egg Exit | 20 за каждую оставшуюся точку | Если игрок входит в выход, открытый золотым яйцом. |
+
+---
+
+## 9. Механики объектов
+
+---
+
+## 9.1 Точки
+
+Точки — основной ресурс уровня.
+
+Правила:
+
+- каждая точка даёт 10 очков;
+
+- уровень завершается, когда все точки собраны;
+
+- точки могут быть собраны игроком или загипнотизированным призраком в режиме Ms. Pac-Man;
+
+- Ultra Ghost может уничтожать ограниченное число точек, но это должно быть риском, а не случайной потерей уровня.
+
+---
+
+## 9.2 Энерджайзеры
+
+Энерджайзер — ключевой объект смены состояния игры.
+
+В режиме Pac-Man:
+
+- активирует Power Pill;
+
+- делает призраков уязвимыми;
+
+- позволяет охотиться на них ради цепочки очков.
+
+В режиме Ms. Pac-Man:
+
+- активирует Hypnotic Overdrive;
+
+- позволяет временно загипнотизировать одного призрака;
+
+- создаёт выбор между немедленной безопасностью и будущей угрозой.
+
+---
+
+## 9.3 Фрукты
+
+Все фрукты сохранены как самостоятельные коллекционные объекты.
+
+Общие правила:
+
+- фрукты не обязательны для завершения уровня;
+
+- фрукты дают очки;
+
+- фрукты должны размещаться так, чтобы их сбор был осознанным риском;
+
+- более ценные фрукты должны находиться в более опасных местах.
+
+Дизайн-цель фруктов:
+
+> Фрукт — это не просто бонус, а вопрос к игроку: “Готов ли ты нарушить безопасный маршрут ради очков?”
+
+Рекомендации по размещению:
+
+- CF и SF — рядом с основными маршрутами;
+
+- OF и AF — на пересечениях маршрутов призраков;
+
+- MF и GF — рядом с телепортами, логовом или тупиками;
+
+- BF и KF — в зонах высокого давления, откуда сложно уйти.
+
+---
+
+## 9.4 Молния
+
+SU — это не катсцена, а инструмент перемещения и зачистки.
+
+### Правила
+
+При подборе молнии:
+
+- игрок получает короткий усиленный рывок;
+
+- игрок задаёт направление входа в рывок;
+
+- рывок длится не более lightningTiles тайлов;
+
+- маршрут автоматически выбирает наиболее насыщенную точками ветку;
+
+- игрок сохраняет возможность слегка влиять на направление в разрешённых поворотах;
+
+- во время рывка игрок неуязвим для призраков;
+
+- все собранные по пути точки дают обычные очки.
+
+### Дизайн-смысл
+
+Молния должна отвечать на вопрос:
+
+> “Хочу ли я быстро и безопасно пройти через опасную зону ради очков?”
+
+Она не должна полностью отбирать управление.
+
+---
+
+## 9.5 Золотое яйцо
+
+GU — редкий объект, который даёт альтернативный способ завершить уровень.
+
+### Правила появления
+
+- появляется не раньше, чем через 30–45 секунд активной игры на уровне;
+
+- существует ограниченное время: 10 секунд;
+
+- если игрок не успел подобрать яйцо, оно исчезает.
+
+### Правила действия
+
+При подборе:
+
+- игрок получает 500 очков;
+
+- на месте яйца появляется Выход Сингулярности;
+
+- выход существует 5 секунд.
+
+Если игрок входит в выход:
+
+- уровень завершается;
+
+- все оставшиеся точки конвертируются в очки по 20 за штуку;
+
+- несъеденные фрукты не конвертируются.
+
+Если игрок не входит в выход:
+
+- уровень продолжается обычным образом.
+
+### Дизайн-смысл
+
+Золотое яйцо не должно автоматически завершать уровень.
+
+Оно должно создавать выбор:
+
+- закончить уровень сейчас с гарантированной наградой;
+
+- или остаться и рискнуть ради большего счёта.
+
+---
+
+## 9.6 Дополнительная жизнь
+
+LU — награда за мастерство или редкий бонус.
+
+Правила:
+
+- дополнительная жизнь может быть выдана за очковые пороги;
+
+- также может быть размещена на уровне токеном LU;
+
+- если LU появляется динамически, он должен быть физически доступен игроку;
+
+- время жизни динамически появившейся дополнительной жизни — 12 секунд.
+
+Рекомендуемые очковые пороги:
+
+| Порог | Награда |
+
+|---:|---|
+
+| 10 000 | +1 жизнь |
+
+| 30 000 | +1 жизнь |
+
+| каждые 30 000 дальше | +1 жизнь |
+
+---
+
+## 9.7 Телепорты
+
+Телепорты — это маршрутные инструменты.
+
+### Правила
+
+- пара одинаковых телепорт-токенов связана между собой;
+
+- вход в телепорт мгновенно перемещает игрока к парному выходу;
+
+- после выхода игрок получает короткий импульс движения;
+
+- импульс помогает быстро выйти из точки появления, но усложняет точный контроль в первые мгновения;
+
+- игрок получает 0.5 секунды неуязвимости после телепорта, чтобы не погибнуть от нечестной ситуации.
+
+### Дизайн-смысл
+
+Телепорт должен быть выбором:
+
+- быстрый побег;
+
+- рискованный вход в зону с фруктом;
+
+- агрессия во время охоты на призраков;
+
+- спасение от окружения.
+
+Телепорт не должен быть просто визуальным перемещением.
+
+---
+
+## 9.8 Логово, переключатель и ловушка
+
+Логово — зона появления и возврата призраков.
+
+Токены:
+
+- LE — вход в логово;
+
+- LT — внутренняя зона логова;
+
+- SW — переключатель контракта;
+
+- RT — ловушка.
+
+### Правила логова
+
+В обычном состоянии:
+
+- игрок не может войти в логово;
+
+- призраки могут выходить из логова;
+
+- съеденные призраки возвращаются в логово.
+
+---
+
+## 10. Ultra Ghost
+
+Ultra Ghost — опциональный вызов, а не случайное наказание.
+
+---
+
+## 10.1 Условие появления
+
+Начиная со 2-го уровня:
+
+- когда собрано примерно 50% точек, тайл SW становится активным;
+
+- если игрок наступает на активный SW, начинается Ultra Contract;
+
+- если игрок игнорирует SW, Ultra Ghost не появляется.
+
+Это сохраняет контроль игрока.
+
+Игрок сам решает:
+
+- активировать вызов ради награды;
+
+- или избегать его ради стабильного прохождения.
+
+---
+
+## 10.2 Контракт
+
+После активации SW:
+
+1. Игра входит в состояние повышенной угрозы.
+
+2. Обычные призраки временно отступают и сливаются в Ultra Ghost.
+
+3. Ultra Ghost начинает охоту на игрока.
+
+4. Ловушка RT активируется после короткого выживания.
+
+Рекомендуемое время до активации RT:
+
+- 5 секунд.
+
+Во время этого окна игрок должен выжить и подготовить маршрут к ловушке.
+
+---
+
+## 10.3 Поведение Ultra Ghost
+
+Ultra Ghost:
+
+- смертелен для игрока;
+
+- не может быть съеден;
+
+- не может быть загипнотизирован;
+
+- движется чуть быстрее обычного призрака;
+
+- активно преследует игрока;
+
+- может уничтожить ограниченное число точек.
+
+Ограничение по уничтожению точек:
+
+- максимум 12 точек;
+
+- уничтоженные точки считаются очищенными для завершения уровня;
+
+- но они не дают игроку очков.
+
+Это создаёт давление:
+
+> Если тянуть слишком долго, уровень можно завершить, но с потерянной выгодой.
+
+---
+
+## 10.4 Победа над Ultra Ghost
+
+Чтобы победить:
+
+1. Дождаться активации RT.
+
+2. Заманить Ultra Ghost на тайл RT.
+
+3. Запечатать его.
+
+Награда:
+
+- 3000 очков;
+
+- короткая презентация разрушения;
+
+- исчезновение угрозы.
+
+Если уровень завершается до запечатывания:
+
+- Ultra Ghost исчезает;
+
+- награда не выдаётся.
+
+---
+
+## 11. Смерть игрока
+
+Смерть происходит при контакте с:
+
+- враждебным призраком;
+
+- разбуженным призраком;
+
+- Ultra Ghost.
+
+### Презентация смерти
+
+Используется Cosmic Disintegration Wave.
+
+Это только презентационный эффект:
+
+- волна расходится от точки смерти;
+
+- объекты разрушаются визуально по мере достижения волной;
+
+- волна не влияет на счёт;
+
+- волна не меняет логику уровня;
+
+- волна не наказывает игрока дополнительно.
+
+---
+
+## 12. Завершение уровня
+
+Уровень завершается, если:
+
+- собраны все точки;
+
+- или игрок вошёл в выход, открытый золотым яйцом.
+
+### Обычное завершение
+
+Если все точки собраны:
+
+- игрок получает 1000 очков;
+
+- если уровень пройден без смерти и без потерь точек от Ultra Ghost, добавляется Perfect Clear бонус 2000 очков.
+
+### Завершение через Golden Egg
+
+Если игрок входит в выход золотого яйца:
+
+- уровень завершается;
+
+- оставшиеся точки конвертируются по 20 очков;
+
+- обычный бонус за завершение уровня не выдаётся;
+
+- Perfect Clear бонус не выдаётся, если уровень завершён через Golden Egg.
+
+---
+
+## 13. Настройки уровня
+
+Каждый уровень может задавать:
+
+- матрицу тайлов;
+
+- визуальную тему;
+
+- длительность Power Pill;
+
+- длительность Hypnotic Overdrive;
+
+- длительность гипноза;
+
+- доступность Ultra Ghost;
+
+- количество точек, которые Ultra Ghost может уничтожить;
+
+- время появления Golden Egg;
+
+- время жизни Golden Egg;
+
+- размещение фруктов.
+
+Важно:
+
+> Эти параметры являются дизайнерскими настройками, а не технической реализацией.
+
+---
+
+## 14. Базовые дизайн-параметры
+
+Ниже — стартовые значения для балансировки.
+
+| Параметр | Значение | Комментарий |
+
+|---|---:|---|
+
+| Базовая скорость игрока | 1.0 | Условная единица скорости. |
+
+| Скорость обычного призрака | 0.9 | Чуть медленнее игрока. |
+
+| Скорость призрака в Enraged | 1.08 | Кратковременная угроза. |
+
+| Скорость Ultra Ghost | 1.05 | Медленнее, чем паника игрока, но быстрее обычного призрака. |
+
+| Длительность Power Pill | 6 секунд | Может уменьшаться с уровнем. |
+
+| Длительность Hypnotic Overdrive | 5 секунд | Окно для гипноза. |
+
+| Длительность гипноза призрака | 4 секунды | Время полезности союзника. |
+
+| Длительность Enraged | 2 секунды | После пробуждения призрака. |
+
+| Неуязвимость после телепорта | 0.5 секунды | Защита от нечестных смертей. |
+
+| Длительность Lightning Dash | до 8 тайлов | Настраивается. |
+
+| Время до активации ловушки | 5 секунд | После активации контракта. |
+
+| Лимит уничтожения точек Ultra Ghost | 12 | Чтобы не ломать уровень полностью. |
+
+| Время жизни Golden Egg | 10 секунд | Редкое окно. |
+
+| Задержка появления Golden Egg | 30–45 секунд | Не раньше середины уровня. |
+
+---
+
+## 15. Презентационные эффекты
+
+Эти элементы важны для ощущения игры, но не должны подменять геймплей.
+
+### Разрешённые презентационные эффекты
+
+- разрушение объектов при смерти;
+
+- визуальный коллапс лабиринта при завершении уровня;
+
+- покраснение пространства во время контракта Ultra Ghost;
+
+- свечение маршрута молнии;
+
+- вращение игрока после телепорта;
+
+- пульсация энерджайзеров;
+
+- появление призраков из логова;
+
+- анимация слияния призраков в Ultra Ghost.
+
+### Запрещённые презентационные злоупотребления
+
+- блокировка ввода без игровой причины;
+
+- автоматические победы без выбора игрока;
+
+- скрытые случайные наказания;
+
+- события, которые невозможно было предсказать;
+
+- эффекты, которые ломают читаемость маршрута.
+
+---
+
+## 16. Итоговая формула игры
+
+Pac-Man REIMAGINED — это аркада про маршрут, жадность и смену ролей.
+
+В режиме Pac-Man игрок решает, когда охотиться на призраков.
+
+В режиме Ms. Pac-Man игрок решает, когда превратить призрака в инструмент и какую цену за это заплатить позже.
+
+Фрукты, телепорты, молния, золотое яйцо и ловушка существуют для одного:
+
+> Создавать короткие, понятные и рискованные решения.
+
+План разработки:
+
+# Pac-Man REIMAGINED — План разработки (20+ итераций)
+
+## Фаза 1: Инфраструктура (Итерации 1-5)
+
+### Итерация 1: Базовая структура проекта
+
+Цель: Создать скелет проекта согласно манифесту
+
+Задачи:
+
+- Создать структуру папок: src/games/pacman/
+
+- Создать core/GameMain.ts — точка входа
+
+- Создать core/Director.ts — управление состояниями
+
+- Создать базовые состояния: MenuState.ts, PlayingState.ts, GameOverState.ts, PausedState.ts
+
+- Создать core/Events.ts — типы событий для EventBus
+
+- Создать core/InputController.ts — обработка ввода
+
+- Создать core/RenderPipeline.ts — конвейер рендера
+
+- Создать engine/EventBus.ts — шина событий
+
+- Создать engine/GameLoop.ts — игровой цикл с фиксированным timestep
+
+Критерии приёмки:
+
+- Приложение запускается и переключается между пустыми состояниями
+
+- Игровой цикл работает с фиксированным dt
+
+- Нет ошибок TypeScript
+
+---
+
+### Итерация 2: Примитивный рендер и отладка
+
+Цель: Визуализировать базовую отладочную информацию
+
+Задачи:
+
+- Реализовать в RenderPipeline.ts отрисовку отладочного текста
+
+- Добавить отображение текущего состояния в углу экрана
+
+- Создать систему отладочного вывода (консоль + on-screen)
+
+- Настроить PixiJS (или Canvas2D) для рендера
+
+Критерии приёмки:
+
+- Видно текущее состояние игры на экране
+
+- Можно переключаться между состояниями через клавиатуру
+
+---
+
+### Итерация 3: Система сетки
+
+Цель: Создать модель лабиринта
+
+Задачи:
+
+- Создать logic/GridModel.ts — представление сетки
+
+- Создать logic/GridService.ts — операции с сеткой (query tile, neighbors)
+
+- Парсинг TILE_MAP в структурированную модель
+
+- Типы тайлов согласно обновлённому дизайну:
+
+- WL — стена (непроходимая)
+
+- DT — точка
+
+- EU — Energizer
+
+- ES — пустое пространство, проходимое
+
+- LE — вход в логово
+
+- LT — внутренность логова
+
+- PM, BY, PY, IY, CE — спавны
+
+- 0A, 0B, 0C — телепорты
+
+- RT — Rune Trap (бывший SW)
+
+- Добавить валидацию матрицы при загрузке
+
+Критерии приёмки:
+
+- Сетка корректно загружается
+
+- Можно получить тайл по координатам
+
+- Можно проверить проходимость тайла
+
+---
+
+### Итерация 4: Рендер сетки
+
+Цель: Визуализировать лабиринт примитивами
+
+Задачи:
+
+- Создать render/GridView.ts — рендер статичной сетки
+
+- Рисовать стены как прямоугольники
+
+- Рисовать точки как маленькие круги
+
+- Рисовать Power Pills как большие круги
+
+- Рисовать телепорты разными цветами
+
+- Синхронизация рендера с игровым циклом
+
+Критерии приёмки:
+
+- Лабиринт отрисован примитивами
+
+- Все типы тайлов имеют различимое представление
+
+---
+
+### Итерация 5: Базовый ввод и камера
+
+Цель: Настроить систему ввода и камеру
+
+Задачи:
+
+- В InputController.ts реализовать чтение клавиатуры
+
+- Маппинг клавиш: стрелки для движения, Space для паузы, Esc для меню
+
+- Создать простую систему камеры (если лабиринт не влезает в экран)
+
+- Интеграция ввода в игровой цикл
+
+Критерии приёмки:
+
+- Нажатия клавиш регистрируются
+
+- Можно поставить игру на паузу
+
+- Камера корректно позиционируется
+
+---
+
+## Фаза 2: Движение игрока (Итерации 6-10)
+
+### Итерация 6: Модель игрока
+
+Цель: Создать сущность игрока
+
+Задачи:
+
+- Создать logic/PlayerModel.ts — состояние игрока (позиция, направление, скорость)
+
+- Создать logic/PlayerService.ts — операции с игроком
+
+- Игрок существует как отдельная сущность (не через ECS, так как один игрок)
+
+- Позиция в мировых координатах (пиксели)
+
+- Текущий тайл (координаты в сетке)
+
+Критерии приёмки:
+
+- Игрок существует с начальной позицией из PM
+
+- Можно получить текущую позицию и тайл
+
+---
+
+### Итерация 7: Движение по сетке — базовая механика
+
+Цель: Реализовать движение игрока с привязкой к сетке
+
+Задачи:
+
+- Реализовать движение в logic/PlayerService.ts:
+
+- Игрок всегда движется к центру следующего тайла
+
+- На перекрёстке игрок может изменить направление
+
+- Если игрок пытается повернуть до перекрёстка, направление буферизуется
+
+- Проверка коллизий со стенами
+
+- Скорость движения в пикселях в секунду
+
+Критерии приёмки:
+
+- Игрок движется по коридорам
+
+- Можно поворачивать на перекрёстках
+
+- Игрок не проходит сквозь стены
+
+---
+
+### Итерация 8: Буферизация ввода и плавное движение
+
+Цель: Сделать движение отзывчивым и плавным
+
+Задачи:
+
+- Реализовать input buffering (запоминание следующего поворота)
+
+- Если игрок нажимает "вверх" до достижения перекрёстка, команда запоминается
+
+- При достижении перекрёстка автоматически применяется буферизованное направление
+
+- Плавная интерполяция между тайлами
+
+- Центрирование на перекрёстках (игрок всегда точно в центре при достижении)
+
+Критерии приёмки:
+
+- Движение отзывчивое, нет "залипания"
+
+- Игрок всегда центрирован на перекрёстках
+
+- Повороты выполняются плавно
+
+---
+
+### Итерация 9: Телепорты и специальные тайлы
+
+Цель: Реализовать логику специальных тайлов
+
+Задачи:
+
+- Телепорты: при входе в 0A игрок появляется в другом 0A
+
+- Добавить неуязвимость на 0.5 секунды после телепорта
+
+- Логово: игрок не может войти (пока что просто блокировка)
+
+- Спавны: только для начального позиционирования
+
+Критерии приёмки:
+
+- Телепорты работают корректно
+
+- Игрок не застревает после телепорта
+
+- Логово недоступно
+
+---
+
+### Итерация 10: Сбор точек
+
+Цель: Реализовать сбор точек и Power Pills
+
+Задачи:
+
+- При входе на тайл с DT — точка считается собранной
+
+- При входе на тайл с PP — активируется Power Pill режим
+
+- Обновление GridModel — тайл становится пустым
+
+- Базовая система очков (10 за точку, 50 за Power Pill)
+
+- EventBus эмитит событие DotCollected / PowerPillActivated
+
+Критерии приёмки:
+
+- Точки исчезают после сбора
+
+- Power Pill активируется
+
+- Счёт увеличивается
+
+---
+
+## Фаза 3: ИИ призраков (Итерации 11-14)
+
+### Итерация 11: Модель призраков и ECS
+
+Цель: Создать систему для множества призраков
+
+Задачи:
+
+- Создать engine/ecs/ структуру (EntityManager, ComponentManager, World)
+
+- Создать компоненты: PositionComponent, MovementComponent, GhostComponent
+
+- Создать systems/GhostMovementSystem.ts — движение призраков
+
+- Создать systems/GhostAISystem.ts — логика ИИ
+
+- Спавн 4 призраков из их спавн-точек
+
+Критерии приёмки:
+
+- 4 призрака существуют как ECS сущности
+
+- Можно получить их позиции
+
+- Системы обновляются в игровом цикле
+
+---
+
+### Итерация 12: Базовое движение призраков
+
+Цель: Призраки движутся по сетке
+
+Задачи:
+
+- Реализовать движение призраков аналогично игроку
+
+- Привязка к сетке, центрирование на перекрёстках
+
+- Скорость призраков = 0.9 от скорости игрока
+
+- На перекрёстках призрак выбирает направление (пока что случайно или вперёд)
+
+Критерии приёмки:
+
+- Призраки движутся по лабиринту
+
+- Не застревают в стенах
+
+- Центрированы на перекрёстках
+
+---
+
+### Итерация 13: ИИ призраков — базовые поведения
+
+Цель: Реализовать классические поведения призраков
+
+Задачи:
+
+- Blinky: преследует игрока напрямую
+
+- Pinky: целится на 4 тайла вперёд от игрока
+
+- Inky: сложное поведение (вектор от Blinky к игроку, отражённый)
+
+- Clyde: преследует, но убегает когда близко
+
+- Target tile system: каждый призрак имеет целевой тайл
+
+Критерии приёмки:
+
+- Призраки демонстрируют разные поведения
+
+- Призраки не двигаются синхронно
+
+---
+
+### Итерация 14: Режимы призраков и выход из логова
+
+Цель: Призраки выходят из логова в разное время
+
+Задачи:
+
+- Scatter mode: призраки движутся к своим углам
+
+- Chase mode: призраки преследуют игрока
+
+- Переключение режимов по таймеру
+
+- Таймеры выхода из логова (каждый призрак выходит в своё время)
+
+- Призраки в логове движутся вверх-вниз
+
+Критерии приёмки:
+
+- Призраки выходят из логова по расписанию
+
+- Режимы переключаются
+
+- Призраки не застревают в логове
+
+---
+
+## Фаза 4: Игровые механики (Итерации 15-18)
+
+### Итерация 15: Power Pill и уязвимость призраков
+
+Цель: Реализовать механику Power Pill
+
+Задачи:
+
+- При активации Power Pill все призраки становятся уязвимыми
+
+- Визуальное изменение призраков (мигание)
+
+- Таймер Power Pill (6 секунд)
+
+- Призраки убегают от игрока (обратное направление)
+
+- Предупреждение о скором окончании (мигание)
+
+Критерии приёмки:
+
+- Power Pill активируется корректно
+
+- Призраки меняют поведение
+
+- Таймер работает
+
+---
+
+### Итерация 16: Поедание призраков
+
+Цель: Реализовать поедание призраков
+
+Задачи:
+
+- При контакте с уязвимым призраком — призрак "съедается"
+
+- Цепочка очков: 200, 400, 800, 1600
+
+- Съеденный призрак возвращается в логово
+
+- Визуализация возвращения (глаза)
+
+- После возвращения призрак снова становится активным
+
+Критерии приёмки:
+
+- Призраков можно есть
+
+- Очки начисляются по цепочке
+
+- Призраки возвращаются в логово
+
+---
+
+### Итерация 17: Смерть и перезапуск
+
+Цель: Реализовать смерть игрока
+
+Задачи:
+
+- При контакте с неуязвимым призраком — смерть
+
+- Анимация смерти (Cosmic Disintegration Wave — визуал)
+
+- Потеря жизни
+
+- Перезапуск уровня или конец игры
+
+- Состояние GameOverState
+
+Критерии приёмки:
+
+- Смерть регистрируется
+
+- Жизнь теряется
+
+- Игра перезапускается или заканчивается
+
+---
+
+### Итерация 18: Завершение уровня
+
+Цель: Уровень завершается при сборе всех точек
+
+Задачи:
+
+- Проверка: все DT и PP собраны
+
+- Бонус за завершение уровня (1000 очков)
+
+- Perfect Clear бонус (2000 очков, если без смертей)
+
+- Переход на следующий уровень (пока что просто перезапуск)
+
+- Состояние победы
+
+Критерии приёмки:
+
+- Уровень завершается при сборе всех точек
+
+- Бонусы начисляются
+
+- Можно начать новый уровень
+
+---
+
+## Фаза 5: UI и полировка (Итерации 19-22)
+
+### Итерация 19: HUD и счёт
+
+Цель: Добавить интерфейс
+
+Задачи:
+
+- Создать ui/HUD.svelte — отображение счёта, жизней
+
+- Адаптер для связи игры с Svelte UI
+
+- Отображение текущего уровня
+
+- EventBus для уведомления UI об изменениях счёта
+
+Критерии приёмки:
+
+- Счёт отображается
+
+- Жизни отображаются
+
+- UI обновляется в реальном времени
+
+---
+
+### Итерация 20: Фрукты
+
+Цель: Реализовать фрукты как бонусы
+
+Задачи:
+
+- Фрукты появляются по таймеру или при сборе определённого количества точек
+
+- Тайл становится фруктом на ограниченное время (10-15 секунд)
+
+- При сборе фрукта — очки согласно типу
+
+- Визуализация разных фруктов
+
+Критерии приёмки:
+
+- Фрукты появляются
+
+- Можно их собрать
+
+- Очки начисляются
+
+---
+
+### Итерация 21: Звуки и музыка
+
+Цель: Добавить звуковое оформление
+
+Задачи:
+
+- Создать audio/PacmanAudioPlayer.ts
+
+- Звуки: сбор точки, Power Pill, поедание призрака, смерть, фрукт
+
+- Фоновая музыка (сирена, меняется в зависимости от количества точек)
+
+- Интеграция с EventBus
+
+Критерии приёмки:
+
+- Звуки воспроизводятся
+
+- Музыка играет
+
+- Звуки синхронизированы с событиями
+
+---
+
+### Итерация 22: Визуальные эффекты и полировка
+
+Цель: Улучшить визуал
+
+Задачи:
+
+- Анимации движения игрока (открытие/закрытие рта)
+
+- Анимации призраков
+
+- Эффекты при сборе точек
+
+- Эффекты при активации Power Pill
+
+- Плавные переходы между состояниями
+
+Критерии приёмки:
+
+- Игра выглядит завершённой
+
+- Все анимации работают
+
+- Нет визуальных артефактов
+
+---
+
+## Дополнительные итерации (если останется время)
+
+### Итерация 23: Ms. Pac-Man режим
+
+- Hypnotic Overdrive вместо Power Pill
+
+- Гипноз призраков
+
+- Передача гипноза
+
+### Итерация 24: Ultra Ghost
+
+- Контракт через Rune Trap
+
+- Уникальное поведение Ultra Ghost
+
+- Ловушка и запечатывание
+
+### Итерация 25: Золотое яйцо
+
+- Альтернативное завершение уровня
+
+- Таймер появления
+
+- Бонус за оставшиеся точки
+
+---
+
+## Принципы на все итерации
+
+1. Одна итерация = одна функциональность
+
+- Не смешивать задачи
+
+- Закончить одно перед началом другого
+
+2. Тестирование после каждой итерации
+
+- Запустить игру
+
+- Проверить что ничего не сломалось
+
+- Проверить edge cases
+
+3. Никакого говнокода
+
+- Если что-то не работает — разобраться почему
+
+- Не использовать "хаки" чтобы заставить работать
+
+- Если нужна рефакторинг — сделать сейчас, не потом
+
+4. Следование манифесту
+
+- Проверять каждую итерацию на соответствие манифесту
+
+- Не создавать god objects
+
+- Не использовать EventBus для логики
+
+- Не создавать таблицы переходов
+
+---
