@@ -1,169 +1,73 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { SimonGame } from '../core/GameMain';
-	import { SimonConsoleKind, type SimonConsoleKindId } from '../core/Events';
+	import { SimonEvent } from '../core/Events';
 	import { SimonMode, SimonState, type SimonPadId } from '../core/SimonTypes';
 	import SimonPads from './SimonPads.svelte';
 	import { SvelteSimonAdapter } from './SvelteSimonAdapter';
 	import { SimonUiStore } from './SimonUiStore.svelte';
 
+	type MascotMood =
+		| 'normal'
+		| 'happy'
+		| 'shock'
+		| 'angry'
+		| 'coffee'
+		| 'shout';
+
+	type LotteryKind = 'life' | 'bonus500' | 'bonus200' | null;
+
+	interface FxPop {
+		readonly id: number;
+		readonly text: string;
+		readonly cls: string;
+		readonly offset: number;
+	}
+
+	interface BannerFx {
+		readonly id: number;
+		readonly title: string;
+		readonly sub: string;
+	}
+
+	interface OrderAcceptedFx {
+		readonly round: number;
+		readonly scoreDelta: number;
+		readonly message: string;
+		readonly crit?: boolean;
+		readonly break?: boolean;
+		readonly lottery?: LotteryKind;
+	}
+
+	interface VisualExtras {
+		mascotMood?: MascotMood;
+		bossTag?: string;
+		flavorText?: string;
+		isBreak?: boolean;
+		ordersInLevel?: number;
+		ordersPerLevel?: number;
+		pipCount?: number;
+		comboHot?: boolean;
+	}
+
 	const store = new SimonUiStore();
+	const ui = store as SimonUiStore & VisualExtras;
 
 	let game: SimonGame | null = null;
 	let host: HTMLDivElement | undefined = $state(undefined);
-	let consoleEl: HTMLDivElement | undefined = $state(undefined);
-	let menuOpen = $state<string | null>(null);
 
-	interface MenuItem {
-		readonly label?: string;
-		readonly separator?: boolean;
-		readonly disabled?: boolean;
-		readonly action?: () => void;
-	}
+	let shakeOn = $state(false);
+	let flashOn = $state(false);
 
-	interface MenuDef {
-		readonly title: string;
-		readonly items: readonly MenuItem[];
-	}
+	let pops = $state<FxPop[]>([]);
+	let banner = $state<BannerFx | null>(null);
 
-	function decorative(text: string): void {
-		store.addLine(text, SimonConsoleKind.Info);
-	}
+	let nextFxId = 1;
+	let levelSeen = $state(1);
+	let lastLives = $state(3);
+	let burstIndex = $state(-1);
 
-	function selectOrders(): void {
-		if (store.isMenu) {
-			game?.selectMode(SimonMode.Orders);
-			return;
-		}
-
-		decorative('Режим можно изменить только до начала смены.');
-	}
-
-	function selectClassic(): void {
-		if (store.isMenu) {
-			game?.selectMode(SimonMode.Classic);
-			return;
-		}
-
-		decorative('Режим можно изменить только до начала смены.');
-	}
-
-	function restartAndStart(): void {
-		if (!game) {
-			return;
-		}
-
-		if (store.isGameOver) {
-			game.requestRestart();
-			game.requestStart();
-			return;
-		}
-
-		if (store.isMenu) {
-			game.requestStart();
-			return;
-		}
-
-		decorative('Сначала завершите текущую смену.');
-	}
-
-	function restartToMenu(): void {
-		if (!game) {
-			return;
-		}
-
-		if (store.isGameOver) {
-			game.requestRestart();
-			return;
-		}
-
-		decorative('Завершение сеанса запрещено администратором.');
-	}
-
-	function about(): void {
-		store.addLine('О программе: 1С:Предприятие 8.3 «Симон говорит».', SimonConsoleKind.Info);
-		store.addLine('Версия 8.3.24.0000 (демо).', SimonConsoleKind.Info);
-		store.addLine('Разработано за 15 минут, внедряется за 15 месяцев.', SimonConsoleKind.Info);
-	}
-
-	const menus: readonly MenuDef[] = [
-		{
-			title: 'Файл',
-			items: [
-				{ label: 'Новый', disabled: true },
-				{ label: 'Открыть…', disabled: true },
-				{ separator: true },
-				{ label: 'Начать заново', action: restartAndStart },
-				{ separator: true },
-				{
-					label: 'Выход',
-					action: () =>
-						decorative('Завершение сеанса запрещено администратором: идёт проведение документов.')
-				}
-			]
-		},
-		{
-			title: 'Правка',
-			items: [
-				{ label: 'Отменить', disabled: true },
-				{ label: 'Повторить', disabled: true },
-				{ separator: true },
-				{ label: 'Найти', disabled: true },
-				{ label: 'Заменить', disabled: true }
-			]
-		},
-		{
-			title: 'Вид',
-			items: [
-				{ label: 'Режим «Подчинённость»', action: selectOrders },
-				{ label: 'Режим «Симон»', action: selectClassic },
-				{ separator: true },
-				{ label: 'Настройка формы', disabled: true }
-			]
-		},
-		{
-			title: 'Инструменты',
-			items: [
-				{
-					label: 'Обновление конфигурации',
-					action: () =>
-						decorative(
-							'Обновление недоступно: ваша лицензия заканчивается раньше, чем выходит новый релиз.'
-						)
-				},
-				{ label: 'Тестирование и исправление', disabled: true },
-				{ label: 'Выгрузка данных', disabled: true }
-			]
-		},
-		{
-			title: 'Окно',
-			items: [
-				{ label: 'Все окна', disabled: true },
-				{ label: 'Закрепить', disabled: true }
-			]
-		},
-		{
-			title: 'Справка',
-			items: [
-				{
-					label: 'Содержание справки',
-					action: () =>
-						decorative(
-							'Раздел справки не найден. Обратитесь к франчайзи. Консультация: 3 000 ₽/час.'
-						)
-				},
-				{ label: 'О программе', action: about }
-			]
-		}
-	];
-
-	const navItems: ReadonlyArray<{ readonly name: string; readonly icon: string }> = [
-		{ name: 'Справочники', icon: '📁' },
-		{ name: 'Документы', icon: '📄' },
-		{ name: 'Регистры', icon: '📊' },
-		{ name: 'Отчёты', icon: '📈' },
-		{ name: 'Обработки', icon: '⚙️' }
-	];
+	let bannerTimer: ReturnType<typeof setTimeout> | null = null;
 
 	onMount(() => {
 		if (!host) {
@@ -176,60 +80,298 @@
 		game = instance;
 		bridge.connect();
 
+		const unsubAccepted = instance.on(SimonEvent.OrderAccepted, (raw) => {
+			const payload = raw as OrderAcceptedFx;
+
+			spawnPop(`+${payload.scoreDelta}`, payload.crit ? 'crit' : '');
+
+			if (payload.crit) {
+				spawnPop('КРИТ!', 'crit', 46);
+			}
+
+			if (payload.break) {
+				spawnPop('☕ ПЕРЕКУР ЗАСЧИТАН', 'life', 20);
+			}
+
+			if (payload.lottery === 'life') {
+				spawnPop('ИЗ «ЕЩЁ…» ВЫПАЛО: +1 ЖИЗНЬ ❤', 'life', 72);
+			}
+
+			if (payload.lottery === 'bonus500') {
+				spawnPop('+500! ПРЕМИЯ ИЗ КУБЫШКИ', 'crit', 72);
+			}
+
+			if (payload.lottery === 'bonus200') {
+				spawnPop('+200 БОНУС', '', 72);
+			}
+		});
+
+		const unsubRejected = instance.on(SimonEvent.OrderRejected, () => {
+			triggerBad();
+			spawnPop('ОШИБКА!', 'bad', 28);
+		});
+
 		void instance.init(host).catch((error: unknown) => {
 			console.error('[Simon] init failed', error);
 		});
 
 		return () => {
+			unsubAccepted();
+			unsubRejected();
 			bridge.disconnect();
 			instance.destroy();
 			game = null;
+
+			if (bannerTimer) {
+				clearTimeout(bannerTimer);
+			}
 		};
 	});
 
 	$effect(() => {
-		const count = store.lines.length;
+		const level = store.level;
 
-		if (consoleEl && count >= 0) {
-			consoleEl.scrollTop = consoleEl.scrollHeight;
+		if (level > levelSeen) {
+			showBanner(`УРОВЕНЬ ${level}!`, 'приказы становятся бодрее');
+		}
+
+		if (level !== levelSeen) {
+			levelSeen = level;
+		}
+	});
+
+	$effect(() => {
+		const lives = store.lives;
+
+		if (lives < lastLives) {
+			burstIndex = lives;
+
+			setTimeout(() => {
+				burstIndex = -1;
+			}, 520);
+		}
+
+		if (lives !== lastLives) {
+			lastLives = lives;
 		}
 	});
 
 	const failureVisible = $derived(
-		store.state === SimonState.FailureOrders || store.state === SimonState.FailureClassic
+		store.state === SimonState.FailureOrders ||
+			store.state === SimonState.FailureClassic
 	);
 
-	const orderLabel = $derived.by(() => {
-		if (store.orderPad === null) {
-			return '';
+	const isMenu = $derived(store.state === SimonState.Menu);
+	const isGameOver = $derived(store.state === SimonState.GameOver);
+	const isOrders = $derived(store.mode === SimonMode.Orders);
+
+	const fallbackMascotMood = $derived.by((): MascotMood => {
+		if (failureVisible) {
+			return 'angry';
 		}
 
-		switch (store.orderPad) {
-			case 'PROVESTI':
-				return 'Провести';
-			case 'ZAPISAT':
-				return 'Записать';
-			case 'UDALIT':
-				return 'Пометить на удаление';
-			case 'ESHCHE':
-				return 'Ещё…';
-			default:
-				return '';
+		if (isGameOver) {
+			return 'shock';
 		}
+
+		if (isMenu) {
+			return 'happy';
+		}
+
+		if (
+			store.state === SimonState.OrdersFeedback ||
+			store.state === SimonState.RoundTransition
+		) {
+			return 'happy';
+		}
+
+		if (
+			store.state === SimonState.OrdersAwaiting ||
+			store.state === SimonState.AwaitingInput
+		) {
+			return 'shout';
+		}
+
+		return 'normal';
 	});
 
-	const showSayOrder = $derived(
-		store.orderSay &&
-			store.orderPad !== null &&
-			(store.state === SimonState.OrdersAwaiting || store.state === SimonState.OrdersIssuing)
+	const mascotMood = $derived(ui.mascotMood ?? fallbackMascotMood);
+
+	const fallbackBossTag = $derived.by((): string => {
+		if (failureVisible) {
+			return 'ОШИБКА СМЕНЫ';
+		}
+
+		if (isGameOver) {
+			return 'БАЗА УПАЛА';
+		}
+
+		if (isMenu) {
+			return '1С ГОВОРИТ';
+		}
+
+		if (isOrders) {
+			if (store.state === SimonState.OrdersAwaiting) {
+				return store.orderSay ? '1С ПРИКАЗЫВАЕТ' : 'ПОСТОРОННИЙ ПРИКАЗ';
+			}
+
+			if (store.state === SimonState.OrdersFeedback) {
+				return 'ДОКУМЕНТ ПРОВЕДЁН';
+			}
+
+			return 'ОЖИДАНИЕ';
+		}
+
+		if (store.state === SimonState.AwaitingInput) {
+			return 'СИМОН ГОВОРИТ';
+		}
+
+		if (store.state === SimonState.RoundTransition) {
+			return 'ПАКЕТ ПРОВЕДЁН';
+		}
+
+		return 'СИМОН ГОВОРИТ';
+	});
+
+	const bossTag = $derived(ui.bossTag ?? fallbackBossTag);
+
+	const fallbackFlavorText = $derived.by((): string => {
+		if (isMenu) {
+			return 'база сама себя не проведёт…';
+		}
+
+		if (failureVisible) {
+			return 'три нарушения — и смена окончена';
+		}
+
+		if (isGameOver) {
+			return 'смена окончена';
+		}
+
+		if (isOrders && store.state === SimonState.OrdersAwaiting && !store.orderSay) {
+			return 'это не от 1С — лучше пропустить';
+		}
+
+		if (store.state === SimonState.AwaitingInput) {
+			return 'твой ход';
+		}
+
+		return '';
+	});
+
+	const flavorText = $derived(ui.flavorText ?? fallbackFlavorText);
+
+	const isBreak = $derived(ui.isBreak ?? false);
+
+	const ordersPerLevel = $derived(ui.ordersPerLevel ?? 7);
+
+	const fallbackPipCount = $derived(
+		Math.max(0, (Math.max(1, store.round) - 1) % ordersPerLevel)
 	);
+
+	const pipCount = $derived(ui.pipCount ?? fallbackPipCount);
+
+	const pips = $derived(
+		Array.from({ length: ordersPerLevel }, (_, index) => index < pipCount)
+	);
+
+	const comboHot = $derived(ui.comboHot ?? store.combo >= 5);
+
+	const canSkip = $derived(
+		isOrders && store.state === SimonState.OrdersAwaiting && !isBreak
+	);
+
+	const showSkip = $derived(isOrders && !isMenu && !isGameOver && !isBreak);
+	const showAbort = $derived(!isMenu && !isGameOver);
+
+	const newRecord = $derived(
+		store.isGameOver && store.score > 0 && store.score >= store.best
+	);
+
+	const rank = $derived.by(() => {
+		if (store.score >= 15000) {
+			return {
+				name: 'ГУРУ 1С',
+				quip: 'О тебе слагают легенды в курилке.'
+			};
+		}
+
+		if (store.score >= 10000) {
+			return {
+				name: 'АРХИТЕКТОР ХАОСА',
+				quip: 'Конфигурация боится тебя.'
+			};
+		}
+
+		if (store.score >= 6000) {
+			return {
+				name: 'ВЕДУЩИЙ ПОГРОМИСТ',
+				quip: 'Главбух смотрит с уважением.'
+			};
+		}
+
+		if (store.score >= 2500) {
+			return {
+				name: 'ПРОГРОМИСТ',
+				quip: 'База жива. Пока.'
+			};
+		}
+
+		return {
+			name: 'КУРСАНТ 1С',
+			quip: 'Тебе доверили только скрепки.'
+		};
+	});
+
+	function spawnPop(text: string, cls = '', offset = 0): void {
+		const id = nextFxId++;
+
+		pops = [...pops, { id, text, cls, offset }];
+
+		setTimeout(() => {
+			pops = pops.filter((pop) => pop.id !== id);
+		}, 950);
+	}
+
+	function showBanner(title: string, sub: string): void {
+		if (bannerTimer) {
+			clearTimeout(bannerTimer);
+		}
+
+		banner = {
+			id: nextFxId++,
+			title,
+			sub
+		};
+
+		bannerTimer = setTimeout(() => {
+			banner = null;
+		}, 1200);
+	}
+
+	function triggerBad(): void {
+		flashOn = true;
+		shakeOn = true;
+
+		setTimeout(() => {
+			flashOn = false;
+		}, 140);
+
+		setTimeout(() => {
+			shakeOn = false;
+		}, 420);
+	}
 
 	function press(pad: SimonPadId): void {
 		game?.pressPad(pad);
 	}
 
-	function start(): void {
-		game?.requestStart();
+	function startOrders(): void {
+		game?.requestStartMode(SimonMode.Orders);
+	}
+
+	function startClassic(): void {
+		game?.requestStartMode(SimonMode.Classic);
 	}
 
 	function skip(): void {
@@ -240,348 +382,495 @@
 		game?.acknowledgeFailure();
 	}
 
-	function abortToMenu(): void {
+	function restartToMenu(): void {
 		game?.requestRestart();
 	}
 
-	function handleModeChange(event: Event): void {
-		const target = event.target;
-
-		if (!(target instanceof HTMLSelectElement)) {
+	function restartAndStart(): void {
+		if (!game) {
 			return;
 		}
 
-		const value = target.value;
-
-		if (value === SimonMode.Orders) {
-			game?.selectMode(SimonMode.Orders);
-			return;
-		}
-
-		if (value === SimonMode.Classic) {
-			game?.selectMode(SimonMode.Classic);
-		}
-	}
-
-	function toggleMenu(title: string, event: MouseEvent): void {
-		event.stopPropagation();
-		menuOpen = menuOpen === title ? null : title;
-	}
-
-	function closeMenu(): void {
-		menuOpen = null;
-	}
-
-	function runMenu(item: MenuItem): void {
-		menuOpen = null;
-
-		if (item.action) {
-			item.action();
-			return;
-		}
-
-		if (item.disabled) {
-			decorative(`«${item.label ?? 'Действие'}» недоступно в демо-версии.`);
-		}
-	}
-
-	function lineClass(kind: SimonConsoleKindId): string {
-		switch (kind) {
-			case SimonConsoleKind.Ok:
-				return 'ok';
-			case SimonConsoleKind.Error:
-				return 'err';
-			case SimonConsoleKind.Command:
-				return 'cmd';
-			default:
-				return '';
-		}
+		game.requestRestart();
+		game.requestStart();
 	}
 </script>
 
-<svelte:window onclick={closeMenu} />
-<div class="simon-app">
-	<div class="desktop" aria-hidden="true">
-		<div class="desktop-icons">
-			<div class="desktop-icon">
-				<span>🟨</span>
-				<small>1С:Предприятие</small>
+<div class="simon-arcade" class:shake={shakeOn}>
+	<div class="bg-grid" aria-hidden="true"></div>
+
+	<div class="doodles" aria-hidden="true">
+		<div class="doodle paper hide-m" style="left: 2.5%; top: 16%;">
+			<h4>НАКЛАДНАЯ №42</h4>
+			<div class="lines"></div>
+			<div class="stamp">ОПЛАЧЕНО</div>
+		</div>
+
+		<div
+			class="doodle paper hide-l"
+			style="right: 3%; bottom: 9%; --r: 8deg; animation-delay: -3s;"
+		>
+			<h4>АКТ ССЫК-3</h4>
+			<div class="lines"></div>
+			<div class="stamp stamp-blue">СРОЧНО!</div>
+		</div>
+
+		<div class="doodle sticky sticky-yellow hide-m" style="left: 15%; top: 6%; animation-delay: -1s;">
+			почини принтер!!1
+		</div>
+
+		<div class="doodle sticky sticky-pink hide-l" style="right: 16%; top: 12%; animation-delay: -2.4s;">
+			пароль: 123456
+		</div>
+
+		<div class="doodle sticky sticky-green hide-l" style="left: 5%; bottom: 22%; animation-delay: -4s;">
+			дедлайн БЫЛ вчера
+		</div>
+
+		<div class="doodle db hide-l" style="left: 6%; bottom: 5%;">
+			<div class="db-lid"></div>
+			<div class="db-body">
+				<b>БАЗА 1С</b>
+				<small>v8.3 НЕ ТРОГАТЬ</small>
 			</div>
-			<div class="desktop-icon">
-				<span>📄</span>
-				<small>Бухгалтерия</small>
+			<span class="crack">⚡</span>
+		</div>
+
+		<div class="doodle coffee hide-l" style="right: 5%; top: 30%;">
+			<svg width="102" height="90" viewBox="0 0 102 90">
+				<g class="steam">
+					<path
+						d="M39 24 q5 -7 0 -14"
+						stroke="#fff"
+						stroke-width="4"
+						fill="none"
+						stroke-linecap="round"
+						opacity=".7"
+					/>
+					<path
+						d="M56 24 q-5 -7 0 -14"
+						stroke="#fff"
+						stroke-width="4"
+						fill="none"
+						stroke-linecap="round"
+						opacity=".7"
+					/>
+				</g>
+
+				<path d="M76 42 q18 6 0 22" fill="none" stroke="#1b1235" stroke-width="7" />
+				<rect x="16" y="33" width="60" height="44" rx="10" fill="#fff" stroke="#1b1235" stroke-width="6" />
+				<path d="M22 43 h48" stroke="#8b5a2b" stroke-width="7" stroke-linecap="round" />
+				<text
+					x="46"
+					y="68"
+					text-anchor="middle"
+					font-size="14"
+					fill="#e8352b"
+					font-family="Russo One, sans-serif"
+				>
+					1С
+				</text>
+			</svg>
+			<small>кофе = жизнь</small>
+		</div>
+
+		<div class="doodle errwin hide-l" style="left: 14%; bottom: 34%; animation-delay: -2s;">
+			<div class="bar">
+				ОШИБКА 0x1C
+				<i>✖</i>
 			</div>
-			<div class="desktop-icon">
-				<span>🗄️</span>
-				<small>База данных</small>
+			<div class="txt">
+				Что-то пошло не так.<br />
+				Как всегда, впрочем.
 			</div>
-			<div class="desktop-icon">
-				<span>🧾</span>
-				<small>Первичка</small>
+			<div class="btns">
+				<span>Закрыть</span>
+				<span>Закрыть всё</span>
 			</div>
 		</div>
 
-		<div class="desktop-logo">1С</div>
-		<div class="scanlines"></div>
-		<div class="vignette"></div>
-
-		<div class="taskbar">
-			<div class="start">Пуск</div>
-			<div class="task-item active">1С:Предприятие 8.3</div>
-			<div class="task-item">Обновление конфигурации</div>
-			<div class="tray">
-				<span>RU</span>
-				<span>🔊</span>
-				<span>14:47</span>
-			</div>
+		<div class="doodle neon hide-m" style="left: 38%; top: 3%;">
+			ООО «РОМАШКА»
 		</div>
+
+		<div class="doodle duck hide-l" style="right: 32%; bottom: 20%;">
+			<svg width="58" height="52" viewBox="0 0 64 56">
+				<ellipse cx="30" cy="40" rx="24" ry="14" fill="#ffd21f" stroke="#1b1235" stroke-width="5" />
+				<circle cx="46" cy="20" r="13" fill="#ffd21f" stroke="#1b1235" stroke-width="5" />
+				<path d="M58 20 h9 l-9 6 z" fill="#ff8c1a" stroke="#1b1235" stroke-width="4" stroke-linejoin="round" />
+				<circle cx="49" cy="17" r="2.4" fill="#1b1235" />
+			</svg>
+			<small>ОТЛАДЧИК</small>
+		</div>
+
+		<span class="doodle codebit" style="left: 28%; bottom: 12%;">
+			Если Правда Тогда КонецЕсли;
+		</span>
+
+		<span class="doodle codebit hide-l" style="right: 20%; top: 24%; animation-delay: -6s;">
+			Запрос.Выполнить();
+		</span>
+
+		<span class="doodle codebit hide-m" style="left: 8%; top: 44%; animation-delay: -3s;">
+			&amp;НаКлиентеНаСервере
+		</span>
 	</div>
-	<div class="window">
-		<div class="titlebar">
-			<div class="app-ic"></div>
-			<div class="tb-title">
-				1С:Предприятие 8.3 — Конфигурация «Симон говорит»
-				<span>(демо-режим)</span>
-			</div>
-			<div class="tb-btns">
-				<button
-					type="button"
-					class="tb-btn"
-					onclick={() => decorative('Свёртывание недоступно: вы ещё не провели все документы.')}
-				>
-					—
-				</button>
-				<button
-					type="button"
-					class="tb-btn"
-					onclick={() => decorative('Развёртывание окна недоступно: форма не масштабируется.')}
-				>
-					□
-				</button>
-				<button
-					type="button"
-					class="tb-btn close"
-					onclick={() =>
-						decorative('Невозможно закрыть окно: сеанс под наблюдением отдела кадров.')}
-				>
-					✕
-				</button>
-			</div>
-		</div>
 
-		<nav class="menubar">
-			{#each menus as menu (menu.title)}
-				<div class="menu" class:open={menuOpen === menu.title}>
-					<div class="menu-title" onclick={(event: MouseEvent) => toggleMenu(menu.title, event)}>
-						{menu.title}
-					</div>
-					<ul class="dropdown">
-						{#each menu.items as item, index (`${menu.title}-${index}`)}
-							{#if item.separator}
-								<hr />
-							{:else}
-								<li class:dis={item.disabled} onclick={() => runMenu(item)}>
-									{item.label}
-								</li>
-							{/if}
+	<div class="game-shell" bind:this={host}>
+		<header class="marquee">
+			<div class="lights" aria-hidden="true"></div>
+
+			<div class="title-row">
+				<span class="star">★</span>
+				<h1>1С: <em>ПОГРОМИСТ</em></h1>
+				<span class="star">★</span>
+			</div>
+
+			<p class="subtitle">
+				СИМОН ГОВОРИТ: ПОГРОМИСТА ★ АРКАДНЫЙ РЕЖИМ ★ СМЕНА №8
+			</p>
+
+			<div class="lights" aria-hidden="true"></div>
+		</header>
+
+		<section class="hud" aria-label="Игровые показатели">
+			<div class="chip score">
+				<span class="chip-label">ОЧКИ</span>
+				<b>{store.score}</b>
+			</div>
+
+			<div class="chip combo" class:hot={comboHot}>
+				<span class="chip-label">КОМБО</span>
+				<b>
+					×{store.combo}
+					{#if comboHot}
+						<span class="flame">🔥</span>
+					{/if}
+				</b>
+			</div>
+
+			<div class="chip">
+				<span class="chip-label">УРОВЕНЬ</span>
+				<b>{store.level}</b>
+
+				{#if isOrders}
+					<div class="pips">
+						{#each pips as lit, index (index)}
+							<i class:on={lit}></i>
 						{/each}
-					</ul>
+					</div>
+				{/if}
+			</div>
+
+			<div class="chip">
+				<span class="chip-label">ПРИКАЗ</span>
+				<b>№{String(store.round).padStart(4, '0')}</b>
+			</div>
+
+			<div class="chip">
+				<span class="chip-label">РЕКОРД</span>
+				<b>{store.best}</b>
+			</div>
+
+			<div class="chip lives-chip">
+				<span class="chip-label">ЖИЗНИ</span>
+				<div class="lives">
+					{#each [0, 1, 2] as index (index)}
+						<svg
+							class="heart"
+							class:lost={index >= store.lives}
+							class:burst={index === burstIndex}
+							viewBox="0 0 24 24"
+							aria-hidden="true"
+						>
+							<path
+								d="M12 21s-8-5.3-8-11a4.6 4.6 0 0 1 8-3 4.6 4.6 0 0 1 8 3c0 5.7-8 11-8 11z"
+							/>
+						</svg>
+					{/each}
+				</div>
+			</div>
+		</section>
+
+		<section class="stage">
+			<div class="stage-row">
+				<div class="mascot-box" data-mood={mascotMood}>
+					<svg class="mascot" viewBox="0 0 200 210" aria-hidden="true">
+						<rect
+							x="20"
+							y="20"
+							width="160"
+							height="170"
+							rx="34"
+							fill="#ffd21f"
+							stroke="#1a1130"
+							stroke-width="8"
+						/>
+
+						<path
+							d="M38 42 q62 -18 124 0"
+							stroke="rgba(255,255,255,0.5)"
+							stroke-width="8"
+							fill="none"
+							stroke-linecap="round"
+						/>
+
+						<text x="100" y="80" text-anchor="middle" class="logo">1С</text>
+
+						<g class="eye-open">
+							<ellipse cx="70" cy="115" rx="18" ry="21" fill="#fff" stroke="#1a1130" stroke-width="5" />
+							<ellipse cx="130" cy="115" rx="18" ry="21" fill="#fff" stroke="#1a1130" stroke-width="5" />
+
+							<circle cx="74" cy="119" r="7" fill="#1a1130" />
+							<circle cx="126" cy="119" r="7" fill="#1a1130" />
+
+							<circle cx="77" cy="115" r="2.2" fill="#fff" />
+							<circle cx="129" cy="115" r="2.2" fill="#fff" />
+						</g>
+
+						<g class="eye-happy">
+							<path
+								d="M54 116 q16 -18 32 0"
+								stroke="#1a1130"
+								stroke-width="6"
+								fill="none"
+								stroke-linecap="round"
+							/>
+							<path
+								d="M114 116 q16 -18 32 0"
+								stroke="#1a1130"
+								stroke-width="6"
+								fill="none"
+								stroke-linecap="round"
+							/>
+						</g>
+
+						<g class="eye-shock">
+							<circle cx="70" cy="115" r="20" fill="#fff" stroke="#1a1130" stroke-width="5" />
+							<circle cx="130" cy="115" r="20" fill="#fff" stroke="#1a1130" stroke-width="5" />
+
+							<circle cx="70" cy="115" r="4.5" fill="#1a1130" />
+							<circle cx="130" cy="115" r="4.5" fill="#1a1130" />
+						</g>
+
+						<g class="brows">
+							<path d="M48 94 l40 12" stroke="#1a1130" stroke-width="7" stroke-linecap="round" />
+							<path d="M152 94 l-40 12" stroke="#1a1130" stroke-width="7" stroke-linecap="round" />
+						</g>
+
+						<g class="mouth-smile">
+							<path
+								d="M76 158 q24 18 48 0"
+								fill="none"
+								stroke="#1a1130"
+								stroke-width="6"
+								stroke-linecap="round"
+							/>
+						</g>
+
+						<g class="mouth-shout">
+							<ellipse cx="100" cy="164" rx="18" ry="13" fill="#7c1220" stroke="#1a1130" stroke-width="5" />
+							<ellipse cx="100" cy="170" rx="9" ry="4" fill="#ff6b6b" />
+						</g>
+
+						<g class="mouth-grit">
+							<rect x="78" y="154" width="44" height="14" rx="5" fill="#fff" stroke="#1a1130" stroke-width="5" />
+							<path d="M78 161 h44 M92 154 v14 M106 154 v14" stroke="#1a1130" stroke-width="3" />
+						</g>
+
+						<g class="coffee-cup">
+							<path class="steam" d="M92 142 q4 -6 0 -12" />
+							<path class="steam steam-2" d="M108 142 q-4 -6 0 -12" />
+
+							<rect x="82" y="148" width="38" height="28" rx="7" fill="#fff" stroke="#1a1130" stroke-width="5" />
+							<path d="M120 154 q13 3 0 15" fill="none" stroke="#1a1130" stroke-width="5" />
+						</g>
+					</svg>
+				</div>
+
+				<div class="speech">
+					<span class="boss-tag">
+						{bossTag}
+					</span>
+
+					<div class="order-text">
+						{store.orderText || 'Ожидание приказа…'}
+					</div>
+
+					{#if flavorText}
+						<div class="order-flavor">
+							{flavorText}
+						</div>
+					{/if}
+
+					<div class="timer">
+						<i
+							class:low={store.timerPercent <= 28}
+							class:mid={store.timerPercent > 28 && store.timerPercent <= 55}
+							style="width: {store.timerPercent}%"
+						></i>
+					</div>
+				</div>
+			</div>
+
+			{#each pops as pop (pop.id)}
+				<div class="pop-fx {pop.cls}" style="top: calc(38% - {pop.offset}px);">
+					{pop.text}
 				</div>
 			{/each}
-		</nav>
+		</section>
 
-		<div class="toolbar">
-			<button
-				type="button"
-				class="tbtn"
-				onclick={() => decorative('Ничего не найдено — как и в прошлом квартале.')}
-			>
-				🔍 Найти
-			</button>
-			<button
-				type="button"
-				class="tbtn"
-				onclick={() => decorative('Проведено 0 документов из 12 458. Начните с любого.')}
-			>
-				📤 Провести всё
-			</button>
-			<button
-				type="button"
-				class="tbtn"
-				onclick={() => decorative('Печать недоступна: принтер не подключен с 2019 года.')}
-			>
-				🖨 Печать
-			</button>
-			<span class="tsep"></span>
-			<button
-				type="button"
-				class="tbtn"
-				onclick={() => decorative('Управление звуком доступно только в платной версии.')}
-			>
-				🔊
-			</button>
-			<button type="button" class="tbtn" onclick={about}> ❓ </button>
-		</div>
+		<section class="controls">
+			<SimonPads {store} onPress={press} breakMode={isBreak} />
 
-		<div class="main">
-			<aside class="nav">
-				<h4>Панель навигации</h4>
-				{#each navItems as item (item.name)}
-					<div
-						class="nav-item"
-						onclick={() =>
-							decorative(`Раздел «${item.name}» доступен в полной версии конфигурации.`)}
+			<div class="actions">
+				{#if showSkip}
+					<button
+						type="button"
+						class="btn ghost"
+						disabled={!canSkip}
+						onclick={skip}
 					>
-						<span class="arr">▶</span>{item.icon}
-						{item.name}
-					</div>
-				{/each}
-			</aside>
-
-			<div class="workspace" bind:this={host}>
-				<div class="form-head">
-					<h1>Обработка «Симон говорит»</h1>
-					<span class="ver">v8.3.24.0001 • внедрено в 2015 г., поддержка закончилась в 2016-м</span>
-					<span class="spacer"></span>
-					<label>
-						Режим:
-						<select value={store.mode} disabled={!store.isMenu} onchange={handleModeChange}>
-							<option value={SimonMode.Orders}>Подчинённость («1С говорит»)</option>
-							<option value={SimonMode.Classic}>Симон (классика)</option>
-						</select>
-					</label>
-				</div>
-
-				<div class="hud">
-					<div class="cell">Проведено: <b>{store.score}</b></div>
-					<div class="cell">Серия: <b>x{store.combo}</b></div>
-					<div class="cell">Уровень: <b>{store.level}</b></div>
-					<div class="cell">Приказ №: <b>{store.round}</b></div>
-					<div class="cell">
-						Нарушения:
-						{#each [0, 1, 2] as index (index)}
-							<span class="warn" class:lost={index >= store.lives}>⚠</span>
-						{/each}
-					</div>
-					<div class="cell">Рекорд предприятия: <b>{store.best}</b></div>
-				</div>
-
-				<div class="console">
-					<div class="console-head">
-						<span>Служебные сообщения</span>
-						<span>Журнал регистрации</span>
-					</div>
-					<div class="console-lines" bind:this={consoleEl}>
-						{#each store.lines as line (line.id)}
-							<div>
-								<span class="t">{line.time}</span>
-								<span class={lineClass(line.kind)}>{line.text}</span>
-							</div>
-						{/each}
-					</div>
-				</div>
-
-				<div class="order">
-					<div
-						class="order-text"
-						class:warn-text={store.isOrders &&
-							!store.orderSay &&
-							store.state === SimonState.OrdersAwaiting}
-					>
-						{#if showSayOrder}
-							<span class="prefix">1С говорит:</span> нажмите «{orderLabel}»!
-						{:else}
-							{store.orderText}
-						{/if}
-					</div>
-					<div class="timer">
-						<i style="width: {store.timerPercent}%"></i>
-					</div>
-				</div>
-
-				<SimonPads {store} onPress={press} />
-
-				<div class="actions">
-					<button type="button" class="btn primary" disabled={!store.canStart} onclick={start}>
-						▶ Начать смену
+						⏭ Пропустить
 					</button>
+				{/if}
 
-					{#if store.isOrders && !store.isMenu && !store.isGameOver}
-						<button type="button" class="btn" disabled={!store.canSkip} onclick={skip}>
-							⏭ Пропустить (команда не от 1С)
-						</button>
-					{/if}
-
-					{#if !store.isMenu && !store.isGameOver}
-						<button type="button" class="btn" onclick={abortToMenu}> ⏹ Завершить смену </button>
-					{/if}
-
-					<span class="spacer"></span>
-
-					<span class="legend">
-						<span class="ok">● цветные кнопки — игровое поле</span>
-						<span class="no">— серые элементы — обёртка 1С (кликабельны, но бесполезны)</span>
-					</span>
-				</div>
-
-				<div class="hint">
-					<b>Как играть.</b>
-					Режим «Подчинённость»: выполняйте команды, только если они начинаются с
-					<b>«1С говорит»</b>. Если команда исходит не от 1С — жмите
-					<b>«Пропустить»</b> (или Пробел). Неверное действие = ⚠ нарушение, три нарушения = конец
-					смены. Режим «Симон»: запомните мигания кнопок и повторите последовательность. Клавиши 1–4
-					— кнопки, Пробел — пропуск, Enter — начать смену.<br />
-					<i>© ООО «Франчайзи-Юг». Любое совпадение с реальной 1С случайно, но проводки сойдутся.</i
-					>
-				</div>
+				{#if showAbort}
+					<button type="button" class="btn danger" onclick={restartToMenu}>
+						⏹ В меню
+					</button>
+				{/if}
 			</div>
-		</div>
+		</section>
 
-		<div class="statusbar">
-			<span>{store.statusText}</span>
-			<span>Демо-версия • Лицензия: 1 рабочее место • Поддержка: бессрочно*</span>
-		</div>
+		<footer class="ticker" aria-hidden="true">
+			<div class="ticker-track">
+				<span>
+					СРОЧНО: база снова легла отдохнуть ★ обновление конфигурации перенесено на никогда ★
+					кофе закончился в 14:45 ★ найдена кнопка «сделать хорошо» — НЕ НАЖИМАТЬ ★
+					главбух требует отчёт ещё вчера ★ резиновая утка признана лучшим отладчиком года ★
+					клиент «ничего не менял» ★
+				</span>
+
+				<span>
+					СРОЧНО: база снова легла отдохнуть ★ обновление конфигурации перенесено на никогда ★
+					кофе закончился в 14:45 ★ найдена кнопка «сделать хорошо» — НЕ НАЖИМАТЬ ★
+					главбух требует отчёт ещё вчера ★ резиновая утка признана лучшим отладчиком года ★
+					клиент «ничего не менял» ★
+				</span>
+			</div>
+		</footer>
 	</div>
 
-	{#if failureVisible}
-		<div class="overlay show">
-			<div class="modal">
-				<div class="modal-title">Ошибка 1С:Предприятия</div>
-				<div class="modal-body">
-					<div class="ic">⚠️</div>
-					<div>
-						{store.failureTitle}
-						<br /><br />
-						Осталось нарушений до увольнения: {Math.max(store.lives, 0)} из 3.
-					</div>
+	<div class="scan" aria-hidden="true"></div>
+	<div class="vig" aria-hidden="true"></div>
+	<div class="flash" class:on={flashOn} aria-hidden="true"></div>
+
+	{#if banner}
+		<div class="banner" aria-hidden="true">
+			<h2>{banner.title}</h2>
+			<p>{banner.sub}</p>
+		</div>
+	{/if}
+
+	{#if isMenu}
+		<div class="overlay">
+			<div class="card">
+				<h2>1С: ПОГРОМИСТ</h2>
+				<p class="tag">СИМОН ГОВОРИТ: ПОГРОМИСТА</p>
+
+				<ul class="rules">
+					<li>🗣️ 1С раздаёт приказы — жми нужную кнопку, пока не сгорел таймер.</li>
+					<li>☕ Приказ «ПЕРЕКУР» — не жми ничего. Просто дыши.</li>
+					<li>⚡ Кнопка «ЕЩЁ…» — лотерея: может выпасть жизнь или премия.</li>
+					<li>🔥 Комбо растёт — очки множатся до ×5. Быстрый ответ = КРИТ!</li>
+					<li>⌨️ Клавиши 1–4 тоже работают. 3 жизни — и смена окончена.</li>
+				</ul>
+
+				<div class="card-actions">
+					<button type="button" class="bigbtn green" onclick={startOrders}>
+						▶ ПРИКАЗЫ
+					</button>
+
+					<button type="button" class="bigbtn blue" onclick={startClassic}>
+						🧠 КЛАССИКА
+					</button>
 				</div>
-				<div class="modal-actions">
-					<button type="button" class="mbtn primary" onclick={acknowledgeFailure}> ОК </button>
-					<button type="button" class="mbtn" onclick={abortToMenu}> Завершить смену </button>
+
+				<p class="hint">ИЛИ ЖМИ ENTER ★ МОНЕТКА УЖЕ В АВТОМАТЕ</p>
+			</div>
+		</div>
+	{/if}
+
+	{#if failureVisible}
+		<div class="overlay">
+			<div class="card error">
+				<h2>ОШИБКА СМЕНЫ</h2>
+				<p class="text">{store.failureTitle}</p>
+				<p class="text">
+					Осталось нарушений до увольнения: {Math.max(store.lives, 0)} из 3.
+				</p>
+
+				<div class="card-actions">
+					<button type="button" class="bigbtn green" onclick={acknowledgeFailure}>
+						ОК
+					</button>
+
+					<button type="button" class="bigbtn red" onclick={restartToMenu}>
+						ЗАВЕРШИТЬ СМЕНУ
+					</button>
 				</div>
 			</div>
 		</div>
 	{/if}
 
-	{#if store.isGameOver}
-		<div class="overlay show">
-			<div class="modal">
-				<div class="modal-title info">Сеанс завершён</div>
-				<div class="modal-body">
-					<div class="ic">ℹ️</div>
+	{#if isGameOver}
+		<div class="overlay">
+			<div class="card error">
+				<h2>БАЗА УПААЛА 💥</h2>
+				<p class="tag">СМЕНА ОКОНЧЕНА</p>
+
+				{#if newRecord}
+					<div class="newrec">★ НОВЫЙ РЕКОРД! ★</div>
+				{/if}
+
+				<div class="final-score">
+					{store.score}
+				</div>
+
+				<div class="stats">
 					<div>
-						Три нарушения подряд. Ваш результат —
-						<b>{store.score}</b> очков («~{Math.floor(store.score / 10)} проведённых документов») — передан
-						в отдел кадров и бухгалтерию.
-						<br /><br />
-						Рекорд предприятия: <b>{store.best}</b>.
+						<span class="stat-label">УРОВЕНЬ</span>
+						<b>{store.level}</b>
+					</div>
+
+					<div>
+						<span class="stat-label">КОМБО</span>
+						<b>×{store.combo}</b>
+					</div>
+
+					<div>
+						<span class="stat-label">РЕКОРД</span>
+						<b>{store.best}</b>
 					</div>
 				</div>
-				<div class="modal-actions">
-					<button type="button" class="mbtn primary" onclick={restartAndStart}>
-						Начать заново
+
+				<div class="rank">
+					{rank.name}
+				</div>
+
+				<div class="rank-quip">
+					{rank.quip}
+				</div>
+
+				<div class="card-actions">
+					<button type="button" class="bigbtn green" onclick={restartAndStart}>
+						↻ ЕЩЁ РАЗ
 					</button>
-					<button type="button" class="mbtn" onclick={restartToMenu}> В меню </button>
+
+					<button type="button" class="bigbtn blue" onclick={restartToMenu}>
+						МЕНЮ
+					</button>
 				</div>
 			</div>
 		</div>
@@ -589,46 +878,6 @@
 </div>
 
 <style>
-	.simon-app {
-		position: fixed;
-		inset: 0;
-		z-index: 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 16px;
-		overflow: hidden;
-		background:
-			radial-gradient(900px 480px at 78% -12%, rgba(255, 210, 77, 0.16), transparent 62%),
-			radial-gradient(760px 460px at 8% 112%, rgba(72, 199, 160, 0.14), transparent 60%),
-			radial-gradient(1200px 700px at 50% 18%, #365f8d 0%, #224363 55%, #12263b 100%);
-		font-family: Tahoma, Arial, sans-serif;
-		font-size: 13px;
-		color: #1b1b1b;
-	}
-
-	.simon-app::before {
-		content: '';
-		position: absolute;
-		inset: -40px;
-		pointer-events: none;
-		background-image:
-			linear-gradient(rgba(154, 186, 226, 0.055) 1px, transparent 1px),
-			linear-gradient(90deg, rgba(154, 186, 226, 0.055) 1px, transparent 1px);
-		background-size: 44px 44px;
-		transform: rotate(-1.2deg);
-		mask-image: radial-gradient(78% 68% at 50% 34%, #000 28%, transparent 92%);
-	}
-
-	.simon-app::after {
-		content: '';
-		position: absolute;
-		inset: 0;
-		pointer-events: none;
-		background:
-			radial-gradient(120% 100% at 50% 42%, transparent 52%, rgba(3, 9, 17, 0.62) 100%),
-			linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 18%, rgba(0, 0, 0, 0.14) 100%);
-	}
 	:global(html, body) {
 		width: 100%;
 		height: 100%;
@@ -637,585 +886,1027 @@
 		overscroll-behavior: none;
 	}
 
-	.simon-app {
+	.simon-arcade {
+		--ink: #1a1130;
+		--deep: #0b071f;
+		--yellow: #ffd21f;
+		--red: #ff4757;
+		--green: #2ed573;
+		--blue: #3f8cff;
+		--cyan: #39e6ff;
+		--pink: #ff5fa2;
+		--orange: #ffab1f;
+
+		--font-display: 'Russo One', 'Arial Black', sans-serif;
+		--font-body: 'Rubik', system-ui, sans-serif;
+		--font-pixel: 'Press Start 2P', monospace;
+		--font-hand: 'Caveat', cursive;
+
 		position: fixed;
 		inset: 0;
+		overflow: hidden;
+		color: #fff;
+		font-family: var(--font-body);
+		background:
+			radial-gradient(1000px 620px at 76% -8%, rgba(255, 140, 60, 0.16), transparent 60%),
+			radial-gradient(880px 620px at 6% 104%, rgba(57, 230, 255, 0.12), transparent 62%),
+			radial-gradient(900px 700px at 94% 92%, rgba(255, 95, 162, 0.13), transparent 55%),
+			linear-gradient(180deg, #1c1246, #130b2e 58%, #0d0822);
+	}
+
+	.simon-arcade.shake {
+		animation: simon-shake 0.4s;
+	}
+
+	@keyframes simon-shake {
+		0%,
+		100% {
+			transform: translate(0, 0);
+		}
+		15% {
+			transform: translate(-10px, 3px);
+		}
+		30% {
+			transform: translate(9px, -4px);
+		}
+		45% {
+			transform: translate(-7px, 2px);
+		}
+		60% {
+			transform: translate(6px, -2px);
+		}
+		80% {
+			transform: translate(-3px, 1px);
+		}
+	}
+
+	.bg-grid,
+	.doodles,
+	.scan,
+	.vig,
+	.flash {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+	}
+
+	.bg-grid {
 		z-index: 0;
+		background-image:
+			linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+			linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+		background-size: 46px 46px;
+		opacity: 0.8;
+	}
+
+	.doodles {
+		z-index: 1;
+		overflow: hidden;
+	}
+
+	.scan {
+		z-index: 3;
+		opacity: 0.28;
+		background: repeating-linear-gradient(
+			0deg,
+			rgba(0, 0, 0, 0.08) 0 2px,
+			transparent 2px 4px
+		);
+	}
+
+	.vig {
+		z-index: 3;
+		box-shadow: inset 0 0 190px rgba(5, 2, 20, 0.88);
+	}
+
+	.flash {
+		z-index: 40;
+		opacity: 0;
+		transition: opacity 0.35s;
+		background: radial-gradient(
+			circle at 50% 50%,
+			rgba(255, 60, 60, 0.45),
+			rgba(255, 0, 60, 0.15) 70%
+		);
+	}
+
+	.flash.on {
+		opacity: 1;
+		transition: opacity 0s;
+	}
+
+	.doodle {
+		position: absolute;
+		filter: drop-shadow(5px 7px 0 rgba(0, 0, 0, 0.26));
+		animation: simon-bob 7s ease-in-out infinite;
+	}
+
+	@keyframes simon-bob {
+		0%,
+		100% {
+			transform: translateY(0) rotate(var(--r, 0deg));
+		}
+		50% {
+			transform: translateY(-12px) rotate(var(--r, 0deg));
+		}
+	}
+
+	.paper {
+		width: 132px;
+		height: 170px;
+		background: #fff8e8;
+		border: 4px solid #1b1235;
+		border-radius: 8px;
+		padding: 12px;
+		--r: -8deg;
+	}
+
+	.paper h4 {
+		font-family: var(--font-pixel);
+		font-size: 7px;
+		letter-spacing: 0.12em;
+		color: #5b4bb0;
+	}
+
+	.paper .lines {
+		margin-top: 8px;
+		height: 84px;
+		background: repeating-linear-gradient(
+			180deg,
+			#cdc5ee 0 2px,
+			transparent 2px 11px
+		);
+	}
+
+	.paper .stamp {
+		position: absolute;
+		right: 8px;
+		bottom: 10px;
+		width: 56px;
+		height: 56px;
+		border: 4px solid #e8352b;
+		border-radius: 50%;
+		color: #e8352b;
+		display: grid;
+		place-items: center;
+		font-size: 9px;
+		font-weight: 900;
+		transform: rotate(-18deg);
+		opacity: 0.88;
+	}
+
+	.paper .stamp-blue {
+		border-color: #1f7ae0;
+		color: #1f7ae0;
+	}
+
+	.sticky {
+		width: 88px;
+		height: 88px;
+		border: 3px solid #1b1235;
+		border-radius: 6px;
+		display: grid;
+		place-items: center;
+		padding: 8px;
+		font-family: var(--font-hand);
+		font-size: 20px;
+		line-height: 1;
+		color: #3a2c10;
+		text-align: center;
+	}
+
+	.sticky-yellow {
+		background: #ffe95e;
+		--r: 6deg;
+	}
+
+	.sticky-pink {
+		background: #ff9ad5;
+		--r: -6deg;
+		color: #5c1030;
+	}
+
+	.sticky-green {
+		background: #7ef0c1;
+		--r: 4deg;
+		color: #0c4a30;
+	}
+
+	.db {
+		width: 104px;
+		--r: 4deg;
+	}
+
+	.db-lid {
+		width: 104px;
+		height: 32px;
+		background: #8f7bff;
+		border: 4px solid #1b1235;
+		border-radius: 50%;
+	}
+
+	.db-body {
+		width: 104px;
+		height: 88px;
+		margin-top: -16px;
+		background: linear-gradient(90deg, #5b46c9, #8f7bff 42%, #5b46c9);
+		border: 4px solid #1b1235;
+		border-radius: 0 0 52px 52px / 0 0 32px 32px;
 		display: flex;
+		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		padding: 16px 16px 64px;
-		overflow: hidden;
-		background: #102434;
-		font-family: Tahoma, Arial, sans-serif;
-		font-size: 13px;
-		color: #1b1b1b;
-	}
-	.desktop {
-		position: absolute;
-		inset: 0;
-		z-index: 1;
-		pointer-events: none;
-		overflow: hidden;
-		background:
-			radial-gradient(920px 520px at 78% -10%, rgba(255, 210, 77, 0.14), transparent 62%),
-			radial-gradient(760px 460px at 6% 112%, rgba(72, 199, 160, 0.12), transparent 60%),
-			linear-gradient(180deg, #2b6d8d 0%, #1d536e 42%, #143c53 74%, #0e2c3f 100%);
-	}
-
-	.desktop-icons {
-		position: absolute;
-		top: 18px;
-		left: 18px;
-		display: flex;
-		flex-direction: column;
-		gap: 18px;
-		opacity: 0.62;
-	}
-
-	.desktop-icon {
-		width: 78px;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 5px;
-		font-size: 24px;
-		filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
-	}
-
-	.desktop-icon small {
-		font-size: 10px;
-		line-height: 1.2;
-		text-align: center;
-		color: #eaf4ff;
-		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
-	}
-
-	.desktop-logo {
-		position: absolute;
-		right: 4vw;
-		bottom: 12vh;
-		font-size: min(34vw, 380px);
-		font-weight: 800;
-		color: rgba(255, 210, 0, 0.055);
-		text-shadow: 0 0 90px rgba(255, 210, 0, 0.06);
-		user-select: none;
-	}
-
-	.scanlines {
-		position: absolute;
-		inset: 0;
-		background-image: repeating-linear-gradient(
-			0deg,
-			rgba(255, 255, 255, 0.022) 0px,
-			rgba(255, 255, 255, 0.022) 1px,
-			transparent 1px,
-			transparent 3px
-		);
-		mix-blend-mode: screen;
-		opacity: 0.5;
-	}
-
-	.vignette {
-		position: absolute;
-		inset: 0;
-		background: radial-gradient(
-			120% 100% at 50% 42%,
-			transparent 52%,
-			rgba(2, 8, 14, 0.62) 100%
-		);
-	}
-
-	.taskbar {
-		position: absolute;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		height: 36px;
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		padding: 0 8px;
-		background: linear-gradient(#e8e8e8, #cfcfcf);
-		border-top: 1px solid #8f8f8f;
-		box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.22);
-		font-size: 11px;
-		color: #222;
-	}
-
-	.start {
-		padding: 3px 12px;
-		border: 1px solid #7b5d00;
-		border-radius: 3px;
-		background: linear-gradient(#ffe066, #f0b400);
-		font-weight: 700;
-		color: #5b3a00;
-	}
-
-	.task-item {
-		padding: 3px 10px;
-		border: 1px solid #98a0a8;
-		border-radius: 3px;
-		background: linear-gradient(#f8f8f8, #d8dde2);
-		color: #203448;
-	}
-
-	.task-item.active {
-		background: linear-gradient(#ffffff, #e7eef6);
-		border-color: #5f7c9d;
-		font-weight: 700;
-	}
-
-	.tray {
-		margin-left: auto;
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		padding: 3px 8px;
-		border: 1px solid #a5adb5;
-		border-radius: 3px;
-		background: linear-gradient(#f2f2f2, #dfe2e6);
-		color: #333;
-	}
-	.window {
-		position: relative;
-		z-index: 2;
-		width: min(1000px, 100%);
-		height: min(780px, calc(100vh - 96px));
-		height: min(780px, calc(100dvh - 96px));
-		min-height: 420px;
-		display: flex;
-		flex-direction: column;
-		background: #f2f2f2;
-		border: 1px solid #2b3a48;
-		border-radius: 6px 6px 4px 4px;
-		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
-		overflow: hidden;
-	}
-
-	.window {
-		width: min(1000px, 97vw);
-		max-height: 96vh;
-		display: flex;
-		flex-direction: column;
-		background: #f2f2f2;
-		border: 1px solid #2b3a48;
-		border-radius: 6px 6px 4px 4px;
-		box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
-		overflow: hidden;
-	}
-	.workspace {
-		scrollbar-gutter: stable;
-		overscroll-behavior: contain;
-	}
-
-	.console-lines {
-		scrollbar-gutter: stable;
-		overflow-wrap: anywhere;
-	}
-
-	.statusbar {
-		overflow: hidden;
-	}
-
-	.statusbar span {
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.titlebar {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		padding: 6px 10px;
-		background: linear-gradient(#5b8ec4, #3f6b9e);
+		gap: 4px;
 		color: #fff;
-		font-weight: bold;
-		text-shadow: 0 1px 1px rgba(0, 0, 0, 0.4);
-		user-select: none;
 	}
 
-	.app-ic {
-		width: 16px;
-		height: 16px;
-		border-radius: 3px;
-		flex: none;
-		background: linear-gradient(135deg, #ffd24d, #e8a200);
-		box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35);
+	.db-body b {
+		font-family: var(--font-display);
+		font-size: 15px;
+		text-shadow: 2px 2px 0 #1b1235;
 	}
 
-	.tb-title {
-		white-space: nowrap;
+	.db-body small {
+		font-family: var(--font-pixel);
+		font-size: 6px;
+		color: #ddd6ff;
+	}
+
+	.db .crack {
+		position: absolute;
+		left: 18px;
+		top: 52px;
+		font-size: 20px;
+		transform: rotate(18deg);
+	}
+
+	.coffee {
+		width: 102px;
+		--r: -4deg;
+	}
+
+	.coffee svg {
+		display: block;
+		overflow: visible;
+	}
+
+	.steam path {
+		animation: simon-steam 2.5s ease-in-out infinite;
+	}
+
+	.steam path:nth-child(2) {
+		animation-delay: 1.1s;
+	}
+
+	@keyframes simon-steam {
+		0% {
+			transform: translateY(0);
+			opacity: 0;
+		}
+		30% {
+			opacity: 0.85;
+		}
+		100% {
+			transform: translateY(-15px);
+			opacity: 0;
+		}
+	}
+
+	.coffee small {
+		display: block;
+		text-align: center;
+		font-family: var(--font-hand);
+		font-size: 18px;
+		color: #ffd9b0;
+		margin-top: 2px;
+	}
+
+	.errwin {
+		width: 205px;
+		background: #f4f2ff;
+		border: 4px solid #1b1235;
+		border-radius: 10px;
 		overflow: hidden;
-		text-overflow: ellipsis;
+		--r: 2deg;
+		font-size: 11px;
 	}
 
-	.tb-title span {
-		font-weight: normal;
-		opacity: 0.85;
+	.errwin .bar {
+		background: linear-gradient(90deg, #ff5252, #d21f3c);
+		padding: 5px 8px;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		color: #fff;
+		font-weight: 800;
+		border-bottom: 4px solid #1b1235;
 	}
 
-	.tb-btns {
-		margin-left: auto;
+	.errwin .bar i {
+		font-style: normal;
+		width: 18px;
+		height: 18px;
+		border-radius: 5px;
+		background: #fff;
+		color: #d21f3c;
+		border: 2px solid #1b1235;
+		display: grid;
+		place-items: center;
+		font-size: 10px;
+		font-weight: 900;
+	}
+
+	.errwin .txt {
+		padding: 8px;
+		color: #2a2150;
+		font-weight: 600;
+	}
+
+	.errwin .btns {
 		display: flex;
 		gap: 6px;
-		flex: none;
+		padding: 0 8px 10px;
 	}
 
-	.tb-btn {
-		width: 26px;
-		height: 20px;
-		border: 1px solid rgba(0, 0, 0, 0.35);
-		border-radius: 3px;
-		background: linear-gradient(#fdfdfd, #d8dee6);
-		color: #223;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 11px;
-		cursor: pointer;
-		font-family: inherit;
-	}
-
-	.tb-btn:hover {
-		background: linear-gradient(#fff, #e8f1fb);
-	}
-
-	.tb-btn.close:hover {
-		background: #e0392f;
-		color: #fff;
-	}
-
-	.menubar {
-		display: flex;
-		background: #e9edf2;
-		border-bottom: 1px solid #9aa5b1;
-	}
-
-	.menu {
-		position: relative;
-	}
-
-	.menu-title {
-		padding: 4px 12px;
-		cursor: default;
-		user-select: none;
-	}
-
-	.menu-title:hover,
-	.menu.open .menu-title {
-		background: #cfe0f2;
-	}
-
-	.dropdown {
-		position: absolute;
-		top: 100%;
-		left: 0;
-		min-width: 240px;
+	.errwin .btns span {
+		flex: 1;
+		text-align: center;
 		background: #fff;
-		border: 1px solid #8b98a5;
-		box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.25);
-		display: none;
-		z-index: 50;
-		padding: 2px;
-		margin: 0;
+		border: 3px solid #1b1235;
+		border-radius: 8px;
+		padding: 3px 4px;
+		font-size: 9px;
+		font-weight: 800;
+		color: #2a2150;
+		box-shadow: 0 3px 0 #1b1235;
 	}
 
-	.menu.open .dropdown {
+	.neon {
+		font-family: var(--font-pixel);
+		font-size: 11px;
+		letter-spacing: 0.18em;
+		color: var(--pink);
+		border: 3px solid var(--pink);
+		border-radius: 12px;
+		padding: 10px 14px;
+		text-shadow: 0 0 8px rgba(255, 95, 162, 0.8);
+		box-shadow:
+			0 0 14px rgba(255, 95, 162, 0.5),
+			inset 0 0 12px rgba(255, 95, 162, 0.28);
+		animation: simon-neon 5s linear infinite;
+		--r: -2deg;
+	}
+
+	@keyframes simon-neon {
+		0%,
+		86%,
+		92%,
+		100% {
+			opacity: 1;
+		}
+		88%,
+		90% {
+			opacity: 0.35;
+		}
+	}
+
+	.duck {
+		--r: -5deg;
+	}
+
+	.duck small {
+		display: block;
+		text-align: center;
+		font-family: var(--font-pixel);
+		font-size: 6px;
+		letter-spacing: 0.16em;
+		color: #ffe9a0;
+		margin-top: 4px;
+	}
+
+	.codebit {
+		font-family: var(--font-pixel);
+		font-size: 9px;
+		color: rgba(180, 200, 255, 0.18);
+		animation: simon-drift 16s ease-in-out infinite;
+		--r: 0deg;
+	}
+
+	@keyframes simon-drift {
+		0%,
+		100% {
+			transform: translateY(0);
+		}
+		50% {
+			transform: translateY(-26px);
+		}
+	}
+
+	.hide-l,
+	.hide-m {
 		display: block;
 	}
 
-	.dropdown li {
-		list-style: none;
-		padding: 5px 10px;
-		white-space: nowrap;
+	@media (max-width: 1180px) {
+		.hide-l {
+			display: none;
+		}
 	}
 
-	.dropdown li:hover {
-		background: #dbe9f8;
-		cursor: pointer;
+	@media (max-width: 860px) {
+		.hide-m {
+			display: none;
+		}
 	}
 
-	.dropdown li.dis {
-		color: #9aa3ad;
-		cursor: not-allowed;
-	}
-
-	.dropdown li.dis:hover {
-		background: #fff;
-	}
-
-	.dropdown hr {
-		border: none;
-		border-top: 1px solid #e2e6ea;
-		margin: 2px 4px;
-	}
-
-	.toolbar {
-		display: flex;
-		gap: 2px;
-		padding: 4px 6px;
-		align-items: center;
-		background: linear-gradient(#f7f7f7, #e4e7ea);
-		border-bottom: 1px solid #9aa5b1;
-	}
-
-	.tbtn {
-		display: flex;
-		align-items: center;
-		gap: 5px;
-		padding: 4px 10px;
-		border: 1px solid transparent;
-		border-radius: 3px;
-		background: transparent;
-		font-family: inherit;
-		font-size: 12px;
-		cursor: pointer;
-		color: #222;
-	}
-
-	.tbtn:hover {
-		background: #e3edf8;
-		border-color: #aac4de;
-	}
-
-	.tsep {
-		width: 1px;
-		height: 20px;
-		background: #c8ced6;
-		margin: 0 4px;
-	}
-
-	.main {
-		flex: 1;
-		display: flex;
-		min-height: 0;
-	}
-
-	.nav {
-		width: 230px;
-		flex: none;
-		background: #f7f8fa;
-		border-right: 1px solid #9aa5b1;
-		padding: 8px;
-		overflow: auto;
-	}
-
-	.nav h4 {
-		font-size: 12px;
-		color: #5a6b7c;
-		margin: 2px 0 6px;
-	}
-
-	.nav-item {
-		display: flex;
-		gap: 6px;
-		align-items: center;
-		padding: 4px 6px;
-		border-radius: 3px;
-		cursor: not-allowed;
-		color: #455260;
-	}
-
-	.nav-item:hover {
-		background: #eef2f6;
-	}
-
-	.nav-item .arr {
-		color: #8a97a3;
-		font-size: 10px;
-	}
-
-	.workspace {
-		flex: 1;
-		padding: 12px;
+	.game-shell {
+		position: relative;
+		z-index: 2;
+		min-height: 100dvh;
+		width: min(1120px, 96vw);
+		margin: 0 auto;
 		display: flex;
 		flex-direction: column;
-		gap: 10px;
-		overflow: auto;
+		gap: 12px;
+		padding: 12px 8px;
 	}
 
-	.form-head {
+	.marquee {
+		flex: none;
+		background: linear-gradient(180deg, rgba(46, 29, 99, 0.92), rgba(22, 12, 52, 0.92));
+		border: 4px solid var(--deep);
+		border-radius: 18px;
+		padding: 8px 14px 10px;
+		text-align: center;
+		box-shadow:
+			0 10px 0 rgba(0, 0, 0, 0.25),
+			0 0 44px rgba(255, 210, 31, 0.08);
+	}
+
+	.lights {
+		height: 10px;
+		background-image: radial-gradient(
+			circle at 5px 5px,
+			rgba(255, 210, 31, 0.95) 3px,
+			rgba(255, 210, 31, 0.18) 4px,
+			transparent 5px
+		);
+		background-size: 26px 10px;
+		filter: drop-shadow(0 0 4px rgba(255, 210, 31, 0.55));
+		animation: simon-bulb 1s steps(2) infinite;
+	}
+
+	@keyframes simon-bulb {
+		0%,
+		49% {
+			opacity: 1;
+		}
+		50%,
+		100% {
+			opacity: 0.22;
+		}
+	}
+
+	.title-row {
 		display: flex;
 		align-items: center;
-		gap: 10px;
-		flex-wrap: wrap;
+		justify-content: center;
+		gap: 14px;
+		margin-top: 6px;
 	}
 
-	.form-head h1 {
-		font-size: 16px;
-		color: #1f3f5f;
+	.title-row h1 {
+		margin: 0;
+		font-family: var(--font-display);
+		font-size: clamp(28px, 5vw, 54px);
+		line-height: 1;
+		letter-spacing: 0.04em;
+		color: var(--yellow);
+		transform: rotate(-1deg);
+		text-shadow:
+			0 3px 0 #e8352b,
+			0 6px 0 rgba(0, 0, 0, 0.35),
+			0 0 26px rgba(255, 210, 31, 0.35);
 	}
 
-	.form-head .ver {
-		color: #7a8896;
-		font-size: 11px;
+	.title-row em {
+		font-style: normal;
+		color: #fff;
 	}
 
-	select,
-	.btn {
-		font-family: inherit;
-		font-size: 12px;
+	.star {
+		color: var(--yellow);
+		font-size: clamp(16px, 2.5vw, 28px);
+		text-shadow: 0 0 12px rgba(255, 210, 31, 0.75);
+		animation: simon-spin 6s linear infinite;
 	}
 
-	select {
-		padding: 3px 6px;
-		border: 1px solid #9aa5b1;
-		border-radius: 3px;
-		background: #fff;
+	.title-row .star:last-child {
+		animation-direction: reverse;
 	}
 
-	.spacer {
-		flex: 1;
+	@keyframes simon-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	.subtitle {
+		margin: 7px 0 4px;
+		font-family: var(--font-pixel);
+		font-size: clamp(7px, 1.1vw, 10px);
+		letter-spacing: 2px;
+		color: var(--cyan);
+		text-shadow: 0 0 10px rgba(57, 230, 255, 0.7);
 	}
 
 	.hud {
+		flex: none;
 		display: flex;
-		gap: 8px;
 		flex-wrap: wrap;
-	}
-
-	.hud .cell {
-		background: #fff;
-		border: 1px solid #9aa5b1;
-		border-radius: 4px;
-		padding: 5px 10px;
-		display: flex;
-		gap: 6px;
-		align-items: center;
-	}
-
-	.hud .cell b {
-		font-size: 14px;
-	}
-
-	.warn {
-		color: #d35400;
-	}
-
-	.warn.lost {
-		color: #c9ced4;
-	}
-
-	.console {
-		background: #fff;
-		border: 1px solid #9aa5b1;
-		border-radius: 4px;
-		flex: none;
-	}
-
-	.console-head {
-		padding: 3px 8px;
-		background: linear-gradient(#f4f6f8, #e7eaee);
-		border-bottom: 1px solid #9aa5b1;
-		font-size: 11px;
-		color: #5a6b7c;
-		display: flex;
-		justify-content: space-between;
-	}
-
-	.console-lines {
-		height: 88px;
-		overflow-y: auto;
-		padding: 6px 8px;
-		font-size: 12px;
-		line-height: 1.5;
-	}
-
-	.console-lines .t {
-		color: #93a0ad;
-		margin-right: 6px;
-	}
-
-	.console-lines .ok {
-		color: #1e7d3c;
-	}
-
-	.console-lines .err {
-		color: #b03a2e;
-	}
-
-	.console-lines .cmd {
-		color: #1a4f8b;
-		font-weight: bold;
-	}
-
-	.order {
-		background: #fff;
-		border: 1px solid #9aa5b1;
-		border-radius: 4px;
-		min-height: 84px;
-		flex: none;
-		display: flex;
-		flex-direction: column;
 		justify-content: center;
-		padding: 10px 16px;
+		align-items: stretch;
 		gap: 8px;
+	}
+
+	.chip {
+		min-width: 92px;
+		padding: 7px 10px;
+		border-radius: 14px;
+		background: rgba(13, 8, 34, 0.82);
+		border: 2px solid rgba(255, 255, 255, 0.08);
+		box-shadow: 0 6px 0 rgba(0, 0, 0, 0.26);
+		display: grid;
+		justify-items: center;
+		gap: 3px;
+	}
+
+	.chip-label {
+		font-family: var(--font-pixel);
+		font-size: 7px;
+		letter-spacing: 1px;
+		color: #8fd8ff;
+	}
+
+	.chip b {
+		font-family: var(--font-display);
+		font-size: clamp(16px, 2vw, 22px);
+		line-height: 1;
+	}
+
+	.chip.score b {
+		font-family: var(--font-pixel);
+		font-size: clamp(12px, 1.5vw, 16px);
+		color: var(--yellow);
+		text-shadow: 0 0 10px rgba(255, 210, 31, 0.55);
+	}
+
+	.chip.combo b {
+		color: var(--orange);
+	}
+
+	.chip.combo.hot b {
+		color: #ff5230;
+		animation: simon-hot-pulse 0.45s ease-in-out infinite;
+	}
+
+	.flame {
+		display: inline-block;
+		animation: simon-hot-pulse 0.3s infinite;
+	}
+
+	@keyframes simon-hot-pulse {
+		50% {
+			transform: scale(1.18);
+		}
+	}
+
+	.pips {
+		display: flex;
+		gap: 3px;
+		margin-top: 3px;
+	}
+
+	.pips i {
+		width: 7px;
+		height: 7px;
+		border-radius: 2px;
+		background: #332a63;
+		box-shadow: inset 0 0 0 1px #0b071f;
+	}
+
+	.pips i.on {
+		background: var(--cyan);
+		box-shadow: 0 0 6px var(--cyan);
+	}
+
+	.lives {
+		display: flex;
+		gap: 4px;
+		padding-top: 2px;
+	}
+
+	.heart {
+		width: 24px;
+		height: 22px;
+	}
+
+	.heart path {
+		fill: #ff4d6d;
+		stroke: #7c0f2b;
+		stroke-width: 2;
+	}
+
+	.heart.lost path {
+		fill: #3a3356;
+		stroke: #241d45;
+	}
+
+	.heart.burst {
+		animation: simon-heart-burst 0.5s;
+	}
+
+	@keyframes simon-heart-burst {
+		0% {
+			transform: scale(1);
+		}
+		30% {
+			transform: scale(1.6) rotate(-14deg);
+		}
+		100% {
+			transform: scale(1);
+		}
+	}
+
+	.stage {
+		flex: 1;
+		min-height: 220px;
+		position: relative;
+		display: grid;
+		place-items: center;
+		padding: 8px 0;
+	}
+
+	.stage-row {
+		width: min(920px, 96vw);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: clamp(14px, 3vw, 34px);
+	}
+
+	.mascot-box {
+		flex: none;
+		width: clamp(110px, 19vh, 180px);
+		animation: simon-mascot-bob 3.2s ease-in-out infinite;
+		filter: drop-shadow(7px 8px 0 rgba(0, 0, 0, 0.28));
+	}
+
+	.mascot {
+		display: block;
+		width: 100%;
+		height: auto;
+	}
+
+	.logo {
+		font-family: var(--font-display);
+		font-size: 36px;
+		fill: #e8352b;
+		stroke: #fff;
+		stroke-width: 1.2px;
+		paint-order: stroke;
+	}
+
+	.mascot g {
+		transition: opacity 0.15s;
+	}
+
+	.eye-happy,
+	.eye-shock,
+	.brows,
+	.mouth-shout,
+	.mouth-grit,
+	.coffee-cup {
+		opacity: 0;
+	}
+
+	.eye-open {
+		animation: simon-mascot-blink 4.2s infinite;
+		transform-box: fill-box;
+		transform-origin: center;
+	}
+
+	@keyframes simon-mascot-blink {
+		0%,
+		93%,
+		100% {
+			transform: scaleY(1);
+		}
+		95.5% {
+			transform: scaleY(0.12);
+		}
+	}
+
+	.mascot-box[data-mood='normal'] .eye-open,
+	.mascot-box[data-mood='shout'] .eye-open {
+		opacity: 1;
+	}
+
+	.mascot-box[data-mood='normal'] .mouth-smile,
+	.mascot-box[data-mood='happy'] .mouth-smile {
+		opacity: 1;
+	}
+
+	.mascot-box[data-mood='happy'] .eye-open {
+		opacity: 0;
+	}
+
+	.mascot-box[data-mood='happy'] .eye-happy {
+		opacity: 1;
+	}
+
+	.mascot-box[data-mood='shout'] .mouth-smile {
+		opacity: 0;
+	}
+
+	.mascot-box[data-mood='shout'] .mouth-shout {
+		opacity: 1;
+	}
+
+	.mascot-box[data-mood='shock'] .eye-open {
+		opacity: 0;
+	}
+
+	.mascot-box[data-mood='shock'] .eye-shock {
+		opacity: 1;
+	}
+
+	.mascot-box[data-mood='shock'] .mouth-smile {
+		opacity: 0;
+	}
+
+	.mascot-box[data-mood='shock'] .mouth-shout {
+		opacity: 1;
+	}
+
+	.mascot-box[data-mood='angry'] .brows {
+		opacity: 1;
+	}
+
+	.mascot-box[data-mood='angry'] .mouth-smile {
+		opacity: 0;
+	}
+
+	.mascot-box[data-mood='angry'] .mouth-grit {
+		opacity: 1;
+	}
+
+	.mascot-box[data-mood='coffee'] .eye-open {
+		opacity: 0;
+	}
+
+	.mascot-box[data-mood='coffee'] .eye-happy {
+		opacity: 1;
+	}
+
+	.mascot-box[data-mood='coffee'] .mouth-smile {
+		opacity: 0;
+	}
+
+	.mascot-box[data-mood='coffee'] .coffee-cup {
+		opacity: 1;
+	}
+
+	.coffee-cup .steam {
+		fill: none;
+		stroke: #fff;
+		stroke-width: 3.5;
+		stroke-linecap: round;
+		opacity: 0.85;
+		animation: simon-mascot-steam 2.2s ease-in-out infinite;
+	}
+
+	.coffee-cup .steam-2 {
+		animation-delay: 1s;
+	}
+
+	@keyframes simon-mascot-steam {
+		0% {
+			transform: translateY(0);
+			opacity: 0;
+		}
+		30% {
+			opacity: 0.85;
+		}
+		100% {
+			transform: translateY(-12px);
+			opacity: 0;
+		}
+	}
+
+	@keyframes simon-mascot-bob {
+		0%,
+		100% {
+			transform: translateY(0) rotate(-2deg);
+		}
+		50% {
+			transform: translateY(-8px) rotate(2deg);
+		}
+	}
+
+	.speech {
+		position: relative;
+		flex: 1;
+		min-width: 0;
+		max-width: 660px;
+		background: #fffdf2;
+		color: var(--ink);
+		border: 5px solid #14102e;
+		border-radius: 26px;
+		padding: 16px 18px;
+		box-shadow: 9px 9px 0 rgba(0, 0, 0, 0.3);
+	}
+
+	.speech::before {
+		content: '';
+		position: absolute;
+		left: -22px;
+		top: 46px;
+		width: 24px;
+		height: 24px;
+		background: #fffdf2;
+		border-left: 5px solid #14102e;
+		border-bottom: 5px solid #14102e;
+		transform: rotate(45deg);
+	}
+
+	.boss-tag {
+		display: inline-block;
+		font-family: var(--font-display);
+		font-size: clamp(11px, 1.4vw, 15px);
+		letter-spacing: 1px;
+		background: #e8352b;
+		color: #fff;
+		padding: 4px 12px;
+		border-radius: 8px;
+		transform: rotate(-2deg);
+		box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.25);
 	}
 
 	.order-text {
-		font-size: 21px;
-		font-weight: bold;
-		color: #243447;
-		text-align: center;
-		min-height: 28px;
+		margin: 10px 0 12px;
+		font-family: var(--font-display);
+		font-size: clamp(20px, 3vw, 34px);
+		line-height: 1.18;
 	}
 
-	.order-text .prefix {
-		color: #1a6b1a;
-	}
-
-	.order-text.warn-text {
-		color: #8a5a00;
+	.order-flavor {
+		margin-top: 4px;
+		font-family: var(--font-hand);
+		font-size: clamp(16px, 1.9vw, 22px);
+		color: #7a5f2c;
+		transform: rotate(-0.6deg);
 	}
 
 	.timer {
-		height: 8px;
-		background: #e5e9ee;
-		border-radius: 4px;
+		height: 16px;
+		background: #241a4d;
+		border: 3px solid #14102e;
+		border-radius: 10px;
 		overflow: hidden;
 	}
 
-	.timer > i {
+	.timer i {
+		position: relative;
 		display: block;
 		height: 100%;
-		width: 0;
-		background: linear-gradient(90deg, #57c46a, #2f9e4f);
+		width: 100%;
+		border-radius: 6px;
+		background: var(--green);
+		transition: width 0.08s linear;
+		overflow: hidden;
+	}
+
+	.timer i::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: 6px;
+		background: repeating-linear-gradient(
+			45deg,
+			rgba(255, 255, 255, 0.25) 0 8px,
+			transparent 8px 16px
+		);
+		animation: simon-stripe 0.7s linear infinite;
+	}
+
+	@keyframes simon-stripe {
+		to {
+			background-position: 22px 0;
+		}
+	}
+
+	.timer i.mid {
+		background: #ffb020;
+	}
+
+	.timer i.low {
+		background: var(--red);
+		animation: simon-timer-pulse 0.3s infinite;
+	}
+
+	@keyframes simon-timer-pulse {
+		50% {
+			filter: brightness(1.7);
+		}
+	}
+
+	.pop-fx {
+		position: absolute;
+		left: 50%;
+		z-index: 30;
+		transform: translateX(-50%);
+		font-family: var(--font-display);
+		font-size: 24px;
+		color: var(--yellow);
+		pointer-events: none;
+		white-space: nowrap;
+		text-shadow:
+			0 3px 0 rgba(0, 0, 0, 0.55),
+			0 0 16px rgba(255, 210, 31, 0.5);
+		animation: simon-pop-rise 0.95s ease-out forwards;
+	}
+
+	.pop-fx.crit {
+		color: #fff;
+		font-size: 32px;
+		text-shadow:
+			0 3px 0 #e8352b,
+			0 0 20px #ff4757;
+	}
+
+	.pop-fx.life {
+		color: #ff8fa8;
+	}
+
+	.pop-fx.bad {
+		color: #ff6a5e;
+	}
+
+	@keyframes simon-pop-rise {
+		0% {
+			opacity: 0;
+			transform: translate(-50%, 0) scale(0.6);
+		}
+		25% {
+			opacity: 1;
+			transform: translate(-50%, -40px) scale(1.1);
+		}
+		100% {
+			opacity: 0;
+			transform: translate(-50%, -140px) scale(1);
+		}
+	}
+
+	.controls {
+		flex: none;
+		display: grid;
+		justify-items: center;
+		gap: 18px;
+		padding-bottom: clamp(56px, 14vh, 150px);
 	}
 
 	.actions {
 		display: flex;
-		gap: 10px;
-		align-items: center;
 		flex-wrap: wrap;
-		flex: none;
+		justify-content: center;
+		gap: 10px;
 	}
 
 	.btn {
-		padding: 8px 18px;
-		border: 1px solid #8fa3b8;
-		border-radius: 4px;
-		background: linear-gradient(#fff, #dde5ee);
-		font-size: 13px;
-		font-weight: bold;
-		cursor: pointer;
-		color: #1f3f5f;
+		border: 0;
+		border-radius: 14px;
+		padding: 10px 16px;
 		font-family: inherit;
+		font-size: 14px;
+		font-weight: 700;
+		color: #fff;
+		cursor: pointer;
+		background: linear-gradient(#63a6ff, #2f6fe0);
+		box-shadow: 0 7px 0 #173e93;
+		transition:
+			transform 0.06s,
+			box-shadow 0.06s,
+			filter 0.15s;
 	}
 
 	.btn:hover:not(:disabled) {
-		background: linear-gradient(#fff, #cfe0f2);
+		filter: brightness(1.08);
 	}
 
-	.btn.primary {
-		background: linear-gradient(#57a85f, #3c8a46);
-		border-color: #2c6b34;
-		color: #fff;
-	}
-
-	.btn.primary:hover:not(:disabled) {
-		background: linear-gradient(#63b96b, #439a4e);
+	.btn:active:not(:disabled) {
+		transform: translateY(4px);
+		box-shadow: 0 3px 0 #173e93;
 	}
 
 	.btn:disabled {
@@ -1223,321 +1914,338 @@
 		cursor: not-allowed;
 	}
 
-	.legend {
-		display: flex;
-		gap: 16px;
-		font-size: 11px;
-		color: #6a7683;
+	.btn.ghost {
+		background: linear-gradient(#63a6ff, #2f6fe0);
+		box-shadow: 0 7px 0 #173e93;
 	}
 
-	.legend .ok {
-		color: #1e7d3c;
+	.btn.danger {
+		background: linear-gradient(#ff6a5e, #e02f2f);
+		box-shadow: 0 7px 0 #8f1414;
 	}
 
-	.legend .no {
-		color: #9aa3ad;
-	}
-
-	.hint {
-		font-size: 12px;
-		color: #55606c;
-		background: #eef2f6;
-		border: 1px dashed #b9c4cf;
-		border-radius: 4px;
-		padding: 8px 10px;
-		line-height: 1.6;
+	.ticker {
 		flex: none;
+		overflow: hidden;
+		background: #120b2e;
+		border: 3px solid var(--deep);
+		border-radius: 12px;
+		padding: 6px 0;
+		box-shadow: 0 5px 0 rgba(0, 0, 0, 0.3);
 	}
 
-	.hint b {
-		color: #1f3f5f;
-	}
-
-	.statusbar {
+	.ticker-track {
 		display: flex;
-		justify-content: space-between;
-		gap: 10px;
-		padding: 4px 10px;
-		background: linear-gradient(#eef1f4, #dde3e9);
-		border-top: 1px solid #9aa5b1;
-		font-size: 11px;
-		color: #455260;
+		width: max-content;
+		animation: simon-marquee 28s linear infinite;
+		font-family: var(--font-pixel);
+		font-size: 8px;
+		color: #8fd8ff;
+		letter-spacing: 1px;
+	}
+
+	.ticker-track span {
+		padding-right: 42px;
+		white-space: nowrap;
+	}
+
+	@keyframes simon-marquee {
+		to {
+			transform: translateX(-50%);
+		}
+	}
+
+	.banner {
+		position: fixed;
+		inset: 0;
+		z-index: 55;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		pointer-events: none;
+		animation: simon-banner 1.1s ease forwards;
+	}
+
+	.banner h2 {
+		margin: 0;
+		font-family: var(--font-display);
+		font-size: clamp(40px, 8vw, 84px);
+		color: var(--yellow);
+		text-shadow:
+			0 4px 0 #e8352b,
+			0 8px 0 rgba(0, 0, 0, 0.4),
+			0 0 40px rgba(255, 210, 31, 0.7);
+	}
+
+	.banner p {
+		margin-top: 10px;
+		font-family: var(--font-pixel);
+		font-size: clamp(8px, 1.4vw, 12px);
+		color: var(--cyan);
+		text-shadow: 0 0 10px var(--cyan);
+	}
+
+	@keyframes simon-banner {
+		0% {
+			opacity: 0;
+			transform: scale(0.5);
+		}
+		18% {
+			opacity: 1;
+			transform: scale(1.1);
+		}
+		30% {
+			transform: scale(1);
+		}
+		80% {
+			opacity: 1;
+		}
+		100% {
+			opacity: 0;
+			transform: scale(1.06);
+		}
 	}
 
 	.overlay {
 		position: fixed;
 		inset: 0;
-		background: rgba(15, 25, 35, 0.45);
-		display: none;
-		align-items: center;
-		justify-content: center;
-		z-index: 100;
-	}
-
-	.overlay.show {
-		display: flex;
-	}
-
-	.modal {
-		width: min(450px, 92vw);
-		background: #fff;
-		border: 1px solid #6f7d8c;
-		box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5);
-		border-radius: 4px;
-		overflow: hidden;
-		animation: pop 0.18s ease-out;
-	}
-
-	.modal-title {
-		padding: 8px 12px;
-		font-weight: bold;
-		color: #b03a2e;
-		background: linear-gradient(#f6f8fa, #e9edf1);
-		border-bottom: 1px solid #d5dbe1;
-	}
-
-	.modal-title.info {
-		color: #1f5fa8;
-	}
-
-	.modal-body {
-		padding: 16px 14px;
-		display: flex;
-		gap: 12px;
-		align-items: flex-start;
-		font-size: 13px;
-		line-height: 1.55;
-	}
-
-	.modal-body .ic {
-		font-size: 26px;
-		line-height: 1;
-	}
-
-	.modal-actions {
-		display: flex;
-		justify-content: flex-end;
-		gap: 8px;
-		padding: 10px 12px;
-		border-top: 1px solid #e4e8ec;
-		background: #fafbfc;
-	}
-
-	.mbtn {
-		padding: 5px 22px;
-		font-family: inherit;
-		font-size: 12px;
-		border: 1px solid #8fa3b8;
-		border-radius: 3px;
-		background: linear-gradient(#fff, #e2e8ef);
-		cursor: pointer;
-	}
-
-	.mbtn:hover {
-		background: #dbe9f8;
-	}
-
-	.mbtn.primary {
-		background: linear-gradient(#57a85f, #3c8a46);
-		border-color: #2c6b34;
-		color: #fff;
-	}
-
-	.window {
-		position: relative;
-		z-index: 1;
-	}
-
-	@keyframes pop {
-		from {
-			transform: scale(0.94);
-			opacity: 0;
-		}
-		to {
-			transform: scale(1);
-			opacity: 1;
-		}
-	}
-
-	@media (max-width: 820px) {
-		.nav {
-			display: none;
-		}
-
-		.order-text {
-			font-size: 17px;
-		}
-	}
-
-		@media (max-width: 820px) {
-		.nav {
-			display: none;
-		}
-
-		.order-text {
-			font-size: 17px;
-		}
-
-		.pad-btn {
-			min-height: 92px;
-		}
-
-		.desktop-icons {
-			display: none;
-		}
-
-		.simon-app {
-			padding-bottom: 56px;
-		}
-	}
-
-	@media (max-height: 560px) {
-		.taskbar {
-			display: none;
-		}
-
-		.simon-app {
-			padding-bottom: 16px;
-		}
-
-		.window {
-			height: min(780px, calc(100vh - 32px));
-			height: min(780px, calc(100dvh - 32px));
-		}
-	}
-
-	@media (max-width: 820px) {
-	.simon-app {
-		padding: 8px 8px 48px;
-	}
-
-	.desktop-icons,
-	.desktop-logo,
-	.scanlines,
-	.vignette,
-	.taskbar,
-	.nav,
-	.menubar,
-	.toolbar,
-	.form-head .ver,
-	.hint,
-	.legend {
-		display: none;
-	}
-
-	.window {
-		width: 100%;
-		height: calc(100dvh - 56px);
-		max-height: none;
-		border-radius: 4px;
-	}
-
-	.titlebar {
-		padding: 4px 8px;
-	}
-
-	.tb-title {
-		font-size: 11px;
-	}
-
-	.tb-btns {
-		display: none;
-	}
-
-	.workspace {
-		padding: 8px;
-		gap: 8px;
-	}
-
-	.form-head h1 {
-		font-size: 13px;
-	}
-
-	.hud {
-		gap: 4px;
-	}
-
-	.hud .cell {
-		padding: 3px 6px;
-		font-size: 11px;
-	}
-
-	.hud .cell b {
-		font-size: 12px;
-	}
-
-	.console-lines {
-		height: 56px;
-		font-size: 11px;
-	}
-
-	.order {
-		min-height: 60px;
-		padding: 8px 10px;
-	}
-
-	.order-text {
-		font-size: 15px;
-	}
-
-	.actions {
-		gap: 6px;
-	}
-
-	.btn {
-		padding: 6px 12px;
-		font-size: 12px;
-	}
-
-	.statusbar {
-		font-size: 10px;
-		padding: 3px 8px;
-	}
-
-	.overlay .modal {
-		width: 94vw;
-	}
-
-	.modal-body {
-		font-size: 12px;
-		padding: 12px 10px;
-	}
-}
-
-@media (max-width: 480px) {
-	.hud {
+		z-index: 60;
 		display: grid;
-		grid-template-columns: 1fr 1fr 1fr;
+		place-items: center;
+		padding: 16px;
+		background: rgba(6, 3, 20, 0.78);
+		backdrop-filter: blur(4px);
 	}
 
-	.order-text {
-		font-size: 13px;
+	.card {
+		width: min(640px, 94vw);
+		background: linear-gradient(180deg, #2b1d5e, #160e34);
+		border: 3px solid #080416;
+		border-radius: 24px;
+		padding: 22px;
+		text-align: center;
+		box-shadow:
+			0 18px 0 rgba(0, 0, 0, 0.32),
+			0 0 60px rgba(255, 210, 31, 0.08);
 	}
 
-	.console-lines {
-		height: 44px;
-	}
-}
-
-@media (max-height: 560px) {
-	.taskbar {
-		display: none;
-	}
-
-	.simon-app {
-		padding-bottom: 8px;
+	.card h2 {
+		margin: 0;
+		font-family: var(--font-display);
+		font-size: clamp(28px, 4.5vw, 44px);
+		line-height: 1.05;
+		color: var(--yellow);
+		text-shadow:
+			0 3px 0 #e8352b,
+			0 6px 0 rgba(0, 0, 0, 0.35);
 	}
 
-	.window {
-		height: calc(100dvh - 16px);
+	.card.error h2 {
+		color: #ff6a5e;
+		text-shadow:
+			0 3px 0 #7c0f2b,
+			0 6px 0 rgba(0, 0, 0, 0.35);
 	}
 
-	.console-lines {
-		height: 40px;
+	.tag {
+		margin: 8px 0 12px;
+		font-family: var(--font-pixel);
+		font-size: 9px;
+		letter-spacing: 2px;
+		color: var(--cyan);
 	}
 
-	.order {
-		min-height: 48px;
+	.rules {
+		margin: 0 auto 18px;
+		max-width: 460px;
+		display: flex;
+		flex-direction: column;
+		gap: 9px;
+		padding: 0;
+		text-align: left;
 	}
-}
+
+	.rules li {
+		list-style: none;
+		font-size: clamp(13px, 1.6vw, 16px);
+		font-weight: 600;
+		color: #e8e4ff;
+		background: #120b2e;
+		border: 3px solid var(--deep);
+		border-radius: 12px;
+		padding: 8px 12px;
+		box-shadow: 0 4px 0 rgba(0, 0, 0, 0.3);
+	}
+
+	.text {
+		margin: 0 auto 14px;
+		max-width: 52ch;
+		line-height: 1.5;
+		color: #e8e4ff;
+	}
+
+	.card-actions {
+		display: flex;
+		justify-content: center;
+		flex-wrap: wrap;
+		gap: 12px;
+	}
+
+	.bigbtn {
+		border: 0;
+		border-radius: 18px;
+		padding: 13px 24px;
+		font-family: var(--font-display);
+		font-size: 18px;
+		letter-spacing: 0.03em;
+		color: #fff;
+		cursor: pointer;
+		transition:
+			transform 0.06s,
+			filter 0.15s;
+	}
+
+	.bigbtn:hover {
+		filter: brightness(1.08);
+	}
+
+	.bigbtn:active {
+		transform: translateY(5px);
+	}
+
+	.bigbtn.green {
+		background: linear-gradient(#5ce96f, #1fae3f);
+		box-shadow:
+			0 10px 0 #0e6b24,
+			0 18px 26px rgba(0, 0, 0, 0.35);
+	}
+
+	.bigbtn.blue {
+		background: linear-gradient(#63a6ff, #2f6fe0);
+		box-shadow:
+			0 10px 0 #173e93,
+			0 18px 26px rgba(0, 0, 0, 0.35);
+	}
+
+	.bigbtn.red {
+		background: linear-gradient(#ff6a5e, #e02f2f);
+		box-shadow:
+			0 10px 0 #8f1414,
+			0 18px 26px rgba(0, 0, 0, 0.35);
+	}
+
+	.hint {
+		margin-top: 14px;
+		font-family: var(--font-pixel);
+		font-size: 8px;
+		color: #9d8dff;
+		letter-spacing: 1px;
+	}
+
+	.newrec {
+		display: inline-block;
+		font-family: var(--font-display);
+		font-size: 14px;
+		background: var(--yellow);
+		color: var(--ink);
+		padding: 4px 12px;
+		border-radius: 8px;
+		transform: rotate(-2deg);
+		box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.4);
+		animation: simon-hot-pulse 0.5s infinite;
+		margin-bottom: 6px;
+	}
+
+	.final-score {
+		font-family: var(--font-pixel);
+		font-size: clamp(20px, 3.4vw, 32px);
+		color: var(--yellow);
+		margin: 12px 0 4px;
+		text-shadow: 0 0 16px rgba(255, 210, 31, 0.6);
+	}
+
+	.stats {
+		display: flex;
+		gap: 10px;
+		justify-content: center;
+		flex-wrap: wrap;
+		margin: 14px 0;
+	}
+
+	.stats div {
+		background: #120b2e;
+		border: 3px solid var(--deep);
+		border-radius: 12px;
+		padding: 8px 14px;
+		min-width: 104px;
+	}
+
+	.stat-label {
+		display: block;
+		font-family: var(--font-pixel);
+		font-size: 6px;
+		color: #8fd8ff;
+		letter-spacing: 1px;
+		margin-bottom: 5px;
+	}
+
+	.stats b {
+		font-family: var(--font-display);
+		font-size: 18px;
+	}
+
+	.rank {
+		font-family: var(--font-display);
+		font-size: clamp(18px, 3vw, 26px);
+		color: var(--cyan);
+		text-shadow: 0 0 14px rgba(57, 230, 255, 0.6);
+		margin-top: 4px;
+	}
+
+	.rank-quip {
+		font-family: var(--font-hand);
+		font-size: 22px;
+		color: #ffd9b0;
+		margin: 4px 0 12px;
+	}
+
+	@media (max-width: 760px) {
+		.stage-row {
+			flex-direction: column;
+			gap: 10px;
+		}
+
+		.speech {
+			width: 100%;
+			max-width: none;
+		}
+
+		.speech::before {
+			display: none;
+		}
+
+		.controls {
+			padding-bottom: clamp(48px, 12vh, 110px);
+		}
+
+		.chip {
+			min-width: 76px;
+			padding: 5px 8px;
+		}
+
+		.order-text {
+			font-size: clamp(18px, 4.4vw, 26px);
+		}
+	}
+
+	@media (max-height: 700px) {
+		.controls {
+			padding-bottom: clamp(36px, 8vh, 84px);
+		}
+
+		.stage {
+			min-height: 160px;
+		}
+	}
 </style>

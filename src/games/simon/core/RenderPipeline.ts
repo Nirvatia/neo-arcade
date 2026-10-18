@@ -1,7 +1,11 @@
 import type { EventBus } from './EventBus';
 import type { SimonModel } from '../logic/SimonModel';
 import type { Director } from './Director';
-import { SimonEvent, type SimonEventPayloads, type SimonUiSnapshot } from './Events';
+import {
+	SimonEvent,
+	type SimonEventPayloads,
+	type SimonUiSnapshot
+} from './Events';
 import { SimonState } from './SimonTypes';
 
 export class RenderPipeline {
@@ -16,9 +20,11 @@ export class RenderPipeline {
 	render(): void {
 		const snapshot = this.buildSnapshot();
 		const key = this.createKey(snapshot);
+
 		if (key === this.lastKey) {
 			return;
 		}
+
 		this.lastKey = key;
 		this.events.emit(SimonEvent.UiSync, snapshot);
 	}
@@ -42,7 +48,14 @@ export class RenderPipeline {
 			orderPad: this.model.orderPad,
 			timerProgress: this.model.timerProgress,
 			statusText: this.model.statusText,
-			failureMessage: this.model.failureMessage
+			failureMessage: this.model.failureMessage,
+
+			mascotMood: this.model.mascotMood,
+			bossTag: this.model.bossTag,
+			flavorText: this.model.flavorText,
+			isBreak: this.model.isBreak,
+			ordersInLevel: this.model.ordersInLevel,
+			ordersPerLevel: this.model.ordersPerLevel
 		};
 	}
 
@@ -65,7 +78,14 @@ export class RenderPipeline {
 			snapshot.orderPad ?? 'null',
 			Math.round(snapshot.timerProgress * 1000),
 			snapshot.statusText,
-			snapshot.failureMessage ?? 'null'
+			snapshot.failureMessage ?? 'null',
+
+			snapshot.mascotMood,
+			snapshot.bossTag,
+			snapshot.flavorText,
+			String(snapshot.isBreak),
+			snapshot.ordersInLevel,
+			snapshot.ordersPerLevel
 		].join('|');
 	}
 }

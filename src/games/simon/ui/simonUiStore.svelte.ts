@@ -1,6 +1,15 @@
 import type { SimonUiSnapshot } from '../core/Events';
-import { SimonConsoleKind, type SimonConsoleKindId } from '../core/Events';
-import { SimonDifficulty, SimonFailureReason, SimonMode, SimonState } from '../core/SimonTypes';
+import {
+	SimonConsoleKind,
+	type SimonConsoleKindId,
+	type SimonMascotMood
+} from '../core/Events';
+import {
+	SimonDifficulty,
+	SimonFailureReason,
+	SimonMode,
+	SimonState
+} from '../core/SimonTypes';
 import type {
 	SimonDifficultyId,
 	SimonFailureReasonId,
@@ -18,6 +27,7 @@ export interface SimonConsoleLine {
 
 export class SimonUiStore {
 	ready = $state(false);
+
 	state = $state<SimonStateId>(SimonState.Boot);
 	difficulty = $state<SimonDifficultyId>(SimonDifficulty.Easy);
 	mode = $state<SimonModeId>(SimonMode.Orders);
@@ -31,6 +41,7 @@ export class SimonUiStore {
 
 	activePad = $state<SimonPadId | null>(null);
 	inputLocked = $state(true);
+
 	failureReason = $state<SimonFailureReasonId | null>(null);
 	failureMessage = $state<string | null>(null);
 
@@ -40,12 +51,21 @@ export class SimonUiStore {
 	timerProgress = $state(0);
 	statusMessage = $state('Готово');
 
+	mascotMood = $state<SimonMascotMood>('normal');
+	bossTag = $state('1С ГОВОРИТ');
+	flavorText = $state('');
+	isBreak = $state(false);
+
+	ordersInLevel = $state(0);
+	ordersPerLevel = $state(7);
+
 	lines = $state<SimonConsoleLine[]>([]);
 
 	private nextLineId = 1;
 
 	apply(snapshot: SimonUiSnapshot): void {
 		this.ready = true;
+
 		this.state = snapshot.state;
 		this.difficulty = snapshot.difficulty;
 		this.mode = snapshot.mode ?? SimonMode.Orders;
@@ -59,6 +79,7 @@ export class SimonUiStore {
 
 		this.activePad = snapshot.activePad;
 		this.inputLocked = snapshot.inputLocked;
+
 		this.failureReason = snapshot.failureReason;
 		this.failureMessage = snapshot.failureMessage ?? null;
 
@@ -67,10 +88,19 @@ export class SimonUiStore {
 		this.orderPad = snapshot.orderPad ?? null;
 		this.timerProgress = Math.max(0, Math.min(1, snapshot.timerProgress ?? 0));
 		this.statusMessage = snapshot.statusText ?? '';
+
+		this.mascotMood = snapshot.mascotMood ?? 'normal';
+		this.bossTag = snapshot.bossTag ?? '1С ГОВОРИТ';
+		this.flavorText = snapshot.flavorText ?? '';
+		this.isBreak = snapshot.isBreak ?? false;
+
+		this.ordersInLevel = snapshot.ordersInLevel ?? 0;
+		this.ordersPerLevel = snapshot.ordersPerLevel ?? 7;
 	}
 
 	reset(): void {
 		this.ready = false;
+
 		this.state = SimonState.Boot;
 		this.difficulty = SimonDifficulty.Easy;
 		this.mode = SimonMode.Orders;
@@ -84,6 +114,7 @@ export class SimonUiStore {
 
 		this.activePad = null;
 		this.inputLocked = true;
+
 		this.failureReason = null;
 		this.failureMessage = null;
 
@@ -92,6 +123,14 @@ export class SimonUiStore {
 		this.orderPad = null;
 		this.timerProgress = 0;
 		this.statusMessage = 'Готово';
+
+		this.mascotMood = 'normal';
+		this.bossTag = '1С ГОВОРИТ';
+		this.flavorText = '';
+		this.isBreak = false;
+
+		this.ordersInLevel = 0;
+		this.ordersPerLevel = 7;
 
 		this.lines = [];
 		this.nextLineId = 1;
@@ -123,7 +162,10 @@ export class SimonUiStore {
 			return;
 		}
 
-		this.addLine('Конфигурация «Симон говорит» загружена. Демо-режим.', SimonConsoleKind.Command);
+		this.addLine(
+			'Конфигурация «Симон говорит» загружена. Демо-режим.',
+			SimonConsoleKind.Command
+		);
 
 		this.addLine(
 			'Добро пожаловать, Стажёр. Вас заставят нажимать кнопки. Легально.',
@@ -160,11 +202,23 @@ export class SimonUiStore {
 	}
 
 	get canSkip(): boolean {
-		return this.isOrders && this.state === SimonState.OrdersAwaiting;
+		return (
+			this.isOrders &&
+			this.state === SimonState.OrdersAwaiting &&
+			!this.isBreak
+		);
 	}
 
 	get timerPercent(): number {
 		return Math.round(Math.max(0, Math.min(1, this.timerProgress)) * 100);
+	}
+
+	get comboHot(): boolean {
+		return this.combo >= 5;
+	}
+
+	get pipCount(): number {
+		return Math.max(0, Math.min(this.ordersPerLevel, this.ordersInLevel));
 	}
 
 	get statusText(): string {
@@ -188,7 +242,9 @@ export class SimonUiStore {
 			case SimonState.OrdersIssuing:
 				return 'Ожидание приказа…';
 			case SimonState.OrdersAwaiting:
-				return 'Ожидание реакции пользователя…';
+				return this.isBreak
+					? 'Перекур. Ничего не нажимайте…'
+					: 'Ожидание реакции пользователя…';
 			case SimonState.OrdersFeedback:
 				return 'Проведение документа…';
 			case SimonState.FailureOrders:
@@ -209,7 +265,6 @@ export class SimonUiStore {
 		switch (this.failureReason) {
 			case SimonFailureReason.WrongPad:
 				return 'Нарушена последовательность шагов обновления конфигурации.';
-
 			case SimonFailureReason.IncompleteSequence:
 				return 'Транзакция обновления завершена не полностью. База повреждена.';
 			case SimonFailureReason.Timeout:

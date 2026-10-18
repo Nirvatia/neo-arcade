@@ -12,7 +12,17 @@ export const SimonConsoleKind = {
 	Error: 'ERROR',
 	Command: 'COMMAND'
 } as const;
-export type SimonConsoleKindId = (typeof SimonConsoleKind)[keyof typeof SimonConsoleKind];
+
+export type SimonConsoleKindId =
+	(typeof SimonConsoleKind)[keyof typeof SimonConsoleKind];
+
+export type SimonMascotMood =
+	| 'normal'
+	| 'happy'
+	| 'shock'
+	| 'angry'
+	| 'coffee'
+	| 'shout';
 
 export const SimonEvent = {
 	UiSync: 'simon/ui-sync',
@@ -24,6 +34,7 @@ export const SimonEvent = {
 	OrderAccepted: 'simon/order-accepted',
 	OrderRejected: 'simon/order-rejected'
 } as const;
+
 export type SimonEventId = (typeof SimonEvent)[keyof typeof SimonEvent];
 
 export interface SimonUiSnapshot {
@@ -45,20 +56,37 @@ export interface SimonUiSnapshot {
 	timerProgress: number;
 	statusText: string;
 	failureMessage: string | null;
+
+	mascotMood: SimonMascotMood;
+	bossTag: string;
+	flavorText: string;
+	isBreak: boolean;
+	ordersInLevel: number;
+	ordersPerLevel: number;
 }
 
 export type SimonEventPayloads = {
 	[SimonEvent.UiSync]: SimonUiSnapshot;
-	[SimonEvent.ConsoleMessageReceived]: { text: string; kind: SimonConsoleKindId };
-	[SimonEvent.PadPressed]: { pad: SimonPadId };
-	[SimonEvent.PlaybackStepTriggered]: { pad: SimonPadId; round: number };
+	[SimonEvent.ConsoleMessageReceived]: {
+		text: string;
+		kind: SimonConsoleKindId;
+	};
+	[SimonEvent.PadPressed]: {
+		pad: SimonPadId;
+	};
+	[SimonEvent.PlaybackStepTriggered]: {
+		pad: SimonPadId;
+		round: number;
+	};
 	[SimonEvent.ClassicInputRejected]: {
 		round: number;
 		step: number;
 		pad: SimonPadId;
 		reason: SimonFailureReasonId;
 	};
-	[SimonEvent.InputSequenceCompleted]: { round: number };
+	[SimonEvent.InputSequenceCompleted]: {
+		round: number;
+	};
 	[SimonEvent.OrderAccepted]: {
 		round: number;
 		scoreDelta: number;

@@ -11,12 +11,14 @@ export const SimonState = {
 	FailureOrders: 'FAILURE_ORDERS',
 	FailureClassic: 'FAILURE_CLASSIC'
 } as const;
+
 export type SimonStateId = (typeof SimonState)[keyof typeof SimonState];
 
 export const SimonMode = {
 	Orders: 'ORDERS',
 	Classic: 'CLASSIC'
 } as const;
+
 export type SimonModeId = (typeof SimonMode)[keyof typeof SimonMode];
 
 export const SimonDifficulty = {
@@ -24,6 +26,7 @@ export const SimonDifficulty = {
 	Normal: 'NORMAL',
 	Hard: 'HARD'
 } as const;
+
 export type SimonDifficultyId = (typeof SimonDifficulty)[keyof typeof SimonDifficulty];
 
 export interface SimonDifficultySettings {
@@ -33,7 +36,9 @@ export interface SimonDifficultySettings {
 	postPatternDelayMs: number;
 }
 
-export const SimonDifficultySettings: Readonly<Record<SimonDifficultyId, SimonDifficultySettings>> = {
+export const SimonDifficultySettings: Readonly<
+	Record<SimonDifficultyId, SimonDifficultySettings>
+> = {
 	[SimonDifficulty.Easy]: {
 		startDelayMs: 1000,
 		stepIntervalMs: 1500,
@@ -60,8 +65,11 @@ export const SimonPad = {
 	Udalit: 'UDALIT',
 	Eshche: 'ESHCHE'
 } as const;
+
 export type SimonPadId = (typeof SimonPad)[keyof typeof SimonPad];
+
 export type SimonPadIndex = 0 | 1 | 2 | 3;
+
 export const SimonPadList = [
 	SimonPad.Provesti,
 	SimonPad.Zapisat,
@@ -75,6 +83,17 @@ export const SimonFailureReason = {
 	Timeout: 'TIMEOUT',
 	WrongOrderButton: 'WRONG_ORDER_BUTTON',
 	ExecutedForeignOrder: 'EXECUTED_FOREIGN_ORDER',
-	SkippedRequiredOrder: 'SKIPPED_REQUIRED_ORDER'
+	SkippedRequiredOrder: 'SKIPPED_REQUIRED_ORDER',
+	BreakViolation: 'BREAK_VIOLATION'
 } as const;
-export type SimonFailureReasonId = (typeof SimonFailureReason)[keyof typeof SimonFailureReason];
+
+export type SimonFailureReasonId =
+	(typeof SimonFailureReason)[keyof typeof SimonFailureReason];
+
+export type SimonMascotMood =
+	| 'normal'
+	| 'happy'
+	| 'shock'
+	| 'angry'
+	| 'coffee'
+	| 'shout';

@@ -4,6 +4,14 @@ import { SimonMode, SimonState, type SimonStateId } from '../SimonTypes';
 import { ClassicState } from './ClassicState';
 import { OrdersState } from './OrdersState';
 
+type MascotMood =
+	| 'normal'
+	| 'happy'
+	| 'shock'
+	| 'angry'
+	| 'coffee'
+	| 'shout';
+
 export class MenuState implements State {
 	private unsubStart: (() => void) | null = null;
 
@@ -15,10 +23,15 @@ export class MenuState implements State {
 
 	enter(ctx: StateContext): void {
 		this.model.resetRun();
+
+		this.setVisual('happy', '1С ГОВОРИТ', 'база сама себя не проведёт…');
+
 		this.model.activePad = null;
 		this.model.inputLocked = true;
+
 		this.model.failureReason = null;
 		this.model.failureMessage = null;
+
 		this.model.orderText = 'Нажмите «Начать смену», чтобы приступить.';
 		this.model.orderSay = false;
 		this.model.orderPad = null;
@@ -30,6 +43,7 @@ export class MenuState implements State {
 				ctx.director.setState(new OrdersState(this.model));
 				return;
 			}
+
 			ctx.director.setState(new ClassicState(this.model));
 		});
 	}
@@ -39,5 +53,23 @@ export class MenuState implements State {
 	exit(): void {
 		this.unsubStart?.();
 		this.unsubStart = null;
+	}
+
+	private setVisual(
+		mood: MascotMood,
+		bossTag: string,
+		flavorText: string
+	): void {
+		const visualModel = this.model as SimonModel & {
+			mascotMood?: MascotMood;
+			bossTag?: string;
+			flavorText?: string;
+			isBreak?: boolean;
+		};
+
+		visualModel.mascotMood = mood;
+		visualModel.bossTag = bossTag;
+		visualModel.flavorText = flavorText;
+		visualModel.isBreak = false;
 	}
 }

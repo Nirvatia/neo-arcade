@@ -4,20 +4,25 @@ import type {
 	SimonModeId,
 	SimonPadId
 } from '../core/SimonTypes';
+import type { SimonMascotMood } from '../core/Events';
 
 export class SimonModel {
 	mode: SimonModeId = 'ORDERS';
 	difficulty: SimonDifficultyId = 'EASY';
+
 	round = 1;
 	score = 0;
 	best = 0;
 	combo = 0;
 	lives = 3;
 	level = 1;
+
 	activePad: SimonPadId | null = null;
 	inputLocked = true;
+
 	failureReason: SimonFailureReasonId | null = null;
 	failureMessage: string | null = null;
+
 	orderText = 'Нажмите «Начать смену», чтобы приступить.';
 	orderSay = false;
 	orderPad: SimonPadId | null = null;
@@ -25,27 +30,46 @@ export class SimonModel {
 	statusText = 'Готово';
 	lastFeedbackMessage = '';
 
+	mascotMood: SimonMascotMood = 'normal';
+	bossTag = '1С ГОВОРИТ';
+	flavorText = '';
+	isBreak = false;
+
+	ordersInLevel = 0;
+	ordersPerLevel = 7;
+
 	resetRun(): void {
 		this.round = 1;
 		this.score = 0;
 		this.combo = 0;
 		this.lives = 3;
 		this.level = 1;
+
 		this.activePad = null;
 		this.inputLocked = true;
+
 		this.failureReason = null;
 		this.failureMessage = null;
+
 		this.orderText = '';
 		this.orderSay = false;
 		this.orderPad = null;
 		this.timerProgress = 0;
 		this.statusText = 'Готово';
 		this.lastFeedbackMessage = '';
+
+		this.mascotMood = 'normal';
+		this.bossTag = '1С ГОВОРИТ';
+		this.flavorText = '';
+		this.isBreak = false;
+
+		this.ordersInLevel = 0;
 	}
 
 	addScore(delta: number): void {
 		const safe = Number.isFinite(delta) && delta > 0 ? Math.floor(delta) : 0;
 		this.score += safe;
+
 		if (this.score > this.best) {
 			this.best = this.score;
 		}

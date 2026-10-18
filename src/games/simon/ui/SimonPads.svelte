@@ -8,7 +8,7 @@
 		readonly key: string;
 		readonly icon: string;
 		readonly label: string;
-		readonly note: string;
+		readonly aria: string;
 	}
 
 	const pads: readonly PadDef[] = [
@@ -17,197 +17,371 @@
 			tone: 'green',
 			key: '1',
 			icon: '✔',
-			label: 'Провести',
-			note: 'зелёная кнопка мечты'
+			label: 'ПРОВЕСТИ',
+			aria: 'Провести документ'
 		},
 		{
 			id: SimonPad.Zapisat,
 			tone: 'blue',
 			key: '2',
 			icon: '💾',
-			label: 'Записать',
-			note: 'сохранить и не думать'
+			label: 'ЗАПИСАТЬ',
+			aria: 'Записать базу'
 		},
 		{
 			id: SimonPad.Udalit,
 			tone: 'red',
 			key: '3',
 			icon: '✖',
-			label: 'Пометить на удаление',
-			note: 'красная — только по приказу!'
+			label: 'УДАЛИТЬ',
+			aria: 'Пометить на удаление'
 		},
 		{
 			id: SimonPad.Eshche,
 			tone: 'yellow',
 			key: '4',
-			icon: '☰',
-			label: 'Ещё…',
-			note: 'все остальные приказы'
+			icon: '⚡',
+			label: 'ЕЩЁ…',
+			aria: 'Ещё'
 		}
 	];
 
 	interface Props {
 		store: SimonUiStore;
 		onPress: (pad: SimonPadId) => void;
+		breakMode?: boolean;
 	}
 
-	let { store, onPress }: Props = $props();
+	let { store, onPress, breakMode = false }: Props = $props();
 </script>
 
-<div class="pad" data-locked={store.canInput ? 'false' : 'true'}>
-	{#each pads as pad (pad.id)}
-		<button
-			type="button"
-			class="pad-btn"
-			data-tone={pad.tone}
-			data-active={store.activePad === pad.id}
-			disabled={!store.canInput}
-			aria-label={pad.label}
-			onclick={() => onPress(pad.id)}
-		>
-			<span class="key">{pad.key}</span>
-			<span class="icon">{pad.icon}</span>
-			<span class="label">{pad.label}</span>
-			<small>{pad.note}</small>
-		</button>
-	{/each}
-</div>
+<section
+	class="panel"
+	data-locked={store.canInput ? 'false' : 'true'}
+	data-break={breakMode ? 'true' : 'false'}
+	aria-label="Пульт управления"
+>
+	<div class="panel-lights" aria-hidden="true"></div>
+
+	<span class="plate">▸ ПУЛЬТ УПРАВЛЕНИЯ БАЗОЙ ◂</span>
+
+	<div class="keys">
+		{#each pads as pad (pad.id)}
+			<button
+				type="button"
+				class="key"
+				data-tone={pad.tone}
+				data-active={store.activePad === pad.id}
+				disabled={!store.canInput}
+				aria-label={pad.aria}
+				onclick={() => onPress(pad.id)}
+			>
+				<span class="num">{pad.key}</span>
+				<span class="ico">{pad.icon}</span>
+				<span class="lbl">{pad.label}</span>
+
+				{#if breakMode}
+					<span class="break-tag">☕ НЕ ЖМИ</span>
+				{/if}
+			</button>
+		{/each}
+	</div>
+
+	<span class="screw tl" aria-hidden="true"></span>
+	<span class="screw tr" aria-hidden="true"></span>
+	<span class="screw bl" aria-hidden="true"></span>
+	<span class="screw br" aria-hidden="true"></span>
+</section>
 
 <style>
-	.pad {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 10px;
-		width: min(560px, 92vw);
-		flex: none;
-	}
+	.panel {
+		--deep: #0b071f;
+		--yellow: #ffd21f;
+		--ink: #1a1130;
+		--cyan: #39e6ff;
 
-	.pad[data-locked='true'] .pad-btn {
-		pointer-events: none;
-		cursor: not-allowed;
-	}
+		--font-pixel: 'Press Start 2P', monospace;
+		--font-display: 'Russo One', 'Arial Black', sans-serif;
+		--font-body: 'Rubik', system-ui, sans-serif;
 
-	.pad-btn {
 		position: relative;
-		min-height: 104px;
-		border: 2px solid;
+		width: min(760px, 96vw);
+		margin: 0 auto;
+		background: linear-gradient(180deg, #2c1f5c, #1a1140);
+		border: 5px solid var(--deep);
+		border-radius: 26px;
+		padding: 10px 18px 18px;
+		box-shadow:
+			0 14px 0 rgba(0, 0, 0, 0.4),
+			0 0 50px rgba(63, 139, 255, 0.12);
+		transform: perspective(1100px) rotateX(4deg);
+	}
+
+	.panel-lights {
+		height: 8px;
+		background-image: radial-gradient(
+			circle at 5px 5px,
+			rgba(255, 210, 31, 0.95) 3px,
+			rgba(255, 210, 31, 0.18) 4px,
+			transparent 5px
+		);
+		background-size: 24px 8px;
+		opacity: 0.8;
+		animation: simon-panel-bulbs 1s steps(2) infinite;
+	}
+
+	@keyframes simon-panel-bulbs {
+		0%,
+		49% {
+			opacity: 0.9;
+		}
+		50%,
+		100% {
+			opacity: 0.25;
+		}
+	}
+
+	.plate {
+		display: block;
+		width: max-content;
+		margin: 8px auto 12px;
+		font-family: var(--font-pixel);
+		font-size: 7px;
+		letter-spacing: 2px;
+		color: #9d8dff;
+		background: #120b2e;
+		border: 2px solid var(--deep);
 		border-radius: 8px;
-		font-family: inherit;
-		font-size: 18px;
-		font-weight: bold;
+		padding: 5px 12px;
+	}
+
+	.keys {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(112px, 176px));
+		justify-content: center;
+		gap: clamp(14px, 3vw, 26px);
+	}
+
+	.key {
+		position: relative;
+		width: 100%;
+		max-width: 150px;
+		aspect-ratio: 1;
+		border: 0;
+		border-radius: 50%;
+		display: grid;
+		place-items: center;
+		align-content: center;
+		gap: 4px;
+		font-family: var(--font-display);
+		font-weight: 800;
 		color: #fff;
 		cursor: pointer;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 3px;
+		text-shadow: 0 2px 0 rgba(0, 0, 0, 0.32);
+		background:
+			radial-gradient(
+				circle at 32% 24%,
+				rgba(255, 255, 255, 0.44),
+				rgba(255, 255, 255, 0) 34%
+			),
+			linear-gradient(180deg, var(--c1), var(--c2));
+		box-shadow:
+			0 14px 0 var(--ce),
+			0 26px 34px rgba(0, 0, 0, 0.42),
+			inset 0 8px 8px rgba(255, 255, 255, 0.28),
+			inset 0 -14px 20px rgba(0, 0, 0, 0.24);
 		transition:
-			filter 0.08s,
-			transform 0.08s;
-		text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+			transform 0.07s ease,
+			box-shadow 0.07s ease,
+			filter 0.16s ease;
 	}
 
-	.pad-btn small {
-		font-size: 11px;
-		font-weight: normal;
-		opacity: 0.85;
-		text-align: center;
-	}
-
-	.key {
+	.key::before {
+		content: '';
 		position: absolute;
-		top: 6px;
-		right: 8px;
-		font-size: 11px;
-		background: rgba(0, 0, 0, 0.25);
-		padding: 1px 6px;
-		border-radius: 3px;
+		left: 20%;
+		right: 20%;
+		top: 11%;
+		height: 24%;
+		border-radius: 999px;
+		background: linear-gradient(
+			rgba(255, 255, 255, 0.46),
+			rgba(255, 255, 255, 0)
+		);
+		pointer-events: none;
 	}
 
-	.icon {
-		font-size: 22px;
+	.key::after {
+		content: '';
+		position: absolute;
+		inset: 9px;
+		border-radius: 50%;
+		border: 2px solid rgba(255, 255, 255, 0.22);
+		box-shadow: inset 0 0 18px rgba(255, 255, 255, 0.12);
+		pointer-events: none;
 	}
 
-	.label {
-		text-align: center;
-		line-height: 1.15;
+	.key:hover:not(:disabled) {
+		transform: translateY(-3px) scale(1.015);
+		filter: brightness(1.08) saturate(1.08);
 	}
 
-	.pad-btn:hover:not(:disabled) {
-		filter: brightness(1.1);
+	.key:active:not(:disabled),
+	.key[data-active='true'] {
+		transform: translateY(9px);
+		box-shadow:
+			0 4px 0 var(--ce),
+			0 12px 16px rgba(0, 0, 0, 0.35),
+			inset 0 4px 6px rgba(255, 255, 255, 0.18);
 	}
 
-	.pad-btn:active:not(:disabled) {
-		transform: scale(0.98);
-	}
-
-	.pad-btn:disabled {
+	.key:disabled {
 		cursor: not-allowed;
-		filter: brightness(0.72) saturate(0.65);
 	}
 
-	.pad-btn[data-active='true'],
-	.pad-btn[data-active='true']:disabled {
-		filter: brightness(1.12) saturate(1.05);
-		transform: scale(1.01);
-		box-shadow: 0 0 18px rgba(255, 255, 255, 0.35);
+	.key:focus-visible {
+		outline: 4px dashed #fff;
+		outline-offset: 4px;
 	}
 
-	.pad-btn:focus-visible {
-		outline: 3px solid #ffd24d;
-		outline-offset: 2px;
+	.num {
+		position: absolute;
+		top: 8px;
+		right: 12px;
+		font-family: var(--font-pixel);
+		font-size: 8px;
+		line-height: 1;
+		padding: 3px 6px;
+		border-radius: 999px;
+		background: rgba(0, 0, 0, 0.25);
 	}
 
-	[data-tone='green'] {
-		background: linear-gradient(#3cb263, #2f9e4f);
-		border-color: #1f7a3a;
+	.ico {
+		font-size: clamp(22px, 3.8vh, 34px);
+		line-height: 1;
 	}
 
-	[data-tone='blue'] {
-		background: linear-gradient(#3f82d6, #2f6fbf);
-		border-color: #21548f;
+	.lbl {
+		font-size: clamp(13px, 1.9vw, 18px);
+		letter-spacing: 0.04em;
+		line-height: 1.1;
+		text-align: center;
+		padding: 0 8px;
 	}
 
-	[data-tone='red'] {
-		background: linear-gradient(#d5523f, #c0392b);
-		border-color: #8f2b20;
+	.key[data-tone='green'] {
+		--c1: #67f07a;
+		--c2: #1c9c40;
+		--ce: #0b5f24;
 	}
 
-	[data-tone='yellow'] {
-		background: linear-gradient(#e7ae2a, #d99a06);
-		border-color: #a87605;
+	.key[data-tone='blue'] {
+		--c1: #63a6ff;
+		--c2: #2f6fe0;
+		--ce: #173e93;
 	}
 
-@media (max-width: 820px) {
-	.pad {
-		width: 100%;
-		gap: 8px;
+	.key[data-tone='red'] {
+		--c1: #ff6a5e;
+		--c2: #e02f2f;
+		--ce: #8f1414;
 	}
 
-	.pad-btn {
-		min-height: 72px;
-		font-size: 14px;
-		gap: 2px;
+	.key[data-tone='yellow'] {
+		--c1: #ffd94d;
+		--c2: #ffab1f;
+		--ce: #a86a00;
+		color: #4a2c00;
+		text-shadow: 0 2px 0 rgba(255, 255, 255, 0.35);
 	}
 
-	.pad-btn small {
-		display: none;
+	.key[data-tone='yellow'] .num {
+		background: rgba(255, 255, 255, 0.35);
+		color: #4a2c00;
 	}
 
-	.key {
-		display: none;
+	.panel[data-locked='true'] .key:not([data-active='true']) {
+		filter: saturate(0.65) brightness(0.78);
 	}
 
-	.icon {
-		font-size: 18px;
+	.panel[data-break='true'] .key {
+		filter: saturate(0.35) brightness(0.6);
 	}
-}
 
-@media (max-width: 480px) {
-	.pad-btn {
-		min-height: 64px;
-		font-size: 13px;
+	.break-tag {
+		position: absolute;
+		left: 50%;
+		bottom: 6px;
+		transform: translateX(-50%) rotate(-4deg);
+		font-family: var(--font-body);
+		font-weight: 800;
+		font-size: 10px;
+		line-height: 1;
+		background: var(--yellow);
+		color: var(--ink);
+		border: 3px solid var(--ink);
+		border-radius: 8px;
+		padding: 2px 6px;
+		box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.4);
+		pointer-events: none;
 	}
-}
+
+	.screw {
+		position: absolute;
+		width: 12px;
+		height: 12px;
+		border-radius: 50%;
+		background: radial-gradient(circle at 35% 30%, #cfc8ff, #5a4d9e);
+		box-shadow: inset 0 -2px 2px rgba(0, 0, 0, 0.6);
+		pointer-events: none;
+	}
+
+	.screw.tl {
+		top: 10px;
+		left: 12px;
+	}
+
+	.screw.tr {
+		top: 10px;
+		right: 12px;
+	}
+
+	.screw.bl {
+		bottom: 10px;
+		left: 12px;
+	}
+
+	.screw.br {
+		bottom: 10px;
+		right: 12px;
+	}
+
+	@media (max-width: 760px) {
+		.panel {
+			transform: none;
+			padding: 8px 12px 14px;
+		}
+
+		.keys {
+			grid-template-columns: repeat(2, minmax(88px, 1fr));
+			gap: 12px;
+		}
+
+		.key {
+			max-width: 118px;
+		}
+
+		.ico {
+			font-size: 20px;
+		}
+
+		.lbl {
+			font-size: 11px;
+		}
+
+		.num {
+			top: 6px;
+			right: 8px;
+		}
+	}
 </style>

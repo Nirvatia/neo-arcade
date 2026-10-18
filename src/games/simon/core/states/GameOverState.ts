@@ -5,6 +5,14 @@ import { SimonConsoleKind, SimonEvent } from '../Events';
 import { SimonState, type SimonStateId } from '../SimonTypes';
 import { MenuState } from './MenuState';
 
+type MascotMood =
+	| 'normal'
+	| 'happy'
+	| 'shock'
+	| 'angry'
+	| 'coffee'
+	| 'shout';
+
 export class GameOverState implements State {
 	private unsubStart: (() => void) | null = null;
 	private unsubAck: (() => void) | null = null;
@@ -19,8 +27,11 @@ export class GameOverState implements State {
 		this.model.inputLocked = true;
 		this.model.activePad = null;
 		this.model.timerProgress = 0;
+
 		this.model.orderText = 'Сеанс завершён.';
 		this.model.statusText = 'Сеанс завершён из-за нарушений.';
+
+		this.setVisual('shock', 'БАЗА УПАЛА', 'смена окончена');
 
 		saveScore('simon', this.model.score);
 		this.persistBest();
@@ -33,6 +44,7 @@ export class GameOverState implements State {
 		this.unsubStart = ctx.input.onStart(() => {
 			ctx.director.setState(new MenuState(this.model));
 		});
+
 		this.unsubAck = ctx.input.onAcknowledge(() => {
 			ctx.director.setState(new MenuState(this.model));
 		});
@@ -43,6 +55,7 @@ export class GameOverState implements State {
 	exit(): void {
 		this.unsubStart?.();
 		this.unsubAck?.();
+
 		this.unsubStart = null;
 		this.unsubAck = null;
 	}
@@ -56,11 +69,30 @@ export class GameOverState implements State {
 			const current = window.localStorage.getItem('simon1c_best');
 			const parsed = current === null ? 0 : Number.parseInt(current, 10);
 			const existing = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+
 			if (this.model.best > existing) {
 				window.localStorage.setItem('simon1c_best', String(this.model.best));
 			}
 		} catch {
 			return;
 		}
+	}
+
+	private setVisual(
+		mood: MascotMood,
+		bossTag: string,
+		flavorText: string
+	): void {
+		const visualModel = this.model as SimonModel & {
+			mascotMood?: MascotMood;
+			bossTag?: string;
+			flavorText?: string;
+			isBreak?: boolean;
+		};
+
+		visualModel.mascotMood = mood;
+		visualModel.bossTag = bossTag;
+		visualModel.flavorText = flavorText;
+		visualModel.isBreak = false;
 	}
 }
