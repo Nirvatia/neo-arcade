@@ -24,6 +24,8 @@ export type SimonMascotMood =
 	| 'coffee'
 	| 'shout';
 
+export type SimonLotteryKind = 'life' | 'bonus500' | 'bonus200';
+
 export const SimonEvent = {
 	UiSync: 'simon/ui-sync',
 	ConsoleMessageReceived: 'simon/console-message-received',
@@ -47,6 +49,7 @@ export interface SimonUiSnapshot {
 	mode: SimonModeId;
 	score: number;
 	combo: number;
+	bestCombo: number;
 	lives: number;
 	level: number;
 	best: number;
@@ -56,13 +59,13 @@ export interface SimonUiSnapshot {
 	timerProgress: number;
 	statusText: string;
 	failureMessage: string | null;
-
 	mascotMood: SimonMascotMood;
 	bossTag: string;
 	flavorText: string;
 	isBreak: boolean;
 	ordersInLevel: number;
 	ordersPerLevel: number;
+	muted: boolean;
 }
 
 export type SimonEventPayloads = {
@@ -91,6 +94,9 @@ export type SimonEventPayloads = {
 		round: number;
 		scoreDelta: number;
 		message: string;
+		crit: boolean;
+		'break': boolean;
+		lottery: SimonLotteryKind | null;
 	};
 	[SimonEvent.OrderRejected]: {
 		round: number;

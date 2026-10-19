@@ -10,7 +10,6 @@
 
 <div class="mascot-box" data-mood={mood}>
 	<svg class="mascot" viewBox="0 0 200 210" aria-hidden="true">
-		<!-- тело -->
 		<rect
 			x="20"
 			y="20"
@@ -21,8 +20,6 @@
 			stroke="#1a1130"
 			stroke-width="8"
 		/>
-
-		<!-- блик сверху -->
 		<path
 			d="M38 42 q62 -18 124 0"
 			stroke="rgba(255,255,255,0.5)"
@@ -30,44 +27,34 @@
 			fill="none"
 			stroke-linecap="round"
 		/>
-
-		<!-- логотип -->
 		<text x="100" y="80" text-anchor="middle" class="logo">1С</text>
 
-		<!-- обычные глаза -->
 		<g class="eye-open">
 			<ellipse cx="70" cy="115" rx="18" ry="21" fill="#fff" stroke="#1a1130" stroke-width="5" />
 			<ellipse cx="130" cy="115" rx="18" ry="21" fill="#fff" stroke="#1a1130" stroke-width="5" />
-
 			<circle cx="74" cy="119" r="7" fill="#1a1130" />
 			<circle cx="126" cy="119" r="7" fill="#1a1130" />
-
 			<circle cx="77" cy="115" r="2.2" fill="#fff" />
 			<circle cx="129" cy="115" r="2.2" fill="#fff" />
 		</g>
 
-		<!-- счастливые глаза -->
 		<g class="eye-happy">
 			<path d="M54 116 q16 -18 32 0" stroke="#1a1130" stroke-width="6" fill="none" stroke-linecap="round" />
 			<path d="M114 116 q16 -18 32 0" stroke="#1a1130" stroke-width="6" fill="none" stroke-linecap="round" />
 		</g>
 
-		<!-- шокированные глаза -->
 		<g class="eye-shock">
 			<circle cx="70" cy="115" r="20" fill="#fff" stroke="#1a1130" stroke-width="5" />
 			<circle cx="130" cy="115" r="20" fill="#fff" stroke="#1a1130" stroke-width="5" />
-
 			<circle cx="70" cy="115" r="4.5" fill="#1a1130" />
 			<circle cx="130" cy="115" r="4.5" fill="#1a1130" />
 		</g>
 
-		<!-- злые брови -->
 		<g class="brows">
 			<path d="M48 94 l40 12" stroke="#1a1130" stroke-width="7" stroke-linecap="round" />
 			<path d="M152 94 l-40 12" stroke="#1a1130" stroke-width="7" stroke-linecap="round" />
 		</g>
 
-		<!-- улыбка -->
 		<g class="mouth-smile">
 			<path
 				d="M76 158 q24 18 48 0"
@@ -78,23 +65,19 @@
 			/>
 		</g>
 
-		<!-- крик -->
 		<g class="mouth-shout">
 			<ellipse cx="100" cy="164" rx="18" ry="13" fill="#7c1220" stroke="#1a1130" stroke-width="5" />
 			<ellipse cx="100" cy="170" rx="9" ry="4" fill="#ff6b6b" />
 		</g>
 
-		<!-- стиснутые зубы -->
 		<g class="mouth-grit">
 			<rect x="78" y="154" width="44" height="14" rx="5" fill="#fff" stroke="#1a1130" stroke-width="5" />
 			<path d="M78 161 h44 M92 154 v14 M106 154 v14" stroke="#1a1130" stroke-width="3" />
 		</g>
 
-		<!-- кофе -->
 		<g class="coffee-cup">
 			<path class="steam" d="M92 142 q4 -6 0 -12" />
 			<path class="steam steam-2" d="M108 142 q-4 -6 0 -12" />
-
 			<rect x="82" y="148" width="38" height="28" rx="7" fill="#fff" stroke="#1a1130" stroke-width="5" />
 			<path d="M120 154 q13 3 0 15" fill="none" stroke="#1a1130" stroke-width="5" />
 		</g>
@@ -154,7 +137,6 @@
 		}
 	}
 
-	/* normal */
 	.mascot-box[data-mood='normal'] .eye-open {
 		opacity: 1;
 	}
@@ -163,7 +145,6 @@
 		opacity: 1;
 	}
 
-	/* happy */
 	.mascot-box[data-mood='happy'] {
 		animation:
 			simon-mascot-hop 0.45s cubic-bezier(0.3, 1.8, 0.4, 1),
@@ -182,7 +163,6 @@
 		opacity: 1;
 	}
 
-	/* shout */
 	.mascot-box[data-mood='shout'] .mouth-smile {
 		opacity: 0;
 	}
@@ -191,7 +171,6 @@
 		opacity: 1;
 	}
 
-	/* shock */
 	.mascot-box[data-mood='shock'] {
 		animation:
 			simon-mascot-shock 0.4s ease,
@@ -214,7 +193,6 @@
 		opacity: 1;
 	}
 
-	/* angry */
 	.mascot-box[data-mood='angry'] {
 		animation:
 			simon-mascot-quake 0.4s ease,
@@ -233,7 +211,6 @@
 		opacity: 1;
 	}
 
-	/* coffee */
 	.mascot-box[data-mood='coffee'] .eye-open {
 		opacity: 0;
 	}

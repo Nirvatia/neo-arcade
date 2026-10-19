@@ -27,131 +27,108 @@ export interface SimonConsoleLine {
 
 export class SimonUiStore {
 	ready = $state(false);
-
 	state = $state<SimonStateId>(SimonState.Boot);
 	difficulty = $state<SimonDifficultyId>(SimonDifficulty.Easy);
 	mode = $state<SimonModeId>(SimonMode.Orders);
-
 	round = $state(0);
 	score = $state(0);
 	combo = $state(0);
+	bestCombo = $state(0);
 	level = $state(1);
 	lives = $state(3);
 	best = $state(0);
-
 	activePad = $state<SimonPadId | null>(null);
 	inputLocked = $state(true);
-
 	failureReason = $state<SimonFailureReasonId | null>(null);
 	failureMessage = $state<string | null>(null);
-
 	orderText = $state('Нажмите «Начать смену», чтобы приступить.');
 	orderSay = $state(false);
 	orderPad = $state<SimonPadId | null>(null);
 	timerProgress = $state(0);
 	statusMessage = $state('Готово');
-
 	mascotMood = $state<SimonMascotMood>('normal');
 	bossTag = $state('1С ГОВОРИТ');
 	flavorText = $state('');
 	isBreak = $state(false);
-
 	ordersInLevel = $state(0);
 	ordersPerLevel = $state(7);
-
+	muted = $state(false);
 	lines = $state<SimonConsoleLine[]>([]);
-
 	private nextLineId = 1;
 
 	apply(snapshot: SimonUiSnapshot): void {
 		this.ready = true;
-
 		this.state = snapshot.state;
 		this.difficulty = snapshot.difficulty;
 		this.mode = snapshot.mode ?? SimonMode.Orders;
-
 		this.round = snapshot.round;
 		this.score = snapshot.score;
 		this.combo = snapshot.combo ?? 0;
+		this.bestCombo = snapshot.bestCombo ?? 0;
 		this.level = snapshot.level ?? 1;
 		this.lives = snapshot.lives ?? 3;
 		this.best = snapshot.best ?? this.best;
-
 		this.activePad = snapshot.activePad;
 		this.inputLocked = snapshot.inputLocked;
-
 		this.failureReason = snapshot.failureReason;
 		this.failureMessage = snapshot.failureMessage ?? null;
-
 		this.orderText = snapshot.orderText ?? '';
 		this.orderSay = snapshot.orderSay ?? false;
 		this.orderPad = snapshot.orderPad ?? null;
 		this.timerProgress = Math.max(0, Math.min(1, snapshot.timerProgress ?? 0));
 		this.statusMessage = snapshot.statusText ?? '';
-
 		this.mascotMood = snapshot.mascotMood ?? 'normal';
 		this.bossTag = snapshot.bossTag ?? '1С ГОВОРИТ';
 		this.flavorText = snapshot.flavorText ?? '';
 		this.isBreak = snapshot.isBreak ?? false;
-
 		this.ordersInLevel = snapshot.ordersInLevel ?? 0;
 		this.ordersPerLevel = snapshot.ordersPerLevel ?? 7;
+		this.muted = snapshot.muted ?? false;
 	}
 
 	reset(): void {
 		this.ready = false;
-
 		this.state = SimonState.Boot;
 		this.difficulty = SimonDifficulty.Easy;
 		this.mode = SimonMode.Orders;
-
 		this.round = 0;
 		this.score = 0;
 		this.combo = 0;
+		this.bestCombo = 0;
 		this.level = 1;
 		this.lives = 3;
 		this.best = 0;
-
 		this.activePad = null;
 		this.inputLocked = true;
-
 		this.failureReason = null;
 		this.failureMessage = null;
-
 		this.orderText = 'Нажмите «Начать смену», чтобы приступить.';
 		this.orderSay = false;
 		this.orderPad = null;
 		this.timerProgress = 0;
 		this.statusMessage = 'Готово';
-
 		this.mascotMood = 'normal';
 		this.bossTag = '1С ГОВОРИТ';
 		this.flavorText = '';
 		this.isBreak = false;
-
 		this.ordersInLevel = 0;
 		this.ordersPerLevel = 7;
-
 		this.lines = [];
 		this.nextLineId = 1;
 	}
 
 	addLine(text: string, kind: SimonConsoleKindId): void {
 		const now = new Date();
-
 		const time = [now.getHours(), now.getMinutes(), now.getSeconds()]
 			.map((value) => String(value).padStart(2, '0'))
 			.join(':');
-
 		this.lines.push({
 			id: this.nextLineId,
 			time,
 			text,
 			kind
 		});
-
 		this.nextLineId += 1;
-
 		if (this.lines.length > 40) {
 			this.lines.shift();
 		}
@@ -161,12 +138,10 @@ export class SimonUiStore {
 		if (this.lines.length > 0) {
 			return;
 		}
-
 		this.addLine(
 			'Конфигурация «Симон говорит» загружена. Демо-режим.',
 			SimonConsoleKind.Command
 		);
-
 		this.addLine(
 			'Добро пожаловать, Стажёр. Вас заставят нажимать кнопки. Легально.',
 			SimonConsoleKind.Info
@@ -181,6 +156,10 @@ export class SimonUiStore {
 		return this.state === SimonState.GameOver;
 	}
 
+	get isPaused(): boolean {
+		return this.state === SimonState.Paused;
+	}
+
 	get isOrders(): boolean {
 		return this.mode === SimonMode.Orders;
 	}
@@ -190,10 +169,12 @@ export class SimonUiStore {
 	}
 
 	get canInput(): boolean {
+		if (this.isPaused) {
+			return false;
+		}
 		if (this.state === SimonState.OrdersAwaiting) {
 			return true;
 		}
-
 		return this.state === SimonState.AwaitingInput && !this.inputLocked;
 	}
 
@@ -205,7 +186,8 @@ export class SimonUiStore {
 		return (
 			this.isOrders &&
 			this.state === SimonState.OrdersAwaiting &&
-			!this.isBreak
+			!this.isBreak &&
+			!this.isPaused
 		);
 	}
 
@@ -225,12 +207,13 @@ export class SimonUiStore {
 		if (this.statusMessage.length > 0) {
 			return this.statusMessage;
 		}
-
 		switch (this.state) {
 			case SimonState.Boot:
 				return 'Инициализация внешней компоненты…';
 			case SimonState.Menu:
 				return 'Готово';
+			case SimonState.Paused:
+				return 'Пауза. 1С перезагружается…';
 			case SimonState.ShowingPattern:
 				return 'Воспроизведение…';
 			case SimonState.AwaitingInput:
@@ -261,7 +244,6 @@ export class SimonUiStore {
 		if (this.failureMessage && this.failureMessage.length > 0) {
 			return this.failureMessage;
 		}
-
 		switch (this.failureReason) {
 			case SimonFailureReason.WrongPad:
 				return 'Нарушена последовательность шагов обновления конфигурации.';
@@ -275,6 +257,8 @@ export class SimonUiStore {
 				return 'Вы выполнили приказ, которого 1С не давала.';
 			case SimonFailureReason.SkippedRequiredOrder:
 				return 'Вы проигнорировали прямой приказ 1С.';
+			case SimonFailureReason.BreakViolation:
+				return 'Сейчас перекур. Нажимать кнопки запрещено.';
 			default:
 				return 'Неизвестная ошибка внешней компоненты обновления.';
 		}

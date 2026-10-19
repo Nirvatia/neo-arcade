@@ -34,20 +34,15 @@ type OrdersPhaseId = (typeof OrdersPhase)[keyof typeof OrdersPhase];
 export class OrdersState implements State {
 	private phase: OrdersPhaseId = OrdersPhase.Issuing;
 	private order: SimonOrder | null = null;
-
 	private issueTimerMs = 0;
 	private elapsedMs = 0;
 	private feedbackTimerMs = 0;
-
 	private inputQueue: SimonPadId[] = [];
 	private skipRequested = false;
-
 	private breakActive = false;
 	private lastBreak = false;
-
 	private manualActivePad: SimonPadId | null = null;
 	private manualActiveTimerMs = 0;
-
 	private unsubPad: (() => void) | null = null;
 	private unsubSkip: (() => void) | null = null;
 	private unsubAck: (() => void) | null = null;
@@ -123,32 +118,31 @@ export class OrdersState implements State {
 		this.model.resetRun();
 		this.model.mode = SimonMode.Orders;
 		this.model.statusText = 'Сеанс активен. 1С наблюдает за вами.';
-
 		this.breakActive = false;
 		this.lastBreak = false;
-
 		this.emitConsole(
 			ctx,
 			'Смена начата. Ожидайте приказов от 1С…',
 			SimonConsoleKind.Command
 		);
-
 		this.beginIssuing();
 
 		this.unsubPad = ctx.input.onPadPress((pad) => {
 			this.handlePadPress(ctx, pad);
 		});
-
 		this.unsubSkip = ctx.input.onSkip(() => {
 			this.handleSkip();
 		});
-
 		this.unsubAck = ctx.input.onAcknowledge(() => {
 			this.handleAcknowledge(ctx);
 		});
 	}
 
 	update(ctx: StateContext): void {
+		if (this.model.paused) {
+			return;
+		}
+
 		this.updateManualActive(ctx.deltaMs);
 
 		switch (this.phase) {
@@ -170,7 +164,6 @@ export class OrdersState implements State {
 		this.unsubPad?.();
 		this.unsubSkip?.();
 		this.unsubAck?.();
-
 		this.unsubPad = null;
 		this.unsubSkip = null;
 		this.unsubAck = null;
@@ -179,31 +172,24 @@ export class OrdersState implements State {
 	private beginIssuing(): void {
 		this.phase = OrdersPhase.Issuing;
 		this.order = null;
-
 		this.issueTimerMs = 0;
 		this.elapsedMs = 0;
 		this.feedbackTimerMs = 0;
-
 		this.inputQueue = [];
 		this.skipRequested = false;
-
 		this.breakActive = false;
-
 		this.manualActivePad = null;
 		this.manualActiveTimerMs = 0;
 
 		this.model.inputLocked = true;
 		this.model.activePad = null;
-
 		this.model.orderText = 'Ожидание приказа…';
 		this.model.orderSay = false;
 		this.model.orderPad = null;
 		this.model.timerProgress = 0;
-
 		this.model.failureReason = null;
 		this.model.failureMessage = null;
 		this.model.statusText = 'Ожидание приказа…';
-
 		this.model.mascotMood = 'normal';
 		this.model.bossTag = 'ОЖИДАНИЕ';
 		this.model.flavorText = '';
@@ -212,7 +198,6 @@ export class OrdersState implements State {
 
 	private updateIssuing(ctx: StateContext): void {
 		this.issueTimerMs += ctx.deltaMs;
-
 		if (this.issueTimerMs >= 320) {
 			this.createOrder(ctx);
 		}
@@ -221,7 +206,6 @@ export class OrdersState implements State {
 	private createOrder(ctx: StateContext): void {
 		const wantBreak =
 			this.model.level >= 3 && !this.lastBreak && Math.random() < 0.16;
-
 		this.lastBreak = wantBreak;
 		this.breakActive = wantBreak;
 
@@ -229,7 +213,6 @@ export class OrdersState implements State {
 		this.elapsedMs = 0;
 		this.inputQueue = [];
 		this.skipRequested = false;
-
 		this.model.inputLocked = false;
 		this.model.failureReason = null;
 		this.model.failureMessage = null;
@@ -238,7 +221,6 @@ export class OrdersState implements State {
 		if (wantBreak) {
 			const reference = generateOrder(this.model.round, this.model.level);
 			const durationMs = reference.durationMs + 800;
-
 			this.order = {
 				pad: SimonPad.Eshche,
 				say: false,
@@ -248,25 +230,21 @@ export class OrdersState implements State {
 			this.model.orderSay = false;
 			this.model.orderPad = null;
 			this.model.timerProgress = 1;
-
 			this.model.orderText = 'ПЕРЕКУР! НИЧЕГО НЕ ЖМИ!';
 			this.model.mascotMood = 'coffee';
 			this.model.bossTag = '1С ГОВОРИТ';
 			this.model.flavorText = 'база на обслуживании… просто жди.';
 			this.model.isBreak = true;
-
 			this.emitConsole(
 				ctx,
 				'ПЕРЕКУР! Ничего не нажимайте.',
 				SimonConsoleKind.Command
 			);
-
 			return;
 		}
 
 		const order = generateOrder(this.model.round, this.model.level);
 		this.order = order;
-
 		this.model.orderSay = order.say;
 		this.model.orderPad = order.pad;
 		this.model.timerProgress = 1;
@@ -279,13 +257,11 @@ export class OrdersState implements State {
 			this.model.mascotMood = 'shout';
 			this.model.bossTag = this.pick(this.bossTags);
 			this.model.flavorText = this.pick(this.padFlavors[order.pad]);
-
 			this.emitConsole(
 				ctx,
 				`1С говорит: нажмите «${label}»!`,
 				SimonConsoleKind.Command
 			);
-
 			return;
 		}
 
@@ -293,7 +269,6 @@ export class OrdersState implements State {
 		this.model.mascotMood = 'shock';
 		this.model.bossTag = 'ПОСТОРОННИЙ ПРИКАЗ';
 		this.model.flavorText = this.pick(this.foreignFlavors);
-
 		this.emitConsole(
 			ctx,
 			`Посторонний приказ: «${label}»…`,
@@ -308,7 +283,6 @@ export class OrdersState implements State {
 		}
 
 		this.elapsedMs += ctx.deltaMs;
-
 		this.model.timerProgress = Math.max(
 			0,
 			1 - this.elapsedMs / this.order.durationMs
@@ -330,11 +304,9 @@ export class OrdersState implements State {
 
 		while (this.inputQueue.length > 0) {
 			const pad = this.inputQueue.shift();
-
 			if (pad === undefined) {
 				continue;
 			}
-
 			this.processReaction(ctx, pad);
 			return;
 		}
@@ -429,19 +401,16 @@ export class OrdersState implements State {
 			0,
 			1 - this.elapsedMs / this.order.durationMs
 		);
-
 		const crit = fraction > 0.62;
 
 		this.model.combo += 1;
 		this.model.bestCombo = Math.max(this.model.bestCombo, this.model.combo);
 
 		const multiplier = this.getComboMultiplier(this.model.combo);
-
 		const baseScore =
 			90 +
 			this.model.level * 10 +
 			Math.round(90 * fraction * (crit ? 2 : 1));
-
 		let scoreDelta = baseScore * multiplier;
 
 		let lottery: 'life' | 'bonus500' | 'bonus200' | null = null;
@@ -449,7 +418,6 @@ export class OrdersState implements State {
 
 		if (this.order.pad === SimonPad.Eshche) {
 			const roll = Math.random();
-
 			if (roll < 0.3 && this.model.lives < 3) {
 				this.model.lives += 1;
 				lottery = 'life';
@@ -466,16 +434,13 @@ export class OrdersState implements State {
 		}
 
 		this.model.addScore(scoreDelta);
-
 		this.model.ordersInLevel += 1;
 		this.checkLevelUp();
 
 		const feedback = lotteryMessage ?? message;
-
 		this.model.lastFeedbackMessage = feedback;
 		this.model.statusText = 'Документ проведён успешно.';
 		this.model.orderText = feedback;
-
 		this.model.mascotMood = 'happy';
 		this.model.bossTag = crit ? 'КРИТ!' : 'ДОКУМЕНТ ПРОВЕДЁН';
 		this.model.flavorText = lotteryMessage
@@ -483,7 +448,6 @@ export class OrdersState implements State {
 			: crit
 				? 'быстро проведено'
 				: this.pick(this.successFlavors);
-
 		this.model.inputLocked = true;
 		this.model.activePad = null;
 		this.model.timerProgress = 0;
@@ -491,7 +455,6 @@ export class OrdersState implements State {
 		this.breakActive = false;
 
 		this.emitConsole(ctx, feedback, SimonConsoleKind.Ok);
-
 		ctx.events.emit(SimonEvent.OrderAccepted, {
 			round: this.model.round,
 			scoreDelta,
@@ -506,25 +469,20 @@ export class OrdersState implements State {
 	}
 
 	private acceptForeignOrder(ctx: StateContext, message: string): void {
-		const scoreDelta =
-			20 + this.model.level * 5 + this.model.combo * 2;
+		const scoreDelta = 20 + this.model.level * 5 + this.model.combo * 2;
 
 		this.model.addScore(scoreDelta);
-
 		this.model.combo += 1;
 		this.model.bestCombo = Math.max(this.model.bestCombo, this.model.combo);
-
 		this.model.ordersInLevel += 1;
 		this.checkLevelUp();
 
 		this.model.lastFeedbackMessage = message;
 		this.model.statusText = 'Посторонняя команда отклонена.';
 		this.model.orderText = message;
-
 		this.model.mascotMood = 'happy';
 		this.model.bossTag = 'КОМАНДА ОТКЛОНЕНА';
 		this.model.flavorText = 'мимо кассы';
-
 		this.model.inputLocked = true;
 		this.model.activePad = null;
 		this.model.timerProgress = 0;
@@ -532,7 +490,6 @@ export class OrdersState implements State {
 		this.breakActive = false;
 
 		this.emitConsole(ctx, message, SimonConsoleKind.Ok);
-
 		ctx.events.emit(SimonEvent.OrderAccepted, {
 			round: this.model.round,
 			scoreDelta,
@@ -550,20 +507,16 @@ export class OrdersState implements State {
 		const scoreDelta = 120 * this.model.level;
 
 		this.model.addScore(scoreDelta);
-
 		this.model.ordersInLevel += 1;
 		this.checkLevelUp();
 
 		const message = `ПЕРЕКУР ЗАСЧИТАН +${scoreDelta} ☕`;
-
 		this.model.lastFeedbackMessage = message;
 		this.model.statusText = 'Перекур пережит.';
 		this.model.orderText = message;
-
 		this.model.mascotMood = 'happy';
 		this.model.bossTag = 'ПЕРЕКУР ЗАСЧИТАН';
 		this.model.flavorText = 'можно выдохнуть';
-
 		this.model.inputLocked = true;
 		this.model.activePad = null;
 		this.model.timerProgress = 0;
@@ -571,7 +524,6 @@ export class OrdersState implements State {
 		this.breakActive = false;
 
 		this.emitConsole(ctx, message, SimonConsoleKind.Ok);
-
 		ctx.events.emit(SimonEvent.OrderAccepted, {
 			round: this.model.round,
 			scoreDelta,
@@ -591,16 +543,13 @@ export class OrdersState implements State {
 		message: string
 	): void {
 		this.model.loseLife();
-
 		this.model.failureReason = reason;
 		this.model.failureMessage = message;
 		this.model.statusText = 'Ошибка. Подробности в журнале регистрации.';
 		this.model.orderText = message;
-
 		this.model.mascotMood = 'angry';
 		this.model.bossTag = 'ОШИБКА СМЕНЫ';
 		this.model.flavorText = '';
-
 		this.model.inputLocked = true;
 		this.model.activePad = null;
 		this.model.timerProgress = 0;
@@ -608,7 +557,6 @@ export class OrdersState implements State {
 		this.breakActive = false;
 
 		this.emitConsole(ctx, `ОШИБКА: ${message}`, SimonConsoleKind.Error);
-
 		ctx.events.emit(SimonEvent.OrderRejected, {
 			round: this.model.round,
 			reason,
@@ -625,7 +573,6 @@ export class OrdersState implements State {
 
 		this.model.ordersInLevel = 0;
 		this.model.level += 1;
-
 		this.model.bossTag = 'НОВЫЙ УРОВЕНЬ';
 		this.model.flavorText = 'приказы становятся бодрее';
 	}
@@ -634,25 +581,20 @@ export class OrdersState implements State {
 		if (combo >= 20) {
 			return 5;
 		}
-
 		if (combo >= 14) {
 			return 4;
 		}
-
 		if (combo >= 9) {
 			return 3;
 		}
-
 		if (combo >= 5) {
 			return 2;
 		}
-
 		return 1;
 	}
 
 	private updateFeedback(ctx: StateContext): void {
 		this.feedbackTimerMs += ctx.deltaMs;
-
 		if (this.feedbackTimerMs >= 720) {
 			this.model.round += 1;
 			this.beginIssuing();
@@ -660,6 +602,9 @@ export class OrdersState implements State {
 	}
 
 	private handlePadPress(ctx: StateContext, pad: SimonPadId): void {
+		if (this.model.paused) {
+			return;
+		}
 		if (this.phase !== OrdersPhase.Awaiting || this.model.inputLocked) {
 			return;
 		}
@@ -669,24 +614,27 @@ export class OrdersState implements State {
 		}
 
 		this.inputQueue.push(pad);
-
 		this.manualActivePad = pad;
 		this.manualActiveTimerMs = 0;
-
 		this.model.activePad = pad;
 
 		ctx.events.emit(SimonEvent.PadPressed, { pad });
 	}
 
 	private handleSkip(): void {
+		if (this.model.paused) {
+			return;
+		}
 		if (this.phase !== OrdersPhase.Awaiting) {
 			return;
 		}
-
 		this.skipRequested = true;
 	}
 
 	private handleAcknowledge(ctx: StateContext): void {
+		if (this.model.paused) {
+			return;
+		}
 		if (this.phase !== OrdersPhase.Failure) {
 			return;
 		}

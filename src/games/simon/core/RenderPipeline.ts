@@ -20,18 +20,19 @@ export class RenderPipeline {
 	render(): void {
 		const snapshot = this.buildSnapshot();
 		const key = this.createKey(snapshot);
-
 		if (key === this.lastKey) {
 			return;
 		}
-
 		this.lastKey = key;
 		this.events.emit(SimonEvent.UiSync, snapshot);
 	}
 
 	buildSnapshot(): SimonUiSnapshot {
+		const directorState =
+			this.director.getCurrentState()?.view ?? SimonState.Boot;
+
 		return {
-			state: this.director.getCurrentState()?.view ?? SimonState.Boot,
+			state: this.model.paused ? SimonState.Paused : directorState,
 			difficulty: this.model.difficulty,
 			round: this.model.round,
 			activePad: this.model.activePad,
@@ -40,6 +41,7 @@ export class RenderPipeline {
 			mode: this.model.mode,
 			score: this.model.score,
 			combo: this.model.combo,
+			bestCombo: this.model.bestCombo,
 			lives: this.model.lives,
 			level: this.model.level,
 			best: this.model.best,
@@ -49,13 +51,13 @@ export class RenderPipeline {
 			timerProgress: this.model.timerProgress,
 			statusText: this.model.statusText,
 			failureMessage: this.model.failureMessage,
-
 			mascotMood: this.model.mascotMood,
 			bossTag: this.model.bossTag,
 			flavorText: this.model.flavorText,
 			isBreak: this.model.isBreak,
 			ordersInLevel: this.model.ordersInLevel,
-			ordersPerLevel: this.model.ordersPerLevel
+			ordersPerLevel: this.model.ordersPerLevel,
+			muted: this.model.muted
 		};
 	}
 
@@ -67,6 +69,7 @@ export class RenderPipeline {
 			snapshot.round,
 			snapshot.score,
 			snapshot.combo,
+			snapshot.bestCombo,
 			snapshot.lives,
 			snapshot.level,
 			snapshot.best,
@@ -79,13 +82,13 @@ export class RenderPipeline {
 			Math.round(snapshot.timerProgress * 1000),
 			snapshot.statusText,
 			snapshot.failureMessage ?? 'null',
-
 			snapshot.mascotMood,
 			snapshot.bossTag,
 			snapshot.flavorText,
 			String(snapshot.isBreak),
 			snapshot.ordersInLevel,
-			snapshot.ordersPerLevel
+			snapshot.ordersPerLevel,
+			String(snapshot.muted)
 		].join('|');
 	}
 }

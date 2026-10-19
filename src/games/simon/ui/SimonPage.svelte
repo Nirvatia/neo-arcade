@@ -3,19 +3,12 @@
 	import { SimonGame } from '../core/GameMain';
 	import { SimonEvent } from '../core/Events';
 	import { SimonMode, SimonState, type SimonPadId } from '../core/SimonTypes';
+	import SimonBackground from './SimonBackground.svelte';
+	import SimonMascot from './SimonMascot.svelte';
 	import SimonPads from './SimonPads.svelte';
+	import SimonTicker from './SimonTicker.svelte';
 	import { SvelteSimonAdapter } from './SvelteSimonAdapter';
 	import { SimonUiStore } from './SimonUiStore.svelte';
-
-	type MascotMood =
-		| 'normal'
-		| 'happy'
-		| 'shock'
-		| 'angry'
-		| 'coffee'
-		| 'shout';
-
-	type LotteryKind = 'life' | 'bonus500' | 'bonus200' | null;
 
 	interface FxPop {
 		readonly id: number;
@@ -30,43 +23,18 @@
 		readonly sub: string;
 	}
 
-	interface OrderAcceptedFx {
-		readonly round: number;
-		readonly scoreDelta: number;
-		readonly message: string;
-		readonly crit?: boolean;
-		readonly break?: boolean;
-		readonly lottery?: LotteryKind;
-	}
-
-	interface VisualExtras {
-		mascotMood?: MascotMood;
-		bossTag?: string;
-		flavorText?: string;
-		isBreak?: boolean;
-		ordersInLevel?: number;
-		ordersPerLevel?: number;
-		pipCount?: number;
-		comboHot?: boolean;
-	}
-
 	const store = new SimonUiStore();
-	const ui = store as SimonUiStore & VisualExtras;
 
 	let game: SimonGame | null = null;
 	let host: HTMLDivElement | undefined = $state(undefined);
-
 	let shakeOn = $state(false);
 	let flashOn = $state(false);
-
 	let pops = $state<FxPop[]>([]);
 	let banner = $state<BannerFx | null>(null);
-
 	let nextFxId = 1;
 	let levelSeen = $state(1);
 	let lastLives = $state(3);
 	let burstIndex = $state(-1);
-
 	let bannerTimer: ReturnType<typeof setTimeout> | null = null;
 
 	onMount(() => {
@@ -76,20 +44,17 @@
 
 		const instance = new SimonGame();
 		const bridge = new SvelteSimonAdapter(instance, store);
-
 		game = instance;
 		bridge.connect();
 
-		const unsubAccepted = instance.on(SimonEvent.OrderAccepted, (raw) => {
-			const payload = raw as OrderAcceptedFx;
-
+		const unsubAccepted = instance.on(SimonEvent.OrderAccepted, (payload) => {
 			spawnPop(`+${payload.scoreDelta}`, payload.crit ? 'crit' : '');
 
 			if (payload.crit) {
 				spawnPop('КРИТ!', 'crit', 46);
 			}
 
-			if (payload.break) {
+			if (payload['break']) {
 				spawnPop('☕ ПЕРЕКУР ЗАСЧИТАН', 'life', 20);
 			}
 
@@ -111,11 +76,22 @@
 			spawnPop('ОШИБКА!', 'bad', 28);
 		});
 
+		const onKey = (event: KeyboardEvent): void => {
+			if (event.code !== 'KeyM' || event.repeat) {
+				return;
+			}
+			event.preventDefault();
+			toggleMute();
+		};
+
+		window.addEventListener('keydown', onKey);
+
 		void instance.init(host).catch((error: unknown) => {
-			console.error('[Simon] init failed', error);
+			console.error('[SimonPage] init failed', error);
 		});
 
 		return () => {
+			window.removeEventListener('keydown', onKey);
 			unsubAccepted();
 			unsubRejected();
 			bridge.disconnect();
@@ -145,7 +121,6 @@
 
 		if (lives < lastLives) {
 			burstIndex = lives;
-
 			setTimeout(() => {
 				burstIndex = -1;
 			}, 520);
@@ -160,130 +135,31 @@
 		store.state === SimonState.FailureOrders ||
 			store.state === SimonState.FailureClassic
 	);
-
 	const isMenu = $derived(store.state === SimonState.Menu);
 	const isGameOver = $derived(store.state === SimonState.GameOver);
+	const isPaused = $derived(store.state === SimonState.Paused);
 	const isOrders = $derived(store.mode === SimonMode.Orders);
-
-	const fallbackMascotMood = $derived.by((): MascotMood => {
-		if (failureVisible) {
-			return 'angry';
-		}
-
-		if (isGameOver) {
-			return 'shock';
-		}
-
-		if (isMenu) {
-			return 'happy';
-		}
-
-		if (
-			store.state === SimonState.OrdersFeedback ||
-			store.state === SimonState.RoundTransition
-		) {
-			return 'happy';
-		}
-
-		if (
-			store.state === SimonState.OrdersAwaiting ||
-			store.state === SimonState.AwaitingInput
-		) {
-			return 'shout';
-		}
-
-		return 'normal';
-	});
-
-	const mascotMood = $derived(ui.mascotMood ?? fallbackMascotMood);
-
-	const fallbackBossTag = $derived.by((): string => {
-		if (failureVisible) {
-			return 'ОШИБКА СМЕНЫ';
-		}
-
-		if (isGameOver) {
-			return 'БАЗА УПАЛА';
-		}
-
-		if (isMenu) {
-			return '1С ГОВОРИТ';
-		}
-
-		if (isOrders) {
-			if (store.state === SimonState.OrdersAwaiting) {
-				return store.orderSay ? '1С ПРИКАЗЫВАЕТ' : 'ПОСТОРОННИЙ ПРИКАЗ';
-			}
-
-			if (store.state === SimonState.OrdersFeedback) {
-				return 'ДОКУМЕНТ ПРОВЕДЁН';
-			}
-
-			return 'ОЖИДАНИЕ';
-		}
-
-		if (store.state === SimonState.AwaitingInput) {
-			return 'СИМОН ГОВОРИТ';
-		}
-
-		if (store.state === SimonState.RoundTransition) {
-			return 'ПАКЕТ ПРОВЕДЁН';
-		}
-
-		return 'СИМОН ГОВОРИТ';
-	});
-
-	const bossTag = $derived(ui.bossTag ?? fallbackBossTag);
-
-	const fallbackFlavorText = $derived.by((): string => {
-		if (isMenu) {
-			return 'база сама себя не проведёт…';
-		}
-
-		if (failureVisible) {
-			return 'три нарушения — и смена окончена';
-		}
-
-		if (isGameOver) {
-			return 'смена окончена';
-		}
-
-		if (isOrders && store.state === SimonState.OrdersAwaiting && !store.orderSay) {
-			return 'это не от 1С — лучше пропустить';
-		}
-
-		if (store.state === SimonState.AwaitingInput) {
-			return 'твой ход';
-		}
-
-		return '';
-	});
-
-	const flavorText = $derived(ui.flavorText ?? fallbackFlavorText);
-
-	const isBreak = $derived(ui.isBreak ?? false);
-
-	const ordersPerLevel = $derived(ui.ordersPerLevel ?? 7);
-
-	const fallbackPipCount = $derived(
-		Math.max(0, (Math.max(1, store.round) - 1) % ordersPerLevel)
-	);
-
-	const pipCount = $derived(ui.pipCount ?? fallbackPipCount);
-
+	const mascotMood = $derived(store.mascotMood);
+	const bossTag = $derived(store.bossTag);
+	const flavorText = $derived(store.flavorText);
+	const isBreak = $derived(store.isBreak);
+	const ordersPerLevel = $derived(store.ordersPerLevel);
+	const pipCount = $derived(store.pipCount);
 	const pips = $derived(
 		Array.from({ length: ordersPerLevel }, (_, index) => index < pipCount)
 	);
-
-	const comboHot = $derived(ui.comboHot ?? store.combo >= 5);
-
+	const comboHot = $derived(store.comboHot);
+	const muted = $derived(store.muted);
 	const canSkip = $derived(
-		isOrders && store.state === SimonState.OrdersAwaiting && !isBreak
+		isOrders &&
+			store.state === SimonState.OrdersAwaiting &&
+			!isBreak &&
+			!isPaused
 	);
-
-	const showSkip = $derived(isOrders && !isMenu && !isGameOver && !isBreak);
-	const showAbort = $derived(!isMenu && !isGameOver);
-
+	const showSkip = $derived(
+		isOrders && !isMenu && !isGameOver && !isBreak && !isPaused
+	);
+	const showAbort = $derived(!isMenu && !isGameOver && !isPaused);
 	const newRecord = $derived(
 		store.isGameOver && store.score > 0 && store.score >= store.best
 	);
@@ -325,7 +201,6 @@
 
 	function spawnPop(text: string, cls = '', offset = 0): void {
 		const id = nextFxId++;
-
 		pops = [...pops, { id, text, cls, offset }];
 
 		setTimeout(() => {
@@ -366,6 +241,10 @@
 		game?.pressPad(pad);
 	}
 
+	function toggleMute(): void {
+		game?.toggleMute();
+	}
+
 	function startOrders(): void {
 		game?.requestStartMode(SimonMode.Orders);
 	}
@@ -380,6 +259,10 @@
 
 	function acknowledgeFailure(): void {
 		game?.acknowledgeFailure();
+	}
+
+	function resume(): void {
+		game?.resume();
 	}
 
 	function restartToMenu(): void {
@@ -397,139 +280,19 @@
 </script>
 
 <div class="simon-arcade" class:shake={shakeOn}>
-	<div class="bg-grid" aria-hidden="true"></div>
-
-	<div class="doodles" aria-hidden="true">
-		<div class="doodle paper hide-m" style="left: 2.5%; top: 16%;">
-			<h4>НАКЛАДНАЯ №42</h4>
-			<div class="lines"></div>
-			<div class="stamp">ОПЛАЧЕНО</div>
-		</div>
-
-		<div
-			class="doodle paper hide-l"
-			style="right: 3%; bottom: 9%; --r: 8deg; animation-delay: -3s;"
-		>
-			<h4>АКТ ССЫК-3</h4>
-			<div class="lines"></div>
-			<div class="stamp stamp-blue">СРОЧНО!</div>
-		</div>
-
-		<div class="doodle sticky sticky-yellow hide-m" style="left: 15%; top: 6%; animation-delay: -1s;">
-			почини принтер!!1
-		</div>
-
-		<div class="doodle sticky sticky-pink hide-l" style="right: 16%; top: 12%; animation-delay: -2.4s;">
-			пароль: 123456
-		</div>
-
-		<div class="doodle sticky sticky-green hide-l" style="left: 5%; bottom: 22%; animation-delay: -4s;">
-			дедлайн БЫЛ вчера
-		</div>
-
-		<div class="doodle db hide-l" style="left: 6%; bottom: 5%;">
-			<div class="db-lid"></div>
-			<div class="db-body">
-				<b>БАЗА 1С</b>
-				<small>v8.3 НЕ ТРОГАТЬ</small>
-			</div>
-			<span class="crack">⚡</span>
-		</div>
-
-		<div class="doodle coffee hide-l" style="right: 5%; top: 30%;">
-			<svg width="102" height="90" viewBox="0 0 102 90">
-				<g class="steam">
-					<path
-						d="M39 24 q5 -7 0 -14"
-						stroke="#fff"
-						stroke-width="4"
-						fill="none"
-						stroke-linecap="round"
-						opacity=".7"
-					/>
-					<path
-						d="M56 24 q-5 -7 0 -14"
-						stroke="#fff"
-						stroke-width="4"
-						fill="none"
-						stroke-linecap="round"
-						opacity=".7"
-					/>
-				</g>
-
-				<path d="M76 42 q18 6 0 22" fill="none" stroke="#1b1235" stroke-width="7" />
-				<rect x="16" y="33" width="60" height="44" rx="10" fill="#fff" stroke="#1b1235" stroke-width="6" />
-				<path d="M22 43 h48" stroke="#8b5a2b" stroke-width="7" stroke-linecap="round" />
-				<text
-					x="46"
-					y="68"
-					text-anchor="middle"
-					font-size="14"
-					fill="#e8352b"
-					font-family="Russo One, sans-serif"
-				>
-					1С
-				</text>
-			</svg>
-			<small>кофе = жизнь</small>
-		</div>
-
-		<div class="doodle errwin hide-l" style="left: 14%; bottom: 34%; animation-delay: -2s;">
-			<div class="bar">
-				ОШИБКА 0x1C
-				<i>✖</i>
-			</div>
-			<div class="txt">
-				Что-то пошло не так.<br />
-				Как всегда, впрочем.
-			</div>
-			<div class="btns">
-				<span>Закрыть</span>
-				<span>Закрыть всё</span>
-			</div>
-		</div>
-
-		<div class="doodle neon hide-m" style="left: 38%; top: 3%;">
-			ООО «РОМАШКА»
-		</div>
-
-		<div class="doodle duck hide-l" style="right: 32%; bottom: 20%;">
-			<svg width="58" height="52" viewBox="0 0 64 56">
-				<ellipse cx="30" cy="40" rx="24" ry="14" fill="#ffd21f" stroke="#1b1235" stroke-width="5" />
-				<circle cx="46" cy="20" r="13" fill="#ffd21f" stroke="#1b1235" stroke-width="5" />
-				<path d="M58 20 h9 l-9 6 z" fill="#ff8c1a" stroke="#1b1235" stroke-width="4" stroke-linejoin="round" />
-				<circle cx="49" cy="17" r="2.4" fill="#1b1235" />
-			</svg>
-			<small>ОТЛАДЧИК</small>
-		</div>
-
-		<span class="doodle codebit" style="left: 28%; bottom: 12%;">
-			Если Правда Тогда КонецЕсли;
-		</span>
-
-		<span class="doodle codebit hide-l" style="right: 20%; top: 24%; animation-delay: -6s;">
-			Запрос.Выполнить();
-		</span>
-
-		<span class="doodle codebit hide-m" style="left: 8%; top: 44%; animation-delay: -3s;">
-			&amp;НаКлиентеНаСервере
-		</span>
-	</div>
+	<SimonBackground />
 
 	<div class="game-shell" bind:this={host}>
 		<header class="marquee">
 			<div class="lights" aria-hidden="true"></div>
-
 			<div class="title-row">
 				<span class="star">★</span>
 				<h1>1С: <em>ПОГРОМИСТ</em></h1>
 				<span class="star">★</span>
 			</div>
-
 			<p class="subtitle">
 				СИМОН ГОВОРИТ: ПОГРОМИСТА ★ АРКАДНЫЙ РЕЖИМ ★ СМЕНА №8
 			</p>
-
 			<div class="lights" aria-hidden="true"></div>
 		</header>
 
@@ -552,7 +315,6 @@
 			<div class="chip">
 				<span class="chip-label">УРОВЕНЬ</span>
 				<b>{store.level}</b>
-
 				{#if isOrders}
 					<div class="pips">
 						{#each pips as lit, index (index)}
@@ -590,119 +352,38 @@
 					{/each}
 				</div>
 			</div>
+
+			<div class="chip sound-chip">
+				<span class="chip-label">ЗВУК</span>
+				<button
+					type="button"
+					class="sound-btn"
+					class:off={muted}
+					aria-pressed={muted}
+					title="Звук (M)"
+					onclick={toggleMute}
+				>
+					{muted ? '🔇' : '🔊'}
+				</button>
+			</div>
 		</section>
 
 		<section class="stage">
 			<div class="stage-row">
-				<div class="mascot-box" data-mood={mascotMood}>
-					<svg class="mascot" viewBox="0 0 200 210" aria-hidden="true">
-						<rect
-							x="20"
-							y="20"
-							width="160"
-							height="170"
-							rx="34"
-							fill="#ffd21f"
-							stroke="#1a1130"
-							stroke-width="8"
-						/>
-
-						<path
-							d="M38 42 q62 -18 124 0"
-							stroke="rgba(255,255,255,0.5)"
-							stroke-width="8"
-							fill="none"
-							stroke-linecap="round"
-						/>
-
-						<text x="100" y="80" text-anchor="middle" class="logo">1С</text>
-
-						<g class="eye-open">
-							<ellipse cx="70" cy="115" rx="18" ry="21" fill="#fff" stroke="#1a1130" stroke-width="5" />
-							<ellipse cx="130" cy="115" rx="18" ry="21" fill="#fff" stroke="#1a1130" stroke-width="5" />
-
-							<circle cx="74" cy="119" r="7" fill="#1a1130" />
-							<circle cx="126" cy="119" r="7" fill="#1a1130" />
-
-							<circle cx="77" cy="115" r="2.2" fill="#fff" />
-							<circle cx="129" cy="115" r="2.2" fill="#fff" />
-						</g>
-
-						<g class="eye-happy">
-							<path
-								d="M54 116 q16 -18 32 0"
-								stroke="#1a1130"
-								stroke-width="6"
-								fill="none"
-								stroke-linecap="round"
-							/>
-							<path
-								d="M114 116 q16 -18 32 0"
-								stroke="#1a1130"
-								stroke-width="6"
-								fill="none"
-								stroke-linecap="round"
-							/>
-						</g>
-
-						<g class="eye-shock">
-							<circle cx="70" cy="115" r="20" fill="#fff" stroke="#1a1130" stroke-width="5" />
-							<circle cx="130" cy="115" r="20" fill="#fff" stroke="#1a1130" stroke-width="5" />
-
-							<circle cx="70" cy="115" r="4.5" fill="#1a1130" />
-							<circle cx="130" cy="115" r="4.5" fill="#1a1130" />
-						</g>
-
-						<g class="brows">
-							<path d="M48 94 l40 12" stroke="#1a1130" stroke-width="7" stroke-linecap="round" />
-							<path d="M152 94 l-40 12" stroke="#1a1130" stroke-width="7" stroke-linecap="round" />
-						</g>
-
-						<g class="mouth-smile">
-							<path
-								d="M76 158 q24 18 48 0"
-								fill="none"
-								stroke="#1a1130"
-								stroke-width="6"
-								stroke-linecap="round"
-							/>
-						</g>
-
-						<g class="mouth-shout">
-							<ellipse cx="100" cy="164" rx="18" ry="13" fill="#7c1220" stroke="#1a1130" stroke-width="5" />
-							<ellipse cx="100" cy="170" rx="9" ry="4" fill="#ff6b6b" />
-						</g>
-
-						<g class="mouth-grit">
-							<rect x="78" y="154" width="44" height="14" rx="5" fill="#fff" stroke="#1a1130" stroke-width="5" />
-							<path d="M78 161 h44 M92 154 v14 M106 154 v14" stroke="#1a1130" stroke-width="3" />
-						</g>
-
-						<g class="coffee-cup">
-							<path class="steam" d="M92 142 q4 -6 0 -12" />
-							<path class="steam steam-2" d="M108 142 q-4 -6 0 -12" />
-
-							<rect x="82" y="148" width="38" height="28" rx="7" fill="#fff" stroke="#1a1130" stroke-width="5" />
-							<path d="M120 154 q13 3 0 15" fill="none" stroke="#1a1130" stroke-width="5" />
-						</g>
-					</svg>
-				</div>
+				<SimonMascot mood={mascotMood} />
 
 				<div class="speech">
 					<span class="boss-tag">
 						{bossTag}
 					</span>
-
 					<div class="order-text">
 						{store.orderText || 'Ожидание приказа…'}
 					</div>
-
 					{#if flavorText}
 						<div class="order-flavor">
 							{flavorText}
 						</div>
 					{/if}
-
 					<div class="timer">
 						<i
 							class:low={store.timerPercent <= 28}
@@ -743,23 +424,7 @@
 			</div>
 		</section>
 
-		<footer class="ticker" aria-hidden="true">
-			<div class="ticker-track">
-				<span>
-					СРОЧНО: база снова легла отдохнуть ★ обновление конфигурации перенесено на никогда ★
-					кофе закончился в 14:45 ★ найдена кнопка «сделать хорошо» — НЕ НАЖИМАТЬ ★
-					главбух требует отчёт ещё вчера ★ резиновая утка признана лучшим отладчиком года ★
-					клиент «ничего не менял» ★
-				</span>
-
-				<span>
-					СРОЧНО: база снова легла отдохнуть ★ обновление конфигурации перенесено на никогда ★
-					кофе закончился в 14:45 ★ найдена кнопка «сделать хорошо» — НЕ НАЖИМАТЬ ★
-					главбух требует отчёт ещё вчера ★ резиновая утка признана лучшим отладчиком года ★
-					клиент «ничего не менял» ★
-				</span>
-			</div>
-		</footer>
+		<SimonTicker />
 	</div>
 
 	<div class="scan" aria-hidden="true"></div>
@@ -784,16 +449,18 @@
 					<li>☕ Приказ «ПЕРЕКУР» — не жми ничего. Просто дыши.</li>
 					<li>⚡ Кнопка «ЕЩЁ…» — лотерея: может выпасть жизнь или премия.</li>
 					<li>🔥 Комбо растёт — очки множатся до ×5. Быстрый ответ = КРИТ!</li>
-					<li>⌨️ Клавиши 1–4 тоже работают. 3 жизни — и смена окончена.</li>
+					<li>⌨️ Клавиши 1–4 работают. ESC — пауза, M — звук. 3 жизни — и смена окончена.</li>
 				</ul>
 
 				<div class="card-actions">
 					<button type="button" class="bigbtn green" onclick={startOrders}>
 						▶ ПРИКАЗЫ
 					</button>
-
 					<button type="button" class="bigbtn blue" onclick={startClassic}>
 						🧠 КЛАССИКА
+					</button>
+					<button type="button" class="bigbtn dark" onclick={toggleMute}>
+						{muted ? '🔇 ЗВУК ВЫКЛ' : '🔊 ЗВУК ВКЛ'}
 					</button>
 				</div>
 
@@ -815,7 +482,6 @@
 					<button type="button" class="bigbtn green" onclick={acknowledgeFailure}>
 						ОК
 					</button>
-
 					<button type="button" class="bigbtn red" onclick={restartToMenu}>
 						ЗАВЕРШИТЬ СМЕНУ
 					</button>
@@ -827,7 +493,7 @@
 	{#if isGameOver}
 		<div class="overlay">
 			<div class="card error">
-				<h2>БАЗА УПААЛА 💥</h2>
+				<h2>БАЗА УПАЛА 💥</h2>
 				<p class="tag">СМЕНА ОКОНЧЕНА</p>
 
 				{#if newRecord}
@@ -843,12 +509,10 @@
 						<span class="stat-label">УРОВЕНЬ</span>
 						<b>{store.level}</b>
 					</div>
-
 					<div>
-						<span class="stat-label">КОМБО</span>
-						<b>×{store.combo}</b>
+						<span class="stat-label">ЛУЧШЕЕ КОМБО</span>
+						<b>×{store.bestCombo}</b>
 					</div>
-
 					<div>
 						<span class="stat-label">РЕКОРД</span>
 						<b>{store.best}</b>
@@ -858,7 +522,6 @@
 				<div class="rank">
 					{rank.name}
 				</div>
-
 				<div class="rank-quip">
 					{rank.quip}
 				</div>
@@ -867,11 +530,33 @@
 					<button type="button" class="bigbtn green" onclick={restartAndStart}>
 						↻ ЕЩЁ РАЗ
 					</button>
-
 					<button type="button" class="bigbtn blue" onclick={restartToMenu}>
 						МЕНЮ
 					</button>
 				</div>
+			</div>
+		</div>
+	{/if}
+
+	{#if isPaused}
+		<div class="overlay">
+			<div class="card">
+				<h2>ПАУЗА</h2>
+				<p class="tag">1С ПЕРЕЗАГРУЖАЕТСЯ… ПОДОЖДИТЕ</p>
+
+				<div class="card-actions">
+					<button type="button" class="bigbtn green" onclick={resume}>
+						▶ ПРОДОЛЖИТЬ
+					</button>
+					<button type="button" class="bigbtn blue" onclick={restartToMenu}>
+						МЕНЮ
+					</button>
+					<button type="button" class="bigbtn dark" onclick={toggleMute}>
+						{muted ? '🔇 ЗВУК ВЫКЛ' : '🔊 ЗВУК ВКЛ'}
+					</button>
+				</div>
+
+				<p class="hint">ESC — ПАУЗА / ПРОДОЛЖИТЬ ★ M — ЗВУК</p>
 			</div>
 		</div>
 	{/if}
@@ -896,7 +581,6 @@
 		--cyan: #39e6ff;
 		--pink: #ff5fa2;
 		--orange: #ffab1f;
-
 		--font-display: 'Russo One', 'Arial Black', sans-serif;
 		--font-body: 'Rubik', system-ui, sans-serif;
 		--font-pixel: 'Press Start 2P', monospace;
@@ -907,11 +591,8 @@
 		overflow: hidden;
 		color: #fff;
 		font-family: var(--font-body);
-		background:
-			radial-gradient(1000px 620px at 76% -8%, rgba(255, 140, 60, 0.16), transparent 60%),
-			radial-gradient(880px 620px at 6% 104%, rgba(57, 230, 255, 0.12), transparent 62%),
-			radial-gradient(900px 700px at 94% 92%, rgba(255, 95, 162, 0.13), transparent 55%),
-			linear-gradient(180deg, #1c1246, #130b2e 58%, #0d0822);
+		user-select: none;
+		background: linear-gradient(180deg, #1c1246, #130b2e 58%, #0d0822);
 	}
 
 	.simon-arcade.shake {
@@ -940,28 +621,12 @@
 		}
 	}
 
-	.bg-grid,
-	.doodles,
 	.scan,
 	.vig,
 	.flash {
 		position: absolute;
 		inset: 0;
 		pointer-events: none;
-	}
-
-	.bg-grid {
-		z-index: 0;
-		background-image:
-			linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-			linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-		background-size: 46px 46px;
-		opacity: 0.8;
-	}
-
-	.doodles {
-		z-index: 1;
-		overflow: hidden;
 	}
 
 	.scan {
@@ -993,330 +658,6 @@
 	.flash.on {
 		opacity: 1;
 		transition: opacity 0s;
-	}
-
-	.doodle {
-		position: absolute;
-		filter: drop-shadow(5px 7px 0 rgba(0, 0, 0, 0.26));
-		animation: simon-bob 7s ease-in-out infinite;
-	}
-
-	@keyframes simon-bob {
-		0%,
-		100% {
-			transform: translateY(0) rotate(var(--r, 0deg));
-		}
-		50% {
-			transform: translateY(-12px) rotate(var(--r, 0deg));
-		}
-	}
-
-	.paper {
-		width: 132px;
-		height: 170px;
-		background: #fff8e8;
-		border: 4px solid #1b1235;
-		border-radius: 8px;
-		padding: 12px;
-		--r: -8deg;
-	}
-
-	.paper h4 {
-		font-family: var(--font-pixel);
-		font-size: 7px;
-		letter-spacing: 0.12em;
-		color: #5b4bb0;
-	}
-
-	.paper .lines {
-		margin-top: 8px;
-		height: 84px;
-		background: repeating-linear-gradient(
-			180deg,
-			#cdc5ee 0 2px,
-			transparent 2px 11px
-		);
-	}
-
-	.paper .stamp {
-		position: absolute;
-		right: 8px;
-		bottom: 10px;
-		width: 56px;
-		height: 56px;
-		border: 4px solid #e8352b;
-		border-radius: 50%;
-		color: #e8352b;
-		display: grid;
-		place-items: center;
-		font-size: 9px;
-		font-weight: 900;
-		transform: rotate(-18deg);
-		opacity: 0.88;
-	}
-
-	.paper .stamp-blue {
-		border-color: #1f7ae0;
-		color: #1f7ae0;
-	}
-
-	.sticky {
-		width: 88px;
-		height: 88px;
-		border: 3px solid #1b1235;
-		border-radius: 6px;
-		display: grid;
-		place-items: center;
-		padding: 8px;
-		font-family: var(--font-hand);
-		font-size: 20px;
-		line-height: 1;
-		color: #3a2c10;
-		text-align: center;
-	}
-
-	.sticky-yellow {
-		background: #ffe95e;
-		--r: 6deg;
-	}
-
-	.sticky-pink {
-		background: #ff9ad5;
-		--r: -6deg;
-		color: #5c1030;
-	}
-
-	.sticky-green {
-		background: #7ef0c1;
-		--r: 4deg;
-		color: #0c4a30;
-	}
-
-	.db {
-		width: 104px;
-		--r: 4deg;
-	}
-
-	.db-lid {
-		width: 104px;
-		height: 32px;
-		background: #8f7bff;
-		border: 4px solid #1b1235;
-		border-radius: 50%;
-	}
-
-	.db-body {
-		width: 104px;
-		height: 88px;
-		margin-top: -16px;
-		background: linear-gradient(90deg, #5b46c9, #8f7bff 42%, #5b46c9);
-		border: 4px solid #1b1235;
-		border-radius: 0 0 52px 52px / 0 0 32px 32px;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 4px;
-		color: #fff;
-	}
-
-	.db-body b {
-		font-family: var(--font-display);
-		font-size: 15px;
-		text-shadow: 2px 2px 0 #1b1235;
-	}
-
-	.db-body small {
-		font-family: var(--font-pixel);
-		font-size: 6px;
-		color: #ddd6ff;
-	}
-
-	.db .crack {
-		position: absolute;
-		left: 18px;
-		top: 52px;
-		font-size: 20px;
-		transform: rotate(18deg);
-	}
-
-	.coffee {
-		width: 102px;
-		--r: -4deg;
-	}
-
-	.coffee svg {
-		display: block;
-		overflow: visible;
-	}
-
-	.steam path {
-		animation: simon-steam 2.5s ease-in-out infinite;
-	}
-
-	.steam path:nth-child(2) {
-		animation-delay: 1.1s;
-	}
-
-	@keyframes simon-steam {
-		0% {
-			transform: translateY(0);
-			opacity: 0;
-		}
-		30% {
-			opacity: 0.85;
-		}
-		100% {
-			transform: translateY(-15px);
-			opacity: 0;
-		}
-	}
-
-	.coffee small {
-		display: block;
-		text-align: center;
-		font-family: var(--font-hand);
-		font-size: 18px;
-		color: #ffd9b0;
-		margin-top: 2px;
-	}
-
-	.errwin {
-		width: 205px;
-		background: #f4f2ff;
-		border: 4px solid #1b1235;
-		border-radius: 10px;
-		overflow: hidden;
-		--r: 2deg;
-		font-size: 11px;
-	}
-
-	.errwin .bar {
-		background: linear-gradient(90deg, #ff5252, #d21f3c);
-		padding: 5px 8px;
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		color: #fff;
-		font-weight: 800;
-		border-bottom: 4px solid #1b1235;
-	}
-
-	.errwin .bar i {
-		font-style: normal;
-		width: 18px;
-		height: 18px;
-		border-radius: 5px;
-		background: #fff;
-		color: #d21f3c;
-		border: 2px solid #1b1235;
-		display: grid;
-		place-items: center;
-		font-size: 10px;
-		font-weight: 900;
-	}
-
-	.errwin .txt {
-		padding: 8px;
-		color: #2a2150;
-		font-weight: 600;
-	}
-
-	.errwin .btns {
-		display: flex;
-		gap: 6px;
-		padding: 0 8px 10px;
-	}
-
-	.errwin .btns span {
-		flex: 1;
-		text-align: center;
-		background: #fff;
-		border: 3px solid #1b1235;
-		border-radius: 8px;
-		padding: 3px 4px;
-		font-size: 9px;
-		font-weight: 800;
-		color: #2a2150;
-		box-shadow: 0 3px 0 #1b1235;
-	}
-
-	.neon {
-		font-family: var(--font-pixel);
-		font-size: 11px;
-		letter-spacing: 0.18em;
-		color: var(--pink);
-		border: 3px solid var(--pink);
-		border-radius: 12px;
-		padding: 10px 14px;
-		text-shadow: 0 0 8px rgba(255, 95, 162, 0.8);
-		box-shadow:
-			0 0 14px rgba(255, 95, 162, 0.5),
-			inset 0 0 12px rgba(255, 95, 162, 0.28);
-		animation: simon-neon 5s linear infinite;
-		--r: -2deg;
-	}
-
-	@keyframes simon-neon {
-		0%,
-		86%,
-		92%,
-		100% {
-			opacity: 1;
-		}
-		88%,
-		90% {
-			opacity: 0.35;
-		}
-	}
-
-	.duck {
-		--r: -5deg;
-	}
-
-	.duck small {
-		display: block;
-		text-align: center;
-		font-family: var(--font-pixel);
-		font-size: 6px;
-		letter-spacing: 0.16em;
-		color: #ffe9a0;
-		margin-top: 4px;
-	}
-
-	.codebit {
-		font-family: var(--font-pixel);
-		font-size: 9px;
-		color: rgba(180, 200, 255, 0.18);
-		animation: simon-drift 16s ease-in-out infinite;
-		--r: 0deg;
-	}
-
-	@keyframes simon-drift {
-		0%,
-		100% {
-			transform: translateY(0);
-		}
-		50% {
-			transform: translateY(-26px);
-		}
-	}
-
-	.hide-l,
-	.hide-m {
-		display: block;
-	}
-
-	@media (max-width: 1180px) {
-		.hide-l {
-			display: none;
-		}
-	}
-
-	@media (max-width: 860px) {
-		.hide-m {
-			display: none;
-		}
 	}
 
 	.game-shell {
@@ -1538,6 +879,36 @@
 		}
 	}
 
+	.sound-chip {
+		min-width: 74px;
+	}
+
+	.sound-btn {
+		border: 0;
+		padding: 0;
+		background: transparent;
+		font-size: 20px;
+		line-height: 1;
+		cursor: pointer;
+		filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.4));
+		transition:
+			transform 0.06s,
+			filter 0.15s,
+			opacity 0.15s;
+	}
+
+	.sound-btn:hover {
+		filter: brightness(1.18) drop-shadow(0 2px 0 rgba(0, 0, 0, 0.4));
+	}
+
+	.sound-btn:active {
+		transform: translateY(2px);
+	}
+
+	.sound-btn.off {
+		opacity: 0.55;
+	}
+
 	.stage {
 		flex: 1;
 		min-height: 220px;
@@ -1553,165 +924,6 @@
 		align-items: center;
 		justify-content: center;
 		gap: clamp(14px, 3vw, 34px);
-	}
-
-	.mascot-box {
-		flex: none;
-		width: clamp(110px, 19vh, 180px);
-		animation: simon-mascot-bob 3.2s ease-in-out infinite;
-		filter: drop-shadow(7px 8px 0 rgba(0, 0, 0, 0.28));
-	}
-
-	.mascot {
-		display: block;
-		width: 100%;
-		height: auto;
-	}
-
-	.logo {
-		font-family: var(--font-display);
-		font-size: 36px;
-		fill: #e8352b;
-		stroke: #fff;
-		stroke-width: 1.2px;
-		paint-order: stroke;
-	}
-
-	.mascot g {
-		transition: opacity 0.15s;
-	}
-
-	.eye-happy,
-	.eye-shock,
-	.brows,
-	.mouth-shout,
-	.mouth-grit,
-	.coffee-cup {
-		opacity: 0;
-	}
-
-	.eye-open {
-		animation: simon-mascot-blink 4.2s infinite;
-		transform-box: fill-box;
-		transform-origin: center;
-	}
-
-	@keyframes simon-mascot-blink {
-		0%,
-		93%,
-		100% {
-			transform: scaleY(1);
-		}
-		95.5% {
-			transform: scaleY(0.12);
-		}
-	}
-
-	.mascot-box[data-mood='normal'] .eye-open,
-	.mascot-box[data-mood='shout'] .eye-open {
-		opacity: 1;
-	}
-
-	.mascot-box[data-mood='normal'] .mouth-smile,
-	.mascot-box[data-mood='happy'] .mouth-smile {
-		opacity: 1;
-	}
-
-	.mascot-box[data-mood='happy'] .eye-open {
-		opacity: 0;
-	}
-
-	.mascot-box[data-mood='happy'] .eye-happy {
-		opacity: 1;
-	}
-
-	.mascot-box[data-mood='shout'] .mouth-smile {
-		opacity: 0;
-	}
-
-	.mascot-box[data-mood='shout'] .mouth-shout {
-		opacity: 1;
-	}
-
-	.mascot-box[data-mood='shock'] .eye-open {
-		opacity: 0;
-	}
-
-	.mascot-box[data-mood='shock'] .eye-shock {
-		opacity: 1;
-	}
-
-	.mascot-box[data-mood='shock'] .mouth-smile {
-		opacity: 0;
-	}
-
-	.mascot-box[data-mood='shock'] .mouth-shout {
-		opacity: 1;
-	}
-
-	.mascot-box[data-mood='angry'] .brows {
-		opacity: 1;
-	}
-
-	.mascot-box[data-mood='angry'] .mouth-smile {
-		opacity: 0;
-	}
-
-	.mascot-box[data-mood='angry'] .mouth-grit {
-		opacity: 1;
-	}
-
-	.mascot-box[data-mood='coffee'] .eye-open {
-		opacity: 0;
-	}
-
-	.mascot-box[data-mood='coffee'] .eye-happy {
-		opacity: 1;
-	}
-
-	.mascot-box[data-mood='coffee'] .mouth-smile {
-		opacity: 0;
-	}
-
-	.mascot-box[data-mood='coffee'] .coffee-cup {
-		opacity: 1;
-	}
-
-	.coffee-cup .steam {
-		fill: none;
-		stroke: #fff;
-		stroke-width: 3.5;
-		stroke-linecap: round;
-		opacity: 0.85;
-		animation: simon-mascot-steam 2.2s ease-in-out infinite;
-	}
-
-	.coffee-cup .steam-2 {
-		animation-delay: 1s;
-	}
-
-	@keyframes simon-mascot-steam {
-		0% {
-			transform: translateY(0);
-			opacity: 0;
-		}
-		30% {
-			opacity: 0.85;
-		}
-		100% {
-			transform: translateY(-12px);
-			opacity: 0;
-		}
-	}
-
-	@keyframes simon-mascot-bob {
-		0%,
-		100% {
-			transform: translateY(0) rotate(-2deg);
-		}
-		50% {
-			transform: translateY(-8px) rotate(2deg);
-		}
 	}
 
 	.speech {
@@ -1924,37 +1136,6 @@
 		box-shadow: 0 7px 0 #8f1414;
 	}
 
-	.ticker {
-		flex: none;
-		overflow: hidden;
-		background: #120b2e;
-		border: 3px solid var(--deep);
-		border-radius: 12px;
-		padding: 6px 0;
-		box-shadow: 0 5px 0 rgba(0, 0, 0, 0.3);
-	}
-
-	.ticker-track {
-		display: flex;
-		width: max-content;
-		animation: simon-marquee 28s linear infinite;
-		font-family: var(--font-pixel);
-		font-size: 8px;
-		color: #8fd8ff;
-		letter-spacing: 1px;
-	}
-
-	.ticker-track span {
-		padding-right: 42px;
-		white-space: nowrap;
-	}
-
-	@keyframes simon-marquee {
-		to {
-			transform: translateX(-50%);
-		}
-	}
-
 	.banner {
 		position: fixed;
 		inset: 0;
@@ -2020,6 +1201,8 @@
 
 	.card {
 		width: min(640px, 94vw);
+		max-height: 94dvh;
+		overflow: auto;
 		background: linear-gradient(180deg, #2b1d5e, #160e34);
 		border: 3px solid #080416;
 		border-radius: 24px;
@@ -2135,6 +1318,13 @@
 			0 18px 26px rgba(0, 0, 0, 0.35);
 	}
 
+	.bigbtn.dark {
+		background: linear-gradient(#4a3a86, #2a1d5c);
+		box-shadow:
+			0 10px 0 #150e33,
+			0 18px 26px rgba(0, 0, 0, 0.35);
+	}
+
 	.hint {
 		margin-top: 14px;
 		font-family: var(--font-pixel);
@@ -2232,6 +1422,10 @@
 		.chip {
 			min-width: 76px;
 			padding: 5px 8px;
+		}
+
+		.sound-chip {
+			min-width: 62px;
 		}
 
 		.order-text {

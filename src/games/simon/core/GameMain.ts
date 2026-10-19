@@ -30,15 +30,19 @@ export class SimonGame implements GameModule, SimonInputTarget {
 	private readonly director: Director;
 	private readonly renderPipeline: RenderPipeline;
 	private readonly audio: SimonAudioPlayer;
-
 	private destroyed = false;
 	private rafId: number | null = null;
 	private lastTimeMs: number | null = null;
+	private listenersBound = false;
 
 	constructor() {
 		this.director = new Director(this.events, this.input);
-		this.renderPipeline = new RenderPipeline(this.events, this.model, this.director);
-		this.audio = new SimonAudioPlayer(this);
+		this.renderPipeline = new RenderPipeline(
+			this.events,
+			this.model,
+			this.director
+		);
+		this.audio = new SimonAudioPlayer(this.events);
 	}
 
 	async init(container: HTMLDivElement): Promise<void> {
@@ -51,6 +55,8 @@ export class SimonGame implements GameModule, SimonInputTarget {
 		}
 
 		this.model.best = this.loadBest();
+		this.model.muted = this.audio.muted;
+		this.bindWindowListeners();
 		this.director.setState(new MenuState(this.model));
 		this.input.attach(this);
 		this.renderPipeline.render();
@@ -63,6 +69,7 @@ export class SimonGame implements GameModule, SimonInputTarget {
 		}
 		this.destroyed = true;
 		this.stopLoop();
+		this.unbindWindowListeners();
 		this.input.detach();
 		this.input.clear();
 		this.events.clear();
@@ -70,7 +77,10 @@ export class SimonGame implements GameModule, SimonInputTarget {
 	}
 
 	get state(): SimonStateId {
-		return this.director.getCurrentState()?.view ?? SimonState.Boot;
+		if (this.model.paused) {
+			return SimonState.Paused;
+		}
+		return this.directorState;
 	}
 
 	get selectedDifficulty(): SimonDifficultyId {
@@ -79,6 +89,10 @@ export class SimonGame implements GameModule, SimonInputTarget {
 
 	get selectedMode(): SimonModeId {
 		return this.model.mode;
+	}
+
+	get muted(): boolean {
+		return this.model.muted;
 	}
 
 	get uiSnapshot(): SimonUiSnapshot {
@@ -120,10 +134,8 @@ export class SimonGame implements GameModule, SimonInputTarget {
 		if (this.model.mode === mode) {
 			return;
 		}
-
 		this.model.mode = mode;
 		this.model.statusText = 'Готово';
-
 		this.events.emit(SimonEvent.ConsoleMessageReceived, {
 			text:
 				mode === SimonMode.Orders
@@ -131,12 +143,26 @@ export class SimonGame implements GameModule, SimonInputTarget {
 					: 'Режим «Симон»: запоминайте последовательность и повторяйте её.',
 			kind: SimonConsoleKind.Command
 		});
-
 		this.renderPipeline.render();
+	}
+
+	setMuted(value: boolean): void {
+		this.assertNotDestroyed();
+		this.audio.setMuted(value);
+		this.model.muted = this.audio.muted;
+		this.renderPipeline.render();
+	}
+
+	toggleMute(): void {
+		this.assertNotDestroyed();
+		this.setMuted(!this.model.muted);
 	}
 
 	requestStart(): void {
 		this.assertNotDestroyed();
+		if (this.model.paused) {
+			return;
+		}
 		this.input.triggerStart();
 	}
 
@@ -157,12 +183,16 @@ export class SimonGame implements GameModule, SimonInputTarget {
 		if (this.director.getCurrentState() === null) {
 			return;
 		}
+		this.model.paused = false;
 		this.director.setState(new MenuState(this.model));
 		this.renderPipeline.render();
 	}
 
 	pressPad(pad: SimonPadId): void {
 		this.assertNotDestroyed();
+		if (this.model.paused) {
+			return;
+		}
 		if (!SimonPadList.includes(pad)) {
 			return;
 		}
@@ -171,19 +201,62 @@ export class SimonGame implements GameModule, SimonInputTarget {
 
 	skip(): void {
 		this.assertNotDestroyed();
+		if (this.model.paused) {
+			return;
+		}
 		this.input.triggerSkip();
 	}
 
 	acknowledgeFailure(): void {
 		this.assertNotDestroyed();
+		if (this.model.paused) {
+			return;
+		}
 		this.input.triggerAcknowledge();
+	}
+
+	pause(): void {
+		this.assertNotDestroyed();
+		if (this.model.paused) {
+			return;
+		}
+		if (!this.canPause(this.directorState)) {
+			return;
+		}
+		this.model.paused = true;
+		this.renderPipeline.render();
+	}
+
+	resume(): void {
+		this.assertNotDestroyed();
+		if (!this.model.paused) {
+			return;
+		}
+		this.model.paused = false;
+		this.renderPipeline.render();
+	}
+
+	togglePause(): void {
+		this.assertNotDestroyed();
+		if (this.model.paused) {
+			this.resume();
+			return;
+		}
+		this.pause();
 	}
 
 	handleEnter(): void {
 		this.assertNotDestroyed();
-		const state = this.state;
+		if (this.model.paused) {
+			this.resume();
+			return;
+		}
 
-		if (state === SimonState.FailureOrders || state === SimonState.FailureClassic) {
+		const state = this.directorState;
+		if (
+			state === SimonState.FailureOrders ||
+			state === SimonState.FailureClassic
+		) {
 			this.acknowledgeFailure();
 			return;
 		}
@@ -201,15 +274,88 @@ export class SimonGame implements GameModule, SimonInputTarget {
 
 	handleEscape(): void {
 		this.assertNotDestroyed();
-		const state = this.state;
+		if (this.model.paused) {
+			this.resume();
+			return;
+		}
 
-		if (state === SimonState.FailureOrders || state === SimonState.FailureClassic) {
+		const state = this.directorState;
+		if (this.canPause(state)) {
+			this.pause();
+			return;
+		}
+
+		if (
+			state === SimonState.FailureOrders ||
+			state === SimonState.FailureClassic
+		) {
 			this.acknowledgeFailure();
 		}
 	}
 
+	private readonly onVisibilityChange = (): void => {
+		if (this.destroyed) {
+			return;
+		}
+		if (typeof document !== 'undefined' && document.hidden) {
+			this.pause();
+		}
+	};
+
+	private readonly onBlur = (): void => {
+		if (this.destroyed) {
+			return;
+		}
+		this.pause();
+	};
+
+	private bindWindowListeners(): void {
+		if (this.listenersBound || typeof window === 'undefined') {
+			return;
+		}
+		this.listenersBound = true;
+		window.addEventListener('blur', this.onBlur);
+		if (typeof document !== 'undefined') {
+			document.addEventListener('visibilitychange', this.onVisibilityChange);
+		}
+	}
+
+	private unbindWindowListeners(): void {
+		if (!this.listenersBound) {
+			return;
+		}
+		this.listenersBound = false;
+		if (typeof window !== 'undefined') {
+			window.removeEventListener('blur', this.onBlur);
+		}
+		if (typeof document !== 'undefined') {
+			document.removeEventListener(
+				'visibilitychange',
+				this.onVisibilityChange
+			);
+		}
+	}
+
+	private get directorState(): SimonStateId {
+		return this.director.getCurrentState()?.view ?? SimonState.Boot;
+	}
+
+	private canPause(state: SimonStateId): boolean {
+		return (
+			state === SimonState.ShowingPattern ||
+			state === SimonState.AwaitingInput ||
+			state === SimonState.RoundTransition ||
+			state === SimonState.OrdersIssuing ||
+			state === SimonState.OrdersAwaiting ||
+			state === SimonState.OrdersFeedback
+		);
+	}
+
 	private startLoop(): void {
-		if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+		if (
+			typeof window === 'undefined' ||
+			typeof window.requestAnimationFrame !== 'function'
+		) {
 			return;
 		}
 
@@ -237,7 +383,6 @@ export class SimonGame implements GameModule, SimonInputTarget {
 
 			this.director.update(deltaMs);
 			this.renderPipeline.render();
-
 			this.rafId = window.requestAnimationFrame(tick);
 		};
 
@@ -256,7 +401,6 @@ export class SimonGame implements GameModule, SimonInputTarget {
 		if (typeof window === 'undefined') {
 			return 0;
 		}
-
 		try {
 			const raw = window.localStorage.getItem('simon1c_best');
 			if (raw === null) {

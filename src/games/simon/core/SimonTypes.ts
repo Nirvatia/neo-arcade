@@ -1,6 +1,7 @@
 export const SimonState = {
 	Boot: 'BOOT',
 	Menu: 'MENU',
+	Paused: 'PAUSED',
 	ShowingPattern: 'SHOWING_PATTERN',
 	AwaitingInput: 'AWAITING_INPUT',
 	RoundTransition: 'ROUND_TRANSITION',
@@ -27,7 +28,8 @@ export const SimonDifficulty = {
 	Hard: 'HARD'
 } as const;
 
-export type SimonDifficultyId = (typeof SimonDifficulty)[keyof typeof SimonDifficulty];
+export type SimonDifficultyId =
+	(typeof SimonDifficulty)[keyof typeof SimonDifficulty];
 
 export interface SimonDifficultySettings {
 	startDelayMs: number;
