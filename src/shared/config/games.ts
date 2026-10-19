@@ -1,4 +1,3 @@
-// src/shared/config/games.ts
 import { getSavedScore } from '../utils/scoreStore';
 
 export interface GameConfig {
@@ -20,7 +19,14 @@ export const games: GameConfig[] = [
 		route: '/games/snake',
 		defaultScore: 0
 	},
-	{ id: 'pacman', title: 'PAC-MAN', genre: 'MAZE', status: 'soon', defaultScore: 0 },
+	{
+		id: 'pacman',
+		title: 'PAC-MAN',
+		genre: 'MAZE',
+		status: 'ready',
+		route: '/games/pacman',
+		defaultScore: 0
+	},
 	{
 		id: 'tetris',
 		title: 'TETRIS',
@@ -28,7 +34,7 @@ export const games: GameConfig[] = [
 		status: 'ready',
 		route: '/games/tetris',
 		defaultScore: 0
-	},
+	}
 ];
 
 export function rankLabel(index: number): string {

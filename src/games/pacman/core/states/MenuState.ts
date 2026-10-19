@@ -3,26 +3,12 @@ import type { PacmanStateName } from '../Events';
 
 export class MenuState implements GameState {
 	readonly name: PacmanStateName = 'menu';
-	private elapsed = 0;
 
 	enter(ctx: GameStateContext): void {
-		if (ctx.director.stateName !== this.name) {
-			return;
-		}
-		this.elapsed = 0;
+		ctx.level.ensure();
 	}
 
-	update(ctx: GameStateContext, dt: number): void {
-		if (ctx.director.stateName !== this.name) {
-			return;
-		}
-		this.elapsed = Math.max(0, this.elapsed + dt);
-	}
+	update(): void {}
 
-	exit(ctx: GameStateContext): void {
-		if (ctx.director.stateName !== this.name) {
-			return;
-		}
-		this.elapsed = 0;
-	}
+	exit(): void {}
 }

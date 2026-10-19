@@ -5,6 +5,7 @@ export interface InputHandlers {
 	confirm?: () => void;
 	pause?: () => void;
 	menu?: () => void;
+	profile?: () => void;
 }
 
 export class InputController {
@@ -19,10 +20,12 @@ export class InputController {
 		if (this.attached) {
 			return;
 		}
+
 		if (typeof window === 'undefined') {
 			console.error('InputController.attach', 'window is unavailable');
 			return;
 		}
+
 		window.addEventListener('keydown', this.handleKeyDown);
 		this.attached = true;
 	}
@@ -31,10 +34,12 @@ export class InputController {
 		if (!this.attached) {
 			return;
 		}
+
 		if (typeof window === 'undefined') {
 			this.attached = false;
 			return;
 		}
+
 		window.removeEventListener('keydown', this.handleKeyDown);
 		this.attached = false;
 	}
@@ -55,10 +60,15 @@ export class InputController {
 		this.handlers.menu?.();
 	}
 
+	pressProfile(): void {
+		this.handlers.profile?.();
+	}
+
 	private handleKeyDown = (event: KeyboardEvent): void => {
 		if (event.repeat) {
 			return;
 		}
+
 		switch (event.code) {
 			case 'ArrowUp':
 			case 'KeyW':
@@ -92,6 +102,10 @@ export class InputController {
 			case 'Escape':
 				event.preventDefault();
 				this.pressMenu();
+				break;
+			case 'KeyM':
+				event.preventDefault();
+				this.pressProfile();
 				break;
 			default:
 				break;
