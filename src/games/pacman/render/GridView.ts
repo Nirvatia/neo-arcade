@@ -1,5 +1,6 @@
 import type { GridService } from '../logic/GridService';
 import type { LevelProgress } from '../logic/LevelProgress';
+import type { SeasonPalette } from '../logic/SeasonCatalog';
 
 export interface GridLayout {
 	readonly tileSize: number;
@@ -13,13 +14,14 @@ export class GridView {
 		grid: GridService,
 		progress: LevelProgress,
 		width: number,
-		height: number
+		height: number,
+		palette: SeasonPalette | null,
+		dayNightRatio: number
 	): GridLayout {
 		if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
 			console.error('GridView.draw', 'invalid view size', { width, height });
 			return { tileSize: 1, offsetX: 0, offsetY: 0 };
 		}
-
 		if (!Number.isFinite(grid.width) || grid.width <= 0 || !Number.isFinite(grid.height) || grid.height <= 0) {
 			console.error('GridView.draw', 'invalid grid size', {
 				width: grid.width,
@@ -27,13 +29,16 @@ export class GridView {
 			});
 			return { tileSize: 1, offsetX: 0, offsetY: 0 };
 		}
-
+		const ratio = Math.min(1, Math.max(0, Number.isFinite(dayNightRatio) ? dayNightRatio : 0));
+		const wall = palette ? this.lerpColor(palette.wall, palette.wallNight, ratio) : '#1d2c5c';
+		const floor = palette ? this.lerpColor(palette.floor, palette.floorNight, ratio) : '#060a14';
+		const dot = palette ? this.lerpColor(palette.dot, palette.dotNight, ratio) : '#c9d4ff';
+		const energizer = palette ? this.lerpColor(palette.energizer, palette.energizerNight, ratio) : '#ffcf4d';
 		const tileSize = Math.max(1, Math.floor(Math.min(width / grid.width, height / grid.height)));
 		const gridWidth = tileSize * grid.width;
 		const gridHeight = tileSize * grid.height;
 		const offsetX = Math.max(0, Math.floor((width - gridWidth) / 2));
 		const offsetY = Math.max(0, Math.floor((height - gridHeight) / 2));
-
 		for (let y = 0; y < grid.height; y += 1) {
 			for (let x = 0; x < grid.width; x += 1) {
 				const tile = grid.tileAt(x, y);
@@ -41,26 +46,22 @@ export class GridView {
 				const py = offsetY + y * tileSize;
 				const cx = px + tileSize / 2;
 				const cy = py + tileSize / 2;
-
 				if (tile === 'WL') {
 					const wallInset = tileSize >= 3 ? 1 : 0;
 					const wallSize = Math.max(1, tileSize - wallInset * 2);
-					ctx.fillStyle = '#1d2c5c';
+					ctx.fillStyle = wall;
 					ctx.fillRect(px + wallInset, py + wallInset, wallSize, wallSize);
 					continue;
 				}
-
-				ctx.fillStyle = '#060a14';
+				ctx.fillStyle = floor;
 				ctx.fillRect(px, py, tileSize, tileSize);
-
 				switch (tile) {
 					case 'DT': {
 						if (progress.isCollected(x, y)) {
 							break;
 						}
-
 						const radius = Math.max(1, Math.min(tileSize * 0.5, tileSize * 0.12));
-						ctx.fillStyle = '#c9d4ff';
+						ctx.fillStyle = dot;
 						ctx.beginPath();
 						ctx.arc(cx, cy, radius, 0, Math.PI * 2);
 						ctx.fill();
@@ -70,9 +71,8 @@ export class GridView {
 						if (progress.isCollected(x, y)) {
 							break;
 						}
-
 						const radius = Math.max(1, Math.min(tileSize * 0.5, tileSize * 0.28));
-						ctx.fillStyle = '#ffcf4d';
+						ctx.fillStyle = energizer;
 						ctx.beginPath();
 						ctx.arc(cx, cy, radius, 0, Math.PI * 2);
 						ctx.fill();
@@ -107,7 +107,6 @@ export class GridView {
 					case 'CE': {
 						const markerSize = Math.min(tileSize, Math.max(1, Math.floor(tileSize * 0.45)));
 						const markerOffset = Math.max(0, Math.floor((tileSize - markerSize) / 2));
-
 						if (tile === 'BY') {
 							ctx.fillStyle = '#ff4d4d';
 						} else if (tile === 'PY') {
@@ -117,7 +116,6 @@ export class GridView {
 						} else {
 							ctx.fillStyle = '#ffb14d';
 						}
-
 						ctx.fillRect(px + markerOffset, py + markerOffset, markerSize, markerSize);
 						break;
 					}
@@ -125,7 +123,6 @@ export class GridView {
 					case '0B':
 					case '0C': {
 						const radius = Math.max(1, Math.min(tileSize * 0.5, tileSize * 0.3));
-
 						if (tile === '0A') {
 							ctx.strokeStyle = '#56d9ff';
 						} else if (tile === '0B') {
@@ -133,7 +130,6 @@ export class GridView {
 						} else {
 							ctx.strokeStyle = '#ff69d8';
 						}
-
 						ctx.fillStyle = '#041018';
 						ctx.lineWidth = Math.max(1, Math.floor(tileSize * 0.1));
 						ctx.beginPath();
@@ -147,7 +143,6 @@ export class GridView {
 						const trapOffset = Math.max(0, Math.floor((tileSize - trapSize) / 2));
 						ctx.fillStyle = '#7f1818';
 						ctx.fillRect(px + trapOffset, py + trapOffset, trapSize, trapSize);
-
 						const coreSize = Math.max(1, Math.floor(trapSize * 0.45));
 						const coreOffset = Math.max(0, Math.floor((trapSize - coreSize) / 2));
 						ctx.fillStyle = '#200404';
@@ -169,7 +164,31 @@ export class GridView {
 				}
 			}
 		}
-
 		return { tileSize, offsetX, offsetY };
+	}
+
+	private lerpColor(dayHex: string, nightHex: string, t: number): string {
+		const d = this.parseHex(dayHex);
+		const n = this.parseHex(nightHex);
+		if (!d || !n) {
+			return dayHex;
+		}
+		const r = Math.round(d.r + (n.r - d.r) * t);
+		const g = Math.round(d.g + (n.g - d.g) * t);
+		const b = Math.round(d.b + (n.b - d.b) * t);
+		return `rgb(${r},${g},${b})`;
+	}
+
+	private parseHex(hex: string): { r: number; g: number; b: number } | null {
+		if (!hex || hex.length !== 7 || hex[0] !== '#') {
+			return null;
+		}
+		const r = parseInt(hex.slice(1, 3), 16);
+		const g = parseInt(hex.slice(3, 5), 16);
+		const b = parseInt(hex.slice(5, 7), 16);
+		if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b)) {
+			return null;
+		}
+		return { r, g, b };
 	}
 }

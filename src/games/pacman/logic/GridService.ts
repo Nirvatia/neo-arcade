@@ -15,7 +15,6 @@ export class GridService {
 			console.error('GridService.constructor', 'invalid grid model');
 			throw new Error('GridService.constructor: invalid grid model');
 		}
-
 		this.model = model;
 	}
 
@@ -43,6 +42,22 @@ export class GridService {
 		return this.model.ghostSpawns;
 	}
 
+	get switchSpawn(): GridPoint | null {
+		return this.model.switchSpawn;
+	}
+
+	get trapSpawn(): GridPoint | null {
+		return this.model.trapSpawn;
+	}
+
+	get eggSpawn(): GridPoint | null {
+		return this.model.eggSpawn;
+	}
+
+	get extraLifeSpawns(): readonly GridPoint[] {
+		return this.model.extraLifeSpawns;
+	}
+
 	tileAt(x: number, y: number): TileType {
 		return this.model.tileAt(x, y);
 	}
@@ -59,9 +74,7 @@ export class GridService {
 		if (!this.isInside(x, y)) {
 			return false;
 		}
-
 		const tile = this.tileAt(x, y);
-
 		return (
 			tile !== 'WL' &&
 			tile !== 'ES' &&
@@ -78,17 +91,13 @@ export class GridService {
 		if (!this.isInside(x, y)) {
 			return false;
 		}
-
 		const tile = this.tileAt(x, y);
-
 		if (tile === 'WL' || tile === 'ES' || tile === 'RT') {
 			return false;
 		}
-
 		if (allowLair) {
 			return true;
 		}
-
 		return (
 			tile !== 'LE' &&
 			tile !== 'LT' &&
@@ -97,6 +106,14 @@ export class GridService {
 			tile !== 'IY' &&
 			tile !== 'CE'
 		);
+	}
+
+	isUltraWalkable(x: number, y: number): boolean {
+		if (!this.isInside(x, y)) {
+			return false;
+		}
+		const tile = this.tileAt(x, y);
+		return tile !== 'WL' && tile !== 'ES' && tile !== 'LE' && tile !== 'LT';
 	}
 
 	isDot(x: number, y: number): boolean {
@@ -113,11 +130,9 @@ export class GridService {
 
 	teleportDestination(x: number, y: number): GridPoint | undefined {
 		const tile = this.model.tileAt(x, y);
-
 		if (!isTeleportId(tile)) {
 			return undefined;
 		}
-
 		return this.model.getTeleportDestination(tile, x, y);
 	}
 
@@ -128,7 +143,6 @@ export class GridService {
 			{ x, y: y - 1 },
 			{ x, y: y + 1 }
 		];
-
 		return candidates.filter((point) => this.model.isInside(point.x, point.y));
 	}
 

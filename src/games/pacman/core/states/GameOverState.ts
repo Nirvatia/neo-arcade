@@ -9,24 +9,12 @@ export class GameOverState implements GameState {
 		ctx.level.ensure();
 
 		const combat = ctx.level.combat;
-		const progress = ctx.level.progress;
 
-		if (!combat || !progress) {
-			console.error('GameOverState.enter', 'level is not initialized');
-			return;
-		}
-
-		if (combat.result !== 'none') {
+		if (combat && combat.result !== 'none') {
 			saveScore('pacman', combat.score);
 		}
 
-		ctx.events.emit('ui:hudChanged', {
-			score: combat.score,
-			lives: combat.lives,
-			dots: progress.remainingDots,
-			power: Math.ceil(combat.powerTimer * 10) / 10,
-			result: combat.result
-		});
+		ctx.level.emitHud();
 	}
 
 	update(): void {}

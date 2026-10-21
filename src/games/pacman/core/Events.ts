@@ -1,6 +1,15 @@
-export type PacmanStateName = 'menu' | 'playing' | 'paused' | 'game-over';
+export type PacmanStateName =
+	| 'menu'
+	| 'ready'
+	| 'playing'
+	| 'paused'
+	| 'death'
+	| 'level-clear'
+	| 'game-over';
 
 export type PacmanGameResult = 'none' | 'win' | 'lose';
+
+export type PacmanProfile = 'pacman' | 'ms-pacman';
 
 export type PacmanAudioCue =
 	| 'dot'
@@ -29,6 +38,7 @@ export interface PacmanHudPayload {
 	lives: number;
 	dots: number;
 	power: number;
+	mode: PacmanProfile;
 	result: PacmanGameResult;
 }
 

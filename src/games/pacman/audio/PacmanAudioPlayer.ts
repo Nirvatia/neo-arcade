@@ -46,7 +46,11 @@ export class PacmanAudioPlayer {
 	}
 
 	private handleState(next: PacmanStateName): void {
-		if (next === 'playing' && (this.state === 'menu' || this.state === 'game-over')) {
+		if (next !== 'ready') {
+			this.stop('start.wav');
+		}
+
+		if (next === 'ready' && this.state !== 'ready') {
 			this.play('start.wav', 0.8);
 		}
 
@@ -180,6 +184,7 @@ export class PacmanAudioPlayer {
 		audio.currentTime = 0;
 
 		void audio.play().catch(() => undefined);
+
 		this.background = audio;
 	}
 
@@ -210,6 +215,18 @@ export class PacmanAudioPlayer {
 		audio.currentTime = 0;
 
 		void audio.play().catch(() => undefined);
+	}
+
+	private stop(name: string): void {
+		const audio = this.sounds.get(name);
+
+		if (!audio) {
+			return;
+		}
+
+		audio.pause();
+		audio.loop = false;
+		audio.currentTime = 0;
 	}
 
 	private sound(name: string): HTMLAudioElement | null {

@@ -31,6 +31,7 @@ export class GameMain implements GameModule {
 		const director = new Director(events, level);
 		const render = new RenderPipeline(container, director, level);
 		const hudAdapter = new SvelteHudAdapter(events, pacmanHudStore);
+
 		const loop = new GameLoop(
 			(dt) => {
 				director.update(dt);
@@ -42,17 +43,41 @@ export class GameMain implements GameModule {
 
 		const input = new InputController({
 			direction: (direction) => {
-				director.startPlaying();
-				level.setDesiredDirection(direction);
+				if (director.stateName === 'playing' || director.stateName === 'ready') {
+					level.setDesiredDirection(direction);
+				}
 			},
 			confirm: () => {
-				director.startPlaying();
+				if (director.stateName === 'menu' || director.stateName === 'game-over') {
+					director.startGame();
+					return;
+				}
+
+				if (director.stateName === 'paused') {
+					director.togglePause();
+					return;
+				}
+
+				if (director.stateName === 'ready') {
+					director.showPlaying();
+				}
 			},
 			pause: () => {
 				director.togglePause();
 			},
 			menu: () => {
-				director.returnToMenu();
+				if (director.stateName === 'playing') {
+					director.togglePause();
+					return;
+				}
+
+				if (
+					director.stateName === 'paused' ||
+					director.stateName === 'ready' ||
+					director.stateName === 'game-over'
+				) {
+					director.returnToMenu();
+				}
 			},
 			profile: () => {
 				if (director.stateName === 'menu' || director.stateName === 'game-over') {

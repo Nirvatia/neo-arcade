@@ -18,23 +18,25 @@
 		<span class="value">{String($pacmanHudStore.dots).padStart(3, '0')}</span>
 	</div>
 
-	{#if $pacmanHudStore.power > 0}
-		<div class="row">
-			<span class="label">POWER</span>
-			<span class="value power">{$pacmanHudStore.power.toFixed(1)}</span>
-		</div>
-	{/if}
+	<div class="row">
+		<span class="label">POWER</span>
+		<span class="value power">
+			{$pacmanHudStore.power > 0 ? $pacmanHudStore.power.toFixed(1) : '--'}
+		</span>
+	</div>
 
-	{#if $pacmanHudStore.result === 'win'}
-		<div class="banner win">LEVEL COMPLETE</div>
-	{:else if $pacmanHudStore.result === 'lose'}
-		<div class="banner lose">GAME OVER</div>
-	{/if}
+	<div class="row">
+		<span class="label">RESULT</span>
+		<span class="value result">
+			{$pacmanHudStore.result === 'none' ? '--' : $pacmanHudStore.result.toUpperCase()}
+		</span>
+	</div>
 </div>
 
 <style>
 	.pacman-hud {
 		min-width: 220px;
+		min-height: 92px;
 		border: 2px solid #223052;
 		background: rgba(3, 5, 9, 0.82);
 		color: #e8efff;
@@ -63,17 +65,7 @@
 		color: #56d9ff;
 	}
 
-	.banner {
-		margin-top: 6px;
-		font-weight: 700;
-		letter-spacing: 0.08em;
-	}
-
-	.win {
-		color: #79ff6f;
-	}
-
-	.lose {
-		color: #ff4d4d;
+	.result {
+		color: #ffd93b;
 	}
 </style>

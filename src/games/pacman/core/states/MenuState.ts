@@ -6,6 +6,7 @@ export class MenuState implements GameState {
 
 	enter(ctx: GameStateContext): void {
 		ctx.level.ensure();
+		ctx.level.emitHud();
 	}
 
 	update(): void {}

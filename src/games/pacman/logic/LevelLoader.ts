@@ -9,14 +9,26 @@ import { FruitService } from './FruitService';
 import { GoldenEggService } from './GoldenEggService';
 import { UltraGhostService } from './UltraGhostService';
 import { HypnosisService } from './HypnosisService';
+import { SpeedBoltService } from './SpeedBoltService';
 import type { GameProfile } from './HypnosisService';
 import type { PlayerDirection } from './PlayerModel';
 import type { EventBus } from '../engine/EventBus';
-import type { PacmanEventMap } from '../core/Events';
+import type { PacmanEventMap, PacmanHudPayload } from '../core/Events';
+import { seasonForLevel } from './SeasonCatalog';
+import type { SeasonData, SeasonName } from './SeasonCatalog';
+
+interface SeasonModifiers {
+	readonly powerDuration: number;
+	readonly fruitDuration: number;
+	readonly ghostSpeedModifier: number;
+	readonly playerSpeedModifier: number;
+}
 
 export class LevelLoader {
 	private readonly events: EventBus<PacmanEventMap>;
 	private profileValue: GameProfile = 'pacman';
+	private levelNumber = 1;
+	private seasonValue: SeasonData | null = null;
 	private gridValue: GridService | null = null;
 	private playerValue: PlayerService | null = null;
 	private ghostsValue: GhostService | null = null;
@@ -27,18 +39,26 @@ export class LevelLoader {
 	private eggValue: GoldenEggService | null = null;
 	private ultraValue: UltraGhostService | null = null;
 	private hypnosisValue: HypnosisService | null = null;
+	private boltValue: SpeedBoltService | null = null;
 
 	constructor(events: EventBus<PacmanEventMap>) {
 		if (!events) {
 			console.error('LevelLoader.constructor', 'missing event bus');
 			throw new Error('LevelLoader.constructor: missing event bus');
 		}
-
 		this.events = events;
 	}
 
 	get profile(): GameProfile {
 		return this.profileValue;
+	}
+
+	get level(): number {
+		return this.levelNumber;
+	}
+
+	get season(): SeasonData | null {
+		return this.seasonValue;
 	}
 
 	get grid(): GridService | null {
@@ -77,24 +97,26 @@ export class LevelLoader {
 		return this.hypnosisValue;
 	}
 
+	get bolt(): SpeedBoltService | null {
+		return this.boltValue;
+	}
+
 	get score(): number {
 		return this.scoreValue ? this.scoreValue.score : 0;
 	}
 
 	toggleProfile(): void {
 		this.profileValue = this.profileValue === 'pacman' ? 'ms-pacman' : 'pacman';
-
 		if (this.combatValue) {
 			this.combatValue.setProfile(this.profileValue);
 		}
-
 		if (this.hypnosisValue) {
 			this.hypnosisValue.reset();
 		}
-
 		if (this.ghostsValue) {
 			this.ghostsValue.setMsOverdrive(false);
 		}
+		this.emitHud();
 	}
 
 	ensure(): void {
@@ -108,34 +130,19 @@ export class LevelLoader {
 			this.fruitValue &&
 			this.eggValue &&
 			this.ultraValue &&
-			this.hypnosisValue
+			this.hypnosisValue &&
+			this.boltValue
 		) {
 			return;
 		}
+		this.buildLevel();
+	}
 
-		const grid = new GridService(new GridModel());
-		const score = new ScoreModel();
-		const progress = new LevelProgress(grid, score, this.events);
-		const player = new PlayerService(grid, progress, this.events);
-		const ghosts = new GhostService(grid, player, progress);
-		const hypnosis = new HypnosisService(score);
-		const combat = new CombatService(player, ghosts, progress, score, this.events, hypnosis);
-		const fruit = new FruitService(progress, score, this.events);
-		const egg = new GoldenEggService(progress, this.events);
-		const ultra = new UltraGhostService(grid, progress, score);
-
-		combat.setProfile(this.profileValue);
-
-		this.gridValue = grid;
-		this.scoreValue = score;
-		this.progressValue = progress;
-		this.playerValue = player;
-		this.ghostsValue = ghosts;
-		this.combatValue = combat;
-		this.fruitValue = fruit;
-		this.eggValue = egg;
-		this.ultraValue = ultra;
-		this.hypnosisValue = hypnosis;
+	startNewGame(): void {
+		this.levelNumber = 1;
+		this.buildLevel();
+		this.resetGameplay();
+		this.emitHud();
 	}
 
 	resetGameplay(): void {
@@ -147,12 +154,12 @@ export class LevelLoader {
 			!this.fruitValue ||
 			!this.eggValue ||
 			!this.ultraValue ||
-			!this.hypnosisValue
+			!this.hypnosisValue ||
+			!this.boltValue
 		) {
 			console.error('LevelLoader.resetGameplay', 'level is not initialized');
 			return;
 		}
-
 		this.playerValue.reset();
 		this.progressValue.reset();
 		this.ghostsValue.reset();
@@ -161,13 +168,116 @@ export class LevelLoader {
 		this.eggValue.reset();
 		this.ultraValue.reset();
 		this.hypnosisValue.reset();
+		this.boltValue.reset();
+	}
+
+	prepareAfterDeath(): void {
+		this.ensure();
+		if (!this.combatValue) {
+			console.error('LevelLoader.prepareAfterDeath', 'level is not initialized');
+			return;
+		}
+		this.combatValue.finishDeath();
+		this.emitHud();
+	}
+
+	advanceLevel(): void {
+		this.levelNumber += 1;
+		const keepScore = this.scoreValue ? this.scoreValue.score : 0;
+		this.buildLevel();
+		if (this.scoreValue) {
+			this.scoreValue.add(keepScore);
+		}
+		this.resetGameplay();
+		if (this.combatValue) {
+			this.combatValue.nextLevel();
+		}
+		this.emitHud();
 	}
 
 	setDesiredDirection(direction: PlayerDirection): void {
 		if (!this.playerValue) {
 			return;
 		}
-
 		this.playerValue.setDesiredDirection(direction);
+	}
+
+	emitHud(): void {
+		this.events.emit('ui:hudChanged', this.hudPayload());
+	}
+
+	hudPayload(): PacmanHudPayload {
+		const result: PacmanHudPayload['result'] = this.combatValue
+			? this.combatValue.result
+			: 'none';
+		return {
+			score: this.scoreValue ? this.scoreValue.score : 0,
+			lives: this.combatValue ? this.combatValue.lives : 3,
+			dots: this.progressValue ? this.progressValue.remainingDots : 0,
+			power: this.currentPower(),
+			mode: this.profileValue,
+			result
+		};
+	}
+
+	private buildLevel(): void {
+		const season = seasonForLevel(this.levelNumber);
+		this.seasonValue = season;
+		const grid = new GridService(new GridModel(season.grid));
+		const score = new ScoreModel();
+		const progress = new LevelProgress(grid, score, this.events);
+		const player = new PlayerService(grid, progress, this.events);
+		const ghosts = new GhostService(grid, player, progress);
+		const hypnosis = new HypnosisService(score);
+		const combat = new CombatService(player, ghosts, progress, score, this.events, hypnosis);
+		const fruit = new FruitService(progress, score, this.events);
+		const egg = new GoldenEggService(progress, this.events, score, grid);
+		const ultra = new UltraGhostService(grid, progress, score, this.levelNumber);
+		const bolt = new SpeedBoltService(progress, this.events);
+		combat.setProfile(this.profileValue);
+		const mods = this.modifiersFor(season.name);
+		combat.setPowerDuration(mods.powerDuration);
+		fruit.setFruitDuration(mods.fruitDuration);
+		ghosts.setSpeedModifier(mods.ghostSpeedModifier);
+		player.setSpeedModifier(mods.playerSpeedModifier);
+		this.gridValue = grid;
+		this.scoreValue = score;
+		this.progressValue = progress;
+		this.playerValue = player;
+		this.ghostsValue = ghosts;
+		this.combatValue = combat;
+		this.fruitValue = fruit;
+		this.eggValue = egg;
+		this.ultraValue = ultra;
+		this.hypnosisValue = hypnosis;
+		this.boltValue = bolt;
+	}
+
+	private modifiersFor(season: SeasonName): SeasonModifiers {
+		if (season === 'spring') {
+			return { powerDuration: 6.5, fruitDuration: 12, ghostSpeedModifier: 1, playerSpeedModifier: 1 };
+		}
+		if (season === 'summer') {
+			return { powerDuration: 6, fruitDuration: 14, ghostSpeedModifier: 1, playerSpeedModifier: 1 };
+		}
+		if (season === 'autumn') {
+			return { powerDuration: 6, fruitDuration: 12, ghostSpeedModifier: 0.97, playerSpeedModifier: 1 };
+		}
+		return { powerDuration: 6, fruitDuration: 12, ghostSpeedModifier: 1, playerSpeedModifier: 0.97 };
+	}
+
+	private currentPower(): number {
+		let timer = 0;
+		if (this.profileValue === 'ms-pacman') {
+			if (this.hypnosisValue && this.hypnosisValue.overdriveActive) {
+				timer = this.hypnosisValue.overdriveTimer;
+			}
+		} else if (this.combatValue && this.combatValue.isPowerActive) {
+			timer = this.combatValue.powerTimer;
+		}
+		if (!Number.isFinite(timer) || timer <= 0) {
+			return 0;
+		}
+		return Math.ceil(timer * 10) / 10;
 	}
 }

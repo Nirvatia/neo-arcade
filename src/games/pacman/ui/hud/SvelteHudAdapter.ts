@@ -4,7 +4,8 @@ import type { PacmanEventMap } from '../../core/Events';
 import type { PacmanHudState } from './hudStore';
 
 export class SvelteHudAdapter {
-	private readonly unsubscribe: () => void;
+	private readonly unsubscribeHud: () => void;
+	private readonly unsubscribeState: () => void;
 
 	constructor(events: EventBus<PacmanEventMap>, store: Writable<PacmanHudState>) {
 		if (!events) {
@@ -17,18 +18,28 @@ export class SvelteHudAdapter {
 			throw new Error('SvelteHudAdapter.constructor: missing hud store');
 		}
 
-		this.unsubscribe = events.on('ui:hudChanged', (payload) => {
-			store.set({
+		this.unsubscribeHud = events.on('ui:hudChanged', (payload) => {
+			store.update((state) => ({
+				...state,
 				score: payload.score,
 				lives: payload.lives,
 				dots: payload.dots,
 				power: payload.power,
+				mode: payload.mode,
 				result: payload.result
-			});
+			}));
+		});
+
+		this.unsubscribeState = events.on('ui:stateChanged', (payload) => {
+			store.update((state) => ({
+				...state,
+				state: payload.state
+			}));
 		});
 	}
 
 	destroy(): void {
-		this.unsubscribe();
+		this.unsubscribeHud();
+		this.unsubscribeState();
 	}
 }
