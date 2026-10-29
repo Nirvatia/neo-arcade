@@ -1,10 +1,7 @@
 import type { GridLayout } from './GridView';
 import type { GridService } from '../logic/GridService';
 import type { GameProfile } from '../logic/HypnosisService';
-import {
-	LEVEL_CLEAR_MAX_BLINK,
-	type LevelClearSnapshot
-} from '../core/states/LevelClearState';
+import { LEVEL_CLEAR_MAX_BLINK, type LevelClearSnapshot } from '../core/states/LevelClearState';
 
 const LANE_HEIGHT_TILES = 1.7;
 const LANE_MARGIN_TILES = 1.1;

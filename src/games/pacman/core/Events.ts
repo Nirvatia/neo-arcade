@@ -1,11 +1,5 @@
 export type PacmanStateName =
-	| 'menu'
-	| 'ready'
-	| 'playing'
-	| 'paused'
-	| 'death'
-	| 'level-clear'
-	| 'game-over';
+	'menu' | 'ready' | 'playing' | 'paused' | 'death' | 'level-clear' | 'game-over';
 
 export type PacmanGameResult = 'none' | 'win' | 'lose';
 

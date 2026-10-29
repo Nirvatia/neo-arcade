@@ -45,8 +45,7 @@ export class DeathWaveView {
 			return;
 		}
 		const eased = deathWaveEase(progress);
-		const radius =
-			eased * deathWaveMaxRadius(gridWidth, gridHeight) * layout.tileSize;
+		const radius = eased * deathWaveMaxRadius(gridWidth, gridHeight) * layout.tileSize;
 		if (!Number.isFinite(radius) || radius < 1) {
 			return;
 		}

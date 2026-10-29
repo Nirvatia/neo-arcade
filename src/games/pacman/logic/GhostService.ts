@@ -78,9 +78,7 @@ export class GhostService {
 			new GhostModel('INKY', spawns.INKY, GHOST_SPEED, EXIT_DELAYS.INKY),
 			new GhostModel('CLYDE', spawns.CLYDE, GHOST_SPEED, EXIT_DELAYS.CLYDE)
 		];
-		this.trainTrailValue = this.ghosts.map((ghost) => [
-			{ x: ghost.tile.x, y: ghost.tile.y }
-		]);
+		this.trainTrailValue = this.ghosts.map((ghost) => [{ x: ghost.tile.x, y: ghost.tile.y }]);
 		const resolved = resolveExitTarget(grid, spawns.BLINKY);
 		if (resolved) {
 			this.exitTargetValue = resolved;
@@ -246,9 +244,7 @@ export class GhostService {
 				ghost.setForceReverse(false);
 			}
 			const target =
-				index === 0
-					? this.player.getTrainTarget(2)
-					: this.trainTargetForGhost(index - 1, 2);
+				index === 0 ? this.player.getTrainTarget(2) : this.trainTargetForGhost(index - 1, 2);
 			this.moveTrainGhost(ghost, target, dt);
 			this.recordTrainTrail(index, ghost);
 		}
@@ -392,9 +388,7 @@ export class GhostService {
 	}
 
 	private resetTrainTrails(): void {
-		this.trainTrailValue = this.ghosts.map((ghost) => [
-			{ x: ghost.tile.x, y: ghost.tile.y }
-		]);
+		this.trainTrailValue = this.ghosts.map((ghost) => [{ x: ghost.tile.x, y: ghost.tile.y }]);
 	}
 
 	private updateMode(dt: number): void {
@@ -434,7 +428,13 @@ export class GhostService {
 					break;
 				}
 				const target = this.targetFor(ghost.tile, direction);
-				if (!this.grid.isGhostWalkable(target.x, target.y, ghost.state === 'exiting' || ghost.state === 'eyes')) {
+				if (
+					!this.grid.isGhostWalkable(
+						target.x,
+						target.y,
+						ghost.state === 'exiting' || ghost.state === 'eyes'
+					)
+				) {
 					break;
 				}
 				ghost.beginMove(direction, target);

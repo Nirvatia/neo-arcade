@@ -1,13 +1,7 @@
 export type GhostKind = 'BLINKY' | 'PINKY' | 'INKY' | 'CLYDE';
 
 export type GhostState =
-	| 'lair'
-	| 'exiting'
-	| 'active'
-	| 'frightened'
-	| 'eyes'
-	| 'hypnotized'
-	| 'enraged';
+	'lair' | 'exiting' | 'active' | 'frightened' | 'eyes' | 'hypnotized' | 'enraged';
 
 export type GhostDirection = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 
@@ -118,7 +112,12 @@ export class GhostModel {
 	}
 
 	beginMove(direction: GhostDirection, target: GhostTile): void {
-		if (!Number.isInteger(target.x) || !Number.isInteger(target.y) || target.x < 0 || target.y < 0) {
+		if (
+			!Number.isInteger(target.x) ||
+			!Number.isInteger(target.y) ||
+			target.x < 0 ||
+			target.y < 0
+		) {
 			console.error('GhostModel.beginMove', 'invalid target', { kind: this.kindValue, target });
 			throw new Error('GhostModel.beginMove: invalid target');
 		}

@@ -77,7 +77,11 @@ export function directionBetween(from: DoomTile, to: DoomTile): DoomDirection | 
 	return null;
 }
 
-export function aheadTile(tile: DoomTile, direction: DoomDirection | null, steps: number): DoomTile {
+export function aheadTile(
+	tile: DoomTile,
+	direction: DoomDirection | null,
+	steps: number
+): DoomTile {
 	if (!direction) return tile;
 	let result = tile;
 	for (let i = 0; i < steps; i++) {

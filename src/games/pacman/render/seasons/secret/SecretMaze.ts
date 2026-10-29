@@ -143,8 +143,7 @@ export class SecretMaze implements MazeView {
 		for (let row = 0; row < 2; row += 1) {
 			for (let col = 0; col < 2; col += 1) {
 				const variant = tileHash(tx + row, ty + col, 17);
-				ctx.fillStyle =
-					variant > 0.66 ? '#201438' : variant > 0.33 ? '#1a1030' : '#170d26';
+				ctx.fillStyle = variant > 0.66 ? '#201438' : variant > 0.33 ? '#1a1030' : '#170d26';
 				ctx.fillRect(
 					px + col * half + 1,
 					py + row * half + 1,
@@ -242,7 +241,15 @@ export class SecretMaze implements MazeView {
 
 		ctx.fillStyle = 'rgba(255,255,255,.6)';
 		ctx.beginPath();
-		ctx.ellipse(cx - radius * 0.3, cy - radius * 0.3, radius * 0.3, radius * 0.18, 0, 0, Math.PI * 2);
+		ctx.ellipse(
+			cx - radius * 0.3,
+			cy - radius * 0.3,
+			radius * 0.3,
+			radius * 0.18,
+			0,
+			0,
+			Math.PI * 2
+		);
 		ctx.fill();
 	}
 }

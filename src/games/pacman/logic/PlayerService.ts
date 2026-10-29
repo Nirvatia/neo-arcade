@@ -177,10 +177,7 @@ export class PlayerService {
 		if (this.trailValue.length === 0) {
 			return tile;
 		}
-		const index = Math.min(
-			this.trailValue.length - 1,
-			Math.max(0, Math.floor(offset) - 1)
-		);
+		const index = Math.min(this.trailValue.length - 1, Math.max(0, Math.floor(offset) - 1));
 		const target = this.trailValue[index];
 		return target ? target : tile;
 	}

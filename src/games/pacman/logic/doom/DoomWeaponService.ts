@@ -232,7 +232,11 @@ export class DoomWeaponService {
 		for (let i = this.barrels.length - 1; i >= 0; i -= 1) {
 			this.barrels[i].timer -= dt;
 			if (this.barrels[i].timer <= 0) {
-				this.pushFx({ kind: 'barrel-fizzle', x: this.barrels[i].x + 0.5, y: this.barrels[i].y + 0.5 });
+				this.pushFx({
+					kind: 'barrel-fizzle',
+					x: this.barrels[i].x + 0.5,
+					y: this.barrels[i].y + 0.5
+				});
 				this.barrels.splice(i, 1);
 			}
 		}

@@ -183,7 +183,13 @@ export class WinterMaze implements MazeView {
 			const angle = i * (Math.PI / 3);
 			ctx.fillStyle = '#e8eef2';
 			ctx.beginPath();
-			ctx.arc(cx + Math.cos(angle) * radius * 0.5, cy + Math.sin(angle) * radius * 0.5, 1, 0, Math.PI * 2);
+			ctx.arc(
+				cx + Math.cos(angle) * radius * 0.5,
+				cy + Math.sin(angle) * radius * 0.5,
+				1,
+				0,
+				Math.PI * 2
+			);
 			ctx.fill();
 		}
 	}
@@ -203,10 +209,13 @@ export class WinterMaze implements MazeView {
 		}
 
 		const color =
-			token === 'BY' ? '#d9333a' :
-			token === 'PY' ? '#ff6b6b' :
-			token === 'IY' ? '#59f0ff' :
-			'#ffb14d';
+			token === 'BY'
+				? '#d9333a'
+				: token === 'PY'
+					? '#ff6b6b'
+					: token === 'IY'
+						? '#59f0ff'
+						: '#ffb14d';
 
 		const radius = Math.max(2, tileSize * 0.28);
 		const cx = px + tileSize / 2;
@@ -224,7 +233,15 @@ export class WinterMaze implements MazeView {
 
 		ctx.fillStyle = 'rgba(255,255,255,.55)';
 		ctx.beginPath();
-		ctx.ellipse(cx - radius * 0.3, cy - radius * 0.3, radius * 0.35, radius * 0.2, 0, 0, Math.PI * 2);
+		ctx.ellipse(
+			cx - radius * 0.3,
+			cy - radius * 0.3,
+			radius * 0.35,
+			radius * 0.2,
+			0,
+			0,
+			Math.PI * 2
+		);
 		ctx.fill();
 	}
 }

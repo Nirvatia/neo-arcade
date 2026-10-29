@@ -12,7 +12,7 @@ export interface DoomDashCheckResult {
 export function canStartDash(
 	grid: GridService,
 	bossTile: DoomTile,
-	playerTile: DoomTile,
+	playerTile: DoomTile
 ): DoomDashCheckResult {
 	if (!sameRowOrCol(bossTile, playerTile)) {
 		return { canStart: false, direction: null };

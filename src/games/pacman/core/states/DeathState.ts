@@ -30,10 +30,7 @@ export class DeathState implements GameState {
 		const duration = DEATH_TIME;
 		const remaining = Math.min(duration, Math.max(0, this.timer));
 		const elapsed = duration - remaining;
-		const progress =
-			duration > 0
-				? Math.min(1, Math.max(0, elapsed / duration))
-				: 1;
+		const progress = duration > 0 ? Math.min(1, Math.max(0, elapsed / duration)) : 1;
 		return {
 			x: this.centerX,
 			y: this.centerY,

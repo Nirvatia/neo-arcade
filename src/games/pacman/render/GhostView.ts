@@ -103,10 +103,22 @@ export class GhostView {
 		const eyeOffsetY = radius * 0.18;
 		ctx.fillStyle = '#ffffff';
 		ctx.beginPath();
-		ctx.arc(x - eyeOffsetX + lookX * radius * 0.12, y - eyeOffsetY + lookY * radius * 0.12, eyeRadius, 0, Math.PI * 2);
+		ctx.arc(
+			x - eyeOffsetX + lookX * radius * 0.12,
+			y - eyeOffsetY + lookY * radius * 0.12,
+			eyeRadius,
+			0,
+			Math.PI * 2
+		);
 		ctx.fill();
 		ctx.beginPath();
-		ctx.arc(x + eyeOffsetX + lookX * radius * 0.12, y - eyeOffsetY + lookY * radius * 0.12, eyeRadius, 0, Math.PI * 2);
+		ctx.arc(
+			x + eyeOffsetX + lookX * radius * 0.12,
+			y - eyeOffsetY + lookY * radius * 0.12,
+			eyeRadius,
+			0,
+			Math.PI * 2
+		);
 		ctx.fill();
 		if (enraged) {
 			ctx.fillStyle = '#ffffff';
@@ -136,10 +148,7 @@ export class GhostView {
 		ctx.restore();
 	}
 
-	private isErased(
-		position: { x: number; y: number },
-		mask: DisintegrationMask | null
-	): boolean {
+	private isErased(position: { x: number; y: number }, mask: DisintegrationMask | null): boolean {
 		if (!mask) {
 			return false;
 		}

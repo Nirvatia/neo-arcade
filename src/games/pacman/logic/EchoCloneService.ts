@@ -135,8 +135,7 @@ export class EchoCloneService {
 		if (this.phaseValue === 'token' || this.phaseValue === 'clone') {
 			return;
 		}
-		const tile =
-			this.locator.findSafeTile(this.progress.collectedDots) ?? this.findAnyDotTile();
+		const tile = this.locator.findSafeTile(this.progress.collectedDots) ?? this.findAnyDotTile();
 		if (!tile) {
 			console.error('EchoCloneService.debugSpawn', 'no spawn tile available');
 			return;
@@ -157,10 +156,7 @@ export class EchoCloneService {
 			return;
 		}
 		if (this.phaseValue === 'waiting') {
-			if (
-				this.progress.collectionRatio >= SPAWN_THRESHOLD &&
-				this.progress.remainingDots > 0
-			) {
+			if (this.progress.collectionRatio >= SPAWN_THRESHOLD && this.progress.remainingDots > 0) {
 				this.spawnToken();
 			}
 			return;

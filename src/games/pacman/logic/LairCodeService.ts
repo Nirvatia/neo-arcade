@@ -113,11 +113,6 @@ export class LairCodeService {
 	}
 
 	private isValidKind(kind: GhostKind): boolean {
-		return (
-			kind === 'BLINKY' ||
-			kind === 'PINKY' ||
-			kind === 'INKY' ||
-			kind === 'CLYDE'
-		);
+		return kind === 'BLINKY' || kind === 'PINKY' || kind === 'INKY' || kind === 'CLYDE';
 	}
 }

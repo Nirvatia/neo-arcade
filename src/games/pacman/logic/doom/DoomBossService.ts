@@ -736,8 +736,13 @@ export class DoomBossService {
 			dashCheck.direction &&
 			this.personalCooldowns.dash <= 0 &&
 			isDashFair(
-				this.grid, this.model.tile, playerTile, dashCheck.direction,
-				DASH_TELEGRAPH[pi], this.playerBaseSpeed, DASH_MAX_TILES
+				this.grid,
+				this.model.tile,
+				playerTile,
+				dashCheck.direction,
+				DASH_TELEGRAPH[pi],
+				this.playerBaseSpeed,
+				DASH_MAX_TILES
 			)
 		) {
 			available.add('dash');
@@ -749,7 +754,13 @@ export class DoomBossService {
 			if (
 				exits >= 3 &&
 				dist <= CROSS_MAX_PATH_DIST &&
-				isCrossFair(this.grid, this.model.tile, playerTile, CROSS_TELEGRAPH[pi], this.playerBaseSpeed)
+				isCrossFair(
+					this.grid,
+					this.model.tile,
+					playerTile,
+					CROSS_TELEGRAPH[pi],
+					this.playerBaseSpeed
+				)
 			) {
 				available.add('cross');
 			}
@@ -823,7 +834,12 @@ export class DoomBossService {
 		}
 		if (chosen === 'seal') {
 			for (const seal of seals) {
-				this.pendingSeals.push({ x: seal.x, y: seal.y, warn: SEAL_TELEGRAPH, total: SEAL_TELEGRAPH });
+				this.pendingSeals.push({
+					x: seal.x,
+					y: seal.y,
+					warn: SEAL_TELEGRAPH,
+					total: SEAL_TELEGRAPH
+				});
 			}
 			this.model.beginTelegraph('seal', SEAL_TELEGRAPH);
 			return true;
@@ -1188,7 +1204,11 @@ export class DoomBossService {
 		if (player.isInvulnerable) {
 			return;
 		}
-		if (this.model.state === 'INTRO' || this.model.state === 'TRANSITION' || this.model.state === 'DEAD') {
+		if (
+			this.model.state === 'INTRO' ||
+			this.model.state === 'TRANSITION' ||
+			this.model.state === 'DEAD'
+		) {
 			return;
 		}
 		if (this.model.state === 'STUNNED') {

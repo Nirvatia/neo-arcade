@@ -1,13 +1,7 @@
 import type { GridLayout } from './GridView';
 
 export type OverlayMode =
-	| 'none'
-	| 'ready'
-	| 'playing'
-	| 'paused'
-	| 'death'
-	| 'level-clear'
-	| 'game-over';
+	'none' | 'ready' | 'playing' | 'paused' | 'death' | 'level-clear' | 'game-over';
 
 export interface OverlaySnapshot {
 	readonly mode: OverlayMode;
@@ -173,9 +167,7 @@ export class OverlayView {
 			titleColor
 		);
 		const showsTimer =
-			snapshot.mode === 'ready' ||
-			snapshot.mode === 'death' ||
-			snapshot.mode === 'level-clear';
+			snapshot.mode === 'ready' || snapshot.mode === 'death' || snapshot.mode === 'level-clear';
 		if (!showsTimer) {
 			return;
 		}
@@ -246,8 +238,7 @@ export class OverlayView {
 		if (!Number.isFinite(x) || !Number.isFinite(y)) {
 			return;
 		}
-		const safeColor =
-			typeof color === 'string' && color.length > 0 ? color : '#e8efff';
+		const safeColor = typeof color === 'string' && color.length > 0 ? color : '#e8efff';
 		ctx.font = `${Math.floor(fontSize)}px monospace`;
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'middle';

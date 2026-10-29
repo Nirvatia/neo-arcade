@@ -186,13 +186,7 @@ export class SecretScene implements SceneView {
 
 			const roll = random();
 			const kind: SecretDecor['kind'] =
-				roll < 0.35
-					? 'crystal'
-					: roll < 0.6
-						? 'orb'
-						: roll < 0.8
-							? 'rune'
-							: 'stars';
+				roll < 0.35 ? 'crystal' : roll < 0.6 ? 'orb' : roll < 0.8 ? 'rune' : 'stars';
 
 			items.push({
 				kind,
@@ -244,11 +238,7 @@ export class SecretScene implements SceneView {
 		ctx.restore();
 	}
 
-	private drawOrb(
-		ctx: CanvasRenderingContext2D,
-		item: SecretDecor,
-		random: () => number
-	): void {
+	private drawOrb(ctx: CanvasRenderingContext2D, item: SecretDecor, random: () => number): void {
 		const radius = item.radius * 0.5;
 		const gradient = ctx.createRadialGradient(
 			item.x - radius * 0.25,
@@ -274,11 +264,7 @@ export class SecretScene implements SceneView {
 		}
 	}
 
-	private drawRune(
-		ctx: CanvasRenderingContext2D,
-		item: SecretDecor,
-		random: () => number
-	): void {
+	private drawRune(ctx: CanvasRenderingContext2D, item: SecretDecor, random: () => number): void {
 		const radius = item.radius * 0.45;
 
 		ctx.save();
@@ -305,11 +291,7 @@ export class SecretScene implements SceneView {
 		ctx.restore();
 	}
 
-	private drawStars(
-		ctx: CanvasRenderingContext2D,
-		item: SecretDecor,
-		random: () => number
-	): void {
+	private drawStars(ctx: CanvasRenderingContext2D, item: SecretDecor, random: () => number): void {
 		const cluster = item.radius * 0.75;
 		const count = 5 + Math.floor(random() * 4);
 

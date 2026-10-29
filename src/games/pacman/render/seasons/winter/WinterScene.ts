@@ -42,7 +42,12 @@ export class WinterScene implements SceneView {
 		}
 	}
 
-	private bake(width: number, height: number, seed: number, board: RenderBoard | null): HTMLCanvasElement {
+	private bake(
+		width: number,
+		height: number,
+		seed: number,
+		board: RenderBoard | null
+	): HTMLCanvasElement {
 		if (typeof document === 'undefined') {
 			console.error('WinterScene.bake', 'document is unavailable');
 			throw new Error('WinterScene.bake: document is unavailable');
@@ -156,7 +161,7 @@ export class WinterScene implements SceneView {
 		ctx.lineWidth = 1;
 
 		for (let x = 0; x < width; x += 18) {
-			const y = wave(x) + (Math.sin(x) * 6);
+			const y = wave(x) + Math.sin(x) * 6;
 			ctx.beginPath();
 			ctx.moveTo(x, y);
 			ctx.lineTo(x + 8, y);
@@ -205,20 +210,23 @@ export class WinterScene implements SceneView {
 		return items.sort((a, b) => a.y - b.y);
 	}
 
-	private drawTree(
-		ctx: CanvasRenderingContext2D,
-		item: SceneDecor,
-		random: () => number
-	): void {
+	private drawTree(ctx: CanvasRenderingContext2D, item: SceneDecor, random: () => number): void {
 		const { x, y, radius } = item;
 		ctx.fillStyle = 'rgba(55,75,115,.3)';
 		ctx.beginPath();
-		ctx.ellipse(x + radius * 0.3, y + radius * 0.35, radius * 1.15, radius * 0.8, 0, 0, Math.PI * 2);
+		ctx.ellipse(
+			x + radius * 0.3,
+			y + radius * 0.35,
+			radius * 1.15,
+			radius * 0.8,
+			0,
+			0,
+			Math.PI * 2
+		);
 		ctx.fill();
 
-		const palette = random() < 0.45
-			? ['#ffffff', '#9fbfae', '#3b6a58']
-			: ['#f4f9fd', '#b4c8d8', '#5a7a8e'];
+		const palette =
+			random() < 0.45 ? ['#ffffff', '#9fbfae', '#3b6a58'] : ['#f4f9fd', '#b4c8d8', '#5a7a8e'];
 
 		for (let i = 0; i < 8; i += 1) {
 			const angle = i * 0.8;
@@ -261,15 +269,19 @@ export class WinterScene implements SceneView {
 
 		ctx.fillStyle = '#ffffff';
 		ctx.beginPath();
-		ctx.ellipse(x - radius * 0.3, y - radius * 0.35, radius * 0.6, radius * 0.28, 0, 0, Math.PI * 2);
+		ctx.ellipse(
+			x - radius * 0.3,
+			y - radius * 0.35,
+			radius * 0.6,
+			radius * 0.28,
+			0,
+			0,
+			Math.PI * 2
+		);
 		ctx.fill();
 	}
 
-	private drawBush(
-		ctx: CanvasRenderingContext2D,
-		item: SceneDecor,
-		random: () => number
-	): void {
+	private drawBush(ctx: CanvasRenderingContext2D, item: SceneDecor, random: () => number): void {
 		const { x, y, radius } = item;
 		ctx.fillStyle = 'rgba(55,75,115,.25)';
 		ctx.beginPath();

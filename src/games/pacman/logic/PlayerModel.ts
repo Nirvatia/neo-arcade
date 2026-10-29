@@ -93,7 +93,12 @@ export class PlayerModel {
 	}
 
 	beginMove(direction: PlayerDirection, target: PlayerTile): void {
-		if (!Number.isInteger(target.x) || !Number.isInteger(target.y) || target.x < 0 || target.y < 0) {
+		if (
+			!Number.isInteger(target.x) ||
+			!Number.isInteger(target.y) ||
+			target.x < 0 ||
+			target.y < 0
+		) {
 			console.error('PlayerModel.beginMove', 'invalid target', target);
 			throw new Error('PlayerModel.beginMove: invalid target');
 		}

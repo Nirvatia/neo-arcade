@@ -193,13 +193,7 @@ export class AutumnScene implements SceneView {
 
 			const roll = random();
 			const kind: AutumnDecor['kind'] =
-				roll < 0.45
-					? 'tree'
-					: roll < 0.68
-						? 'bush'
-						: roll < 0.85
-							? 'mushroom'
-							: 'leaves';
+				roll < 0.45 ? 'tree' : roll < 0.68 ? 'bush' : roll < 0.85 ? 'mushroom' : 'leaves';
 
 			items.push({
 				kind,
@@ -212,11 +206,7 @@ export class AutumnScene implements SceneView {
 		return items.sort((a, b) => a.y - b.y);
 	}
 
-	private drawTree(
-		ctx: CanvasRenderingContext2D,
-		item: AutumnDecor,
-		random: () => number
-	): void {
+	private drawTree(ctx: CanvasRenderingContext2D, item: AutumnDecor, random: () => number): void {
 		const radius = item.radius;
 
 		ctx.fillStyle = 'rgba(70,45,20,.28)';
@@ -233,9 +223,7 @@ export class AutumnScene implements SceneView {
 		ctx.fill();
 
 		const palette =
-			random() < 0.5
-				? ['#ffb14d', '#ff6b4d', '#8a4a2f']
-				: ['#ffd34d', '#d9532f', '#6f3b23'];
+			random() < 0.5 ? ['#ffb14d', '#ff6b4d', '#8a4a2f'] : ['#ffd34d', '#d9532f', '#6f3b23'];
 
 		for (let i = 0; i < 9; i += 1) {
 			const angle = i * 0.7;
@@ -262,11 +250,7 @@ export class AutumnScene implements SceneView {
 		}
 	}
 
-	private drawBush(
-		ctx: CanvasRenderingContext2D,
-		item: AutumnDecor,
-		random: () => number
-	): void {
+	private drawBush(ctx: CanvasRenderingContext2D, item: AutumnDecor, random: () => number): void {
 		const radius = item.radius * 0.8;
 
 		ctx.fillStyle = 'rgba(70,45,20,.24)';
@@ -325,11 +309,7 @@ export class AutumnScene implements SceneView {
 		}
 	}
 
-	private drawLeaves(
-		ctx: CanvasRenderingContext2D,
-		item: AutumnDecor,
-		random: () => number
-	): void {
+	private drawLeaves(ctx: CanvasRenderingContext2D, item: AutumnDecor, random: () => number): void {
 		const cluster = item.radius * 0.7;
 		const count = 5 + Math.floor(random() * 4);
 		const palette = ['#ffb14d', '#ff6b4d', '#ffd34d', '#d9532f'];

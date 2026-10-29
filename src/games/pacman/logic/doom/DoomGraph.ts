@@ -13,19 +13,27 @@ export function doomTileKey(tile: DoomTile): string {
 
 export function adjacentTile(from: DoomTile, direction: DoomDirection): DoomTile {
 	switch (direction) {
-		case 'UP': return { x: from.x, y: from.y - 1 };
-		case 'DOWN': return { x: from.x, y: from.y + 1 };
-		case 'LEFT': return { x: from.x - 1, y: from.y };
-		case 'RIGHT': return { x: from.x + 1, y: from.y };
+		case 'UP':
+			return { x: from.x, y: from.y - 1 };
+		case 'DOWN':
+			return { x: from.x, y: from.y + 1 };
+		case 'LEFT':
+			return { x: from.x - 1, y: from.y };
+		case 'RIGHT':
+			return { x: from.x + 1, y: from.y };
 	}
 }
 
 export function oppositeDirection(direction: DoomDirection): DoomDirection {
 	switch (direction) {
-		case 'UP': return 'DOWN';
-		case 'DOWN': return 'UP';
-		case 'LEFT': return 'RIGHT';
-		case 'RIGHT': return 'LEFT';
+		case 'UP':
+			return 'DOWN';
+		case 'DOWN':
+			return 'UP';
+		case 'LEFT':
+			return 'RIGHT';
+		case 'RIGHT':
+			return 'LEFT';
 	}
 }
 
@@ -35,10 +43,7 @@ export function doomDistanceSq(a: DoomTile, b: DoomTile): number {
 	return dx * dx + dy * dy;
 }
 
-export function bfsDistanceFrom(
-	grid: GridService,
-	origin: DoomTile
-): Map<string, number> {
+export function bfsDistanceFrom(grid: GridService, origin: DoomTile): Map<string, number> {
 	const distances = new Map<string, number>();
 	const queue: Array<{ tile: DoomTile; distance: number }> = [];
 	let head = 0;

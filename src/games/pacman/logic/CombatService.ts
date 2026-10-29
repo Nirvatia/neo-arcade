@@ -398,12 +398,7 @@ export class CombatService {
 		for (const ghost of this.ghosts.list) {
 			const state = ghost.state;
 
-			if (
-				state === 'lair' ||
-				state === 'exiting' ||
-				state === 'eyes' ||
-				state === 'hypnotized'
-			) {
+			if (state === 'lair' || state === 'exiting' || state === 'eyes' || state === 'hypnotized') {
 				continue;
 			}
 

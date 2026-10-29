@@ -201,11 +201,7 @@ export class SpringScene implements SceneView {
 		return items.sort((a, b) => a.y - b.y);
 	}
 
-	private drawTree(
-		ctx: CanvasRenderingContext2D,
-		item: SpringDecor,
-		random: () => number
-	): void {
+	private drawTree(ctx: CanvasRenderingContext2D, item: SpringDecor, random: () => number): void {
 		const radius = item.radius;
 
 		ctx.fillStyle = 'rgba(55,95,55,.28)';
@@ -222,9 +218,7 @@ export class SpringScene implements SceneView {
 		ctx.fill();
 
 		const palette =
-			random() < 0.5
-				? ['#fff4f9', '#ffd7ea', '#8fb57a']
-				: ['#ffffff', '#e8f8dc', '#6f9d5f'];
+			random() < 0.5 ? ['#fff4f9', '#ffd7ea', '#8fb57a'] : ['#ffffff', '#e8f8dc', '#6f9d5f'];
 
 		for (let i = 0; i < 9; i += 1) {
 			const angle = i * 0.7;
@@ -251,11 +245,7 @@ export class SpringScene implements SceneView {
 		}
 	}
 
-	private drawBush(
-		ctx: CanvasRenderingContext2D,
-		item: SpringDecor,
-		random: () => number
-	): void {
+	private drawBush(ctx: CanvasRenderingContext2D, item: SpringDecor, random: () => number): void {
 		const radius = item.radius * 0.8;
 
 		ctx.fillStyle = 'rgba(60,95,60,.25)';

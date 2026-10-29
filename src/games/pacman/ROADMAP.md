@@ -55,7 +55,7 @@ Order matters: each stage builds on the ones before it.
    change. Includes the ESLint backlog and duplicated helpers (e.g. `makeRandom` copied into
    five season scenes). Acceptance: tests green, lint clean, before/after screenshots match.
 2. **Transitions and timers.** State flow `menu → ready → playing → death → level-clear →
-   game-over`, durations, pause/resume. Later animations hook into these.
+game-over`, durations, pause/resume. Later animations hook into these.
 3. **Replace the level disintegration on death.** Pac-Man's own death is done; replace the
    reaction of the level around it (`render/DeathWaveView.ts`, the disintegration mask).
 4. **Level-complete animation.** Built on stage 2's transitions.

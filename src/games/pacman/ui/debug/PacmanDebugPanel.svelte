@@ -55,11 +55,7 @@
 		<div class="panel">
 			<div class="row">
 				<input type="number" min="1" bind:value={levelInput} />
-				<button
-					type="button"
-					tabindex={-1}
-					on:click={(event) => run(prepareLevel, event)}
-				>
+				<button type="button" tabindex={-1} on:click={(event) => run(prepareLevel, event)}>
 					PREPARE LV
 				</button>
 			</div>
@@ -99,9 +95,7 @@
 			<button type="button" tabindex={-1} on:click={(e) => run(debugCompleteLevel, e)}>
 				COMPLETE LEVEL
 			</button>
-			<button type="button" tabindex={-1} on:click={(e) => run(debugKillPlayer, e)}>
-				DIE
-			</button>
+			<button type="button" tabindex={-1} on:click={(e) => run(debugKillPlayer, e)}> DIE </button>
 			<button type="button" tabindex={-1} on:click={(e) => run(debugEnterHell, e)}>
 				ENTER HELL
 			</button>

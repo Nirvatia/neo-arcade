@@ -190,8 +190,7 @@ export class SummerScene implements SceneView {
 			}
 
 			const roll = random();
-			const kind: SummerDecor['kind'] =
-				roll < 0.45 ? 'sunflower' : roll < 0.72 ? 'bush' : 'rock';
+			const kind: SummerDecor['kind'] = roll < 0.45 ? 'sunflower' : roll < 0.72 ? 'bush' : 'rock';
 
 			items.push({
 				kind,
@@ -260,11 +259,7 @@ export class SummerScene implements SceneView {
 		ctx.fill();
 	}
 
-	private drawBush(
-		ctx: CanvasRenderingContext2D,
-		item: SummerDecor,
-		random: () => number
-	): void {
+	private drawBush(ctx: CanvasRenderingContext2D, item: SummerDecor, random: () => number): void {
 		const radius = item.radius * 0.8;
 
 		ctx.fillStyle = 'rgba(75,70,25,.24)';

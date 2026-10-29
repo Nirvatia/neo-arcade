@@ -13,23 +13,9 @@ import {
 } from './DoomBalance';
 
 export type DoomStateName =
-	| 'INTRO'
-	| 'CHASE'
-	| 'TELEGRAPH'
-	| 'ACTIVE'
-	| 'RECOVER'
-	| 'STUNNED'
-	| 'TRANSITION'
-	| 'DEAD';
+	'INTRO' | 'CHASE' | 'TELEGRAPH' | 'ACTIVE' | 'RECOVER' | 'STUNNED' | 'TRANSITION' | 'DEAD';
 
-export type DoomShape =
-	| 'normal'
-	| 'wedge'
-	| 'cross'
-	| 'shrink'
-	| 'lobes'
-	| 'cast'
-	| 'stunned';
+export type DoomShape = 'normal' | 'wedge' | 'cross' | 'shrink' | 'lobes' | 'cast' | 'stunned';
 
 export interface DoomRenderState {
 	x: number;
@@ -241,7 +227,11 @@ export class DoomBossModel {
 		const threshold2 = PHASE_THRESHOLDS[1];
 		if (this.hp > threshold1 && this.hp - actualDamage < threshold1) {
 			actualDamage = this.hp - threshold1;
-		} else if (this.hp > threshold2 && this.hp <= threshold1 && this.hp - actualDamage < threshold2) {
+		} else if (
+			this.hp > threshold2 &&
+			this.hp <= threshold1 &&
+			this.hp - actualDamage < threshold2
+		) {
 			actualDamage = this.hp - threshold2;
 		}
 		this.hp = Math.max(0, this.hp - actualDamage);
@@ -327,7 +317,8 @@ export class DoomBossModel {
 		if (this.state === 'TELEGRAPH') {
 			this.stateTimer += dt;
 			this.telegraphProgress = Math.min(1, this.stateTimer / this.telegraphDuration);
-			this.chaos = baseChaosForPhase(this.phase) +
+			this.chaos =
+				baseChaosForPhase(this.phase) +
 				(1.0 - baseChaosForPhase(this.phase)) * this.telegraphProgress;
 			return;
 		}

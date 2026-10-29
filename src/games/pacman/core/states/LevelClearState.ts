@@ -72,9 +72,7 @@ export class LevelClearState implements GameState {
 			phaseDuration = CUTSCENE_DURATION;
 			phaseElapsed = elapsed - BLINK_DURATION;
 		}
-		const phaseProgress = clamp01(
-			phaseDuration > 0 ? phaseElapsed / phaseDuration : 1
-		);
+		const phaseProgress = clamp01(phaseDuration > 0 ? phaseElapsed / phaseDuration : 1);
 		const phaseTimer = Math.max(0, phaseDuration - phaseElapsed);
 		let blinkAmount = 0;
 		let mazeAlpha = 1;
@@ -133,10 +131,7 @@ export class LevelClearState implements GameState {
 			this.musicEmitted = true;
 			ctx.events.emit('audio:cue', { cue: 'win' });
 		}
-		if (
-			TOTAL_DURATION <= EPSILON ||
-			this.elapsed >= TOTAL_DURATION - EPSILON
-		) {
+		if (TOTAL_DURATION <= EPSILON || this.elapsed >= TOTAL_DURATION - EPSILON) {
 			this.elapsed = TOTAL_DURATION;
 			this.awaitingAdvance = true;
 		}

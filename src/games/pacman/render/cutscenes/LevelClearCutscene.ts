@@ -35,11 +35,7 @@ export class LevelClearCutscene implements Cutscene {
 			console.error('LevelClearCutscene.draw', 'invalid tile size', frame.tileSize);
 			return;
 		}
-		if (
-			!Number.isFinite(frame.progress) ||
-			frame.progress < 0 ||
-			frame.progress > 1
-		) {
+		if (!Number.isFinite(frame.progress) || frame.progress < 0 || frame.progress > 1) {
 			console.error('LevelClearCutscene.draw', 'invalid progress', frame.progress);
 			return;
 		}
@@ -74,10 +70,7 @@ export class LevelClearCutscene implements Cutscene {
 		ctx.fillStyle = accent;
 		ctx.fillRect(laneLeft, laneTop, laneWidth, edge);
 		ctx.fillRect(laneLeft, laneTop + laneHeight - edge, laneWidth, edge);
-		const radius = Math.max(
-			1,
-			Math.min(ts * PLAYER_RADIUS_RATIO, laneHeight * 0.32)
-		);
+		const radius = Math.max(1, Math.min(ts * PLAYER_RADIUS_RATIO, laneHeight * 0.32));
 		const runStart = laneLeft + radius;
 		const span = Math.max(0, laneWidth - radius * 2);
 		const travel = this.clamp(
@@ -86,10 +79,7 @@ export class LevelClearCutscene implements Cutscene {
 			1
 		);
 		const playerX = runStart + span * travel;
-		const dotCount = Math.max(
-			3,
-			Math.min(MAX_DOTS, Math.floor(laneWidth / (ts * 1.4)))
-		);
+		const dotCount = Math.max(3, Math.min(MAX_DOTS, Math.floor(laneWidth / (ts * 1.4))));
 		const dotRadius = Math.max(1, ts * DOT_RADIUS_RATIO);
 		for (let i = 0; i < dotCount; i += 1) {
 			const t = dotCount > 1 ? i / (dotCount - 1) : 0.5;

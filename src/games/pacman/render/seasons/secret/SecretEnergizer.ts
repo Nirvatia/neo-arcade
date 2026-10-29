@@ -32,7 +32,13 @@ export class SecretEnergizer implements EnergizerView {
 		ctx.strokeStyle = colors.dot;
 		ctx.lineWidth = Math.max(1, tileSize * 0.05);
 		ctx.beginPath();
-		ctx.arc(cx, cy, radius * 1.35, safeTime * 1.8 + hash * 6, safeTime * 1.8 + hash * 6 + Math.PI * 0.7);
+		ctx.arc(
+			cx,
+			cy,
+			radius * 1.35,
+			safeTime * 1.8 + hash * 6,
+			safeTime * 1.8 + hash * 6 + Math.PI * 0.7
+		);
 		ctx.stroke();
 
 		ctx.save();

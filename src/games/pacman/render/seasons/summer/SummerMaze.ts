@@ -147,8 +147,7 @@ export class SummerMaze implements MazeView {
 		for (let row = 0; row < 2; row += 1) {
 			for (let col = 0; col < 2; col += 1) {
 				const variant = tileHash(tx + row, ty + col, 11);
-				ctx.fillStyle =
-					variant > 0.66 ? '#93805a' : variant > 0.33 ? '#81704d' : '#756343';
+				ctx.fillStyle = variant > 0.66 ? '#93805a' : variant > 0.33 ? '#81704d' : '#756343';
 				ctx.fillRect(
 					px + col * half + 1,
 					py + row * half + 1,
@@ -237,7 +236,15 @@ export class SummerMaze implements MazeView {
 
 		ctx.fillStyle = 'rgba(255,255,255,.55)';
 		ctx.beginPath();
-		ctx.ellipse(cx - radius * 0.3, cy - radius * 0.3, radius * 0.35, radius * 0.2, 0, 0, Math.PI * 2);
+		ctx.ellipse(
+			cx - radius * 0.3,
+			cy - radius * 0.3,
+			radius * 0.35,
+			radius * 0.2,
+			0,
+			0,
+			Math.PI * 2
+		);
 		ctx.fill();
 	}
 }

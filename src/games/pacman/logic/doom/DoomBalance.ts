@@ -7,7 +7,7 @@ export interface DoomPhaseTuning {
 const PHASE_TUNING: readonly DoomPhaseTuning[] = [
 	{ speedRatio: 0.8, baseChaos: 0.25, attackCooldown: 4.0 },
 	{ speedRatio: 6 / 7, baseChaos: 0.45, attackCooldown: 3.0 },
-	{ speedRatio: 32 / 35, baseChaos: 0.70, attackCooldown: 2.2 }
+	{ speedRatio: 32 / 35, baseChaos: 0.7, attackCooldown: 2.2 }
 ];
 
 export const DASH_SPEED_MUL = 2;

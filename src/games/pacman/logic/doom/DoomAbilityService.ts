@@ -315,10 +315,7 @@ export class DoomAbilityService {
 				continue;
 			}
 			this.processedTracers.add(tracer);
-			if (
-				!this.ballHitBossValue &&
-				this.tileInTracer(this.boss.tile.x, this.boss.tile.y, tracer)
-			) {
+			if (!this.ballHitBossValue && this.tileInTracer(this.boss.tile.x, this.boss.tile.y, tracer)) {
 				this.boss.takeDamage(BFG_TRACER_DAMAGE);
 			}
 			this.boss.killMinionsWhere((minion) => {

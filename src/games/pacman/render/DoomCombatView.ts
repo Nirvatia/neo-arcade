@@ -33,7 +33,12 @@ export class DoomCombatView {
 	}
 
 	/** Hazard blasts and minions, drawn over the boss (projectiles live in DoomFxView). */
-	drawAir(ctx: CanvasRenderingContext2D, boss: DoomBossService, layout: GridLayout, time: number): void {
+	drawAir(
+		ctx: CanvasRenderingContext2D,
+		boss: DoomBossService,
+		layout: GridLayout,
+		time: number
+	): void {
 		this.drawHazardBlasts(ctx, boss, layout, time);
 		this.drawMinions(ctx, boss, layout, time);
 	}
@@ -457,7 +462,14 @@ export class DoomCombatView {
 			const py = layout.offsetY + pos.y * s;
 			const r = s * 0.24;
 			const eyeColor = MINION_COLORS[minion.kind] ?? '#ffffff';
-			const dir = minion.facing === 'UP' ? -Math.PI / 2 : minion.facing === 'DOWN' ? Math.PI / 2 : minion.facing === 'LEFT' ? Math.PI : 0;
+			const dir =
+				minion.facing === 'UP'
+					? -Math.PI / 2
+					: minion.facing === 'DOWN'
+						? Math.PI / 2
+						: minion.facing === 'LEFT'
+							? Math.PI
+							: 0;
 			const seed = minion.kind.length * 1.7;
 			ctx.save();
 			ctx.globalAlpha = Math.min(1, minion.lifetime / 2);
@@ -472,7 +484,10 @@ export class DoomCombatView {
 				ctx.moveTo(-r * 0.6, k * r * 0.35);
 				for (let i = 1; i <= 4; i += 1) {
 					const u = i / 4;
-					ctx.lineTo(-r * (0.6 + u * 1.1), k * r * 0.35 + Math.sin(time * 12 + seed + k * 2 + u * 4) * r * 0.35 * u);
+					ctx.lineTo(
+						-r * (0.6 + u * 1.1),
+						k * r * 0.35 + Math.sin(time * 12 + seed + k * 2 + u * 4) * r * 0.35 * u
+					);
 				}
 				ctx.stroke();
 			}
@@ -505,7 +520,14 @@ export class DoomCombatView {
 			// two eyes, tinted by kind so the three behaviours stay readable
 			for (const side of [-1, 1]) {
 				ctx.globalCompositeOperation = 'lighter';
-				const g = ctx.createRadialGradient(-r * 0.05, side * r * 0.5, 0, -r * 0.05, side * r * 0.5, r * 0.45);
+				const g = ctx.createRadialGradient(
+					-r * 0.05,
+					side * r * 0.5,
+					0,
+					-r * 0.05,
+					side * r * 0.5,
+					r * 0.45
+				);
 				g.addColorStop(0, eyeColor);
 				g.addColorStop(1, 'rgba(0,0,0,0)');
 				ctx.fillStyle = g;

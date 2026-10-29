@@ -26,9 +26,12 @@ export class SecretWeather implements WeatherView {
 		time: number
 	): void {
 		if (
-			!Number.isFinite(viewportWidth) || viewportWidth <= 0 ||
-			!Number.isFinite(viewportHeight) || viewportHeight <= 0 ||
-			!Number.isFinite(layout.tileSize) || layout.tileSize <= 0
+			!Number.isFinite(viewportWidth) ||
+			viewportWidth <= 0 ||
+			!Number.isFinite(viewportHeight) ||
+			viewportHeight <= 0 ||
+			!Number.isFinite(layout.tileSize) ||
+			layout.tileSize <= 0
 		) {
 			return;
 		}

@@ -150,8 +150,17 @@ export class RenderPipeline {
 
 		const mask = this.disintegrationMask(grid);
 		const drawnLayout = this.gridView.draw(
-			this.ctx, grid, progress, this.width, this.height,
-			season.palette, ratio, bundle, this.timeValue, mask, this.level.mazeScale
+			this.ctx,
+			grid,
+			progress,
+			this.width,
+			this.height,
+			season.palette,
+			ratio,
+			bundle,
+			this.timeValue,
+			mask,
+			this.level.mazeScale
 		);
 
 		this.drawCollectibles(drawnLayout, mask);
@@ -161,8 +170,12 @@ export class RenderPipeline {
 			const isMs = this.level.profile === 'ms-pacman';
 			const hypnosis = this.level.hypnosis;
 			const ghostTimer = isMs
-				? (hypnosis ? hypnosis.overdriveTimer : 0)
-				: (combat ? combat.powerTimer : 0);
+				? hypnosis
+					? hypnosis.overdriveTimer
+					: 0
+				: combat
+					? combat.powerTimer
+					: 0;
 			const overdrive = Boolean(isMs && hypnosis && hypnosis.overdriveActive);
 			this.ghostView.draw(this.ctx, ghosts, drawnLayout, ghostTimer, overdrive, mask);
 		}
@@ -171,14 +184,24 @@ export class RenderPipeline {
 			const wave = this.director.deathWave;
 			if (wave) {
 				this.deathWaveView.draw(
-					this.ctx, drawnLayout, grid.width, grid.height,
-					wave.x, wave.y, wave.progress
+					this.ctx,
+					drawnLayout,
+					grid.width,
+					grid.height,
+					wave.x,
+					wave.y,
+					wave.progress
 				);
 			}
 			const dead = this.level.player;
 			if (dead) {
 				this.playerView.draw(
-					this.ctx, dead, drawnLayout, this.level.profile, this.timeValue, this.playerOptions(state)
+					this.ctx,
+					dead,
+					drawnLayout,
+					this.level.profile,
+					this.timeValue,
+					this.playerOptions(state)
 				);
 			}
 			this.drawOverlay(drawnLayout, grid);
@@ -188,16 +211,19 @@ export class RenderPipeline {
 		const player = this.level.player;
 		if (player) {
 			this.playerView.draw(
-				this.ctx, player, drawnLayout, this.level.profile, this.timeValue, this.playerOptions(state)
+				this.ctx,
+				player,
+				drawnLayout,
+				this.level.profile,
+				this.timeValue,
+				this.playerOptions(state)
 			);
 		}
 
 		this.drawDimming(drawnLayout, grid, ratio);
 
 		if (state !== 'menu' && state !== 'paused') {
-			bundle.weather.draw(
-				this.ctx, drawnLayout, this.width, this.height, dt, this.timeValue
-			);
+			bundle.weather.draw(this.ctx, drawnLayout, this.width, this.height, dt, this.timeValue);
 		}
 
 		this.drawOverlay(drawnLayout, grid);
@@ -299,14 +325,27 @@ export class RenderPipeline {
 			if (state === 'death') {
 				const wave = this.director.deathWave;
 				if (wave) {
-					this.deathWaveView.draw(this.ctx, layout, grid.width, grid.height, wave.x, wave.y, wave.progress);
+					this.deathWaveView.draw(
+						this.ctx,
+						layout,
+						grid.width,
+						grid.height,
+						wave.x,
+						wave.y,
+						wave.progress
+					);
 				}
 			} else if (player && boss && fighting) {
 				this.doomCombatView.drawPull(this.ctx, boss, player.position, layout, this.timeValue);
 			}
 			if (player) {
 				this.playerView.draw(
-					this.ctx, player, layout, this.level.profile, this.timeValue, this.playerOptions(state)
+					this.ctx,
+					player,
+					layout,
+					this.level.profile,
+					this.timeValue,
+					this.playerOptions(state)
 				);
 			}
 			if (doom) {
@@ -429,7 +468,11 @@ export class RenderPipeline {
 		}
 
 		const echo = this.level.echo;
-		if (echo && (echo.phase === 'token' || echo.phase === 'clone') && !this.erased(echo.position, mask)) {
+		if (
+			echo &&
+			(echo.phase === 'token' || echo.phase === 'clone') &&
+			!this.erased(echo.position, mask)
+		) {
 			this.echoCloneView.draw(this.ctx, echo, layout);
 		}
 	}
@@ -443,7 +486,10 @@ export class RenderPipeline {
 		const width = Math.floor(rectWidth);
 		const height = Math.floor(rectHeight);
 		const deviceRatio = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
-		const pixelRatio = Math.min(2, Number.isFinite(deviceRatio) && deviceRatio > 0 ? deviceRatio : 1);
+		const pixelRatio = Math.min(
+			2,
+			Number.isFinite(deviceRatio) && deviceRatio > 0 ? deviceRatio : 1
+		);
 		if (width === this.width && height === this.height && pixelRatio === this.pixelRatio) {
 			return true;
 		}
@@ -486,9 +532,8 @@ export class RenderPipeline {
 	}
 
 	private sceneSeed(): number {
-		const level = Number.isFinite(this.level.level) && this.level.level >= 1
-			? Math.floor(this.level.level)
-			: 1;
+		const level =
+			Number.isFinite(this.level.level) && this.level.level >= 1 ? Math.floor(this.level.level) : 1;
 		let seed = level * 7919;
 		if (this.level.secretMode) {
 			seed += 104729;
@@ -529,8 +574,10 @@ export class RenderPipeline {
 		}
 		this.ctx.fillStyle = `rgba(2,4,12,${Math.min(0.28, ratio * 0.28)})`;
 		this.ctx.fillRect(
-			layout.offsetX, layout.offsetY,
-			grid.width * layout.tileSize, grid.height * layout.tileSize
+			layout.offsetX,
+			layout.offsetY,
+			grid.width * layout.tileSize,
+			grid.height * layout.tileSize
 		);
 	}
 
@@ -540,8 +587,11 @@ export class RenderPipeline {
 			return;
 		}
 		this.overlayView.draw(
-			this.ctx, snapshot, layout,
-			grid.width * layout.tileSize, grid.height * layout.tileSize,
+			this.ctx,
+			snapshot,
+			layout,
+			grid.width * layout.tileSize,
+			grid.height * layout.tileSize,
 			!this.level.hellMode
 		);
 	}
@@ -609,7 +659,10 @@ export class RenderPipeline {
 			title,
 			timer: Number.isFinite(timer) && timer >= 0 ? timer : 0,
 			duration: Number.isFinite(duration) && duration >= 0 ? duration : 0,
-			level: Number.isFinite(this.level.level) && this.level.level >= 1 ? Math.floor(this.level.level) : 1,
+			level:
+				Number.isFinite(this.level.level) && this.level.level >= 1
+					? Math.floor(this.level.level)
+					: 1,
 			lives: combat && combat.lives >= 0 ? Math.floor(combat.lives) : 0,
 			powerLabel,
 			powerTimer: Number.isFinite(powerTimer) && powerTimer >= 0 ? powerTimer : 0

@@ -29,10 +29,7 @@ export class ReadyState implements GameState {
 
 	get snapshot(): ReadySnapshot {
 		const remaining = Math.min(READY_TIME, Math.max(0, this.timer));
-		const progress =
-			READY_TIME > 0
-				? Math.min(1, Math.max(0, 1 - remaining / READY_TIME))
-				: 1;
+		const progress = READY_TIME > 0 ? Math.min(1, Math.max(0, 1 - remaining / READY_TIME)) : 1;
 		return {
 			timer: remaining,
 			duration: READY_TIME,

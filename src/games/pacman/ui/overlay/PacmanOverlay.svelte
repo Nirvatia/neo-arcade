@@ -15,69 +15,37 @@
 
 {#if $pacmanHudStore.state === 'menu'}
 	<div class="pacman-overlay">
-		<button
-			type="button"
-			tabindex={-1}
-			on:click={(event) => activate(pressConfirm, event)}
-		>
+		<button type="button" tabindex={-1} on:click={(event) => activate(pressConfirm, event)}>
 			START
 		</button>
-		<button
-			type="button"
-			tabindex={-1}
-			on:click={(event) => activate(pressProfile, event)}
-		>
+		<button type="button" tabindex={-1} on:click={(event) => activate(pressProfile, event)}>
 			CHANGE MODE
 		</button>
 	</div>
 {:else if $pacmanHudStore.state === 'ready'}
 	<div class="pacman-overlay">
-		<button
-			type="button"
-			tabindex={-1}
-			on:click={(event) => activate(pressConfirm, event)}
-		>
+		<button type="button" tabindex={-1} on:click={(event) => activate(pressConfirm, event)}>
 			SKIP
 		</button>
 	</div>
 {:else if $pacmanHudStore.state === 'paused'}
 	<div class="pacman-overlay">
-		<button
-			type="button"
-			tabindex={-1}
-			on:click={(event) => activate(pressPause, event)}
-		>
+		<button type="button" tabindex={-1} on:click={(event) => activate(pressPause, event)}>
 			RESUME
 		</button>
-		<button
-			type="button"
-			tabindex={-1}
-			on:click={(event) => activate(pressMenu, event)}
-		>
+		<button type="button" tabindex={-1} on:click={(event) => activate(pressMenu, event)}>
 			MENU
 		</button>
 	</div>
 {:else if $pacmanHudStore.state === 'game-over'}
 	<div class="pacman-overlay">
-		<button
-			type="button"
-			tabindex={-1}
-			on:click={(event) => activate(pressConfirm, event)}
-		>
+		<button type="button" tabindex={-1} on:click={(event) => activate(pressConfirm, event)}>
 			PLAY AGAIN
 		</button>
-		<button
-			type="button"
-			tabindex={-1}
-			on:click={(event) => activate(pressProfile, event)}
-		>
+		<button type="button" tabindex={-1} on:click={(event) => activate(pressProfile, event)}>
 			CHANGE MODE
 		</button>
-		<button
-			type="button"
-			tabindex={-1}
-			on:click={(event) => activate(pressMenu, event)}
-		>
+		<button type="button" tabindex={-1} on:click={(event) => activate(pressMenu, event)}>
 			MENU
 		</button>
 	</div>
