@@ -443,6 +443,7 @@ export class DoomCombatView {
 		}
 	}
 
+	/** Lamprey spawn: a fleshy lump with a toothed maw, three trailing tentacles and eyes. */
 	private drawMinions(
 		ctx: CanvasRenderingContext2D,
 		boss: DoomBossService,
@@ -454,36 +455,71 @@ export class DoomCombatView {
 			const pos = minionPosition(minion);
 			const px = layout.offsetX + pos.x * s;
 			const py = layout.offsetY + pos.y * s;
-			const radius = Math.max(3, s * 0.35);
-			const color = MINION_COLORS[minion.kind] ?? '#ffffff';
-			const wobble = Math.sin(time * 6 + pos.x * 3) * s * 0.03;
-			const fadeAlpha = Math.min(1, minion.lifetime / 2);
+			const r = s * 0.24;
+			const eyeColor = MINION_COLORS[minion.kind] ?? '#ffffff';
+			const dir = minion.facing === 'UP' ? -Math.PI / 2 : minion.facing === 'DOWN' ? Math.PI / 2 : minion.facing === 'LEFT' ? Math.PI : 0;
+			const seed = minion.kind.length * 1.7;
 			ctx.save();
-			ctx.globalAlpha = fadeAlpha;
-			ctx.translate(px, py + wobble);
-			ctx.fillStyle = color;
-			ctx.beginPath();
-			ctx.arc(0, 0, radius, Math.PI, 0);
-			ctx.lineTo(radius, radius * 0.6);
-			for (let i = 0; i < 4; i += 1) {
-				const waveX = radius - (i * radius * 2) / 3;
-				ctx.quadraticCurveTo(
-					waveX - radius / 6, radius * 0.9,
-					waveX - radius / 3, radius * 0.6
-				);
+			ctx.globalAlpha = Math.min(1, minion.lifetime / 2);
+			ctx.translate(px, py);
+			ctx.rotate(dir);
+			ctx.lineCap = 'round';
+			// tentacles trail behind the direction of travel
+			for (let k = -1; k <= 1; k += 1) {
+				ctx.strokeStyle = '#5a1414';
+				ctx.lineWidth = Math.max(1, r * 0.28);
+				ctx.beginPath();
+				ctx.moveTo(-r * 0.6, k * r * 0.35);
+				for (let i = 1; i <= 4; i += 1) {
+					const u = i / 4;
+					ctx.lineTo(-r * (0.6 + u * 1.1), k * r * 0.35 + Math.sin(time * 12 + seed + k * 2 + u * 4) * r * 0.35 * u);
+				}
+				ctx.stroke();
 			}
-			ctx.closePath();
-			ctx.fill();
-			ctx.fillStyle = '#ffffff';
+			const pulse = 1 + Math.sin(time * 8 + seed) * 0.06;
+			const flesh = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r * 1.1);
+			flesh.addColorStop(0, '#d0605a');
+			flesh.addColorStop(0.55, '#7a1414');
+			flesh.addColorStop(1, '#2a0404');
+			ctx.fillStyle = flesh;
 			ctx.beginPath();
-			ctx.ellipse(-radius * 0.3, -radius * 0.2, radius * 0.25, radius * 0.3, 0, 0, Math.PI * 2);
-			ctx.ellipse(radius * 0.3, -radius * 0.2, radius * 0.25, radius * 0.3, 0, 0, Math.PI * 2);
+			ctx.ellipse(0, 0, r * pulse, r * 0.85 * pulse, 0, 0, Math.PI * 2);
 			ctx.fill();
-			ctx.fillStyle = '#111111';
+			ctx.strokeStyle = 'rgba(0,0,0,.6)';
+			ctx.lineWidth = Math.max(1, r * 0.1);
+			ctx.stroke();
+			// maw at the front with a ring of teeth
+			ctx.fillStyle = '#0a0000';
 			ctx.beginPath();
-			ctx.arc(-radius * 0.3, -radius * 0.15, radius * 0.12, 0, Math.PI * 2);
-			ctx.arc(radius * 0.3, -radius * 0.15, radius * 0.12, 0, Math.PI * 2);
+			ctx.arc(r * 0.45, 0, r * 0.38, 0, Math.PI * 2);
 			ctx.fill();
+			ctx.fillStyle = '#efe4d2';
+			for (let i = 0; i < 6; i += 1) {
+				const a = (i / 6) * Math.PI * 2 + time * 3;
+				ctx.beginPath();
+				ctx.moveTo(r * 0.45 + Math.cos(a - 0.3) * r * 0.38, Math.sin(a - 0.3) * r * 0.38);
+				ctx.lineTo(r * 0.45 + Math.cos(a) * r * 0.18, Math.sin(a) * r * 0.18);
+				ctx.lineTo(r * 0.45 + Math.cos(a + 0.3) * r * 0.38, Math.sin(a + 0.3) * r * 0.38);
+				ctx.fill();
+			}
+			// two eyes, tinted by kind so the three behaviours stay readable
+			for (const side of [-1, 1]) {
+				ctx.globalCompositeOperation = 'lighter';
+				const g = ctx.createRadialGradient(-r * 0.05, side * r * 0.5, 0, -r * 0.05, side * r * 0.5, r * 0.45);
+				g.addColorStop(0, eyeColor);
+				g.addColorStop(1, 'rgba(0,0,0,0)');
+				ctx.fillStyle = g;
+				ctx.fillRect(-r * 0.5, side * r * 0.5 - r * 0.45, r * 0.9, r * 0.9);
+				ctx.globalCompositeOperation = 'source-over';
+				ctx.fillStyle = eyeColor;
+				ctx.beginPath();
+				ctx.arc(-r * 0.05, side * r * 0.5, r * 0.16, 0, Math.PI * 2);
+				ctx.fill();
+				ctx.fillStyle = '#120000';
+				ctx.beginPath();
+				ctx.arc(r * 0.02, side * r * 0.5, r * 0.07, 0, Math.PI * 2);
+				ctx.fill();
+			}
 			ctx.restore();
 		}
 	}

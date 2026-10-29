@@ -2,184 +2,190 @@ import type { PlayerService } from '../logic/PlayerService';
 import type { PacmanAudioCue, PacmanProfile } from '../core/Events';
 import type { GridLayout } from './GridView';
 
-/** Per-frame modifiers decided by the game (power-ups, weapons, death). */
+export type PlayerLook = 'normal' | 'energized' | 'berserk';
+
+/** Per-frame state decided by the game. */
 export interface PlayerDrawOptions {
-	/** Power pellet / berserk: hotter body, corona, brighter trail. */
-	readonly supernova: boolean;
-	/** BFG charge 0..1: the body heats to white and draws plasma into the mouth. */
+	/** energized: power pellet / overdrive; berserk: the hell level's berserk pickup. */
+	readonly look: PlayerLook;
+	/** BFG charge 0..1: the body swells and the throat glows white. */
 	readonly charge: number;
-	/** The death sequence is running: convulse, collapse, pop. */
+	/** The death sequence is running. */
 	readonly dying: boolean;
 }
 
-interface TrailPoint {
-	x: number;
-	y: number;
-	life: number;
-	max: number;
+interface Palette {
+	skin0: number;
+	skin1: number;
+	skin2: number;
+	rim: number;
+	mouth0: number;
+	mouth1: number;
+	tongue: number;
+	glow: number;
+	trail: number;
+	trail2: number;
 }
 
-interface Spark {
-	x: number;
-	y: number;
-	vx: number;
-	vy: number;
-	life: number;
-	max: number;
-	size: number;
-	temp: number;
-	active: boolean;
-}
-
-type RingKind = 'micro' | 'mega' | 'entry' | 'exit';
-
-interface Ring {
-	x: number;
-	y: number;
-	life: number;
-	max: number;
-	radius: number;
-	kind: RingKind;
-	rot: number;
-}
-
-// "Solar flare" palette of the prototype
-const CHROMOSPHERE = '#110500';
-const PHOTOSPHERE = 0xff4400;
-const CORONA_OUTER = '#ff8800';
-const CORONA_INNER = 0xffcc44;
-const SOLAR_FLARE = 0xffee88;
-const PROMINENCE = 0xff2200;
-const SUPERHOT = '#ffffff';
-const PLASMA_GHOST = '#ff9944';
+const LOOKS: Record<PlayerLook, Palette> = {
+	normal: {
+		skin0: 0xfff0a0,
+		skin1: 0xffcc2a,
+		skin2: 0xe8901a,
+		rim: 0x8a3a06,
+		mouth0: 0x6a1a0e,
+		mouth1: 0x220604,
+		tongue: 0xff6a6a,
+		glow: 0xffc040,
+		trail: 0xffd060,
+		trail2: 0xff8a20
+	},
+	energized: {
+		skin0: 0xffffff,
+		skin1: 0xfff4c0,
+		skin2: 0xffd060,
+		rim: 0x40e0ff,
+		mouth0: 0x1a3a6a,
+		mouth1: 0x06101e,
+		tongue: 0x9ae8ff,
+		glow: 0x60e8ff,
+		trail: 0xc8f8ff,
+		trail2: 0x40c8ff
+	},
+	berserk: {
+		skin0: 0xff7a5a,
+		skin1: 0xc8201a,
+		skin2: 0x5a0808,
+		rim: 0x1a0202,
+		mouth0: 0xb0200a,
+		mouth1: 0x3a0200,
+		tongue: 0xff2a2a,
+		glow: 0xff2a10,
+		trail: 0xff5a2a,
+		trail2: 0x6a1008
+	}
+};
 
 const TAU = Math.PI * 2;
-const SPARKS = 180;
-/** The prototype was tuned for a 28 px radius; speeds are scaled from that. */
-const PROTO_R = 28;
-
-function lerpColor(a: number, b: number, t: number): string {
-	const ar = (a >> 16) & 255;
-	const ag = (a >> 8) & 255;
-	const ab = a & 255;
-	const r = Math.round(ar + (((b >> 16) & 255) - ar) * t);
-	const g = Math.round(ag + (((b >> 8) & 255) - ag) * t);
-	const bl = Math.round(ab + ((b & 255) - ab) * t);
-	return `rgb(${r},${g},${bl})`;
-}
+/** Trail length in tiles at full speed; it starts this far behind the body. */
+const TRAIL_LENGTH = 1.7;
+const TRAIL_GAP = 0.1;
+const MORPH_TIME = 0.6;
 
 function rgba(hex: number, a: number): string {
-	return `rgba(${(hex >> 16) & 255},${(hex >> 8) & 255},${hex & 255},${a})`;
+	const clamped = Math.max(0, Math.min(1, a));
+	return `rgba(${(hex >> 16) & 255},${(hex >> 8) & 255},${hex & 255},${clamped})`;
 }
 
-function directionAngle(facing: string | null): number {
-	if (facing === 'UP') {
-		return -Math.PI / 2;
+function mixHex(a: number, b: number, t: number): number {
+	const ch = (shift: number): number => {
+		const x = (a >> shift) & 255;
+		const y = (b >> shift) & 255;
+		return Math.round(x + (y - x) * t);
+	};
+	return (ch(16) << 16) | (ch(8) << 8) | ch(0);
+}
+
+function ease(t: number): number {
+	return 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
+}
+
+function lerpAngle(a: number, b: number, t: number): number {
+	let d = b - a;
+	while (d > Math.PI) d -= TAU;
+	while (d < -Math.PI) d += TAU;
+	return a + d * t;
+}
+
+function facingAngle(facing: string | null, fallback: number): number {
+	if (facing === 'UP') return -Math.PI / 2;
+	if (facing === 'DOWN') return Math.PI / 2;
+	if (facing === 'LEFT') return Math.PI;
+	if (facing === 'RIGHT') return 0;
+	return fallback;
+}
+
+function glow(
+	ctx: CanvasRenderingContext2D,
+	x: number,
+	y: number,
+	r: number,
+	color: number,
+	a: number
+): void {
+	if (a <= 0 || r <= 0) {
+		return;
 	}
-	if (facing === 'DOWN') {
-		return Math.PI / 2;
-	}
-	if (facing === 'LEFT') {
-		return Math.PI;
-	}
-	return 0;
+	const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+	g.addColorStop(0, rgba(color, a));
+	g.addColorStop(1, rgba(color, 0));
+	ctx.fillStyle = g;
+	ctx.fillRect(x - r, y - r, r * 2, r * 2);
 }
 
 /**
- * Plasma Pac-Man, ported from the SOLAR FLARE prototype to Canvas2D and used on every
- * level. Positions of the trail and the sparks are kept in tile units, so they follow
- * the maze when the layout changes.
+ * The living Pac-Man: a soft body that stretches on the run, squashes on turns and bites,
+ * breathes when idle and swells when it swallows; a comet-like ribbon follows the path a
+ * little behind it. Looks: normal, energized (lit from inside like a deep-sea jelly) and
+ * berserk (blood, muscle, veins, fangs, steam). Used on every level.
  */
 export class PlayerView {
-	private readonly trail: TrailPoint[] = [];
-	private readonly sparks: Spark[] = [];
-	private readonly rings: Ring[] = [];
 	private time = 0;
 	private lastTime = -1;
-	private last: { x: number; y: number } | null = null;
-	private lastTrail: { x: number; y: number } | null = null;
 	private angle = 0;
-	private moving = false;
+	private chomp = 0;
+	private turnKick = 0;
+	private squash = 0;
+	private gulp = 0;
 	private flash = 0;
-	private flashMax = 1;
-	private flashKind: 'micro' | 'mega' | 'plasma' | null = null;
-	private absorb = 0;
-	private collapse = -1;
-	private chargeEmit = 0;
-	private pendingTeleport = false;
+	private flashColor = 0xffffff;
+	private from: PlayerLook = 'normal';
+	private look: PlayerLook = 'normal';
+	private morph = 1;
+	private speed = 0;
+	private dyingTime = -1;
+	private last: { x: number; y: number } | null = null;
+	private history: Array<{ x: number; y: number; t: number }> = [];
+	private motes: Array<{
+		x: number;
+		y: number;
+		vx: number;
+		vy: number;
+		life: number;
+		max: number;
+		s: number;
+	}> = [];
+	private teleported = false;
 
-	constructor() {
-		for (let i = 0; i < SPARKS; i += 1) {
-			this.sparks.push({
-				x: 0,
-				y: 0,
-				vx: 0,
-				vy: 0,
-				life: 0,
-				max: 1,
-				size: 1,
-				temp: 0.5,
-				active: false
-			});
-		}
-	}
-
-	/** Gameplay events that make the plasma react. */
 	trigger(cue: PacmanAudioCue): void {
 		if (cue === 'dot') {
-			this.setFlash('micro', 0.12);
-			const at = this.last ?? { x: 0, y: 0 };
-			this.ring(
-				'micro',
-				at.x + Math.cos(this.angle) * 0.45,
-				at.y + Math.sin(this.angle) * 0.45,
-				0.15,
-				6 / PROTO_R
-			);
+			this.gulp = Math.max(this.gulp, 0.7);
 		} else if (cue === 'energizer' || cue === 'fruit-collect' || cue === 'egg-collect') {
-			this.megaFlare();
+			this.gulp = 1;
+			this.squash = 0.3;
+			this.setFlash(0xffffff);
 		} else if (cue === 'ghost-eaten') {
-			this.setFlash('plasma', 0.3);
-			this.absorb = 0.3;
-			this.burst(15, 100, 300, 0.3, 0.8, 1, 4, 0.8);
+			this.gulp = 1;
+			this.setFlash(LOOKS[this.look].glow);
 		} else if (cue === 'teleport') {
-			this.pendingTeleport = true;
-		} else if (cue === 'death') {
-			this.collapse = 0;
+			this.teleported = true;
 		}
 	}
 
-	/** BFG release: muzzle burst in the facing direction. */
+	/** BFG release: the body recoils and flashes. */
 	fireBurst(): void {
-		this.megaFlare();
-		const ox = Math.cos(this.angle) * 0.45;
-		const oy = Math.sin(this.angle) * 0.45;
-		for (let i = 0; i < 24; i += 1) {
-			const a = this.angle + (Math.random() - 0.5) * 0.9;
-			const v = (180 + Math.random() * 320) / (PROTO_R / 0.42);
-			this.spawn({
-				x: ox,
-				y: oy,
-				vx: Math.cos(a) * v,
-				vy: Math.sin(a) * v,
-				life: 0.3 + Math.random() * 0.4,
-				size: 1 + Math.random() * 2.5,
-				temp: 0.9
-			});
-		}
+		this.squash = 0.45;
+		this.setFlash(0xffffff);
 	}
 
 	reset(): void {
-		this.trail.length = 0;
-		this.rings.length = 0;
-		for (const s of this.sparks) {
-			s.active = false;
-		}
-		this.collapse = -1;
-		this.flash = 0;
-		this.absorb = 0;
+		this.history = [];
+		this.motes = [];
 		this.last = null;
-		this.lastTrail = null;
+		this.dyingTime = -1;
+		this.flash = 0;
+		this.gulp = 0;
+		this.squash = 0;
 	}
 
 	draw(
@@ -188,713 +194,540 @@ export class PlayerView {
 		layout: GridLayout,
 		profile: PacmanProfile,
 		time: number,
-		options: PlayerDrawOptions = { supernova: false, charge: 0, dying: false }
+		options: PlayerDrawOptions = { look: 'normal', charge: 0, dying: false }
 	): void {
 		const S = layout.tileSize;
-		if (!Number.isFinite(S) || S <= 0) {
-			return;
-		}
 		const pos = player.position;
-		if (!Number.isFinite(pos.x) || !Number.isFinite(pos.y)) {
+		if (!(S > 0) || !Number.isFinite(pos.x) || !Number.isFinite(pos.y)) {
 			return;
 		}
 		const dt = this.lastTime < 0 ? 0 : Math.min(0.1, Math.max(0, time - this.lastTime));
 		this.lastTime = time;
 		this.time += dt;
-		if (!options.dying && this.collapse >= 0) {
-			this.reset();
-		}
-		if (options.dying && this.collapse < 0) {
-			this.collapse = 0;
-		}
-
-		// motion and facing
-		const moved = this.last ? Math.hypot(pos.x - this.last.x, pos.y - this.last.y) : 0;
-		if (this.pendingTeleport && this.last) {
-			this.coronal(this.last, false);
-			this.coronal(pos, true);
-			this.trail.length = 0;
-			this.lastTrail = null;
-		}
-		this.pendingTeleport = false;
-		this.moving = moved > 1e-4 && moved < 2;
-		if (player.facing) {
-			this.angle = directionAngle(player.facing);
-		}
-		this.last = { x: pos.x, y: pos.y };
-
-		const r = S * 0.42;
-		const k = r / PROTO_R;
-		const supernova = options.supernova || options.charge > 0;
-		this.update(dt, pos, supernova, options);
+		this.update(dt, player, options);
 
 		const cx = layout.offsetX + pos.x * S;
 		const cy = layout.offsetY + pos.y * S;
+		const L = this.palette();
 		ctx.save();
-		ctx.lineCap = 'round';
-		ctx.lineJoin = 'round';
-		if (this.collapse >= 0) {
-			this.drawCollapse(ctx, cx, cy, r, k, S, layout);
+		if (this.dyingTime >= 0) {
+			this.drawDeath(ctx, cx, cy, S, L);
 			ctx.restore();
 			return;
 		}
-		this.drawTrail(ctx, layout, S, r, supernova);
-		// contact shadow keeps the body readable on any floor
-		const shadow = ctx.createRadialGradient(cx, cy + r * 0.2, r * 0.6, cx, cy + r * 0.2, r * 1.6);
-		shadow.addColorStop(0, 'rgba(0,0,0,0.45)');
-		shadow.addColorStop(1, 'rgba(0,0,0,0)');
-		ctx.fillStyle = shadow;
-		ctx.fillRect(cx - r * 1.6, cy - r * 1.4, r * 3.2, r * 3.2);
-		if (supernova) {
-			this.drawCorona(ctx, cx, cy, r, k, options.charge);
-		}
-		const blink = player.isInvulnerable && Math.floor(this.time * 12) % 2 === 0;
-		ctx.globalAlpha = blink ? 0.45 : 1;
-		const mouth = this.mouthAngle(supernova, options.charge);
-		this.drawBody(ctx, cx, cy, r, k, mouth, supernova);
-		this.drawMouthGlow(ctx, cx, cy, r, k, mouth, supernova);
-		if (options.charge > 0) {
-			this.drawCharge(ctx, cx, cy, r, options.charge);
-		}
+		this.drawTrail(ctx, layout, L);
+		this.drawBody(ctx, cx, cy, S, L, options.charge, player.isInvulnerable);
 		if (profile === 'ms-pacman') {
-			this.drawBow(ctx, cx, cy, r);
+			this.drawBow(ctx, cx, cy, S * 0.42);
 		}
-		ctx.globalAlpha = 1;
-		this.drawSparks(ctx, layout, S);
-		this.drawRings(ctx, layout, S, r, k);
-		this.drawFlash(ctx, cx, cy, r, k);
 		ctx.restore();
 	}
 
-	private update(
-		dt: number,
-		pos: { x: number; y: number },
-		supernova: boolean,
-		options: PlayerDrawOptions
-	): void {
-		for (let i = this.trail.length - 1; i >= 0; i -= 1) {
-			this.trail[i].life -= dt;
-			if (this.trail[i].life <= 0) {
-				this.trail.splice(i, 1);
+	private setFlash(color: number): void {
+		this.flash = 1;
+		this.flashColor = color;
+	}
+
+	private update(dt: number, player: PlayerService, options: PlayerDrawOptions): void {
+		const pos = player.position;
+		if (options.dying) {
+			if (this.dyingTime < 0) {
+				this.dyingTime = 0;
+				this.history = [];
 			}
-		}
-		for (const s of this.sparks) {
-			if (!s.active) {
-				continue;
-			}
-			s.life -= dt;
-			if (s.life <= 0) {
-				s.active = false;
-				continue;
-			}
-			s.x += s.vx * dt;
-			s.y += s.vy * dt;
-			const drag = Math.pow(0.92, dt * 60);
-			s.vx *= drag;
-			s.vy *= drag;
-			s.temp *= Math.pow(0.995, dt * 60);
-		}
-		for (let i = this.rings.length - 1; i >= 0; i -= 1) {
-			const ring = this.rings[i];
-			ring.life -= dt;
-			if (ring.life <= 0) {
-				this.rings.splice(i, 1);
-			}
-		}
-		this.flash = Math.max(0, this.flash - dt);
-		this.absorb = Math.max(0, this.absorb - dt);
-		if (this.collapse >= 0) {
-			this.collapse += dt;
-			const shrink = Math.min(1, Math.max(0, (this.collapse - 0.3) / 1.5));
-			if (this.collapse >= 0.3 && this.collapse < 1.8) {
-				const count = Math.round((2 + shrink * 5) * dt * 30);
-				for (let i = 0; i < count; i += 1) {
-					const jet = Math.random() < 0.45;
-					const a = jet
-						? this.angle + (Math.random() - 0.5) * 0.7 + (Math.random() < 0.5 ? 0 : Math.PI)
-						: Math.random() * TAU;
-					const v = ((jet ? 200 + Math.random() * 300 : 70 + Math.random() * 150) * 0.42) / PROTO_R;
-					this.spawn({
-						x: 0,
-						y: 0,
-						vx: Math.cos(a) * v,
-						vy: Math.sin(a) * v,
-						life: 0.45 + Math.random() * 0.8,
-						size: 0.5 + Math.random() * 3,
-						temp: 0.7 + Math.random() * 0.3,
-						absolute: pos
-					});
-				}
-			}
+			this.dyingTime += dt;
 			return;
 		}
-		// trail points every ~0.06 tiles of travel
-		const lt = this.lastTrail;
-		if (!lt || Math.hypot(pos.x - lt.x, pos.y - lt.y) > 4 / (PROTO_R / 0.42)) {
-			const life = supernova ? 0.7 : 0.45;
-			this.trail.push({ x: pos.x, y: pos.y, life, max: life });
-			this.lastTrail = { x: pos.x, y: pos.y };
-			if (Math.random() < (supernova ? 0.15 : 0.06)) {
-				const a = Math.random() * TAU;
-				const d = 0.42 * (0.95 + Math.random() * 0.15);
-				const v = ((40 + Math.random() * 100) * 0.42) / PROTO_R;
-				this.spawn({
-					x: Math.cos(a) * d,
-					y: Math.sin(a) * d,
-					vx: Math.cos(a) * v,
-					vy: Math.sin(a) * v,
-					life: 0.15 + Math.random() * 0.25,
-					size: 0.3 + Math.random() * 0.8,
-					temp: 0.7 + Math.random() * 0.3,
-					absolute: pos
-				});
-			}
+		if (this.dyingTime >= 0) {
+			this.reset();
 		}
-		// BFG charge: plasma is sucked into the mouth
-		if (options.charge > 0) {
-			this.chargeEmit += dt * (20 + options.charge * 40);
-			while (this.chargeEmit >= 1) {
-				this.chargeEmit -= 1;
-				const a = Math.random() * TAU;
-				const d = 0.42 * (1.8 + Math.random() * 0.8);
-				const mx = Math.cos(this.angle) * 0.25;
-				const my = Math.sin(this.angle) * 0.25;
-				const life = 0.25 + Math.random() * 0.15;
-				const sx = Math.cos(a) * d;
-				const sy = Math.sin(a) * d;
-				this.spawn({
-					x: sx,
-					y: sy,
-					vx: (mx - sx) / life,
-					vy: (my - sy) / life,
-					life,
-					size: 0.8 + Math.random() * 1.6,
-					temp: 0.85,
-					absolute: pos
-				});
-			}
+		if (options.look !== this.look) {
+			this.from = this.look;
+			this.look = options.look;
+			this.morph = 0;
+			this.squash = 0.35;
+			this.setFlash(LOOKS[options.look].glow);
 		}
-	}
+		this.morph = Math.min(1, this.morph + dt / MORPH_TIME);
+		this.flash = Math.max(0, this.flash - dt * 2.5);
+		this.squash = Math.max(0, this.squash - dt * 2);
+		this.gulp = Math.max(0, this.gulp - dt * 5);
+		this.turnKick = Math.max(0, this.turnKick - dt * 4);
 
-	private spawn(o: {
-		x: number;
-		y: number;
-		vx: number;
-		vy: number;
-		life: number;
-		size: number;
-		temp: number;
-		absolute?: { x: number; y: number };
-	}): void {
-		for (const s of this.sparks) {
-			if (!s.active) {
-				const base = o.absolute ?? this.last ?? { x: 0, y: 0 };
-				s.x = base.x + o.x;
-				s.y = base.y + o.y;
-				s.vx = o.vx;
-				s.vy = o.vy;
-				s.life = o.life;
-				s.max = o.life;
-				s.size = o.size;
-				s.temp = o.temp;
-				s.active = true;
-				return;
-			}
+		const moved = this.last ? Math.hypot(pos.x - this.last.x, pos.y - this.last.y) : 0;
+		if (this.teleported || moved > 1.5) {
+			this.history = [];
+			this.teleported = false;
+		} else if (dt > 0) {
+			// smoothed speed in tiles per second drives the stretch and the trail length
+			this.speed += (moved / dt - this.speed) * Math.min(1, dt * 10);
 		}
-	}
+		this.last = { x: pos.x, y: pos.y };
 
-	private burst(
-		n: number,
-		vmin: number,
-		vmax: number,
-		lmin: number,
-		lmax: number,
-		smin: number,
-		smax: number,
-		temp: number
-	): void {
-		for (let i = 0; i < n; i += 1) {
-			const a = Math.random() * TAU;
-			const v = ((vmin + Math.random() * (vmax - vmin)) * 0.42) / PROTO_R;
-			this.spawn({
-				x: Math.cos(a) * 0.21,
-				y: Math.sin(a) * 0.21,
-				vx: Math.cos(a) * v,
-				vy: Math.sin(a) * v,
-				life: lmin + Math.random() * (lmax - lmin),
-				size: smin + Math.random() * (smax - smin),
-				temp: temp + Math.random() * (1 - temp)
+		const target = facingAngle(player.facing, this.angle);
+		let turn = target - this.angle;
+		while (turn > Math.PI) turn -= TAU;
+		while (turn < -Math.PI) turn += TAU;
+		if (Math.abs(turn) > 1 && this.turnKick <= 0) {
+			this.turnKick = 1;
+		}
+		this.angle = lerpAngle(this.angle, target, Math.min(1, dt * 18));
+
+		const running = this.speed > 0.5;
+		this.chomp += dt * (running ? 11 : 2.5);
+		const head = this.history[0];
+		if (!head || Math.hypot(head.x - pos.x, head.y - pos.y) > 0.05) {
+			this.history.unshift({ x: pos.x, y: pos.y, t: this.time });
+		}
+		this.history = this.history.filter((h) => this.time - h.t < 0.6).slice(0, 48);
+		if (running && Math.random() < dt * 30) {
+			const a = this.angle + Math.PI + (Math.random() - 0.5) * 1.2;
+			this.motes.push({
+				x: pos.x + Math.cos(a) * 0.38,
+				y: pos.y + Math.sin(a) * 0.38,
+				vx: Math.cos(a) * 0.4,
+				vy: Math.sin(a) * 0.4 - 0.1,
+				life: 0.6,
+				max: 0.6,
+				s: 0.03 + Math.random() * 0.04
 			});
 		}
-	}
-
-	private megaFlare(): void {
-		this.setFlash('mega', 0.5);
-		const at = this.last ?? { x: 0, y: 0 };
-		this.ring('mega', at.x, at.y, 0.5, 3.5);
-		this.burst(20, 50, 300, 0.4, 1.0, 0.8, 3.3, 0.6);
-	}
-
-	private setFlash(kind: 'micro' | 'mega' | 'plasma', seconds: number): void {
-		this.flashKind = kind;
-		this.flash = seconds;
-		this.flashMax = seconds;
-	}
-
-	/** Ring burst at tile coordinates (x, y); `radius` is in body radii. */
-	private ring(kind: RingKind, x: number, y: number, life: number, radius: number): void {
-		this.rings.push({ x, y, life, max: life, radius, kind, rot: Math.random() * Math.PI });
-	}
-
-	/** Coronal ejection: the exit burst where the player left, the entry where they arrive. */
-	private coronal(at: { x: number; y: number }, entry: boolean): void {
-		this.ring(entry ? 'entry' : 'exit', at.x, at.y, entry ? 0.35 : 0.25, 1.6);
-		for (let i = 0; i < (entry ? 12 : 8); i += 1) {
-			const a = Math.random() * TAU;
-			const v = ((80 + Math.random() * 180) * 0.42) / PROTO_R;
-			this.spawn({
-				x: Math.cos(a) * 0.15,
-				y: Math.sin(a) * 0.15,
-				vx: Math.cos(a) * v,
-				vy: Math.sin(a) * v,
-				life: 0.2 + Math.random() * 0.3,
-				size: 0.5 + Math.random() * 1.5,
-				temp: 0.7 + Math.random() * 0.3,
-				absolute: at
-			});
+		for (const m of this.motes) {
+			m.x += m.vx * dt;
+			m.y += m.vy * dt;
+			m.vx *= Math.pow(0.94, dt * 60);
+			m.vy *= Math.pow(0.94, dt * 60);
+			m.life -= dt;
 		}
+		this.motes = this.motes.filter((m) => m.life > 0);
 	}
 
-	private mouthAngle(supernova: boolean, charge: number): number {
-		let mouth: number;
-		if (charge > 0) {
-			mouth = Math.PI * (0.18 + 0.27 * charge);
-		} else if (this.moving) {
-			const speed = supernova ? 1.45 : 1;
-			mouth = Math.abs(Math.sin(this.time * 1000 * 0.01 * speed)) * (Math.PI / 2.8);
-		} else {
-			mouth = Math.PI / 14;
+	private palette(): Palette {
+		const a = LOOKS[this.from];
+		const b = LOOKS[this.look];
+		const t = ease(this.morph);
+		const out = {} as Palette;
+		for (const key of Object.keys(a) as Array<keyof Palette>) {
+			out[key] = mixHex(a[key], b[key], t);
 		}
-		mouth = Math.max(0.06, Math.min(mouth, Math.PI * 0.45));
-		if (supernova && charge <= 0) {
-			mouth = Math.min(mouth * 1.2, Math.PI * 0.48);
-		}
-		return mouth;
+		return out;
 	}
 
-	private wedge(
+	private weight(look: PlayerLook): number {
+		const t = ease(this.morph);
+		return (this.from === look ? 1 - t : 0) + (this.look === look ? t : 0);
+	}
+
+	/** Comet ribbon along the real path, so it bends neatly round corners. */
+	private drawTrail(ctx: CanvasRenderingContext2D, layout: GridLayout, L: Palette): void {
+		const S = layout.tileSize;
+		const full = Math.min(1, this.speed / 6);
+		const maxLen = TRAIL_LENGTH * full * (this.look === 'berserk' ? 1.15 : 1);
+		const pts: Array<[number, number, number]> = [];
+		let acc = 0;
+		let prev = this.last;
+		if (!prev || maxLen < 0.2) {
+			return;
+		}
+		pts.push([layout.offsetX + prev.x * S, layout.offsetY + prev.y * S, 0]);
+		for (const h of this.history) {
+			const seg = Math.hypot(h.x - prev.x, h.y - prev.y);
+			if (seg < 1e-4) {
+				continue;
+			}
+			if (acc + seg > maxLen) {
+				const f = (maxLen - acc) / seg;
+				const x = prev.x + (h.x - prev.x) * f;
+				const y = prev.y + (h.y - prev.y) * f;
+				pts.push([layout.offsetX + x * S, layout.offsetY + y * S, maxLen]);
+				acc = maxLen;
+				break;
+			}
+			acc += seg;
+			pts.push([layout.offsetX + h.x * S, layout.offsetY + h.y * S, acc]);
+			prev = h;
+		}
+		const r = S * 0.42;
+		const start = 0.42 + TRAIL_GAP;
+		if (acc <= start) {
+			return;
+		}
+		ctx.save();
+		ctx.globalCompositeOperation = 'lighter';
+		ctx.lineCap = 'round';
+		ctx.lineJoin = 'round';
+		// the outer veil is painted normally so it shows on bright floors too; the inner
+		// thread is added as light
+		const layers: Array<[number, number, number, GlobalCompositeOperation]> = [
+			[L.trail2, 1.05, 0.45, 'source-over'],
+			[L.trail, 0.45, 0.85, 'lighter']
+		];
+		for (const [color, wMul, aMul, op] of layers) {
+			ctx.globalCompositeOperation = op;
+			for (let i = 1; i < pts.length; i += 1) {
+				const d0 = pts[i - 1][2];
+				const d1 = pts[i][2];
+				if (d1 < start) {
+					continue;
+				}
+				const k = Math.pow(1 - (d1 - start) / Math.max(0.01, acc - start), 0.8);
+				if (k <= 0) {
+					continue;
+				}
+				const f = d0 < start ? (start - d0) / (d1 - d0) : 0;
+				const x0 = pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * f;
+				const y0 = pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * f;
+				ctx.strokeStyle = rgba(color, aMul * k * full);
+				ctx.lineWidth = Math.max(0.6, r * wMul * k);
+				ctx.beginPath();
+				ctx.moveTo(x0, y0);
+				ctx.lineTo(pts[i][0], pts[i][1]);
+				ctx.stroke();
+			}
+		}
+		for (const m of this.motes) {
+			const k = m.life / m.max;
+			glow(
+				ctx,
+				layout.offsetX + m.x * S,
+				layout.offsetY + m.y * S,
+				S * m.s * 1.2,
+				L.trail,
+				k * 0.5
+			);
+		}
+		ctx.restore();
+	}
+
+	/** Soft wedge with rounded mouth corners (unit circle scaled to rx, ry). */
+	private bodyPath(
 		ctx: CanvasRenderingContext2D,
-		cx: number,
-		cy: number,
-		r: number,
-		sa: number,
-		ea: number
+		x: number,
+		y: number,
+		rx: number,
+		ry: number,
+		angle: number,
+		mouth: number
 	): void {
+		ctx.save();
+		ctx.translate(x, y);
+		ctx.rotate(angle);
+		ctx.scale(rx, ry);
+		const c = 0.13;
 		ctx.beginPath();
-		ctx.moveTo(cx, cy);
-		ctx.arc(cx, cy, r, sa, ea, false);
+		ctx.moveTo(Math.cos(mouth) * c * 1.4, Math.sin(mouth) * c * 0.2);
+		ctx.lineTo(Math.cos(mouth) * 0.93, Math.sin(mouth) * 0.93);
+		ctx.quadraticCurveTo(
+			Math.cos(mouth),
+			Math.sin(mouth),
+			Math.cos(mouth + 0.08),
+			Math.sin(mouth + 0.08)
+		);
+		ctx.arc(0, 0, 1, mouth + 0.08, TAU - mouth - 0.08);
+		ctx.quadraticCurveTo(
+			Math.cos(-mouth),
+			Math.sin(-mouth),
+			Math.cos(-mouth) * 0.93,
+			Math.sin(-mouth) * 0.93
+		);
+		ctx.lineTo(Math.cos(-mouth) * c * 1.4, -Math.sin(mouth) * c * 0.2);
+		ctx.quadraticCurveTo(-c, 0, Math.cos(mouth) * c * 1.4, Math.sin(mouth) * c * 0.2);
 		ctx.closePath();
+		ctx.restore();
 	}
 
 	private drawBody(
 		ctx: CanvasRenderingContext2D,
 		cx: number,
 		cy: number,
-		r: number,
-		k: number,
-		mouth: number,
-		supernova: boolean
+		S: number,
+		L: Palette,
+		charge: number,
+		invulnerable: boolean
 	): void {
-		const sa = this.angle + mouth;
-		const ea = this.angle + TAU - mouth;
-		const alpha = ctx.globalAlpha;
-		for (let i = 5; i >= 0; i -= 1) {
-			const frac = i / 5;
-			const gr = r * (1 - frac * 0.12);
-			const color = lerpColor(
-				frac < 0.5 ? PHOTOSPHERE : PROMINENCE,
-				frac < 0.5 ? CORONA_INNER : SOLAR_FLARE,
-				frac
-			);
-			ctx.globalAlpha = alpha * (0.8 + (1 - frac) * 0.2);
-			ctx.fillStyle = color;
-			this.wedge(ctx, cx, cy, gr, sa, ea);
-			ctx.fill();
-		}
-		ctx.globalAlpha = alpha * (supernova ? 0.55 : 0.5);
-		ctx.strokeStyle = supernova ? rgba(SOLAR_FLARE, 1) : CORONA_OUTER;
-		ctx.lineWidth = (supernova ? 8 : 6) * k;
-		this.wedge(ctx, cx, cy, r, sa, ea);
-		ctx.stroke();
-		// temperature rim: hottest at the back, cooler toward the mouth
-		const segments = 32;
-		ctx.lineCap = 'butt';
-		ctx.lineWidth = (supernova ? 3 : 2.5) * k;
-		for (let i = 0; i < segments; i += 1) {
-			const a1 = sa + ((ea - sa) / segments) * i;
-			const a2 = sa + ((ea - sa) / segments) * (i + 1);
-			const temp = 0.5 + 0.5 * Math.cos((a1 + a2) / 2 - this.angle);
-			ctx.globalAlpha = alpha * (0.4 + temp * 0.6) * (supernova ? 1 : 0.9);
-			ctx.strokeStyle = `rgb(${Math.round(180 + temp * 75)},${Math.round(40 + temp * 100)},${Math.round(10 + temp * 30)})`;
-			ctx.beginPath();
-			ctx.arc(cx, cy, r, a1, a2, false);
-			ctx.stroke();
-		}
-		ctx.lineCap = 'round';
-		ctx.globalAlpha = alpha;
-	}
+		const t = this.time;
+		const r = S * 0.42;
+		const wE = this.weight('energized');
+		const wB = this.weight('berserk');
+		const running = this.speed > 0.5;
+		const open = Math.pow(Math.abs(Math.sin(this.chomp)), 0.8);
+		const mouth = Math.min(1.05, 0.08 + open * (0.62 + wB * 0.08) + charge * 0.35);
+		const breathe = Math.sin(t * (2.2 + wB * 2.5)) * (0.015 + wB * 0.03);
+		const run = running ? 0.05 : 0;
+		const squash = this.turnKick * 0.12 + this.squash * 0.2;
+		const swell = this.gulp * 0.06 + wB * 0.06 + charge * 0.08 * (1 + 0.3 * Math.sin(t * 40));
+		const rx = r * (1 + run - squash + swell + breathe - (1 - open) * 0.02);
+		const ry = r * (1 - run * 0.6 + squash * 0.8 + swell + breathe + (1 - open) * 0.03);
+		const a = this.angle;
+		const blink = invulnerable && Math.floor(t * 12) % 2 === 0;
+		ctx.globalAlpha = blink ? 0.5 : 1;
 
-	private drawMouthGlow(
-		ctx: CanvasRenderingContext2D,
-		cx: number,
-		cy: number,
-		r: number,
-		k: number,
-		mouth: number,
-		supernova: boolean
-	): void {
-		const mouthSize = mouth * 2;
-		if (mouthSize < 0.05) {
-			return;
-		}
-		const sa = this.angle + mouth;
-		const ea = this.angle + TAU - mouth;
-		let a = Math.min(1, mouthSize / 0.55) * (supernova ? 0.45 : 0.3);
-		if (!this.moving && !supernova) {
-			a *= 0.75 + 0.25 * Math.sin(this.time * 3);
-		}
-		const alpha = ctx.globalAlpha;
+		const shadow = ctx.createRadialGradient(cx, cy + r * 0.3, r * 0.3, cx, cy + r * 0.3, r * 1.15);
+		shadow.addColorStop(0, 'rgba(0,0,0,.5)');
+		shadow.addColorStop(1, 'rgba(0,0,0,0)');
+		ctx.fillStyle = shadow;
+		ctx.fillRect(cx - r * 1.2, cy - r * 0.9, r * 2.4, r * 2.4);
 		ctx.globalCompositeOperation = 'lighter';
-		ctx.globalAlpha = alpha * a;
-		ctx.fillStyle = supernova ? SUPERHOT : rgba(CORONA_INNER, 1);
-		this.wedge(ctx, cx, cy, r * 0.8, sa, ea);
-		ctx.fill();
-		const span = Math.PI * 0.6;
-		const mid = sa + (ea - sa) / 2;
-		ctx.globalAlpha = alpha * Math.min(1, a * 1.7);
-		ctx.strokeStyle = supernova ? SUPERHOT : rgba(SOLAR_FLARE, 1);
-		ctx.lineWidth = (supernova ? 1.4 : 1) * k;
-		ctx.beginPath();
-		ctx.arc(cx, cy, r * 0.5, mid - span / 2, mid + span / 2, false);
-		ctx.stroke();
-		if (mouthSize > 0.2) {
-			ctx.globalAlpha = alpha * Math.min(1, a * 1.3);
-			ctx.fillStyle = SUPERHOT;
-			ctx.beginPath();
-			ctx.arc(cx, cy, r * 0.06, 0, TAU);
-			ctx.fill();
-		}
+		glow(ctx, cx, cy, r * 1.25, L.glow, 0.12 + wE * 0.3 + wB * 0.2 + charge * 0.3);
 		ctx.globalCompositeOperation = 'source-over';
-		ctx.globalAlpha = alpha;
-	}
 
-	private drawCorona(
-		ctx: CanvasRenderingContext2D,
-		cx: number,
-		cy: number,
-		r: number,
-		k: number,
-		charge: number
-	): void {
-		const cr = r * (1.2 + charge * 0.25 * Math.sin(this.time * 30));
-		ctx.save();
-		ctx.globalCompositeOperation = 'lighter';
-		const glow = ctx.createRadialGradient(cx, cy, r * 0.8, cx, cy, r * 2.4);
-		glow.addColorStop(0, `rgba(255,136,0,${0.28 + charge * 0.3})`);
-		glow.addColorStop(1, 'rgba(255,136,0,0)');
-		ctx.fillStyle = glow;
-		ctx.fillRect(cx - r * 2.4, cy - r * 2.4, r * 4.8, r * 4.8);
-		const passes: Array<[string, number, number, number]> = [
-			[CORONA_OUTER, cr + 6 * k, 10 * k, 0.12],
-			[CORONA_OUTER, cr, 2.5 * k, 0.35],
-			[rgba(SOLAR_FLARE, 1), cr - 2 * k, 1 * k, 0.2]
-		];
-		for (const [color, radius, width, a] of passes) {
-			ctx.globalAlpha = a;
-			ctx.strokeStyle = color;
-			ctx.lineWidth = Math.max(0.5, width);
-			ctx.beginPath();
-			ctx.arc(cx, cy, radius, 0, TAU);
-			ctx.stroke();
-		}
-		ctx.restore();
-	}
-
-	/** Body heating to white while the BFG charges. */
-	private drawCharge(
-		ctx: CanvasRenderingContext2D,
-		cx: number,
-		cy: number,
-		r: number,
-		charge: number
-	): void {
-		ctx.save();
-		ctx.globalCompositeOperation = 'lighter';
-		const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * (1 + charge * 0.6));
-		g.addColorStop(0, `rgba(255,255,255,${0.75 * charge})`);
-		g.addColorStop(0.5, `rgba(255,238,136,${0.45 * charge})`);
-		g.addColorStop(1, 'rgba(255,120,0,0)');
-		ctx.fillStyle = g;
-		ctx.beginPath();
-		ctx.arc(cx, cy, r * (1 + charge * 0.6), 0, TAU);
+		// skin with subsurface warmth
+		this.bodyPath(ctx, cx, cy, rx, ry, a, mouth);
+		const skin = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.38, r * 0.05, cx, cy, r * 1.05);
+		skin.addColorStop(0, rgba(L.skin0, 1));
+		skin.addColorStop(0.5, rgba(L.skin1, 1));
+		skin.addColorStop(1, rgba(L.skin2, 1));
+		ctx.fillStyle = skin;
 		ctx.fill();
-		ctx.restore();
-	}
 
-	private drawTrail(
-		ctx: CanvasRenderingContext2D,
-		layout: GridLayout,
-		S: number,
-		r: number,
-		supernova: boolean
-	): void {
-		if (this.trail.length < 2) {
-			return;
-		}
-		const base = r * (supernova ? 0.6 : 0.4);
 		ctx.save();
-		ctx.globalCompositeOperation = 'lighter';
-		for (let i = 1; i < this.trail.length; i += 1) {
-			const p1 = this.trail[i - 1];
-			const p2 = this.trail[i];
-			const ratio = p2.life / p2.max;
-			if (ratio <= 0.01 || Math.hypot(p2.x - p1.x, p2.y - p1.y) > 1) {
-				continue;
-			}
-			const x1 = layout.offsetX + p1.x * S;
-			const y1 = layout.offsetY + p1.y * S;
-			const x2 = layout.offsetX + p2.x * S;
-			const y2 = layout.offsetY + p2.y * S;
-			const w = base * ratio;
-			ctx.globalAlpha = ratio * (supernova ? 0.22 : 0.13);
-			ctx.strokeStyle = rgba(PROMINENCE, 1);
-			ctx.lineWidth = w * 3.5;
-			ctx.beginPath();
-			ctx.moveTo(x1, y1);
-			ctx.lineTo(x2, y2);
-			ctx.stroke();
-			ctx.globalAlpha = ratio * (supernova ? 0.65 : 0.5);
-			ctx.strokeStyle = supernova ? SUPERHOT : rgba(CORONA_INNER, 1);
-			ctx.lineWidth = w * (supernova ? 1.1 : 0.6);
-			ctx.beginPath();
-			ctx.moveTo(x1, y1);
-			ctx.lineTo(x2, y2);
-			ctx.stroke();
-		}
-		ctx.restore();
-	}
-
-	private drawSparks(ctx: CanvasRenderingContext2D, layout: GridLayout, S: number): void {
-		const k = (S * 0.42) / PROTO_R;
-		ctx.save();
-		ctx.globalCompositeOperation = 'lighter';
-		for (const s of this.sparks) {
-			if (!s.active) {
-				continue;
-			}
-			const a = Math.max(0, s.life / s.max);
-			if (a <= 0.01) {
-				continue;
-			}
-			const x = layout.offsetX + s.x * S;
-			const y = layout.offsetY + s.y * S;
-			ctx.globalAlpha = a * 0.18;
-			ctx.fillStyle = rgba(PHOTOSPHERE, 1);
-			ctx.beginPath();
-			ctx.arc(x, y, Math.max(0.3, s.size * 2 * a * k), 0, TAU);
-			ctx.fill();
-			ctx.globalAlpha = a * 0.75;
-			ctx.fillStyle = lerpColor(0xff2200, 0xffffff, s.temp);
-			ctx.beginPath();
-			ctx.arc(x, y, Math.max(0.3, s.size * 0.4 * a * k + 0.3), 0, TAU);
-			ctx.fill();
-		}
-		ctx.restore();
-	}
-
-	private drawRings(
-		ctx: CanvasRenderingContext2D,
-		layout: GridLayout,
-		S: number,
-		r: number,
-		k: number
-	): void {
-		ctx.save();
-		ctx.globalCompositeOperation = 'lighter';
-		for (const ring of this.rings) {
-			const a = Math.max(0, ring.life / ring.max);
-			const progress = 1 - a;
-			const x = layout.offsetX + ring.x * S;
-			const y = layout.offsetY + ring.y * S;
-			const max = ring.radius * r;
-			if (ring.kind === 'micro') {
-				const rr = max * a;
-				ctx.globalAlpha = a * 0.8;
-				ctx.strokeStyle = rgba(SOLAR_FLARE, 1);
-				ctx.lineWidth = Math.max(0.4, 1.5 * a * k);
-				ctx.beginPath();
-				ctx.arc(x, y, Math.max(0.3, rr), 0, TAU);
-				ctx.stroke();
-			} else if (ring.kind === 'mega') {
-				const rr = max * progress;
-				const passes: Array<[string, number, number, number]> = [
-					[SUPERHOT, rr, 3, 0.7],
-					[CORONA_OUTER, rr * 0.75, 5, 0.3],
-					[SUPERHOT, rr * 0.2, 1.5, 0.55]
-				];
-				for (const [color, radius, width, al] of passes) {
-					ctx.globalAlpha = a * al;
-					ctx.strokeStyle = color;
-					ctx.lineWidth = Math.max(0.4, width * a * k);
-					ctx.beginPath();
-					ctx.arc(x, y, Math.max(0.3, radius), 0, TAU);
-					ctx.stroke();
-				}
-			} else {
-				const entry = ring.kind === 'entry';
-				const rr = entry ? max * progress : max;
-				ctx.globalAlpha = a * 0.7;
-				ctx.strokeStyle = entry ? rgba(SOLAR_FLARE, 1) : rgba(CORONA_INNER, 1);
-				ctx.lineWidth = Math.max(0.4, 4 * a * k);
-				ctx.beginPath();
-				ctx.arc(x, y, Math.max(0.3, rr), 0, TAU);
-				ctx.stroke();
-				const twist = entry ? progress * Math.PI * 1.5 : (1 - progress) * Math.PI * 1.5;
-				for (let s = 0; s < 12; s += 1) {
-					const base = (s / 12) * TAU + ring.rot;
-					const ia = base + twist;
-					const oa = base - twist * 0.5;
-					const id = rr * 0.15 * a;
-					const od = rr * (0.8 + a * 0.2);
-					ctx.globalAlpha = a * 0.5;
-					ctx.strokeStyle = s % 3 === 0 ? SUPERHOT : rgba(CORONA_INNER, 1);
-					ctx.lineWidth = Math.max(0.3, (s % 3 === 0 ? 1.8 : 0.8) * a * k);
-					ctx.beginPath();
-					ctx.moveTo(x + Math.cos(ia) * id, y + Math.sin(ia) * id);
-					ctx.lineTo(x + Math.cos(oa) * od, y + Math.sin(oa) * od);
-					ctx.stroke();
-				}
-			}
-		}
-		ctx.restore();
-	}
-
-	private drawFlash(
-		ctx: CanvasRenderingContext2D,
-		cx: number,
-		cy: number,
-		r: number,
-		k: number
-	): void {
-		ctx.save();
-		ctx.globalCompositeOperation = 'lighter';
-		if (this.absorb > 0) {
-			const a = this.absorb / 0.3;
-			const fr = r * (0.5 + a * 2);
-			const layers: Array<[string, number, number]> = [
-				[PLASMA_GHOST, 1.8, 0.2],
-				[rgba(CORONA_INNER, 1), 1.2, 0.45],
-				[SUPERHOT, 1, 0.8]
-			];
-			for (const [color, m, al] of layers) {
-				ctx.globalAlpha = a * al;
-				ctx.fillStyle = color;
-				ctx.beginPath();
-				ctx.arc(cx, cy, fr * m, 0, TAU);
-				ctx.fill();
-			}
-		}
-		if (this.flash > 0 && this.flashKind) {
-			const a = this.flash / this.flashMax;
-			if (this.flashKind === 'micro') {
-				ctx.globalAlpha = a * 0.2;
-				ctx.fillStyle = SUPERHOT;
-				ctx.beginPath();
-				ctx.arc(cx, cy, r * 0.25, 0, TAU);
-				ctx.fill();
-			} else {
-				const plasma = this.flashKind === 'plasma';
-				ctx.globalAlpha = a * (plasma ? 0.7 : 0.85);
-				ctx.strokeStyle = SUPERHOT;
-				ctx.lineWidth = Math.max(0.5, (plasma ? 4 : 3) * a * k);
-				ctx.beginPath();
-				ctx.arc(cx, cy, r, 0, TAU);
-				ctx.stroke();
-				ctx.globalAlpha = a * (plasma ? 0.25 : 0.35);
-				ctx.strokeStyle = plasma ? PLASMA_GHOST : rgba(SOLAR_FLARE, 1);
-				ctx.lineWidth = Math.max(0.5, (plasma ? 8 : 6) * a * k);
-				ctx.beginPath();
-				ctx.arc(cx, cy, r + (plasma ? 12 : 8) * k, 0, TAU);
-				ctx.stroke();
-			}
-		}
-		ctx.restore();
-	}
-
-	/** Death: convulse, shrink into a dark core with a hot rim, pop, flash. */
-	private drawCollapse(
-		ctx: CanvasRenderingContext2D,
-		cx: number,
-		cy: number,
-		r0: number,
-		k: number,
-		S: number,
-		layout: GridLayout
-	): void {
-		const t = this.collapse;
-		const shrink = Math.min(1, Math.max(0, (t - 0.3) / 1.5));
-		const r =
-			t < 0.3 ? r0 * (1 + Math.sin(t * 45 * 4) * 0.1) : Math.max(0, r0 * (1 - shrink * 0.85));
-		const alpha = t < 1.8 ? 1 : Math.max(0, 1 - (t - 1.8) / 0.2);
-		if (alpha > 0 && r > 0.3) {
-			ctx.globalAlpha = alpha;
-			ctx.fillStyle = CHROMOSPHERE;
-			ctx.beginPath();
-			ctx.arc(cx, cy, r, 0, TAU);
-			ctx.fill();
+		this.bodyPath(ctx, cx, cy, rx, ry, a, mouth);
+		ctx.clip();
+		if (wE > 0.01) {
+			// lit from inside: a soft heart of light and drifting sparks
 			ctx.globalCompositeOperation = 'lighter';
-			if (t < 0.3) {
-				const f = 0.5 + 0.5 * Math.sin(t * 45 * 4);
-				ctx.strokeStyle = f > 0.7 ? SUPERHOT : rgba(CORONA_INNER, 1);
-				ctx.lineWidth = (2 + f * 3.5) * k;
-				ctx.globalAlpha = (0.5 + f * 0.5) * alpha;
-			} else {
-				ctx.strokeStyle = shrink > 0.7 ? SUPERHOT : rgba(SOLAR_FLARE, 1);
-				ctx.lineWidth = (1.5 + shrink * 2) * k;
-				ctx.globalAlpha = (0.5 + shrink * 0.5) * alpha;
+			glow(
+				ctx,
+				cx - Math.cos(a) * r * 0.15,
+				cy - Math.sin(a) * r * 0.15,
+				r * 0.75,
+				0xffffff,
+				0.55 * wE
+			);
+			for (let i = 0; i < 6; i += 1) {
+				const ang = i * 1.7 + t * 0.8;
+				const d = r * (0.35 + 0.3 * Math.sin(t * 1.3 + i));
+				glow(
+					ctx,
+					cx + Math.cos(ang) * d,
+					cy + Math.sin(ang) * d,
+					r * 0.12,
+					0x60e8ff,
+					(0.5 + 0.5 * Math.sin(t * 5 + i)) * wE
+				);
 			}
-			ctx.beginPath();
-			ctx.arc(cx, cy, r, 0, TAU);
-			ctx.stroke();
-			if (t >= 0.3) {
-				ctx.strokeStyle = CORONA_OUTER;
-				ctx.lineWidth = 1.2 * k;
-				ctx.globalAlpha = shrink * alpha * 0.35;
+			ctx.globalCompositeOperation = 'source-over';
+		}
+		if (wB > 0.01) {
+			// muscle bands and swelling veins
+			ctx.globalAlpha = wB * (blink ? 0.5 : 1);
+			ctx.strokeStyle = 'rgba(40,0,0,.55)';
+			ctx.lineWidth = Math.max(1, r * 0.07);
+			for (const off of [0.45, 0.72]) {
 				ctx.beginPath();
-				ctx.arc(cx, cy, r * (1.1 + shrink * 2.8), 0, TAU);
+				ctx.ellipse(cx, cy, rx * off, ry * off, a, Math.PI * 0.55, Math.PI * 1.45);
 				ctx.stroke();
 			}
+			ctx.strokeStyle = 'rgba(255,120,100,.25)';
+			ctx.lineWidth = Math.max(1, r * 0.03);
+			for (const off of [0.42, 0.69]) {
+				ctx.beginPath();
+				ctx.ellipse(
+					cx - r * 0.03,
+					cy - r * 0.03,
+					rx * off,
+					ry * off,
+					a,
+					Math.PI * 0.6,
+					Math.PI * 1.2
+				);
+				ctx.stroke();
+			}
+			const pump = 0.6 + 0.4 * Math.sin(t * 7);
+			ctx.strokeStyle = `rgba(110,0,10,${0.8 * pump})`;
+			ctx.lineWidth = Math.max(1, r * 0.05);
+			ctx.lineCap = 'round';
+			const veins: Array<[number, number, number]> = [
+				[2.3, 0.6, 0.3],
+				[3.5, 0.55, -0.25],
+				[4.1, 0.5, 0.2]
+			];
+			for (const [b0, len, wob] of veins) {
+				ctx.beginPath();
+				for (let i = 0; i <= 6; i += 1) {
+					const u = i / 6;
+					const ang = a + b0 + Math.sin(u * 5 + b0) * wob * 0.3;
+					const d = r * (0.95 - u * len);
+					const px = cx + Math.cos(ang) * d;
+					const py = cy + Math.sin(ang) * d;
+					if (i === 0) {
+						ctx.moveTo(px, py);
+					} else {
+						ctx.lineTo(px, py);
+					}
+				}
+				ctx.stroke();
+			}
+			ctx.globalAlpha = blink ? 0.5 : 1;
 		}
-		ctx.globalCompositeOperation = 'lighter';
-		if (t >= 1.5 && t < 1.8) {
-			const p = (t - 1.5) / 0.3;
-			ctx.globalAlpha = (1 - p) * 0.9;
-			ctx.fillStyle = SUPERHOT;
+		ctx.restore();
+
+		// throat and tongue, deep in the wedge
+		ctx.save();
+		ctx.translate(cx, cy);
+		ctx.rotate(a);
+		ctx.beginPath();
+		ctx.moveTo(-r * 0.06, 0);
+		ctx.arc(-r * 0.06, 0, rx * 0.9, -mouth * 0.92, mouth * 0.92);
+		ctx.closePath();
+		const throat = ctx.createRadialGradient(-r * 0.06, 0, 0, -r * 0.06, 0, rx * 0.9);
+		throat.addColorStop(0, rgba(charge > 0 ? 0xffffff : L.mouth1, 1));
+		throat.addColorStop(
+			charge > 0 ? 0.3 + 0.5 * (1 - charge) : 0,
+			rgba(charge > 0 ? 0xfff0c0 : L.mouth1, 1)
+		);
+		throat.addColorStop(1, rgba(L.mouth0, 1));
+		ctx.fillStyle = throat;
+		ctx.fill();
+		if (open > 0.25 && charge <= 0) {
+			ctx.fillStyle = rgba(L.tongue, Math.min(1, (open - 0.25) * 2));
 			ctx.beginPath();
-			ctx.arc(cx, cy, r0 * 0.15 * (1 + p * 4), 0, TAU);
+			ctx.ellipse(r * 0.18, 0, r * 0.2 * open, r * 0.11 * open, 0, 0, TAU);
 			ctx.fill();
 		}
-		if (t >= 1.8 && t < 1.95) {
-			const a = Math.max(0, 1 - (t - 1.8) / 0.15);
-			ctx.globalAlpha = a * 0.55;
-			ctx.fillStyle = SUPERHOT;
-			ctx.beginPath();
-			ctx.arc(cx, cy, r0 * 2.5 * (2 - a), 0, TAU);
-			ctx.fill();
+		if (wB > 0.01) {
+			// fangs on both jaws, pointing into the mouth
+			for (const side of [1, -1]) {
+				for (const u of [0.55, 0.82]) {
+					const ex = Math.cos(mouth) * rx * u;
+					const ey = side * Math.sin(mouth) * rx * u;
+					const len = r * 0.2 * wB;
+					ctx.fillStyle = '#fff4e6';
+					ctx.beginPath();
+					ctx.moveTo(ex - r * 0.06, ey);
+					ctx.lineTo(ex + r * 0.06, ey);
+					ctx.lineTo(ex + r * 0.01, ey - side * len);
+					ctx.closePath();
+					ctx.fill();
+				}
+			}
 		}
+		ctx.restore();
+
+		// soft gloss: reads as skin, not metal
+		ctx.save();
+		this.bodyPath(ctx, cx, cy, rx, ry, a, mouth);
+		ctx.clip();
+		const hl = ctx.createRadialGradient(
+			cx - r * 0.38,
+			cy - r * 0.45,
+			0,
+			cx - r * 0.38,
+			cy - r * 0.45,
+			r * 0.45
+		);
+		hl.addColorStop(0, `rgba(255,255,255,${0.55 - wB * 0.3})`);
+		hl.addColorStop(1, 'rgba(255,255,255,0)');
+		ctx.fillStyle = hl;
+		ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+		ctx.restore();
+
+		this.bodyPath(ctx, cx, cy, rx, ry, a, mouth);
+		ctx.lineWidth = Math.max(1, r * 0.05);
+		ctx.strokeStyle = rgba(L.rim, 0.75 + wE * 0.25);
+		if (wE > 0.5) {
+			ctx.globalCompositeOperation = 'lighter';
+		}
+		ctx.stroke();
 		ctx.globalCompositeOperation = 'source-over';
+
+		if (wB > 0.01) {
+			// steam off the top
+			for (let k = 0; k < 4; k += 1) {
+				const u = (t * 1.2 + k / 4) % 1;
+				const px = cx + Math.sin(k * 2.1 + t) * r * 0.3;
+				const py = cy - r * (0.7 + u * 0.55);
+				ctx.fillStyle = `rgba(200,180,170,${0.25 * (1 - u) * wB})`;
+				ctx.beginPath();
+				ctx.arc(px, py, r * (0.1 + u * 0.18), 0, TAU);
+				ctx.fill();
+			}
+		}
+		if (charge > 0) {
+			// plasma drawn into the mouth from the front
+			ctx.globalCompositeOperation = 'lighter';
+			for (let k = 0; k < 8; k += 1) {
+				const u = (t * 2.2 + k / 8) % 1;
+				const ang = a + (k - 3.5) * 0.18;
+				const d = r * 1.25 * (1 - u);
+				glow(
+					ctx,
+					cx + Math.cos(ang) * d,
+					cy + Math.sin(ang) * d,
+					r * 0.14,
+					0xffffff,
+					0.8 * u * charge
+				);
+			}
+			ctx.globalCompositeOperation = 'source-over';
+		}
+		if (this.flash > 0) {
+			ctx.globalCompositeOperation = 'lighter';
+			glow(ctx, cx, cy, r * (0.9 + (1 - this.flash) * 0.35), this.flashColor, 0.8 * this.flash);
+			ctx.globalCompositeOperation = 'source-over';
+		}
 		ctx.globalAlpha = 1;
-		this.drawSparks(ctx, layout, S);
+	}
+
+	/** Classic death, made alive: a shiver, then the mouth opens until nothing is left, a pop. */
+	private drawDeath(
+		ctx: CanvasRenderingContext2D,
+		cx: number,
+		cy: number,
+		S: number,
+		L: Palette
+	): void {
+		const t = this.dyingTime;
+		const r = S * 0.42;
+		if (t < 0.35) {
+			const jitter = Math.sin(t * 90) * r * 0.04;
+			const g = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.38, r * 0.05, cx, cy, r);
+			g.addColorStop(0, rgba(L.skin0, 1));
+			g.addColorStop(1, rgba(L.skin2, 1));
+			this.bodyPath(ctx, cx + jitter, cy, r * (1 + 0.06 * Math.sin(t * 60)), r, -Math.PI / 2, 0.15);
+			ctx.fillStyle = g;
+			ctx.fill();
+			ctx.strokeStyle = rgba(L.rim, 0.9);
+			ctx.lineWidth = Math.max(1, r * 0.06);
+			ctx.stroke();
+			return;
+		}
+		const u = Math.min(1, (t - 0.35) / 1.1);
+		if (u < 1) {
+			// slow start, then the body folds away like the arcade death
+			const mouth = 0.15 + Math.pow(u, 1.6) * (Math.PI - 0.15);
+			const g = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.38, r * 0.05, cx, cy, r);
+			g.addColorStop(0, rgba(L.skin0, 1));
+			g.addColorStop(1, rgba(L.skin2, 1));
+			ctx.fillStyle = g;
+			ctx.beginPath();
+			ctx.moveTo(cx, cy);
+			ctx.arc(cx, cy, r * (1 - u * 0.15), -Math.PI / 2 + mouth, -Math.PI / 2 + TAU - mouth);
+			ctx.closePath();
+			ctx.fill();
+			// dark rim: the death wave whitens the screen behind it
+			ctx.strokeStyle = rgba(L.rim, 0.9);
+			ctx.lineWidth = Math.max(1, r * 0.06);
+			ctx.stroke();
+			return;
+		}
+		const p = Math.min(1, (t - 1.45) / 0.35);
+		if (p < 1) {
+			ctx.globalCompositeOperation = 'lighter';
+			for (let i = 0; i < 8; i += 1) {
+				const ang = (i / 8) * TAU;
+				const d = r * (0.2 + p * 0.9);
+				glow(
+					ctx,
+					cx + Math.cos(ang) * d,
+					cy + Math.sin(ang) * d,
+					r * 0.18 * (1 - p),
+					L.glow,
+					1 - p
+				);
+			}
+			ctx.globalCompositeOperation = 'source-over';
+		}
 	}
 
 	private drawBow(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number): void {

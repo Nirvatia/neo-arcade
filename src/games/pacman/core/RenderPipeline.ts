@@ -12,8 +12,8 @@ import { GhostView } from '../render/GhostView';
 import { FruitView } from '../render/FruitView';
 import { GoldenEggView } from '../render/GoldenEggView';
 import { EchoCloneView } from '../render/EchoCloneView';
-import { AbyssBossView } from '../render/AbyssBossView';
-import type { AbyssBossSnapshot } from '../render/AbyssBossView';
+import { LampreyBossView } from '../render/LampreyBossView';
+import type { BossSnapshot } from '../render/LampreyBossView';
 import type { DoomBossService } from '../logic/doom/DoomBossService';
 import { DoomCombatView } from '../render/DoomCombatView';
 import { DoomWorld } from '../render/doom/DoomWorld';
@@ -40,8 +40,9 @@ export class RenderPipeline {
 	private readonly fruitView: FruitView;
 	private readonly goldenEggView: GoldenEggView;
 	private readonly echoCloneView: EchoCloneView;
-	private readonly abyssBossView: AbyssBossView;
-	private readonly echoBossView: AbyssBossView;
+	private readonly bossView: LampreyBossView;
+	private readonly echoBossView: LampreyBossView;
+	private bossHitFlash = 0;
 	private readonly doomCombatView: DoomCombatView;
 	private readonly deathWaveView: DeathWaveView;
 	private readonly levelClearView: LevelClearView;
@@ -85,8 +86,8 @@ export class RenderPipeline {
 		this.fruitView = new FruitView();
 		this.goldenEggView = new GoldenEggView();
 		this.echoCloneView = new EchoCloneView();
-		this.abyssBossView = new AbyssBossView();
-		this.echoBossView = new AbyssBossView();
+		this.bossView = new LampreyBossView();
+		this.echoBossView = new LampreyBossView();
 		this.doomCombatView = new DoomCombatView();
 		this.deathWaveView = new DeathWaveView();
 		this.levelClearView = new LevelClearView();
@@ -212,7 +213,7 @@ export class RenderPipeline {
 		if (this.level.hellMode) {
 			const doom = this.level.doom;
 			return {
-				supernova: Boolean(doom && doom.berserkActive),
+				look: doom && doom.berserkActive ? 'berserk' : 'normal',
 				charge: doom && doom.bfgCharging ? doom.bfgChargeProgress : 0,
 				dying
 			};
@@ -223,7 +224,7 @@ export class RenderPipeline {
 			this.level.profile === 'ms-pacman'
 				? Boolean(hypnosis && hypnosis.overdriveActive)
 				: Boolean(combat && combat.isPowerActive);
-		return { supernova: powered, charge: 0, dying };
+		return { look: powered ? 'energized' : 'normal', charge: 0, dying };
 	}
 
 	// Hell level: the CLAUDE_GRID_DOOM_v3 world (baked maze + meadow), its atmosphere (ash
@@ -244,11 +245,15 @@ export class RenderPipeline {
 		if (doom) {
 			for (const event of doom.consumeFx()) {
 				this.fxView.spawn(event);
+				if (event.kind === 'boss-hit' || event.kind === 'bite') {
+					this.bossHitFlash = 1;
+				}
 				if (event.kind === 'bfg-fire') {
 					this.playerView.fireBurst();
 				}
 			}
 			this.fxView.update(dt, doom.shots, doom.barrelList);
+			this.bossHitFlash = Math.max(0, this.bossHitFlash - dt * 5);
 		}
 
 		// camera shake moves the world and the actors, never the screen-space overlay
@@ -281,7 +286,7 @@ export class RenderPipeline {
 					);
 				}
 				if (!this.erased(boss.position, mask)) {
-					this.abyssBossView.draw(
+					this.bossView.draw(
 						this.ctx,
 						this.bossSnapshot(boss, boss.position, false, 1),
 						layout,
@@ -381,8 +386,10 @@ export class RenderPipeline {
 		at: { x: number; y: number },
 		echo: boolean,
 		presence: number
-	): AbyssBossSnapshot {
+	): BossSnapshot {
 		const rs = boss.renderState;
+		const player = this.level.player;
+		const target = player ? player.position : { x: at.x - 1, y: at.y };
 		return {
 			x: at.x,
 			y: at.y,
@@ -391,10 +398,10 @@ export class RenderPipeline {
 			shape: rs.shape,
 			dir: rs.dir,
 			progress: rs.progress,
-			scale: rs.scale,
-			alpha: echo ? Math.max(0, Math.min(1, presence)) * 0.9 : rs.alpha,
-			chaos: rs.chaos,
+			alpha: echo ? Math.max(0, Math.min(1, presence)) : rs.alpha,
 			intro: boss.introProgress,
+			look: Math.atan2(target.y - at.y, target.x - at.x),
+			hit: echo ? 0 : this.bossHitFlash,
 			echo
 		};
 	}
