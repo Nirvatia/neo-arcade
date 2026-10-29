@@ -63,8 +63,13 @@ export class GridService {
 		return this.model.isInside(x, y);
 	}
 
+	/** Inside the maze and not a wall; the empty ES border around the maze is never walkable. */
 	isWalkable(x: number, y: number): boolean {
-		return this.model.tileAt(x, y) !== 'WL';
+		if (!this.isInside(x, y)) {
+			return false;
+		}
+		const tile = this.model.tileAt(x, y);
+		return tile !== 'WL' && tile !== 'ES';
 	}
 
 	isPlayerWalkable(x: number, y: number): boolean {

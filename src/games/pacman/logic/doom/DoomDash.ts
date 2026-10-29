@@ -2,21 +2,7 @@ import type { GridService } from '../GridService';
 import type { DoomTile, DoomDirection } from './DoomGraph';
 import { adjacentTile } from './DoomGraph';
 import { directionBetween, sameRowOrCol, tileDistance } from './DoomAttackCore';
-
-export interface DoomDashConfig {
-	readonly telegraph: number;
-	readonly speed: number;
-	readonly maxLength: number;
-	readonly recover: number;
-	readonly minDist: number;
-	readonly maxDist: number;
-}
-
-export function dashConfigForPhase(phase: number): DoomDashConfig {
-	if (phase === 1) return { telegraph: 0.7, speed: 11.2, maxLength: 14, recover: 0.8, minDist: 3, maxDist: 12 };
-	if (phase === 2) return { telegraph: 0.6, speed: 12.0, maxLength: 14, recover: 0.7, minDist: 3, maxDist: 12 };
-	return { telegraph: 0.5, speed: 12.8, maxLength: 14, recover: 0.6, minDist: 3, maxDist: 12 };
-}
+import { DASH_MAX_DISTANCE, DASH_MIN_DISTANCE } from './DoomBalance';
 
 export interface DoomDashCheckResult {
 	readonly canStart: boolean;
@@ -27,14 +13,12 @@ export function canStartDash(
 	grid: GridService,
 	bossTile: DoomTile,
 	playerTile: DoomTile,
-	phase: number
 ): DoomDashCheckResult {
-	const config = dashConfigForPhase(phase);
 	if (!sameRowOrCol(bossTile, playerTile)) {
 		return { canStart: false, direction: null };
 	}
 	const dist = tileDistance(bossTile, playerTile);
-	if (dist < config.minDist || dist > config.maxDist) {
+	if (dist < DASH_MIN_DISTANCE || dist > DASH_MAX_DISTANCE) {
 		return { canStart: false, direction: null };
 	}
 	const direction = directionBetween(bossTile, playerTile);

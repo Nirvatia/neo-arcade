@@ -71,6 +71,10 @@ export class DoomAbilityService {
 		return this.pickups.list;
 	}
 
+	canCollect(kind: DoomPickupKind): boolean {
+		return this.pickups.isCollectible(kind, this.playerHpValue, this.weapons.slot !== null);
+	}
+
 	get bfgChargeProgress(): number {
 		return this.weapons.bfgChargeProgress;
 	}
@@ -144,7 +148,7 @@ export class DoomAbilityService {
 		}
 		const slot = this.weapons.slot;
 		if (slot === 'bfg') {
-			if (this.weapons.startBfgCharge()) {
+			if (player.facing && this.weapons.startBfgCharge()) {
 				return 'bfg';
 			}
 			return null;

@@ -45,8 +45,8 @@ export class AbyssBossView {
   ): void {
     this.time = time;
     const state = boss.renderState;
-    const cx = layout.offsetX + (state.x + 0.5) * layout.tileSize;
-    const cy = layout.offsetY + (state.y + 0.5) * layout.tileSize;
+    const cx = layout.offsetX + state.x * layout.tileSize;
+    const cy = layout.offsetY + state.y * layout.tileSize;
     const baseSize = layout.tileSize * 0.4;
 
     ctx.save();

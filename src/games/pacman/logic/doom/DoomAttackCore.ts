@@ -1,5 +1,13 @@
 import type { DoomTile, DoomDirection } from './DoomGraph';
 import { adjacentTile } from './DoomGraph';
+import {
+	BLINK_WEIGHTS,
+	BROOD_WEIGHTS,
+	CROSS_WEIGHTS,
+	DASH_WEIGHTS,
+	VOID_WEIGHTS,
+	phaseIndex
+} from './DoomBalance';
 
 export type DoomAttackKind = 'dash' | 'cross' | 'voidTrail' | 'blink' | 'brood';
 
@@ -12,15 +20,14 @@ export interface DoomAttackWeights {
 }
 
 export function attackWeightsForPhase(phase: number): DoomAttackWeights {
-	if (phase === 1) return { dash: 100, cross: 0, voidTrail: 0, blink: 0, brood: 0 };
-	if (phase === 2) return { dash: 40, cross: 35, voidTrail: 25, blink: 0, brood: 0 };
-	return { dash: 25, cross: 25, voidTrail: 15, blink: 20, brood: 15 };
-}
-
-export function attackCooldownForPhase(phase: number): number {
-	if (phase === 1) return 4.0;
-	if (phase === 2) return 3.0;
-	return 2.2;
+	const i = phaseIndex(phase);
+	return {
+		dash: DASH_WEIGHTS[i],
+		cross: CROSS_WEIGHTS[i],
+		voidTrail: VOID_WEIGHTS[i],
+		blink: BLINK_WEIGHTS[i],
+		brood: BROOD_WEIGHTS[i]
+	};
 }
 
 export function sameRowOrCol(a: DoomTile, b: DoomTile): boolean {

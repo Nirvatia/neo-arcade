@@ -253,8 +253,8 @@ export class DoomCombatView {
 	): void {
 		const s = layout.tileSize;
 		for (const tracer of doom.tracerList) {
-			const startX = layout.offsetX + (tracer.x + 0.5) * s;
-			const startY = layout.offsetY + (tracer.y + 0.5) * s;
+			const startX = layout.offsetX + tracer.x * s;
+			const startY = layout.offsetY + tracer.y * s;
 			const endX = startX + tracer.dx * tracer.length * s;
 			const endY = startY + tracer.dy * tracer.length * s;
 			const alpha = Math.min(1, tracer.timer / 0.1);
@@ -288,8 +288,8 @@ export class DoomCombatView {
 		const s = layout.tileSize;
 		for (const minion of boss.minionList) {
 			const pos = minionPosition(minion);
-			const px = layout.offsetX + (pos.x + 0.5) * s;
-			const py = layout.offsetY + (pos.y + 0.5) * s;
+			const px = layout.offsetX + pos.x * s;
+			const py = layout.offsetY + pos.y * s;
 			const radius = Math.max(3, s * 0.35);
 			const color = MINION_COLORS[minion.kind] ?? '#ffffff';
 			const wobble = Math.sin(time * 6 + pos.x * 3) * s * 0.03;

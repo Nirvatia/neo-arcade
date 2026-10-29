@@ -103,11 +103,12 @@ export class DoomBossModel {
 	}
 
 	get position(): { x: number; y: number } {
-		let renderX = this._tile.x;
-		let renderY = this._tile.y;
+		// Tile-center coordinates, same convention as PlayerService.position.
+		let renderX = this._tile.x + 0.5;
+		let renderY = this._tile.y + 0.5;
 		if (this._target) {
-			renderX = this._tile.x + (this._target.x - this._tile.x) * this._moveProgress;
-			renderY = this._tile.y + (this._target.y - this._tile.y) * this._moveProgress;
+			renderX = this._tile.x + 0.5 + (this._target.x - this._tile.x) * this._moveProgress;
+			renderY = this._tile.y + 0.5 + (this._target.y - this._tile.y) * this._moveProgress;
 		}
 		return { x: renderX, y: renderY };
 	}

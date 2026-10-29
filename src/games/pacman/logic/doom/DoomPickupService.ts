@@ -102,7 +102,7 @@ export class DoomPickupService {
 		this.initialSpawn();
 	}
 
-	private isCollectible(kind: DoomPickupKind, playerHp: number, slotOccupied: boolean): boolean {
+	isCollectible(kind: DoomPickupKind, playerHp: number, slotOccupied: boolean): boolean {
 		if (kind === 'medkit') {
 			return playerHp < 3;
 		}
@@ -178,8 +178,8 @@ export class DoomPickupService {
 		if (!Number.isFinite(pos.x) || !Number.isFinite(pos.y)) {
 			return false;
 		}
-		const dx = pos.x - tile.x;
-		const dy = pos.y - tile.y;
+		const dx = pos.x - (tile.x + 0.5);
+		const dy = pos.y - (tile.y + 0.5);
 		return dx * dx + dy * dy < PICKUP_CONTACT_RADIUS_SQ;
 	}
 }

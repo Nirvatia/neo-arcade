@@ -221,17 +221,23 @@ export class DoomBossService {
 		if (this.model.defeated) {
 			return;
 		}
+		this.updateBoss(dt, player);
+		this.updateMinions(dt, player);
+	}
+
+	private updateBoss(dt: number, player: PlayerService): void {
 		if (
 			this.model.state === 'INTRO' ||
 			this.model.state === 'TRANSITION' ||
 			this.model.state === 'STUNNED'
 		) {
-			this.updateMinions(dt, player);
 			return;
 		}
 		if (this.model.state === 'TELEGRAPH') {
 			if (this.model.stateTimer >= this.model.telegraphDuration) {
 				this.enterActivePhase();
+			} else {
+				this.checkPlayerContact(player);
 			}
 			return;
 		}
@@ -240,7 +246,6 @@ export class DoomBossService {
 			return;
 		}
 		if (this.model.state === 'RECOVER') {
-			this.updateMinions(dt, player);
 			this.checkPlayerContact(player);
 			return;
 		}
@@ -285,7 +290,6 @@ export class DoomBossService {
 			}
 			this.checkPlayerContact(player);
 		}
-		this.updateMinions(dt, player);
 	}
 
 	takeDamage(amount: number): void {
@@ -366,6 +370,9 @@ export class DoomBossService {
 	private updateActivePhase(dt: number, player: PlayerService): void {
 		const kind = this.model.attackKind;
 		const pi = phaseIndex(this.model.phase);
+		if (kind !== 'dash' && kind !== 'blink') {
+			this.checkPlayerContact(player);
+		}
 		if (kind === 'dash') {
 			const direction = this.model.dashDirection;
 			if (!direction) {
@@ -440,7 +447,7 @@ export class DoomBossService {
 		const playerTile = this.currentTargetTile(player);
 		const pi = phaseIndex(this.model.phase);
 		const available = new Set<DoomAttackKind>();
-		const dashCheck = canStartDash(this.grid, this.model.tile, playerTile, this.model.phase);
+		const dashCheck = canStartDash(this.grid, this.model.tile, playerTile);
 		if (
 			dashCheck.canStart &&
 			dashCheck.direction &&
@@ -597,7 +604,10 @@ export class DoomBossService {
 			}
 		}
 		if (!minion.target) {
-			const targetTile = this.minionTargetTile(minion.kind, player);
+			const targetTile = this.walkableOr(
+				this.minionTargetTile(minion.kind, player),
+				this.currentTargetTile(player)
+			);
 			const distances = bfsDistanceFrom(this.grid, targetTile);
 			const directions: DoomDirection[] = ['UP', 'LEFT', 'DOWN', 'RIGHT'];
 			let bestDir: DoomDirection | null = null;
@@ -648,6 +658,10 @@ export class DoomBossService {
 		return this.nearestCorner();
 	}
 
+	private walkableOr(tile: GridPoint, fallback: GridPoint): GridPoint {
+		return this.grid.isWalkable(tile.x, tile.y) ? tile : fallback;
+	}
+
 	private aheadTile(tile: GridPoint, direction: DoomDirection | null, steps: number): GridPoint {
 		if (!direction) {
 			return tile;
@@ -661,10 +675,10 @@ export class DoomBossService {
 
 	private nearestCorner(): GridPoint {
 		const corners: GridPoint[] = [
-			{ x: 1, y: 1 },
-			{ x: 1, y: this.grid.height - 2 },
-			{ x: this.grid.width - 2, y: 1 },
-			{ x: this.grid.width - 2, y: this.grid.height - 2 }
+			{ x: 2, y: 2 },
+			{ x: 2, y: this.grid.height - 3 },
+			{ x: this.grid.width - 3, y: 2 },
+			{ x: this.grid.width - 3, y: this.grid.height - 3 }
 		];
 		let best = corners[0];
 		let bestDist = Number.POSITIVE_INFINITY;
