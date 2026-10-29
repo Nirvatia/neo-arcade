@@ -4,12 +4,15 @@ Working agreement: one stage per chat. A new chat starts with
 "read `src/games/pacman/ROADMAP.md`, stage N". Claude analyses the code, proposes a plan,
 waits for approval, works, then updates this file (done / found) and pushes to `feat/pacman`.
 
-## Architecture (after stage 1)
+## Architecture (after stage 2)
 
 ```
-core/        GameMain (wiring, input → director), Director + states/ (game flow), Events
+core/        GameMain (wiring, input → director, auto-pause), Events
+             Director (transition table, pause stack, screen fade, `flow` snapshot)
+  flow/      GameState interface, StateClock (timeline of named phases)
+  states/    menu, ready (intro | short), playing, paused, death, level-clear, game-over
 engine/      EventBus, GameLoop
-config/      grids, scores, actor contact distance
+config/      grids, scores, actor contact distance, flowConfig (every flow duration)
 logic/
   level/     LevelLoader (the run: level number, profile, secret/hell routing, carry-over)
              LevelSession (all services of one level, built together, never partial)
@@ -38,6 +41,28 @@ Rules of thumb:
 - Per-level state goes into `LevelSession`; anything that survives a level change is
   carried explicitly by `LevelLoader.changeLevel`.
 - Shared drawing helpers go to `render/common/`, not copied into views.
+- Timed things are `StateClock` phases with durations in `config/flowConfig.ts`.
+  Animations read `frame.flow` (`state`, `phase`, `phaseProgress`, `progress`, `remaining`,
+  `paused`, `fade`) and never keep their own timers for flow events.
+- State changes go through `Director`; a change missing from its `TRANSITIONS` table is
+  logged and ignored. Level changes use `director.changeLevel(route)` (fade + short READY).
+
+### Game flow (stage 2)
+
+```
+menu ──fade──▶ ready(intro 5 s, jingle) ──▶ playing ──▶ death 5 s ──▶ ready(short 2 s)
+                  ▲   skip: Enter                │  │           └─ no lives ─▶ game-over
+                  │                              │  └─▶ level-clear 8 s ──fade──▶ ready(short)
+game-over ─fade───┘  (input locked 1 s)          └─ golden egg ──fade──▶ secret ready(short)
+hell: dying in the abyss ──fade──▶ next level, ready(short)
+pause (Space/P, Esc in play): ready, playing, death, level-clear — freezes and resumes the
+same state; tab hidden / window blur auto-pauses; requests during a fade apply after it.
+```
+
+Hooks for later stages: stage 3 splits `DeathState` into phases (`flowConfig.death`),
+stage 4 retimes `LevelClearState` phases (`blink`, `cutscene`, `maze-out`), stage 7 draws
+cutscenes in the `cutscene` phase. The fade is a flat colour in `RenderPipeline.drawFade`
+and covers the canvas only (Svelte buttons stay on top); replace it there.
 
 ## Current state
 
@@ -59,13 +84,17 @@ Rules of thumb:
   game loop (no judder), one tile-center coordinate convention for all actors.
 - **Tests**: `logic/doom/doomMechanics.test.ts` (pickups, BFG hits, maze bounds, minions,
   stun vs death/transition, attack sets per phase, rift escape, eruption parity, seals keep
-  the maze connected). Run with `npx vitest run src/games/pacman`.
+  the maze connected) and `core/director.test.ts` (game flow: fades, intro/short ready,
+  pause in every state, auto-pause, game-over lock, transition table). Run with
+  `npx vitest run src/games/pacman`.
 
 ### Debug tools (dev build only)
 
 - Debug panel: `ENTER HELL`, `BOSS -250 HP`, `GOD MODE`, `DIE`, `COMPLETE LEVEL`, …
 - `window.__pacman = { level, director, render }` for the console and Playwright play-tests.
-  Directions are upper case: `level.setDesiredDirection('LEFT')`.
+  Directions are upper case: `level.setDesiredDirection('LEFT')`. `director.startGame()`
+  now fades for 0.8 s before READY; wait for it before `showPlaying()` / `debugEnter*()`
+  (both are ignored during a fade). `director.flow` shows the state, phase and timers.
 - Fire key is `F` / `Shift`; `Space` pauses.
 - Deterministic screenshots: Playwright `page.clock.install()` + a seeded `Math.random`
   init script make most frames repeatable (noise < 0.1 %). Boss phase 3 and the death wave
@@ -80,8 +109,8 @@ Rules of thumb:
 - Large files left as they are, to be cut when their stage rewrites them:
   `logic/doom/DoomBossService.ts` (~1300 lines), `logic/actors/GhostService.ts`,
   `logic/rules/CombatService.ts`, `render/doom/DoomBake.ts`.
-- States still reach services through the nullable `LevelLoader` getters; stage 2 can switch
-  them to `level.session` / `level.ensure()` like `PlayingState`.
+- Some states still reach services through the nullable `LevelLoader` getters
+  (`DeathState.enter`, `GameOverState`); harmless, switch to `level.ensure()` when touched.
 
 ### Design decisions (keep)
 
@@ -113,8 +142,17 @@ Order matters: each stage builds on the ones before it.
      to the next level without losing a life — intentional (`abyss`), not a bug.
    - Before/after screenshots (menu, ready/playing per season, secret, hell phases 1–3,
      death, level clear) match within run-to-run noise.
-2. **Transitions and timers.** State flow `menu → ready → playing → death → level-clear →
-game-over`, durations, pause/resume. Later animations hook into these.
+2. ✅ **Transitions and timers.** Done in the second chat (see Game flow above):
+   - `StateClock` timelines for every timed state, durations in `config/flowConfig.ts`,
+     typed `director.flow` instead of duck-typed `overlayTimer` / `deathWave` getters.
+   - Transition table in `Director`; pause is a stack that resumes the same state.
+   - Owner-approved behaviour changes: long READY + jingle only on a new game, short
+     READY (2 s) after death and level changes; pause in death and level clear too;
+     auto-pause on hidden tab / blur; 0.4 s + 0.4 s screen fade between menu and game and
+     between levels (incl. secret entry and the hell abyss); game-over input lock 1 s.
+   - Removed: the never-used `PlayingState` reset path, `ReadySnapshot`, the ready-timer
+     hand-off through `PausedState`.
+   - 11 flow tests; randomized play-test and screenshots: no errors, play frames unchanged.
 3. **Replace the level disintegration on death.** Pac-Man's own death is done; replace the
    reaction of the level around it (`render/transitions/DeathWaveView.ts`, the
    disintegration mask in `SharedLayers`).
