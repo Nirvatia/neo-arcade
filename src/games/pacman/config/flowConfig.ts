@@ -7,8 +7,15 @@ export const FLOW = {
 	readyIntro: 5,
 	/** READY after a death or a level change. */
 	readyShort: 2,
-	/** Death of Pac-Man and the reaction of the level (stage 3 splits it into phases). */
-	death: 5,
+	/**
+	 * Death: the level shatters from the death point, hangs over the abyss, then
+	 * reassembles from the respawn point. Pac-Man's own death plays inside `shatter`.
+	 */
+	death: {
+		shatter: 2.6,
+		void: 0.5,
+		rebuild: 1.9
+	},
 	levelClear: {
 		blink: 2,
 		cutscene: 5,

@@ -1,8 +1,14 @@
 // Sprites of the CLAUDE_GRID_DOOM_v3 prototype: drawn once at 3x and downscaled on draw.
 import type { DoomPickupKind } from '../../logic/doom/DoomPickupModel';
-import { doomCanvas, canvasContext, hexChannels, makeTexture, radialTexture } from './DoomTextures';
+import {
+	makeCanvas,
+	canvasContext,
+	hexChannels,
+	makeTexture,
+	radialTexture
+} from '../common/textures';
 
-export { glowTexture } from './DoomTextures';
+export { glowTexture } from '../common/textures';
 
 const edge = (x: CanvasRenderingContext2D): void => {
 	x.strokeStyle = '#0a0a0a';
@@ -39,7 +45,7 @@ export const vignetteTexture = lazy(() =>
 );
 
 export const washTexture = lazy(() => {
-	const c = doomCanvas(64, 64);
+	const c = makeCanvas(64, 64);
 	const x = canvasContext(c);
 	const q = x.createLinearGradient(0, 0, 64, 64);
 	q.addColorStop(0, 'rgba(160,190,230,.12)');

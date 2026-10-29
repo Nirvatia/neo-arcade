@@ -4,6 +4,7 @@ import type { LevelLoader } from '../logic/level/LevelLoader';
 import type { LevelProgress } from '../logic/level/LevelProgress';
 import type { SeasonData } from '../logic/level/SeasonCatalog';
 import type { GridService } from '../logic/maze/GridService';
+import type { GridLayout } from './maze/GridView';
 
 /** Everything a level renderer needs for one frame. Built by `RenderPipeline`. */
 export interface RenderFrame {
@@ -27,7 +28,11 @@ export interface RenderFrame {
 	readonly progress: LevelProgress;
 }
 
-/** Draws one kind of level (seasonal or hell) into the frame. */
+/**
+ * Draws one kind of level into the frame and returns where the board went. In the death
+ * state it leaves Pac-Man out (the pipeline draws him over the level decay); the canvas
+ * overlay is always drawn by the pipeline.
+ */
 export interface LevelRenderer {
-	render(frame: RenderFrame): void;
+	render(frame: RenderFrame): GridLayout;
 }

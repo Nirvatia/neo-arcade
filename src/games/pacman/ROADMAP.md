@@ -4,7 +4,7 @@ Working agreement: one stage per chat. A new chat starts with
 "read `src/games/pacman/ROADMAP.md`, stage N". Claude analyses the code, proposes a plan,
 waits for approval, works, then updates this file (done / found) and pushes to `feat/pacman`.
 
-## Architecture (after stage 2)
+## Architecture (after stage 3)
 
 ```
 core/        GameMain (wiring, input → director, auto-pause), Events
@@ -25,11 +25,13 @@ logic/
 render/
   RenderPipeline   canvas, HiDPI, render clock → builds a RenderFrame per frame
   RenderFrame      frame data + the LevelRenderer interface
-  SharedLayers     Pac-Man, bonuses, death wave, level clear, overlay (every level)
-  seasons/         SeasonLevelRenderer + per-season bundles (scene, maze, pellets, weather)
+  SharedLayers     Pac-Man, bonuses, level clear, overlay (every level)
+  seasons/         SeasonLevelRenderer + bundles for spring, summer, autumn, secret
+  seasons/winter/  WinterBake (static world) + WinterWorld (live layer) + WinterLevelRenderer
   doom/            DoomLevelRenderer, baked world, lamprey boss, combat and weapon FX
-  maze/ actors/ items/ (fruit stubs: one file per fruit) transitions/ (death wave,
-  level clear, cutscenes) overlay/ contracts/ common/ (seededRandom, clamp, rgba)
+  transitions/decay/  level decay on death: field (Dijkstra), timeline, WebGL2 pass, shader
+  maze/ actors/ items/ (fruit stubs: one file per fruit) transitions/ (level clear,
+  cutscenes) overlay/ contracts/ common/ (textures, seededRandom, clamp, rgba)
 ui/          Svelte HUD (hell), overlay, debug panel, action bridges
 ```
 
@@ -41,6 +43,11 @@ Rules of thumb:
 - Per-level state goes into `LevelSession`; anything that survives a level change is
   carried explicitly by `LevelLoader.changeLevel`.
 - Shared drawing helpers go to `render/common/`, not copied into views.
+- A level renderer returns the board layout and never draws the overlay; in the death
+  state it leaves Pac-Man out. `RenderPipeline` renders the level offscreen while dying,
+  runs the decay pass, then draws Pac-Man, the overlay and the screen fade on top.
+- No PixiJS: per-pixel effects are WebGL2 passes over the Canvas2D frame, uploaded only
+  while the effect runs (`transitions/decay/DecayPass` is the pattern).
 - Timed things are `StateClock` phases with durations in `config/flowConfig.ts`.
   Animations read `frame.flow` (`state`, `phase`, `phaseProgress`, `progress`, `remaining`,
   `paused`, `fade`) and never keep their own timers for flow events.
@@ -59,8 +66,8 @@ pause (Space/P, Esc in play): ready, playing, death, level-clear — freezes and
 same state; tab hidden / window blur auto-pauses; requests during a fade apply after it.
 ```
 
-Hooks for later stages: stage 3 splits `DeathState` into phases (`flowConfig.death`),
-stage 4 retimes `LevelClearState` phases (`blink`, `cutscene`, `maze-out`), stage 7 draws
+Hooks for later stages: `DeathState` runs `shatter` → `void` → `rebuild`
+(`flowConfig.death`); stage 4 retimes `LevelClearState` phases (`blink`, `cutscene`, `maze-out`), stage 7 draws
 cutscenes in the `cutscene` phase. The fade is a flat colour in `RenderPipeline.drawFade`
 and covers the canvas only (Svelte buttons stay on top); replace it there.
 
@@ -153,19 +160,32 @@ Order matters: each stage builds on the ones before it.
    - Removed: the never-used `PlayingState` reset path, `ReadySnapshot`, the ready-timer
      hand-off through `PausedState`.
    - 11 flow tests; randomized play-test and screenshots: no errors, play frames unchanged.
-3. **Replace the level disintegration on death.** Pac-Man's own death is done; replace the
-   reaction of the level around it (`render/transitions/DeathWaveView.ts`, the
-   disintegration mask in `SharedLayers`).
-   - Decision: no PixiJS. Effects that need per-pixel maths run as a WebGL2 post pass over
-     the Canvas2D world layer (upload the frame as a texture only while the effect runs).
-   - Prototype: `prototypes/pacman/winter-decay.html` (open in a browser, no build). Winter
-     art from the owner's mock-up, live layer ported to Canvas2D, decay shader: geodesic
-     front through the corridors, domain-warped edge, Voronoi ice shards, frost, abyss,
-     shock ring, rebuild from the respawn point. Waiting for the owner's verdict.
+3. ✅ **Replace the level disintegration on death.** Done in the second chat.
+   - Decision: no PixiJS (see Architecture).
+   - Prototype approved by the owner (corridor mode): `prototypes/pacman/winter-decay.html`.
+   - In the game (`render/transitions/decay/`), on every level: the level shatters into
+     Voronoi ice shards along a geodesic front from the death point (corridors cost 1,
+     walls 5, open ground 2.4, so it runs down the corridors first), hangs over the abyss,
+     then reassembles from the respawn point. Shock ring, flash, shake and ice dust at the
+     start. Palettes: ice (seasons), ember (hell). Without WebGL2 a dark veil stands in.
+   - `DeathState` phases `shatter` 2.6 s, `void` 0.5 s, `rebuild` 1.9 s; `director.death`
+     gives the death point. Removed: `DeathWaveView`, the disintegration mask in
+     `GridView`, `GhostView`, `SharedLayers` and the hell renderer.
+   - Tests: `transitions/decay/decay.test.ts` (field: corridors beat walls, no corner
+     cutting, shader-equivalent sampling, 16-bit packing; timeline sweeps and rebuilds).
+   - Performance: the pass runs at ≤ 1.5× pixel ratio. Headless Chromium renders it in
+     software (~0.8 s/frame), so smoothness must be checked on real hardware.
 4. **Level-complete animation.** Built on stage 2's transitions.
 5. **New regular HUD.** The hell HUD is the reference for quality.
 6. **Integrate the 4 seasons.** Largest stage; one season per chat, from the owner's
    mock-ups, following the hell pattern (`*Bake` static world + `*World` live layer).
+   - ✅ Winter (second chat): `seasons/winter/` from CLAUDE_GRID_WINTER — `bake()` ported
+     1:1 and parameterised by the grid, the PIXI live layer ported to Canvas2D (ice
+     pellets, snow-crystal energizers, portal swirls, stream glints, chimney smoke, mist,
+     drifting snow, blizzard, blue night with lamp and cabin lights). The blizzard rises at
+     50 % of the dots eaten and the night falls at 75 % (`WinterLevelRenderer`). The old
+     tile-by-tile winter bundle is deleted; the secret level keeps its own bundle.
+   - Remaining: spring, summer, autumn (and a decay palette per season).
 7. **Cutscenes.** One per season (4), then an original one for the secret level. The
    skeleton is in `render/transitions/cutscenes/` (`Cutscene` interface, catalog,
    `LevelClearCutscene`); it is not wired in yet — the level-clear state has a `cutscene`

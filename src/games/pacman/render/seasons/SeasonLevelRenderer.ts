@@ -22,7 +22,7 @@ export class SeasonLevelRenderer implements LevelRenderer {
 		this.shared = shared;
 	}
 
-	render(frame: RenderFrame): void {
+	render(frame: RenderFrame): GridLayout {
 		const { ctx, width, height, dt, time, state, level, season, grid, progress } = frame;
 		const ratio = progress.collectionRatio;
 		ctx.fillStyle = lerpHex(season.palette.background, season.palette.backgroundNight, ratio);
@@ -34,11 +34,9 @@ export class SeasonLevelRenderer implements LevelRenderer {
 
 		if (state === 'level-clear') {
 			this.shared.drawLevelClear(frame, layout);
-			this.shared.drawOverlay(frame, layout);
-			return;
+			return layout;
 		}
 
-		const mask = this.shared.disintegrationMask(frame);
 		const drawnLayout = this.gridView.draw(
 			ctx,
 			grid,
@@ -49,11 +47,10 @@ export class SeasonLevelRenderer implements LevelRenderer {
 			ratio,
 			bundle,
 			time,
-			mask,
 			level.mazeScale
 		);
 
-		this.shared.drawCollectibles(frame, drawnLayout, mask);
+		this.shared.drawCollectibles(frame, drawnLayout);
 
 		const ghosts = level.ghosts;
 		if (ghosts) {
@@ -68,14 +65,12 @@ export class SeasonLevelRenderer implements LevelRenderer {
 					? combat.powerTimer
 					: 0;
 			const overdrive = Boolean(isMs && hypnosis && hypnosis.overdriveActive);
-			this.ghostView.draw(ctx, ghosts, drawnLayout, ghostTimer, overdrive, mask);
+			this.ghostView.draw(ctx, ghosts, drawnLayout, ghostTimer, overdrive);
 		}
 
 		if (state === 'death') {
-			this.shared.drawDeathWave(frame, drawnLayout);
-			this.shared.drawPlayer(frame, drawnLayout);
-			this.shared.drawOverlay(frame, drawnLayout);
-			return;
+			// Pac-Man is drawn by the pipeline over the level decay
+			return drawnLayout;
 		}
 
 		this.shared.drawPlayer(frame, drawnLayout);
@@ -84,8 +79,7 @@ export class SeasonLevelRenderer implements LevelRenderer {
 		if (state !== 'menu' && !frame.paused) {
 			bundle.weather.draw(ctx, drawnLayout, width, height, dt, time);
 		}
-
-		this.shared.drawOverlay(frame, drawnLayout);
+		return drawnLayout;
 	}
 
 	// Bundles keep animation state (weather particles), so they must survive between frames.

@@ -11,7 +11,7 @@ import type { ReadyKind } from './states/ReadyState';
 import { PlayingState } from './states/PlayingState';
 import { PausedState } from './states/PausedState';
 import { DeathState } from './states/DeathState';
-import type { DeathWaveSnapshot } from './states/DeathState';
+import type { DeathSnapshot } from './states/DeathState';
 import { LevelClearState } from './states/LevelClearState';
 import type { LevelClearSnapshot } from './states/LevelClearState';
 import { GameOverState } from './states/GameOverState';
@@ -100,9 +100,10 @@ export class Director {
 		};
 	}
 
-	get deathWave(): DeathWaveSnapshot | null {
+	/** Where Pac-Man died, while the death state is on screen. */
+	get death(): DeathSnapshot | null {
 		const state = this.activeState;
-		return state instanceof DeathState ? state.deathWave : null;
+		return state instanceof DeathState ? state.death : null;
 	}
 
 	get levelClear(): LevelClearSnapshot | null {

@@ -6,6 +6,7 @@ import { Director } from './Director';
 import { FLOW } from '../config/flowConfig';
 
 const FADE = FLOW.screenFade * 2;
+const DEATH = FLOW.death.shatter + FLOW.death.void + FLOW.death.rebuild;
 
 function setup(): {
 	director: Director;
@@ -95,15 +96,16 @@ describe('game flow', () => {
 		director.debugKillPlayer();
 		expect(director.stateName).toBe('death');
 		run(director, 1);
-		const wave = director.deathWave?.progress ?? 0;
+		const progress = director.flow.progress;
+		expect(director.death).not.toBeNull();
 		director.togglePause();
 		run(director, 10);
 		expect(director.stateName).toBe('paused');
-		expect(director.deathWave?.progress).toBeCloseTo(wave, 5);
+		expect(director.flow.progress).toBeCloseTo(progress, 5);
 		director.togglePause();
 		expect(director.stateName).toBe('death');
 
-		run(director, FLOW.death);
+		run(director, DEATH);
 		expect(director.stateName).toBe('ready');
 		director.showPlaying();
 		director.debugCompleteLevel();
@@ -122,7 +124,7 @@ describe('game flow', () => {
 		director.showPlaying();
 		cues.length = 0;
 		director.debugKillPlayer();
-		run(director, FLOW.death + 0.05);
+		run(director, DEATH + 0.05);
 		expect(director.stateName).toBe('ready');
 		expect(director.flow.phase).toBe('short');
 		expect(director.flow.duration).toBe(FLOW.readyShort);
@@ -168,7 +170,7 @@ describe('game flow', () => {
 		director.showPlaying();
 		level.ensure().combat.setLives(1);
 		director.debugKillPlayer();
-		run(director, FLOW.death + 0.05);
+		run(director, DEATH + 0.05);
 		expect(director.stateName).toBe('game-over');
 		director.startGame();
 		director.returnToMenu();

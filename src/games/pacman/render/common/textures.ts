@@ -1,4 +1,4 @@
-export function doomCanvas(width: number, height: number): HTMLCanvasElement {
+export function makeCanvas(width: number, height: number): HTMLCanvasElement {
 	const canvas = document.createElement('canvas');
 	canvas.width = Math.max(1, Math.floor(width));
 	canvas.height = Math.max(1, Math.floor(height));
@@ -8,8 +8,8 @@ export function doomCanvas(width: number, height: number): HTMLCanvasElement {
 export function canvasContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
 	const ctx = canvas.getContext('2d');
 	if (!ctx) {
-		console.error('DoomTextures.canvasContext', '2d context unavailable');
-		throw new Error('DoomTextures.canvasContext: 2d context unavailable');
+		console.error('textures.canvasContext', '2d context unavailable');
+		throw new Error('textures.canvasContext: 2d context unavailable');
 	}
 	return ctx;
 }
@@ -23,7 +23,7 @@ export function radialTexture(
 	stops: ReadonlyArray<readonly [number, string]>
 ): HTMLCanvasElement {
 	const safeSize = Math.max(2, Math.floor(size));
-	const canvas = doomCanvas(safeSize, safeSize);
+	const canvas = makeCanvas(safeSize, safeSize);
 	const ctx = canvasContext(canvas);
 	const gradient = ctx.createRadialGradient(
 		safeSize / 2,
@@ -64,7 +64,7 @@ export function makeTexture(
 	painter: (ctx: CanvasRenderingContext2D) => void
 ): HTMLCanvasElement {
 	const scale = 3;
-	const canvas = doomCanvas(width * scale, height * scale);
+	const canvas = makeCanvas(width * scale, height * scale);
 	const ctx = canvasContext(canvas);
 	ctx.scale(scale, scale);
 	painter(ctx);

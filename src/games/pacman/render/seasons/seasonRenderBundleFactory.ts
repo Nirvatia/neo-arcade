@@ -3,7 +3,6 @@ import type { SeasonRenderBundle } from '../contracts/SeasonRenderBundle';
 import { SpringRenderBundle } from './spring/SpringRenderBundle';
 import { SummerRenderBundle } from './summer/SummerRenderBundle';
 import { AutumnRenderBundle } from './autumn/AutumnRenderBundle';
-import { WinterRenderBundle } from './winter/WinterRenderBundle';
 import { SecretRenderBundle } from './secret/SecretRenderBundle';
 
 export interface SeasonBundleRequest {
@@ -12,6 +11,11 @@ export interface SeasonBundleRequest {
 	readonly level: number;
 }
 
+/**
+ * Bundles for the seasons still drawn tile by tile. Winter has its own renderer
+ * (`winter/WinterLevelRenderer`); the secret level keeps a bundle even though it is a
+ * winter season by name.
+ */
 export function seasonRenderBundleFor(request: SeasonBundleRequest): SeasonRenderBundle {
 	if (!request || !request.season) {
 		console.error('seasonRenderBundleFor', 'missing request or season', request);
@@ -28,9 +32,6 @@ export function seasonRenderBundleFor(request: SeasonBundleRequest): SeasonRende
 	}
 	if (request.season.name === 'autumn') {
 		return new AutumnRenderBundle();
-	}
-	if (request.season.name === 'winter') {
-		return new WinterRenderBundle();
 	}
 	console.error('seasonRenderBundleFor', 'unknown season', request.season.name);
 	throw new Error(`seasonRenderBundleFor: unknown season ${request.season.name}`);

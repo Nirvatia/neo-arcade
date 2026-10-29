@@ -11,12 +11,6 @@ export interface GridLayout {
 	readonly offsetY: number;
 }
 
-export interface DisintegrationMask {
-	readonly centerX: number;
-	readonly centerY: number;
-	readonly radius: number;
-}
-
 export class GridView {
 	computeLayout(grid: GridService, width: number, height: number, mazeScale: number): GridLayout {
 		if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
@@ -47,7 +41,6 @@ export class GridView {
 		dayNightRatio: number,
 		bundle: SeasonRenderBundle,
 		time: number,
-		disintegration: DisintegrationMask | null = null,
 		mazeScale: number = 1
 	): GridLayout {
 		const layout = this.computeLayout(grid, width, height, mazeScale);
@@ -60,14 +53,9 @@ export class GridView {
 		const colors = mazeColorsFor(palette, ratio);
 		const safeTime = Number.isFinite(time) && time >= 0 ? time : 0;
 		const tileSize = layout.tileSize;
-		const mask = this.validMask(disintegration);
 
 		for (let y = 0; y < grid.height; y += 1) {
 			for (let x = 0; x < grid.width; x += 1) {
-				if (mask && this.isErased(x, y, mask)) {
-					continue;
-				}
-
 				const tile = grid.tileAt(x, y);
 				const px = layout.offsetX + x * tileSize;
 				const py = layout.offsetY + y * tileSize;
@@ -119,28 +107,5 @@ export class GridView {
 		}
 
 		return layout;
-	}
-
-	private validMask(mask: DisintegrationMask | null): DisintegrationMask | null {
-		if (!mask) {
-			return null;
-		}
-
-		if (
-			!Number.isFinite(mask.centerX) ||
-			!Number.isFinite(mask.centerY) ||
-			!Number.isFinite(mask.radius) ||
-			mask.radius <= 0
-		) {
-			return null;
-		}
-
-		return mask;
-	}
-
-	private isErased(x: number, y: number, mask: DisintegrationMask): boolean {
-		const dx = x + 0.5 - mask.centerX;
-		const dy = y + 0.5 - mask.centerY;
-		return dx * dx + dy * dy <= mask.radius * mask.radius;
 	}
 }

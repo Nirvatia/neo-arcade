@@ -1,6 +1,6 @@
 import type { GhostService } from '../../logic/actors/GhostService';
 import type { GhostModel } from '../../logic/actors/GhostModel';
-import type { GridLayout, DisintegrationMask } from '../maze/GridView';
+import type { GridLayout } from '../maze/GridView';
 
 export class GhostView {
 	draw(
@@ -8,15 +8,14 @@ export class GhostView {
 		ghosts: GhostService,
 		layout: GridLayout,
 		powerTimer: number,
-		msOverdrive: boolean,
-		disintegration: DisintegrationMask | null = null
+		msOverdrive: boolean
 	): void {
 		if (!Number.isFinite(layout.tileSize) || layout.tileSize <= 0) {
 			console.error('GhostView.draw', 'invalid layout tile size', layout.tileSize);
 			return;
 		}
 		for (const ghost of ghosts.list) {
-			this.drawGhost(ctx, ghost, layout, powerTimer, msOverdrive, disintegration);
+			this.drawGhost(ctx, ghost, layout, powerTimer, msOverdrive);
 		}
 	}
 
@@ -25,8 +24,7 @@ export class GhostView {
 		ghost: GhostModel,
 		layout: GridLayout,
 		powerTimer: number,
-		msOverdrive: boolean,
-		disintegration: DisintegrationMask | null
+		msOverdrive: boolean
 	): void {
 		const position = ghost.position;
 		if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) {
@@ -34,9 +32,6 @@ export class GhostView {
 				kind: ghost.kind,
 				position
 			});
-			return;
-		}
-		if (this.isErased(position, disintegration)) {
 			return;
 		}
 		const x = layout.offsetX + position.x * layout.tileSize;
@@ -146,18 +141,6 @@ export class GhostView {
 		);
 		ctx.fill();
 		ctx.restore();
-	}
-
-	private isErased(position: { x: number; y: number }, mask: DisintegrationMask | null): boolean {
-		if (!mask) {
-			return false;
-		}
-		if (!Number.isFinite(mask.radius) || mask.radius <= 0) {
-			return false;
-		}
-		const dx = position.x - mask.centerX;
-		const dy = position.y - mask.centerY;
-		return dx * dx + dy * dy <= mask.radius * mask.radius;
 	}
 
 	private drawEyes(

@@ -9,9 +9,9 @@ import type { BossSnapshot } from './LampreyBossView';
 import { DoomWorld } from './DoomWorld';
 import type { DoomLight } from './DoomWorld';
 import { pickupSprite } from './DoomSprites';
-import { erased } from '../SharedLayers';
 import type { SharedLayers } from '../SharedLayers';
 import type { LevelRenderer, RenderFrame } from '../RenderFrame';
+import type { GridLayout } from '../maze/GridView';
 
 /**
  * Hell level: the CLAUDE_GRID_DOOM_v3 world (baked maze + meadow), its atmosphere (ash
@@ -33,7 +33,7 @@ export class DoomLevelRenderer implements LevelRenderer {
 		this.shared = shared;
 	}
 
-	render(frame: RenderFrame): void {
+	render(frame: RenderFrame): GridLayout {
 		const { ctx, dt, time, state, level, grid } = frame;
 		const world = this.worldFor(frame);
 		world.resize(frame.width, frame.height, frame.pixelRatio);
@@ -70,9 +70,8 @@ export class DoomLevelRenderer implements LevelRenderer {
 		if (state === 'level-clear') {
 			this.shared.drawLevelClear(frame, layout);
 		} else {
-			const mask = this.shared.disintegrationMask(frame);
 			this.fxView.drawGround(ctx, layout);
-			this.shared.drawCollectibles(frame, layout, mask);
+			this.shared.drawCollectibles(frame, layout);
 			if (boss && doom && fighting) {
 				this.combatView.drawGround(ctx, boss, doom, grid, layout, time);
 				const echo = boss.echo;
@@ -85,23 +84,22 @@ export class DoomLevelRenderer implements LevelRenderer {
 						time
 					);
 				}
-				if (!erased(boss.position, mask)) {
-					this.bossView.draw(
-						ctx,
-						this.bossSnapshot(level, boss, boss.position, false, 1),
-						layout,
-						time
-					);
-				}
+				this.bossView.draw(
+					ctx,
+					this.bossSnapshot(level, boss, boss.position, false, 1),
+					layout,
+					time
+				);
 				this.combatView.drawAir(ctx, boss, layout, time);
 			}
 			const player = level.player;
-			if (state === 'death') {
-				this.shared.drawDeathWave(frame, layout);
-			} else if (player && boss && fighting) {
-				this.combatView.drawPull(ctx, boss, player.position, layout, time);
+			if (state !== 'death') {
+				// while dying, the pipeline draws Pac-Man over the level decay
+				if (player && boss && fighting) {
+					this.combatView.drawPull(ctx, boss, player.position, layout, time);
+				}
+				this.shared.drawPlayer(frame, layout);
 			}
-			this.shared.drawPlayer(frame, layout);
 			if (doom) {
 				this.fxView.draw(ctx, layout, doom.shots, doom.tracerList);
 			}
@@ -111,7 +109,7 @@ export class DoomLevelRenderer implements LevelRenderer {
 		ctx.restore();
 		world.drawOverlay(ctx);
 		this.fxView.drawHurt(ctx, frame.width, frame.height);
-		this.shared.drawOverlay(frame, layout);
+		return layout;
 	}
 
 	/** The baked world is rebuilt only when a new hell level (a new grid) starts. */

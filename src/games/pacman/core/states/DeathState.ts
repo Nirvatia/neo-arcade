@@ -4,37 +4,29 @@ import type { FlowTiming } from '../flow/StateClock';
 import type { PacmanStateName } from '../Events';
 import { FLOW } from '../../config/flowConfig';
 
-export interface DeathWaveSnapshot {
+/** Where Pac-Man died, in tile-centre coordinates (tile (c, r) is centred at (c + .5, r + .5)). */
+export interface DeathSnapshot {
 	readonly x: number;
 	readonly y: number;
-	readonly progress: number;
-	readonly timer: number;
-	readonly duration: number;
 }
 
-export type DeathPhase = 'dying';
+export type DeathPhase = 'shatter' | 'void' | 'rebuild';
 
 export class DeathState implements GameState {
 	readonly name: PacmanStateName = 'death';
 	readonly pausable = true;
-	private readonly clock = new StateClock<DeathPhase>([{ name: 'dying', duration: FLOW.death }]);
+	private readonly clock = new StateClock<DeathPhase>([
+		{ name: 'shatter', duration: FLOW.death.shatter },
+		{ name: 'void', duration: FLOW.death.void },
+		{ name: 'rebuild', duration: FLOW.death.rebuild }
+	]);
 	private centerX = 0;
 	private centerY = 0;
 	private hasCenter = false;
 	private resolved = false;
 
-	get deathWave(): DeathWaveSnapshot | null {
-		if (!this.hasCenter) {
-			return null;
-		}
-		const timing = this.clock.timing;
-		return {
-			x: this.centerX,
-			y: this.centerY,
-			progress: timing.progress,
-			timer: timing.remaining,
-			duration: timing.duration
-		};
+	get death(): DeathSnapshot | null {
+		return this.hasCenter ? { x: this.centerX, y: this.centerY } : null;
 	}
 
 	enter(ctx: GameStateContext): void {

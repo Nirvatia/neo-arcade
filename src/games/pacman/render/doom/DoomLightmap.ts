@@ -1,5 +1,5 @@
 import type { GridMatrix } from '../../config/gridConfig';
-import { hexChannels } from './DoomTextures';
+import { hexChannels } from '../common/textures';
 
 export interface DoomLightSource {
 	/** Tile-center coordinates. */
