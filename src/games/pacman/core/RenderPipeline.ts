@@ -16,6 +16,7 @@ import { OverlayView } from '../render/OverlayView';
 import type { OverlayMode, OverlaySnapshot } from '../render/OverlayView';
 import { lerpHex } from '../render/contracts/MazePalette';
 import { seasonRenderBundleFor } from '../render/seasons/seasonRenderBundleFactory';
+import type { SeasonData } from '../logic/SeasonCatalog';
 import type { SeasonRenderBundle, RenderBoard } from '../render/contracts/SeasonRenderBundle';
 
 export class RenderPipeline {
@@ -37,6 +38,9 @@ export class RenderPipeline {
 	private readonly ctx: CanvasRenderingContext2D;
 	private width = 0;
 	private height = 0;
+	private pixelRatio = 1;
+	private bundle: SeasonRenderBundle | null = null;
+	private bundleKey = '';
 	private lastRenderTime = 0;
 	private timeValue = 0;
 
@@ -64,14 +68,12 @@ export class RenderPipeline {
 		this.overlayView = new OverlayView();
 		this.canvas = document.createElement('canvas');
 		this.canvas.style.display = 'block';
-		this.canvas.style.imageRendering = 'pixelated';
 		container.appendChild(this.canvas);
-		const ctx = this.canvas.getContext('2d');
+		const ctx = this.canvas.getContext('2d', { alpha: false });
 		if (!ctx) {
 			throw new Error('RenderPipeline.constructor: 2d context unavailable');
 		}
 		this.ctx = ctx;
-		this.ctx.imageSmoothingEnabled = false;
 	}
 
 	render(): void {
@@ -92,16 +94,16 @@ export class RenderPipeline {
 			return;
 		}
 
+		this.ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
+		this.ctx.globalAlpha = 1;
+		this.ctx.globalCompositeOperation = 'source-over';
+		this.ctx.imageSmoothingEnabled = true;
+
 		const ratio = this.dayNightRatio();
 		this.ctx.fillStyle = lerpHex(season.palette.background, season.palette.backgroundNight, ratio);
 		this.ctx.fillRect(0, 0, this.width, this.height);
 
-		const bundle = seasonRenderBundleFor({
-			season,
-			secret: this.level.secretMode,
-			hell: this.level.hellMode,
-			level: this.level.level
-		});
+		const bundle = this.currentBundle(season);
 		const layout = this.gridView.computeLayout(grid, this.width, this.height, this.level.mazeScale);
 		this.drawSeasonScene(bundle, layout, grid);
 
@@ -196,17 +198,34 @@ export class RenderPipeline {
 		}
 		const width = Math.floor(rectWidth);
 		const height = Math.floor(rectHeight);
-		if (width === this.width && height === this.height) {
+		const deviceRatio = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
+		const pixelRatio = Math.min(2, Number.isFinite(deviceRatio) && deviceRatio > 0 ? deviceRatio : 1);
+		if (width === this.width && height === this.height && pixelRatio === this.pixelRatio) {
 			return true;
 		}
 		this.width = width;
 		this.height = height;
-		this.canvas.width = width;
-		this.canvas.height = height;
+		this.pixelRatio = pixelRatio;
+		this.canvas.width = Math.round(width * pixelRatio);
+		this.canvas.height = Math.round(height * pixelRatio);
 		this.canvas.style.width = `${width}px`;
 		this.canvas.style.height = `${height}px`;
-		this.ctx.imageSmoothingEnabled = false;
 		return true;
+	}
+
+	// Bundles keep animation state (weather particles), so they must survive between frames.
+	private currentBundle(season: SeasonData): SeasonRenderBundle {
+		const key = `${season.name}:${this.level.secretMode}:${this.level.hellMode}:${this.level.level}`;
+		if (!this.bundle || key !== this.bundleKey) {
+			this.bundle = seasonRenderBundleFor({
+				season,
+				secret: this.level.secretMode,
+				hell: this.level.hellMode,
+				level: this.level.level
+			});
+			this.bundleKey = key;
+		}
+		return this.bundle;
 	}
 
 	private dayNightRatio(): number {

@@ -3,7 +3,6 @@ export class GameLoop {
 	private readonly update: (dt: number) => void;
 	private readonly render: () => void;
 	private running = false;
-	private accumulator = 0;
 	private lastTime = 0;
 	private frameHandle = 0;
 
@@ -30,7 +29,6 @@ export class GameLoop {
 			return;
 		}
 		this.running = true;
-		this.accumulator = 0;
 		this.lastTime = performance.now();
 		this.frameHandle = window.requestAnimationFrame(this.tick);
 	}
@@ -43,7 +41,6 @@ export class GameLoop {
 		if (typeof window !== 'undefined') {
 			window.cancelAnimationFrame(this.frameHandle);
 		}
-		this.accumulator = 0;
 		this.frameHandle = 0;
 	}
 
@@ -52,12 +49,14 @@ export class GameLoop {
 			return;
 		}
 		try {
-			const frameTime = Math.min(0.25, Math.max(0, (now - this.lastTime) / 1000));
+			// Variable step split into chunks of at most `step`: movement advances by the real
+			// frame time, so high refresh displays never get frames without an update (judder).
+			let remaining = Math.min(0.1, Math.max(0, (now - this.lastTime) / 1000));
 			this.lastTime = now;
-			this.accumulator += frameTime;
-			while (this.accumulator >= this.step) {
-				this.update(this.step);
-				this.accumulator -= this.step;
+			while (remaining > 1e-6) {
+				const dt = Math.min(this.step, remaining);
+				this.update(dt);
+				remaining -= dt;
 			}
 			this.render();
 		} catch (error: unknown) {
