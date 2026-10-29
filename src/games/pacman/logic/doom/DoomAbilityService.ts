@@ -33,6 +33,7 @@ export class DoomAbilityService {
 	private readonly weapons: DoomWeaponService;
 	private playerHpValue = PLAYER_MAX_HP;
 	private playerDeadValue = false;
+	private godModeValue = false;
 	private moveLockTimer = 0;
 	private ballHitBossValue = false;
 	private readonly processedTracers = new Set<DoomBfgTracer>();
@@ -100,7 +101,9 @@ export class DoomAbilityService {
 			console.error('DoomAbilityService.update', 'invalid delta time', dt);
 			return;
 		}
-		player.setSpeedModifier(this.weapons.berserkActive ? BERSERK_SPEED_MUL : 1);
+		player.setSpeedModifier(
+			(this.weapons.berserkActive ? BERSERK_SPEED_MUL : 1) * this.boss.playerSpeedFactor(player)
+		);
 		if (this.playerDeadValue) {
 			return;
 		}
@@ -132,7 +135,7 @@ export class DoomAbilityService {
 				this.damagePlayer(1, player);
 			}
 		}
-		if (this.boss.consumeCrossHit()) {
+		if (this.boss.consumeHazardHit()) {
 			this.damagePlayer(1, player);
 		}
 		this.resolveShotCollisions(player);
@@ -162,7 +165,19 @@ export class DoomAbilityService {
 		return null;
 	}
 
+	get godMode(): boolean {
+		return this.godModeValue;
+	}
+
+	/** Debug: the player takes no damage. */
+	setGodMode(value: boolean): void {
+		this.godModeValue = value;
+	}
+
 	damagePlayer(amount: number, player: PlayerService): void {
+		if (this.godModeValue) {
+			return;
+		}
 		if (!Number.isFinite(amount) || amount <= 0) {
 			console.error('DoomAbilityService.damagePlayer', 'invalid damage amount', amount);
 			return;

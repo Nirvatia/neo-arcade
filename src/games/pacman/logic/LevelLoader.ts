@@ -444,6 +444,14 @@ export class LevelLoader {
 		};
 	}
 
+	private godModeValue = false;
+
+	debugToggleGodMode(): boolean {
+		this.godModeValue = !this.godModeValue;
+		this.doomValue?.setGodMode(this.godModeValue);
+		return this.godModeValue;
+	}
+
 	debugDamageBoss(): void {
 		if (this.hellModeValue && this.doomBossValue) {
 			this.doomBossValue.takeDamage(250);
@@ -530,6 +538,7 @@ export class LevelLoader {
 			}
 			doomBoss = new DoomBossService(grid, bossSpawn);
 			doom = new DoomAbilityService(grid, doomBoss);
+			doom.setGodMode(this.godModeValue);
 		}
 		combat.setProfile(this.profileValue);
 		combat.setHellMode(hell);

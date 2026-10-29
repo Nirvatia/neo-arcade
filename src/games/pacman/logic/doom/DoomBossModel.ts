@@ -28,6 +28,7 @@ export type DoomShape =
 	| 'cross'
 	| 'shrink'
 	| 'lobes'
+	| 'cast'
 	| 'stunned';
 
 export interface DoomRenderState {
@@ -128,6 +129,14 @@ export class DoomBossModel {
 		};
 	}
 
+	/** 0..1 while the boss materialises at the start of the fight. */
+	get introProgress(): number {
+		if (this.state !== 'INTRO') {
+			return 1;
+		}
+		return Math.min(1, Math.max(0, 1 - this.introTimer / INTRO_DURATION));
+	}
+
 	get inRecoverWindow(): boolean {
 		return this.state === 'RECOVER' && this.recoverDamageMultiplier > 1;
 	}
@@ -187,6 +196,11 @@ export class DoomBossModel {
 			this.shape = 'shrink';
 		} else if (kind === 'brood') {
 			this.shape = 'lobes';
+		} else if (kind === 'split') {
+			this.shape = 'wedge';
+		} else {
+			// rift, seal, pull, eruption: spells cast from a distance
+			this.shape = 'cast';
 		}
 	}
 

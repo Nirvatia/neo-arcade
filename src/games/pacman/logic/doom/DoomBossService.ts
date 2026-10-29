@@ -7,10 +7,13 @@ import { chooseChaseDirection } from './DoomMovement';
 import { DoomBossModel } from './DoomBossModel';
 import type { DoomAttackKind } from './DoomAttackCore';
 import {
+	DOOM_ATTACK_KINDS,
 	attackWeightsForPhase,
 	chooseWeightedAttack,
 	tileDistance
 } from './DoomAttackCore';
+import type { DoomHazard, DoomSegment } from './DoomHazards';
+import { DoomHazardField, canEscape, distanceRings, straightSegment } from './DoomHazards';
 import {
 	bossChaseSpeed,
 	bossDashSpeed,
@@ -46,18 +49,90 @@ import {
 	RECOVER_DAMAGE_MUL,
 	ATTACK_RETRY_INTERVAL,
 	PHASE_THRESHOLDS,
-	CONTACT_DISTANCE
+	CONTACT_DISTANCE,
+	RIFT_TELEGRAPH,
+	RIFT_ACTIVE,
+	RIFT_RECOVER,
+	RIFT_MIN_LENGTH,
+	RIFT_MAX_RANGE,
+	RIFT_COOLDOWN,
+	SEAL_TELEGRAPH,
+	SEAL_DURATION,
+	SEAL_COUNT,
+	SEAL_MIN_DIST,
+	SEAL_MAX_DIST,
+	SEAL_COOLDOWN,
+	PULL_TELEGRAPH,
+	PULL_DURATION,
+	PULL_SLOW,
+	PULL_COOLDOWN,
+	SPLIT_TELEGRAPH,
+	SPLIT_RECOVER,
+	SPLIT_MIN_LENGTH,
+	SPLIT_MIN_END_DIST,
+	SPLIT_COOLDOWN,
+	ERUPTION_TELEGRAPH,
+	ERUPTION_WAVE_GAP,
+	ERUPTION_ACTIVE,
+	ERUPTION_RADIUS,
+	ERUPTION_COOLDOWN,
+	CORRUPTION_RATE,
+	CORRUPTION_MAX,
+	CORRUPTION_SLOW,
+	CORRUPTION_BAND,
+	SHAKE_HAZARD,
+	SHAKE_TRANSITION,
+	SHAKE_SPLIT
 } from './DoomBalance';
 import { isDashFair, isCrossFair } from './DoomFairness';
 import { canStartDash } from './DoomDash';
 import type { DoomMinion, DoomMinionKind } from './DoomMinions';
 import { createMinion, minionPosition } from './DoomMinions';
-import type { DoomRenderState } from './DoomBossModel';
+import type { DoomRenderState, DoomStateName } from './DoomBossModel';
 
-interface VoidCell {
+export interface VoidCell {
 	x: number;
 	y: number;
 	timer: number;
+	/** trail: left behind while moving; seal: an intersection locked on purpose. */
+	kind: 'trail' | 'seal';
+}
+
+export interface PendingSeal {
+	x: number;
+	y: number;
+	warn: number;
+	readonly total: number;
+}
+
+/** The phase-3 decoy that closes in from the far end of the player's corridor. */
+export interface DoomEcho {
+	tile: GridPoint;
+	target: GridPoint | null;
+	progress: number;
+	readonly dir: DoomDirection;
+	remaining: number;
+	/** 0..1, fades in during the telegraph and out after the run. */
+	presence: number;
+	running: boolean;
+	done: boolean;
+}
+
+function noCooldowns(): Record<DoomAttackKind, number> {
+	const result = {} as Record<DoomAttackKind, number>;
+	for (const kind of DOOM_ATTACK_KINDS) {
+		result[kind] = 0;
+	}
+	return result;
+}
+
+function segmentKeys(segment: DoomSegment): Set<string> {
+	return new Set(segment.tiles.map(doomTileKey));
+}
+
+function hash01(x: number, y: number): number {
+	const v = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+	return v - Math.floor(v);
 }
 
 export class DoomBossService {
@@ -68,18 +143,19 @@ export class DoomBossService {
 	private readonly protectedTileKeys = new Set<string>();
 	private barrelLocatorValue: (() => GridPoint | null) | null = null;
 	private attackRetryTimer = 0;
-	private personalCooldowns: Record<DoomAttackKind, number> = {
-		dash: 0,
-		cross: 0,
-		voidTrail: 0,
-		blink: 0,
-		brood: 0
-	};
+	private personalCooldowns: Record<DoomAttackKind, number> = noCooldowns();
+	private readonly hazards = new DoomHazardField();
+	private readonly pendingSeals: PendingSeal[] = [];
+	private pullTimer = 0;
+	private corruptionValue = 0;
+	private echoValue: DoomEcho | null = null;
+	private shakeValue = 0;
+	private splitSegment: DoomSegment | null = null;
 	private lastAttackKind: DoomAttackKind | null = null;
 	private playerBaseSpeed = 6;
 	private bossContactHitValue = false;
 	private minionContactHitValue = false;
-	private crossHitValue = false;
+	private hazardHitValue = false;
 	private phaseTransitionValue = false;
 
 	constructor(grid: GridService, spawn: GridPoint) {
@@ -103,8 +179,81 @@ export class DoomBossService {
 		return this.model.phase;
 	}
 
-	get state(): string {
+	get state(): DoomStateName {
 		return this.model.state;
+	}
+
+	get introProgress(): number {
+		return this.model.introProgress;
+	}
+
+	get hazardList(): readonly DoomHazard[] {
+		return this.hazards.list;
+	}
+
+	get pendingSealList(): readonly PendingSeal[] {
+		return this.pendingSeals;
+	}
+
+	get pullRemaining(): number {
+		return this.pullTimer;
+	}
+
+	/** 0..CORRUPTION_MAX, grows during phase 3. */
+	get corruption(): number {
+		return this.corruptionValue;
+	}
+
+	get echo(): Readonly<DoomEcho> | null {
+		return this.echoValue;
+	}
+
+	/** Camera shake strength 0..1, decays by itself. */
+	get shake(): number {
+		return this.shakeValue;
+	}
+
+	echoPosition(): { x: number; y: number } | null {
+		const echo = this.echoValue;
+		if (!echo) {
+			return null;
+		}
+		const t = echo.target ? echo.progress : 0;
+		const tx = echo.target ? echo.target.x - echo.tile.x : 0;
+		const ty = echo.target ? echo.target.y - echo.tile.y : 0;
+		return { x: echo.tile.x + 0.5 + tx * t, y: echo.tile.y + 0.5 + ty * t };
+	}
+
+	/** Outer corridors decay in phase 3; protected (pickup) tiles never do. */
+	isCorrupted(x: number, y: number): boolean {
+		if (this.corruptionValue <= 0 || !this.grid.isWalkable(x, y)) {
+			return false;
+		}
+		const band = CORRUPTION_BAND;
+		const outer =
+			x <= band || y <= band || x >= this.grid.width - 1 - band || y >= this.grid.height - 1 - band;
+		if (!outer || this.protectedTileKeys.has(`${x},${y}`)) {
+			return false;
+		}
+		return hash01(x, y) < this.corruptionValue;
+	}
+
+	/** Speed multiplier for the player from pull and corruption. */
+	playerSpeedFactor(player: PlayerService): number {
+		let factor = 1;
+		const pos = player.position;
+		if (this.isCorrupted(Math.floor(pos.x), Math.floor(pos.y))) {
+			factor *= CORRUPTION_SLOW;
+		}
+		if (this.pullTimer > 0 && player.facing) {
+			const boss = this.model.position;
+			const fx = player.facing === 'LEFT' ? -1 : player.facing === 'RIGHT' ? 1 : 0;
+			const fy = player.facing === 'UP' ? -1 : player.facing === 'DOWN' ? 1 : 0;
+			if (fx * (boss.x - pos.x) + fy * (boss.y - pos.y) < 0) {
+				factor *= PULL_SLOW;
+			}
+		}
+		return factor;
 	}
 
 	get tile(): GridPoint {
@@ -159,9 +308,10 @@ export class DoomBossService {
 		return hit;
 	}
 
-	consumeCrossHit(): boolean {
-		const hit = this.crossHitValue;
-		this.crossHitValue = false;
+	/** Cross blast, rift, eruption or the echo caught the player. */
+	consumeHazardHit(): boolean {
+		const hit = this.hazardHitValue;
+		this.hazardHitValue = false;
 		return hit;
 	}
 
@@ -218,9 +368,12 @@ export class DoomBossService {
 		this.model.update(dt);
 		this.updateCooldowns(dt);
 		this.updateVoidCells(dt);
+		this.shakeValue = Math.max(0, this.shakeValue - dt * 2.5);
 		if (this.model.defeated) {
+			this.clearArena();
 			return;
 		}
+		this.updateArena(dt, player);
 		this.updateBoss(dt, player);
 		this.updateMinions(dt, player);
 	}
@@ -271,7 +424,7 @@ export class DoomBossService {
 						return;
 					}
 				}
-				const target = this.currentTargetTile(player);
+				const target = this.chaseTargetTile(player);
 				const direction = chooseChaseDirection(
 					this.grid,
 					this.model.tile,
@@ -301,11 +454,13 @@ export class DoomBossService {
 			this.model.startTransition();
 			this.clearVoidAndMinions();
 			this.phaseTransitionValue = true;
+			this.shakeValue = Math.max(this.shakeValue, SHAKE_TRANSITION);
 		}
 		if (this.model.hp <= PHASE_THRESHOLDS[1] && this.model.phase === 2) {
 			this.model.startTransition();
 			this.clearVoidAndMinions();
 			this.phaseTransitionValue = true;
+			this.shakeValue = Math.max(this.shakeValue, SHAKE_TRANSITION);
 		}
 	}
 
@@ -321,14 +476,110 @@ export class DoomBossService {
 		this.lastAttackKind = null;
 		this.bossContactHitValue = false;
 		this.minionContactHitValue = false;
-		this.crossHitValue = false;
+		this.hazardHitValue = false;
 		this.phaseTransitionValue = false;
-		this.personalCooldowns = { dash: 0, cross: 0, voidTrail: 0, blink: 0, brood: 0 };
+		this.personalCooldowns = noCooldowns();
+		this.corruptionValue = 0;
+		this.shakeValue = 0;
+	}
+
+	/** Timed hazards, seals, pull, corruption and the echo; all independent of the boss state. */
+	private updateArena(dt: number, player: PlayerService): void {
+		const playerTile = this.currentTargetTile(player);
+		if (this.hazards.update(dt, playerTile, player.isInvulnerable)) {
+			this.hazardHitValue = true;
+		}
+		if (this.hazards.consumeDetonations() > 0) {
+			this.shakeValue = Math.max(this.shakeValue, SHAKE_HAZARD);
+		}
+		const pi = phaseIndex(this.model.phase);
+		for (let i = this.pendingSeals.length - 1; i >= 0; i -= 1) {
+			const seal = this.pendingSeals[i];
+			seal.warn -= dt;
+			if (seal.warn > 0) {
+				continue;
+			}
+			this.pendingSeals.splice(i, 1);
+			const here = this.currentTargetTile(player);
+			if (
+				(here.x !== seal.x || here.y !== seal.y) &&
+				!this.grid.isVoidBlocked(seal.x, seal.y) &&
+				this.keepsPlayerGraphConnected(seal, here)
+			) {
+				this.grid.setVoidBlocked(seal.x, seal.y, true);
+				this.voidCells.push({ x: seal.x, y: seal.y, timer: SEAL_DURATION[pi], kind: 'seal' });
+			}
+		}
+		this.pullTimer = Math.max(0, this.pullTimer - dt);
+		if (this.model.phase >= 3 && this.model.state !== 'TRANSITION') {
+			this.corruptionValue = Math.min(CORRUPTION_MAX, this.corruptionValue + CORRUPTION_RATE * dt);
+		}
+		this.updateEcho(dt, player);
+	}
+
+	private updateEcho(dt: number, player: PlayerService): void {
+		const echo = this.echoValue;
+		if (!echo) {
+			return;
+		}
+		if (echo.done) {
+			echo.presence -= dt / 0.3;
+			if (echo.presence <= 0) {
+				this.echoValue = null;
+			}
+			return;
+		}
+		if (!echo.running) {
+			echo.presence = Math.min(1, echo.presence + dt / 0.4);
+			return;
+		}
+		const speed = bossDashSpeed(this.playerBaseSpeed, this.model.phase);
+		let remaining = dt;
+		while (remaining > 1e-6 && !echo.done) {
+			if (!echo.target) {
+				const next = adjacentTile(echo.tile, echo.dir);
+				if (echo.remaining <= 0 || !this.grid.isWalkable(next.x, next.y)) {
+					echo.done = true;
+					break;
+				}
+				echo.target = next;
+				echo.progress = 0;
+			}
+			const need = (1 - echo.progress) / speed;
+			if (need > remaining) {
+				echo.progress += remaining * speed;
+				remaining = 0;
+			} else {
+				remaining -= need;
+				echo.tile = echo.target;
+				echo.target = null;
+				echo.progress = 0;
+				echo.remaining -= 1;
+			}
+		}
+		const pos = this.echoPosition();
+		if (pos && !player.isInvulnerable) {
+			const p = player.position;
+			const dx = p.x - pos.x;
+			const dy = p.y - pos.y;
+			if (dx * dx + dy * dy < CONTACT_DISTANCE * CONTACT_DISTANCE) {
+				this.hazardHitValue = true;
+			}
+		}
+	}
+
+	private clearArena(): void {
+		this.hazards.clear();
+		this.pendingSeals.length = 0;
+		this.pullTimer = 0;
+		if (this.echoValue) {
+			this.echoValue.done = true;
+		}
+		this.splitSegment = null;
 	}
 
 	private updateCooldowns(dt: number): void {
-		const keys: DoomAttackKind[] = ['dash', 'cross', 'voidTrail', 'blink', 'brood'];
-		for (const key of keys) {
+		for (const key of DOOM_ATTACK_KINDS) {
 			if (this.personalCooldowns[key] > 0) {
 				this.personalCooldowns[key] = Math.max(0, this.personalCooldowns[key] - dt);
 			}
@@ -364,6 +615,22 @@ export class DoomBossService {
 		} else if (kind === 'brood') {
 			this.model.beginActive(0.1);
 			this.spawnBrood();
+		} else if (kind === 'split') {
+			const segment = this.splitSegment;
+			this.model.beginActive(999);
+			this.model.dashDirection = this.model.facing;
+			this.model.dashTilesRemaining = segment ? segment.tiles.length : DASH_MAX_TILES;
+			this.model.dashCompleted = false;
+			if (this.echoValue) {
+				this.echoValue.running = true;
+			}
+			this.shakeValue = Math.max(this.shakeValue, SHAKE_SPLIT);
+		} else {
+			// spells: rift, seal and eruption were queued at cast time; pull starts now
+			this.model.beginActive(0.1);
+			if (kind === 'pull') {
+				this.pullTimer = PULL_DURATION[pi];
+			}
 		}
 	}
 
@@ -373,10 +640,11 @@ export class DoomBossService {
 		if (kind !== 'dash' && kind !== 'blink') {
 			this.checkPlayerContact(player);
 		}
-		if (kind === 'dash') {
+		if (kind === 'dash' || kind === 'split') {
+			const recover = kind === 'split' ? SPLIT_RECOVER : DASH_RECOVER[pi];
 			const direction = this.model.dashDirection;
 			if (!direction) {
-				this.finishAttack(DASH_RECOVER[pi], RECOVER_DAMAGE_MUL);
+				this.finishAttack(recover, RECOVER_DAMAGE_MUL);
 				return;
 			}
 			if (!this.model.isMoving) {
@@ -386,7 +654,7 @@ export class DoomBossService {
 					!this.grid.isWalkable(next.x, next.y) ||
 					this.model.dashTilesRemaining <= 0
 				) {
-					this.finishAttack(DASH_RECOVER[pi], RECOVER_DAMAGE_MUL);
+					this.finishAttack(recover, RECOVER_DAMAGE_MUL);
 					return;
 				}
 				this.model.beginMove(direction);
@@ -394,7 +662,7 @@ export class DoomBossService {
 			this.model.updateMovement(dt, bossDashSpeed(this.playerBaseSpeed, this.model.phase));
 			this.checkPlayerContact(player);
 			if (this.model.consumeDashCompleted()) {
-				this.finishAttack(DASH_RECOVER[pi], RECOVER_DAMAGE_MUL);
+				this.finishAttack(recover, RECOVER_DAMAGE_MUL);
 			}
 		} else if (kind === 'cross') {
 			if (this.model.stateTimer >= this.model.activeDuration) {
@@ -420,10 +688,15 @@ export class DoomBossService {
 			if (this.model.stateTimer >= this.model.activeDuration) {
 				this.finishAttack(BROOD_RECOVER, 1.0);
 			}
+		} else if (this.model.stateTimer >= this.model.activeDuration) {
+			this.finishAttack(RIFT_RECOVER, RECOVER_DAMAGE_MUL);
 		}
 	}
 
 	private finishAttack(recoverDuration: number, damageMultiplier: number): void {
+		if (this.model.attackKind === 'split') {
+			this.splitSegment = null;
+		}
 		this.model.beginRecover(recoverDuration, damageMultiplier);
 		if (this.model.attackKind) {
 			this.lastAttackKind = this.model.attackKind;
@@ -440,6 +713,16 @@ export class DoomBossService {
 			this.personalCooldowns.blink = BLINK_COOLDOWN;
 		} else if (kind === 'brood') {
 			this.personalCooldowns.brood = BROOD_COOLDOWN;
+		} else if (kind === 'rift') {
+			this.personalCooldowns.rift = RIFT_COOLDOWN;
+		} else if (kind === 'seal') {
+			this.personalCooldowns.seal = SEAL_COOLDOWN;
+		} else if (kind === 'pull') {
+			this.personalCooldowns.pull = PULL_COOLDOWN;
+		} else if (kind === 'split') {
+			this.personalCooldowns.split = SPLIT_COOLDOWN;
+		} else if (kind === 'eruption') {
+			this.personalCooldowns.eruption = ERUPTION_COOLDOWN;
 		}
 	}
 
@@ -452,7 +735,6 @@ export class DoomBossService {
 			dashCheck.canStart &&
 			dashCheck.direction &&
 			this.personalCooldowns.dash <= 0 &&
-			this.lastAttackKind !== 'dash' &&
 			isDashFair(
 				this.grid, this.model.tile, playerTile, dashCheck.direction,
 				DASH_TELEGRAPH[pi], this.playerBaseSpeed, DASH_MAX_TILES
@@ -461,7 +743,7 @@ export class DoomBossService {
 			available.add('dash');
 			this.model.aim(dashCheck.direction);
 		}
-		if (this.model.phase >= 2 && this.personalCooldowns.cross <= 0 && this.lastAttackKind !== 'cross') {
+		if (this.model.phase >= 2 && this.personalCooldowns.cross <= 0) {
 			const exits = this.grid.exitsCount(this.model.tile.x, this.model.tile.y);
 			const dist = tileDistance(this.model.tile, playerTile);
 			if (
@@ -472,28 +754,103 @@ export class DoomBossService {
 				available.add('cross');
 			}
 		}
-		if (this.model.phase >= 2 && this.personalCooldowns.voidTrail <= 0 && this.lastAttackKind !== 'voidTrail') {
+		if (this.model.phase >= 2 && this.personalCooldowns.voidTrail <= 0) {
 			available.add('voidTrail');
 		}
-		if (this.model.phase >= 3 && this.personalCooldowns.blink <= 0 && this.lastAttackKind !== 'blink') {
+		if (this.model.phase >= 3 && this.personalCooldowns.blink <= 0) {
 			const blinkTarget = this.findBlinkTarget(playerTile);
 			if (blinkTarget) {
 				this.model.blinkTarget = blinkTarget;
 				available.add('blink');
 			}
 		}
-		if (this.model.phase >= 3 && this.personalCooldowns.brood <= 0 && this.lastAttackKind !== 'brood') {
+		if (this.model.phase >= 3 && this.personalCooldowns.brood <= 0) {
 			if (this.minions.length < BROOD_MAX_ALIVE) {
 				available.add('brood');
 			}
 		}
+		const weights = attackWeightsForPhase(this.model.phase);
+		const ready = (kind: DoomAttackKind): boolean =>
+			weights[kind] > 0 && this.personalCooldowns[kind] <= 0;
+		const speed = this.playerBaseSpeed;
+		let rift: DoomSegment | null = null;
+		if (ready('rift') && tileDistance(this.model.tile, playerTile) <= RIFT_MAX_RANGE) {
+			rift = this.riftSegment(player, playerTile);
+			if (rift && canEscape(this.grid, playerTile, segmentKeys(rift), RIFT_TELEGRAPH[pi], speed)) {
+				available.add('rift');
+			}
+		}
+		let seals: GridPoint[] = [];
+		if (ready('seal')) {
+			seals = this.pickSeals(playerTile, SEAL_COUNT[pi]);
+			if (seals.length >= 2) {
+				available.add('seal');
+			}
+		}
+		if (ready('pull') && tileDistance(this.model.tile, playerTile) >= 4) {
+			available.add('pull');
+		}
+		let split: DoomSegment | null = null;
+		if (ready('split')) {
+			split = this.splitSegmentFor(player, playerTile);
+			if (split && canEscape(this.grid, playerTile, segmentKeys(split), SPLIT_TELEGRAPH, speed)) {
+				available.add('split');
+			}
+		}
+		if (
+			ready('eruption') &&
+			this.grid
+				.walkableNeighbors(playerTile.x, playerTile.y)
+				.some((n) => this.grid.isPlayerWalkable(n.x, n.y))
+		) {
+			available.add('eruption');
+		}
+		// never the same attack twice in a row, unless it is the only option
+		if (available.size > 1 && this.lastAttackKind) {
+			available.delete(this.lastAttackKind);
+		}
 		if (available.size === 0) {
 			return false;
 		}
-		const weights = attackWeightsForPhase(this.model.phase);
 		const chosen = chooseWeightedAttack(weights, available, Math.random());
 		if (!chosen) {
 			return false;
+		}
+		if (chosen === 'rift' && rift) {
+			this.hazards.add('rift', rift.tiles, RIFT_TELEGRAPH[pi], RIFT_ACTIVE, rift.axis);
+			this.model.beginTelegraph('rift', RIFT_TELEGRAPH[pi]);
+			return true;
+		}
+		if (chosen === 'seal') {
+			for (const seal of seals) {
+				this.pendingSeals.push({ x: seal.x, y: seal.y, warn: SEAL_TELEGRAPH, total: SEAL_TELEGRAPH });
+			}
+			this.model.beginTelegraph('seal', SEAL_TELEGRAPH);
+			return true;
+		}
+		if (chosen === 'pull') {
+			this.model.beginTelegraph('pull', PULL_TELEGRAPH);
+			return true;
+		}
+		if (chosen === 'split' && split) {
+			this.beginSplit(split, playerTile);
+			return true;
+		}
+		if (chosen === 'eruption') {
+			const rings = distanceRings(this.grid, playerTile, ERUPTION_RADIUS);
+			const even = rings.filter((_, d) => d % 2 === 0).flat();
+			const odd = rings.filter((_, d) => d % 2 === 1).flat();
+			this.hazards.add('eruption', even, ERUPTION_TELEGRAPH, ERUPTION_ACTIVE);
+			this.hazards.add(
+				'eruption',
+				odd,
+				ERUPTION_TELEGRAPH + ERUPTION_WAVE_GAP,
+				ERUPTION_ACTIVE,
+				null,
+				ERUPTION_TELEGRAPH
+			);
+			this.model.beginTelegraph('eruption', ERUPTION_TELEGRAPH);
+			return true;
 		}
 		if (chosen === 'dash') {
 			this.model.beginTelegraph('dash', DASH_TELEGRAPH[pi]);
@@ -507,6 +864,127 @@ export class DoomBossService {
 			this.model.beginTelegraph('brood', BROOD_TELEGRAPH);
 		}
 		return true;
+	}
+
+	/** The corridor the player runs along (falls back to the other axis). */
+	private riftSegment(player: PlayerService, playerTile: GridPoint): DoomSegment | null {
+		const facing = player.facing;
+		const first: 'x' | 'y' = facing === 'UP' || facing === 'DOWN' ? 'y' : 'x';
+		const second: 'x' | 'y' = first === 'x' ? 'y' : 'x';
+		for (const axis of [first, second]) {
+			const segment = straightSegment(this.grid, playerTile, axis);
+			if (segment.tiles.length >= RIFT_MIN_LENGTH) {
+				return segment;
+			}
+		}
+		return null;
+	}
+
+	/** A long corridor with the player well inside it, so both ends can close in. */
+	private splitSegmentFor(player: PlayerService, playerTile: GridPoint): DoomSegment | null {
+		const facing = player.facing;
+		const first: 'x' | 'y' = facing === 'UP' || facing === 'DOWN' ? 'y' : 'x';
+		const second: 'x' | 'y' = first === 'x' ? 'y' : 'x';
+		for (const axis of [first, second]) {
+			const segment = straightSegment(this.grid, playerTile, axis);
+			const n = segment.tiles.length;
+			if (n < SPLIT_MIN_LENGTH) {
+				continue;
+			}
+			const i = segment.tiles.findIndex((t) => t.x === playerTile.x && t.y === playerTile.y);
+			if (i >= SPLIT_MIN_END_DIST && n - 1 - i >= SPLIT_MIN_END_DIST) {
+				return segment;
+			}
+		}
+		return null;
+	}
+
+	private beginSplit(segment: DoomSegment, playerTile: GridPoint): void {
+		const tiles = segment.tiles;
+		const a = tiles[0];
+		const b = tiles[tiles.length - 1];
+		// the boss takes the end it is closer to, the echo the other one
+		const bossAtA = tileDistance(this.model.tile, a) <= tileDistance(this.model.tile, b);
+		const bossEnd = bossAtA ? a : b;
+		const echoEnd = bossAtA ? b : a;
+		const towardEcho: DoomDirection =
+			segment.axis === 'x' ? (bossAtA ? 'RIGHT' : 'LEFT') : bossAtA ? 'DOWN' : 'UP';
+		const towardBoss: DoomDirection =
+			segment.axis === 'x' ? (bossAtA ? 'LEFT' : 'RIGHT') : bossAtA ? 'UP' : 'DOWN';
+		this.model.teleportTo(bossEnd);
+		this.model.aim(towardEcho);
+		this.splitSegment = segment;
+		this.echoValue = {
+			tile: { x: echoEnd.x, y: echoEnd.y },
+			target: null,
+			progress: 0,
+			dir: towardBoss,
+			remaining: tiles.length - 1,
+			presence: 0,
+			running: false,
+			done: false
+		};
+		void playerTile;
+		this.model.beginTelegraph('split', SPLIT_TELEGRAPH);
+	}
+
+	/** Intersections around the player that can be sealed, spread apart. */
+	private pickSeals(playerTile: GridPoint, count: number): GridPoint[] {
+		if (count <= 0) {
+			return [];
+		}
+		const rings = distanceRings(this.grid, playerTile, SEAL_MAX_DIST);
+		const candidates: GridPoint[] = [];
+		for (let d = SEAL_MIN_DIST; d < rings.length; d += 1) {
+			for (const tile of rings[d]) {
+				if (
+					this.grid.exitsCount(tile.x, tile.y) >= 3 &&
+					!this.protectedTileKeys.has(`${tile.x},${tile.y}`) &&
+					!this.grid.isVoidBlocked(tile.x, tile.y) &&
+					!(tile.x === this.model.tile.x && tile.y === this.model.tile.y)
+				) {
+					candidates.push(tile);
+				}
+			}
+		}
+		for (let i = candidates.length - 1; i > 0; i -= 1) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+		}
+		const picked: GridPoint[] = [];
+		for (const tile of candidates) {
+			if (picked.length >= count) {
+				break;
+			}
+			if (picked.every((p) => tileDistance(p, tile) >= 3)) {
+				picked.push(tile);
+			}
+		}
+		return picked;
+	}
+
+	/**
+	 * Ambush pursuit: when the player is not close, head for the intersection the player
+	 * is running into instead of the player's current tile.
+	 */
+	private chaseTargetTile(player: PlayerService): GridPoint {
+		const playerTile = this.currentTargetTile(player);
+		const facing = player.facing;
+		if (!facing || tileDistance(this.model.tile, playerTile) <= 4) {
+			return playerTile;
+		}
+		let tile = playerTile;
+		for (let step = 0; step < 6; step += 1) {
+			const next = adjacentTile(tile, facing);
+			if (!this.grid.isWalkable(next.x, next.y)) {
+				break;
+			}
+			tile = next;
+			if (this.grid.exitsCount(tile.x, tile.y) >= 3) {
+				return tile;
+			}
+		}
+		return tile;
 	}
 
 	private findBlinkTarget(playerTile: GridPoint): GridPoint | null {
@@ -732,7 +1210,7 @@ export class DoomBossService {
 		const playerTile = this.currentTargetTile(player);
 		const bossTile = this.model.tile;
 		if (playerTile.x === bossTile.x || playerTile.y === bossTile.y) {
-			this.crossHitValue = true;
+			this.hazardHitValue = true;
 		}
 	}
 
@@ -760,7 +1238,7 @@ export class DoomBossService {
 			return;
 		}
 		this.grid.setVoidBlocked(tile.x, tile.y, true);
-		this.voidCells.push({ x: tile.x, y: tile.y, timer: VOID_CELL_LIFETIME[pi] });
+		this.voidCells.push({ x: tile.x, y: tile.y, timer: VOID_CELL_LIFETIME[pi], kind: 'trail' });
 	}
 
 	private keepsPlayerGraphConnected(candidate: GridPoint, playerTile: GridPoint): boolean {
@@ -804,6 +1282,7 @@ export class DoomBossService {
 	}
 
 	private clearVoidAndMinions(): void {
+		this.clearArena();
 		for (const cell of this.voidCells) {
 			this.grid.setVoidBlocked(cell.x, cell.y, false);
 		}

@@ -23,7 +23,10 @@ export class DoomCombatView {
 		layout: GridLayout,
 		time: number
 	): void {
+		this.drawCorruption(ctx, boss, grid, layout, time);
 		this.drawVoidCells(ctx, boss, layout, time);
+		this.drawPendingSeals(ctx, boss, layout, time);
+		this.drawHazardWarnings(ctx, boss, layout, time);
 		this.drawCrossTelegraph(ctx, boss, grid, layout);
 		this.drawPickups(ctx, doom, layout, time);
 		this.drawBarrels(ctx, doom, layout, time);
@@ -37,9 +40,234 @@ export class DoomCombatView {
 		layout: GridLayout,
 		time: number
 	): void {
+		this.drawHazardBlasts(ctx, boss, layout, time);
 		this.drawShots(ctx, doom, layout);
 		this.drawTracers(ctx, doom, layout);
 		this.drawMinions(ctx, boss, layout, time);
+	}
+
+	/** Pull: chains of void dragging the player toward the boss. */
+	drawPull(
+		ctx: CanvasRenderingContext2D,
+		boss: DoomBossService,
+		player: { x: number; y: number },
+		layout: GridLayout,
+		time: number
+	): void {
+		const left = boss.pullRemaining;
+		if (left <= 0) {
+			return;
+		}
+		const s = layout.tileSize;
+		const b = boss.position;
+		const x0 = layout.offsetX + b.x * s;
+		const y0 = layout.offsetY + b.y * s;
+		const x1 = layout.offsetX + player.x * s;
+		const y1 = layout.offsetY + player.y * s;
+		const fade = Math.min(1, left / 0.5);
+		const len = Math.hypot(x1 - x0, y1 - y0);
+		const nx = len > 0 ? -(y1 - y0) / len : 0;
+		const ny = len > 0 ? (x1 - x0) / len : 0;
+		ctx.save();
+		ctx.globalCompositeOperation = 'lighter';
+		for (let strand = 0; strand < 3; strand += 1) {
+			ctx.strokeStyle = `rgba(170,60,255,${0.35 * fade})`;
+			ctx.lineWidth = Math.max(1, s * 0.06);
+			ctx.beginPath();
+			for (let i = 0; i <= 24; i += 1) {
+				const u = i / 24;
+				const wave = Math.sin(u * 10 - time * 9 + strand * 2.1) * s * 0.18 * Math.sin(u * Math.PI);
+				const x = x0 + (x1 - x0) * u + nx * wave;
+				const y = y0 + (y1 - y0) * u + ny * wave;
+				if (i === 0) {
+					ctx.moveTo(x, y);
+				} else {
+					ctx.lineTo(x, y);
+				}
+			}
+			ctx.stroke();
+		}
+		// beads crawling toward the boss
+		for (let i = 0; i < 6; i += 1) {
+			const u = 1 - ((time * 0.9 + i / 6) % 1);
+			ctx.fillStyle = `rgba(220,150,255,${0.7 * fade})`;
+			ctx.beginPath();
+			ctx.arc(x0 + (x1 - x0) * u, y0 + (y1 - y0) * u, Math.max(1, s * 0.07), 0, Math.PI * 2);
+			ctx.fill();
+		}
+		ctx.restore();
+	}
+
+	/** Phase 3: outer corridors rot into the abyss (they slow the player). */
+	private drawCorruption(
+		ctx: CanvasRenderingContext2D,
+		boss: DoomBossService,
+		grid: GridService,
+		layout: GridLayout,
+		time: number
+	): void {
+		if (boss.corruption <= 0) {
+			return;
+		}
+		const s = layout.tileSize;
+		ctx.save();
+		for (let y = 0; y < grid.height; y += 1) {
+			for (let x = 0; x < grid.width; x += 1) {
+				if (!boss.isCorrupted(x, y)) {
+					continue;
+				}
+				const px = layout.offsetX + x * s;
+				const py = layout.offsetY + y * s;
+				const pulse = 0.5 + 0.5 * Math.sin(time * 2.2 + x * 0.9 + y * 1.3);
+				ctx.globalAlpha = 0.75;
+				ctx.fillStyle = '#0a0410';
+				ctx.fillRect(px, py, s, s);
+				ctx.globalAlpha = 0.35 + 0.3 * pulse;
+				ctx.strokeStyle = '#8a2aff';
+				ctx.lineWidth = Math.max(0.8, s * 0.045);
+				ctx.beginPath();
+				for (let k = 0; k < 3; k += 1) {
+					const ax = px + tileNoise(x, y, k) * s;
+					const ay = py + tileNoise(y, x, k + 5) * s;
+					ctx.moveTo(ax, ay);
+					ctx.lineTo(px + tileNoise(x + 3, y, k) * s, py + tileNoise(x, y + 7, k) * s);
+				}
+				ctx.stroke();
+			}
+		}
+		ctx.restore();
+	}
+
+	private drawPendingSeals(
+		ctx: CanvasRenderingContext2D,
+		boss: DoomBossService,
+		layout: GridLayout,
+		time: number
+	): void {
+		const s = layout.tileSize;
+		for (const seal of boss.pendingSealList) {
+			const p = 1 - Math.max(0, seal.warn) / seal.total;
+			const cx = layout.offsetX + (seal.x + 0.5) * s;
+			const cy = layout.offsetY + (seal.y + 0.5) * s;
+			drawSigil(ctx, cx, cy, s * (0.9 - 0.45 * p), time, 0.35 + 0.65 * p, p);
+		}
+	}
+
+	private drawHazardWarnings(
+		ctx: CanvasRenderingContext2D,
+		boss: DoomBossService,
+		layout: GridLayout,
+		time: number
+	): void {
+		const s = layout.tileSize;
+		ctx.save();
+		for (const hazard of boss.hazardList) {
+			if (hazard.warn <= 0 || hazard.warn > hazard.warnVisible) {
+				continue;
+			}
+			const p = 1 - hazard.warn / hazard.warnVisible;
+			const flicker = p > 0.75 ? 0.5 + 0.5 * Math.sin(time * 50) : 1;
+			const rift = hazard.kind === 'rift';
+			for (const tile of hazard.tiles) {
+				const px = layout.offsetX + tile.x * s;
+				const py = layout.offsetY + tile.y * s;
+				ctx.globalCompositeOperation = 'source-over';
+				ctx.globalAlpha = (0.18 + 0.32 * p) * flicker;
+				ctx.fillStyle = rift ? '#3a0010' : '#1a0020';
+				ctx.fillRect(px + 1, py + 1, s - 2, s - 2);
+				ctx.globalCompositeOperation = 'lighter';
+				ctx.globalAlpha = (0.3 + 0.7 * p) * flicker;
+				ctx.strokeStyle = rift ? '#ff3a1a' : '#c02aff';
+				ctx.lineWidth = Math.max(0.8, s * (0.04 + 0.05 * p));
+				ctx.beginPath();
+				// a crack that grows across the tile as the blast nears
+				const n = 4;
+				for (let k = 0; k <= n; k += 1) {
+					const u = (k / n) * (0.35 + 0.65 * p);
+					const jx = (tileNoise(tile.x, tile.y, k) - 0.5) * s * 0.4;
+					const jy = (tileNoise(tile.y, tile.x, k + 9) - 0.5) * s * 0.4;
+					const x = rift && hazard.axis === 'y' ? px + s / 2 + jx : px + u * s;
+					const y = rift && hazard.axis === 'y' ? py + u * s : py + s / 2 + jy;
+					if (k === 0) {
+						ctx.moveTo(x, y);
+					} else {
+						ctx.lineTo(x, y);
+					}
+				}
+				ctx.stroke();
+				if (!rift) {
+					ctx.beginPath();
+					ctx.arc(px + s / 2, py + s / 2, s * (0.42 - 0.25 * p), 0, Math.PI * 2);
+					ctx.stroke();
+				}
+			}
+		}
+		ctx.restore();
+	}
+
+	private drawHazardBlasts(
+		ctx: CanvasRenderingContext2D,
+		boss: DoomBossService,
+		layout: GridLayout,
+		time: number
+	): void {
+		const s = layout.tileSize;
+		ctx.save();
+		for (const hazard of boss.hazardList) {
+			if (hazard.warn > 0) {
+				continue;
+			}
+			const k = Math.max(0, hazard.active / hazard.activeTotal);
+			if (hazard.kind === 'rift' && hazard.tiles.length > 0) {
+				const a = hazard.tiles[0];
+				const b = hazard.tiles[hazard.tiles.length - 1];
+				const x0 = layout.offsetX + (a.x + 0.5) * s;
+				const y0 = layout.offsetY + (a.y + 0.5) * s;
+				const x1 = layout.offsetX + (b.x + 0.5) * s;
+				const y1 = layout.offsetY + (b.y + 0.5) * s;
+				ctx.lineCap = 'round';
+				ctx.globalCompositeOperation = 'lighter';
+				const passes: Array<[string, number]> = [
+					[`rgba(255,40,20,${0.55 * k})`, s * 1.1],
+					[`rgba(255,140,60,${0.8 * k})`, s * 0.55],
+					[`rgba(255,255,240,${k})`, s * 0.18]
+				];
+				for (const [color, width] of passes) {
+					ctx.strokeStyle = color;
+					ctx.lineWidth = width * (0.7 + 0.3 * Math.sin(time * 60));
+					ctx.beginPath();
+					ctx.moveTo(x0, y0);
+					ctx.lineTo(x1, y1);
+					ctx.stroke();
+				}
+				ctx.globalCompositeOperation = 'source-over';
+				ctx.strokeStyle = `rgba(0,0,0,${0.85 * k})`;
+				ctx.lineWidth = s * 0.08;
+				ctx.beginPath();
+				ctx.moveTo(x0, y0);
+				ctx.lineTo(x1, y1);
+				ctx.stroke();
+				continue;
+			}
+			for (const tile of hazard.tiles) {
+				const cx = layout.offsetX + (tile.x + 0.5) * s;
+				const cy = layout.offsetY + (tile.y + 0.5) * s;
+				const r = s * (0.3 + 0.5 * (1 - k));
+				ctx.globalCompositeOperation = 'lighter';
+				const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+				g.addColorStop(0, `rgba(255,220,255,${k})`);
+				g.addColorStop(0.4, `rgba(200,60,255,${0.8 * k})`);
+				g.addColorStop(1, 'rgba(0,0,0,0)');
+				ctx.fillStyle = g;
+				ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+				ctx.globalCompositeOperation = 'source-over';
+				ctx.fillStyle = `rgba(0,0,0,${0.9 * k})`;
+				ctx.beginPath();
+				ctx.arc(cx, cy, s * 0.14 * k, 0, Math.PI * 2);
+				ctx.fill();
+			}
+		}
+		ctx.restore();
 	}
 
 	private drawVoidCells(
@@ -55,6 +283,15 @@ export class DoomCombatView {
 			let alpha = 1.0;
 			if (cell.timer < VOID_FLICKER) {
 				alpha = 0.4 + 0.6 * Math.abs(Math.sin(time * 10));
+			}
+			if (cell.kind === 'seal') {
+				ctx.save();
+				ctx.globalAlpha = alpha * 0.85;
+				ctx.fillStyle = '#050005';
+				ctx.fillRect(px, py, s, s);
+				ctx.restore();
+				drawSigil(ctx, px + s / 2, py + s / 2, s * 0.46, time, alpha, 1);
+				continue;
 			}
 			ctx.save();
 			ctx.globalAlpha = alpha;
@@ -321,4 +558,46 @@ export class DoomCombatView {
 			ctx.restore();
 		}
 	}
+}
+
+function tileNoise(x: number, y: number, k: number): number {
+	const v = Math.sin(x * 12.9898 + y * 78.233 + k * 37.719) * 43758.5453;
+	return v - Math.floor(v);
+}
+
+/** Seal glyph: a burning ring with a pentagram, used for warnings and locked tiles. */
+function drawSigil(
+	ctx: CanvasRenderingContext2D,
+	cx: number,
+	cy: number,
+	r: number,
+	time: number,
+	alpha: number,
+	strength: number
+): void {
+	ctx.save();
+	ctx.translate(cx, cy);
+	ctx.rotate(time * 0.8);
+	ctx.globalCompositeOperation = 'lighter';
+	ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+	ctx.strokeStyle = '#ff3a1a';
+	ctx.lineWidth = Math.max(0.8, r * 0.12);
+	ctx.beginPath();
+	ctx.arc(0, 0, r, 0, Math.PI * 2);
+	ctx.stroke();
+	ctx.lineWidth = Math.max(0.6, r * 0.08);
+	ctx.strokeStyle = strength >= 1 ? '#ffb070' : '#ff6a3a';
+	ctx.beginPath();
+	for (let i = 0; i <= 5; i += 1) {
+		const a = -Math.PI / 2 + (i * 4 * Math.PI) / 5;
+		const x = Math.cos(a) * r * 0.92;
+		const y = Math.sin(a) * r * 0.92;
+		if (i === 0) {
+			ctx.moveTo(x, y);
+		} else {
+			ctx.lineTo(x, y);
+		}
+	}
+	ctx.stroke();
+	ctx.restore();
 }

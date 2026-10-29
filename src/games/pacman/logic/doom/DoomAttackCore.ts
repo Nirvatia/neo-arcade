@@ -5,19 +5,41 @@ import {
 	BROOD_WEIGHTS,
 	CROSS_WEIGHTS,
 	DASH_WEIGHTS,
+	ERUPTION_WEIGHTS,
+	PULL_WEIGHTS,
+	RIFT_WEIGHTS,
+	SEAL_WEIGHTS,
+	SPLIT_WEIGHTS,
 	VOID_WEIGHTS,
 	phaseIndex
 } from './DoomBalance';
 
-export type DoomAttackKind = 'dash' | 'cross' | 'voidTrail' | 'blink' | 'brood';
+export type DoomAttackKind =
+	| 'dash'
+	| 'cross'
+	| 'voidTrail'
+	| 'blink'
+	| 'brood'
+	| 'rift'
+	| 'seal'
+	| 'pull'
+	| 'split'
+	| 'eruption';
 
-export interface DoomAttackWeights {
-	readonly dash: number;
-	readonly cross: number;
-	readonly voidTrail: number;
-	readonly blink: number;
-	readonly brood: number;
-}
+export const DOOM_ATTACK_KINDS: readonly DoomAttackKind[] = [
+	'dash',
+	'cross',
+	'voidTrail',
+	'blink',
+	'brood',
+	'rift',
+	'seal',
+	'pull',
+	'split',
+	'eruption'
+];
+
+export type DoomAttackWeights = Readonly<Record<DoomAttackKind, number>>;
 
 export function attackWeightsForPhase(phase: number): DoomAttackWeights {
 	const i = phaseIndex(phase);
@@ -26,7 +48,12 @@ export function attackWeightsForPhase(phase: number): DoomAttackWeights {
 		cross: CROSS_WEIGHTS[i],
 		voidTrail: VOID_WEIGHTS[i],
 		blink: BLINK_WEIGHTS[i],
-		brood: BROOD_WEIGHTS[i]
+		brood: BROOD_WEIGHTS[i],
+		rift: RIFT_WEIGHTS[i],
+		seal: SEAL_WEIGHTS[i],
+		pull: PULL_WEIGHTS[i],
+		split: SPLIT_WEIGHTS[i],
+		eruption: ERUPTION_WEIGHTS[i]
 	};
 }
 
@@ -66,25 +93,12 @@ export function chooseWeightedAttack(
 ): DoomAttackKind | null {
 	const entries: Array<{ kind: DoomAttackKind; weight: number }> = [];
 	let total = 0;
-	if (available.has('dash') && weights.dash > 0) {
-		entries.push({ kind: 'dash', weight: weights.dash });
-		total += weights.dash;
-	}
-	if (available.has('cross') && weights.cross > 0) {
-		entries.push({ kind: 'cross', weight: weights.cross });
-		total += weights.cross;
-	}
-	if (available.has('voidTrail') && weights.voidTrail > 0) {
-		entries.push({ kind: 'voidTrail', weight: weights.voidTrail });
-		total += weights.voidTrail;
-	}
-	if (available.has('blink') && weights.blink > 0) {
-		entries.push({ kind: 'blink', weight: weights.blink });
-		total += weights.blink;
-	}
-	if (available.has('brood') && weights.brood > 0) {
-		entries.push({ kind: 'brood', weight: weights.brood });
-		total += weights.brood;
+	for (const kind of DOOM_ATTACK_KINDS) {
+		const weight = weights[kind];
+		if (available.has(kind) && weight > 0) {
+			entries.push({ kind, weight });
+			total += weight;
+		}
 	}
 	if (entries.length === 0 || total <= 0) return null;
 	let roll = random * total;

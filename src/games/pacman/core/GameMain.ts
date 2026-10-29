@@ -96,6 +96,7 @@ export class GameMain implements GameModule {
 		setDebugActions({
 			gotoLevel: (value) => level.setPendingStartLevel(value),
 			spawnBonus: () => level.debugSpawnBonus(),
+			toggleGodMode: () => level.debugToggleGodMode(),
 			damageBoss: () => {
 				level.debugDamageBoss();
 				level.emitHud();
@@ -108,6 +109,10 @@ export class GameMain implements GameModule {
 			setMazeScale: (value) => level.setMazeScale(value)
 		});
 		loop.start();
+		if (import.meta.env.DEV) {
+			// dev only: lets the browser console and automated play-tests inspect the game
+			(window as unknown as { __pacman?: unknown }).__pacman = { level, director };
+		}
 		this.events = events;
 		this.level = level;
 		this.audio = audio;
@@ -119,6 +124,9 @@ export class GameMain implements GameModule {
 	}
 
 	destroy(): void {
+		if (import.meta.env.DEV) {
+			delete (window as unknown as { __pacman?: unknown }).__pacman;
+		}
 		this.loop?.stop();
 		this.input?.detach();
 		clearPacmanActions();

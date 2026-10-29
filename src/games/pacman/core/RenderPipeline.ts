@@ -9,6 +9,8 @@ import { FruitView } from '../render/FruitView';
 import { GoldenEggView } from '../render/GoldenEggView';
 import { EchoCloneView } from '../render/EchoCloneView';
 import { AbyssBossView } from '../render/AbyssBossView';
+import type { AbyssBossSnapshot } from '../render/AbyssBossView';
+import type { DoomBossService } from '../logic/doom/DoomBossService';
 import { DoomCombatView } from '../render/DoomCombatView';
 import { DoomWorld } from '../render/doom/DoomWorld';
 import type { DoomLight } from '../render/doom/DoomWorld';
@@ -32,6 +34,7 @@ export class RenderPipeline {
 	private readonly goldenEggView: GoldenEggView;
 	private readonly echoCloneView: EchoCloneView;
 	private readonly abyssBossView: AbyssBossView;
+	private readonly echoBossView: AbyssBossView;
 	private readonly doomCombatView: DoomCombatView;
 	private readonly deathWaveView: DeathWaveView;
 	private readonly levelClearView: LevelClearView;
@@ -66,6 +69,7 @@ export class RenderPipeline {
 		this.goldenEggView = new GoldenEggView();
 		this.echoCloneView = new EchoCloneView();
 		this.abyssBossView = new AbyssBossView();
+		this.echoBossView = new AbyssBossView();
 		this.doomCombatView = new DoomCombatView();
 		this.deathWaveView = new DeathWaveView();
 		this.levelClearView = new LevelClearView();
@@ -187,6 +191,11 @@ export class RenderPipeline {
 		const phase = boss ? boss.phase : 1;
 		world.setMood(phase >= 2, phase >= 3);
 		world.update(dt);
+		// camera shake moves the world and the actors, never the screen-space atmosphere
+		const shake = boss ? boss.shake : 0;
+		const amp = shake * shake * world.layout.tileSize * 0.35;
+		this.ctx.save();
+		this.ctx.translate((Math.random() - 0.5) * amp, (Math.random() - 0.5) * amp);
 		world.drawWorld(this.ctx);
 		const layout = world.layout;
 
@@ -196,6 +205,7 @@ export class RenderPipeline {
 			if (clear && clear.phase === 'cutscene') {
 				this.levelClearView.draw(this.ctx, clear, grid, layout, this.level.profile);
 			}
+			this.ctx.restore();
 			world.drawPost(this.ctx);
 			this.drawOverlay(layout, grid);
 			return;
@@ -206,8 +216,23 @@ export class RenderPipeline {
 		const lights: DoomLight[] = [];
 		if (boss && doom && !boss.defeated) {
 			this.doomCombatView.drawGround(this.ctx, boss, doom, grid, layout, this.timeValue);
+			const echo = boss.echo;
+			const echoPos = boss.echoPosition();
+			if (echo && echoPos) {
+				this.echoBossView.draw(
+					this.ctx,
+					this.bossSnapshot(boss, echoPos, true, echo.presence),
+					layout,
+					this.timeValue
+				);
+			}
 			if (!this.erased(boss.position, mask)) {
-				this.abyssBossView.draw(this.ctx, boss, layout, this.timeValue);
+				this.abyssBossView.draw(
+					this.ctx,
+					this.bossSnapshot(boss, boss.position, false, 1),
+					layout,
+					this.timeValue
+				);
 				lights.push({ x: boss.position.x, y: boss.position.y, r: 1.6, tint: 0xff2a1a, a: 0.45 });
 			}
 			this.doomCombatView.drawAir(this.ctx, boss, doom, layout, this.timeValue);
@@ -218,6 +243,7 @@ export class RenderPipeline {
 			if (wave) {
 				this.deathWaveView.draw(this.ctx, layout, grid.width, grid.height, wave.x, wave.y, wave.progress);
 			}
+			this.ctx.restore();
 			world.drawPost(this.ctx, lights);
 			this.drawOverlay(layout, grid);
 			return;
@@ -225,12 +251,39 @@ export class RenderPipeline {
 
 		const player = this.level.player;
 		if (player) {
+			if (boss && !boss.defeated) {
+				this.doomCombatView.drawPull(this.ctx, boss, player.position, layout, this.timeValue);
+			}
 			this.playerView.draw(this.ctx, player, layout, this.level.profile);
 			const p = player.position;
 			lights.push({ x: p.x, y: p.y, r: 2.4, tint: 0xffd890, a: 0.55 });
 		}
+		this.ctx.restore();
 		world.drawPost(this.ctx, lights);
 		this.drawOverlay(layout, grid);
+	}
+
+	private bossSnapshot(
+		boss: DoomBossService,
+		at: { x: number; y: number },
+		echo: boolean,
+		presence: number
+	): AbyssBossSnapshot {
+		const rs = boss.renderState;
+		return {
+			x: at.x,
+			y: at.y,
+			phase: boss.phase,
+			state: boss.state,
+			shape: rs.shape,
+			dir: rs.dir,
+			progress: rs.progress,
+			scale: rs.scale,
+			alpha: echo ? Math.max(0, Math.min(1, presence)) * 0.9 : rs.alpha,
+			chaos: rs.chaos,
+			intro: boss.introProgress,
+			echo
+		};
 	}
 
 	private doomWorldFor(season: SeasonData, grid: GridService): DoomWorld {

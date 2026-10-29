@@ -3,6 +3,7 @@
 		debugGotoLevel,
 		debugSpawnBonus,
 		debugDamageBoss,
+		debugToggleGodMode,
 		debugCompleteLevel,
 		debugKillPlayer,
 		debugEnterHell,
@@ -15,6 +16,7 @@
 	let levelInput = 1;
 	let prepared = 0;
 	let mazeScale = 0.8;
+	let godMode = false;
 
 	function prepareLevel(): void {
 		const value = Math.floor(Number(levelInput));
@@ -86,6 +88,13 @@
 			</button>
 			<button type="button" tabindex={-1} on:click={(e) => run(debugDamageBoss, e)}>
 				BOSS -250 HP
+			</button>
+			<button
+				type="button"
+				tabindex={-1}
+				on:click={(e) => run(() => (godMode = debugToggleGodMode()), e)}
+			>
+				GOD MODE: {godMode ? 'ON' : 'OFF'}
 			</button>
 			<button type="button" tabindex={-1} on:click={(e) => run(debugCompleteLevel, e)}>
 				COMPLETE LEVEL

@@ -2,6 +2,7 @@ export interface PacmanDebugActions {
 	gotoLevel: (level: number) => void;
 	spawnBonus: () => void;
 	damageBoss: () => void;
+	toggleGodMode: () => boolean;
 	completeLevel: () => void;
 	killPlayer: () => void;
 	enterHell: () => void;
@@ -46,6 +47,14 @@ export function debugDamageBoss(): void {
 		return;
 	}
 	actions.damageBoss();
+}
+
+export function debugToggleGodMode(): boolean {
+	if (!actions) {
+		console.error('debugActions.debugToggleGodMode', 'actions are not initialized');
+		return false;
+	}
+	return actions.toggleGodMode();
 }
 
 export function debugCompleteLevel(): void {
