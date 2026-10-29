@@ -17,7 +17,13 @@ import { SECRET_LEVEL_NUMBER, HELL_LEVEL_INTERVAL } from '../config/gridConfig';
 import type { GameProfile } from './HypnosisService';
 import type { PlayerDirection } from './PlayerModel';
 import type { EventBus } from '../engine/EventBus';
-import type { PacmanEventMap, PacmanHudPayload } from '../core/Events';
+import type {
+	PacmanEventMap,
+	PacmanHellHud,
+	PacmanHellWeapon,
+	PacmanHudPayload
+} from '../core/Events';
+import { BOSS_HP, PLAYER_MAX_HP } from './doom/DoomBalance';
 import { seasonForLevel, secretSeason, hellSeason } from './SeasonCatalog';
 import type { SeasonData, SeasonName } from './SeasonCatalog';
 
@@ -432,7 +438,35 @@ export class LevelLoader {
 			dots: this.progressValue ? this.progressValue.remainingDots : 0,
 			power: this.currentPower(),
 			mode: this.profileValue,
-			result
+			result,
+			level: this.levelNumber,
+			hell: this.hellHud()
+		};
+	}
+
+	debugDamageBoss(): void {
+		if (this.hellModeValue && this.doomBossValue) {
+			this.doomBossValue.takeDamage(250);
+		}
+	}
+
+	private hellHud(): PacmanHellHud | null {
+		const boss = this.doomBossValue;
+		const doom = this.doomValue;
+		if (!this.hellModeValue || !boss || !doom) {
+			return null;
+		}
+		const armed = doom.armed;
+		const weapon: PacmanHellWeapon =
+			armed === 'bfg' || armed === 'barrel' || armed === 'berserk' ? armed : '';
+		return {
+			hp: doom.playerHp,
+			hpMax: PLAYER_MAX_HP,
+			bossHp: Math.max(0, Math.round(boss.hp)),
+			bossHpMax: BOSS_HP,
+			bossPhase: boss.phase,
+			weapon,
+			berserk: weapon === 'berserk' ? Math.ceil(doom.berserkTimer * 10) / 10 : 0
 		};
 	}
 

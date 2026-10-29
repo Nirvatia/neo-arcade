@@ -5,12 +5,10 @@ import { SummerRenderBundle } from './summer/SummerRenderBundle';
 import { AutumnRenderBundle } from './autumn/AutumnRenderBundle';
 import { WinterRenderBundle } from './winter/WinterRenderBundle';
 import { SecretRenderBundle } from './secret/SecretRenderBundle';
-import { DoomRenderBundle } from '../doom/DoomRenderBundle';
 
 export interface SeasonBundleRequest {
 	readonly season: SeasonData;
 	readonly secret: boolean;
-	readonly hell: boolean;
 	readonly level: number;
 }
 
@@ -18,9 +16,6 @@ export function seasonRenderBundleFor(request: SeasonBundleRequest): SeasonRende
 	if (!request || !request.season) {
 		console.error('seasonRenderBundleFor', 'missing request or season', request);
 		throw new Error('seasonRenderBundleFor: missing request or season');
-	}
-	if (request.hell) {
-		return new DoomRenderBundle(request.season.palette);
 	}
 	if (request.secret) {
 		return new SecretRenderBundle(request.season.palette);

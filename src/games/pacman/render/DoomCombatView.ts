@@ -4,6 +4,8 @@ import type { DoomBossService } from '../logic/doom/DoomBossService';
 import type { DoomAbilityService } from '../logic/doom/DoomAbilityService';
 import { minionPosition } from '../logic/doom/DoomMinions';
 import { VOID_FLICKER } from '../logic/doom/DoomBalance';
+import { DOOM_TILE } from './doom/DoomBake';
+import { barrelSprite, glowTexture, pickupSprite } from './doom/DoomSprites';
 
 const MINION_COLORS: Record<string, string> = {
 	pinky: '#ff9de2',
@@ -11,15 +13,9 @@ const MINION_COLORS: Record<string, string> = {
 	clyde: '#ffb14d'
 };
 
-const PICKUP_COLORS: Record<string, string> = {
-	berserk: '#ff4d4d',
-	bfg: '#4dff4d',
-	barrel: '#ffb14d',
-	medkit: '#59f0ff'
-};
-
 export class DoomCombatView {
-	draw(
+	/** Everything lying on the floor, drawn under the boss. */
+	drawGround(
 		ctx: CanvasRenderingContext2D,
 		boss: DoomBossService,
 		doom: DoomAbilityService,
@@ -31,6 +27,16 @@ export class DoomCombatView {
 		this.drawCrossTelegraph(ctx, boss, grid, layout);
 		this.drawPickups(ctx, doom, layout, time);
 		this.drawBarrels(ctx, doom, layout, time);
+	}
+
+	/** Projectiles and minions, drawn over the boss. */
+	drawAir(
+		ctx: CanvasRenderingContext2D,
+		boss: DoomBossService,
+		doom: DoomAbilityService,
+		layout: GridLayout,
+		time: number
+	): void {
 		this.drawShots(ctx, doom, layout);
 		this.drawTracers(ctx, doom, layout);
 		this.drawMinions(ctx, boss, layout, time);
@@ -132,6 +138,8 @@ export class DoomCombatView {
 		ctx.restore();
 	}
 
+	// Power-up from the prototype: additive glow plus icon, gently pulsing and swaying.
+	// A pickup that cannot be taken right now (full health, occupied slot) is dimmed.
 	private drawPickups(
 		ctx: CanvasRenderingContext2D,
 		doom: DoomAbilityService,
@@ -139,45 +147,40 @@ export class DoomCombatView {
 		time: number
 	): void {
 		const s = layout.tileSize;
+		const u = s / DOOM_TILE;
 		for (const pickup of doom.pickupList) {
 			const px = layout.offsetX + (pickup.tile.x + 0.5) * s;
 			const py = layout.offsetY + (pickup.tile.y + 0.5) * s;
-			const radius = Math.max(3, s * 0.3);
+			const phase = pickup.tile.x * 1.7 + pickup.tile.y * 0.9;
 			if (pickup.visible && pickup.kind) {
-				const color = PICKUP_COLORS[pickup.kind] ?? '#ffffff';
-				const pulse = 1 + 0.1 * Math.sin(time * 3);
+				const sprite = pickupSprite(pickup.kind);
+				const ready = doom.canCollect(pickup.kind);
+				const scale = 1 + 0.05 * Math.sin(time * 2.6 + phase);
+				const glow = ((64 * 0.95) / 3) * u;
 				ctx.save();
-				ctx.globalAlpha = 0.3;
-				ctx.fillStyle = color;
-				ctx.beginPath();
-				ctx.arc(px, py, radius * 1.5 * pulse, 0, Math.PI * 2);
-				ctx.fill();
-				ctx.globalAlpha = 1;
-				ctx.fillStyle = color;
-				ctx.beginPath();
-				ctx.arc(px, py, radius * pulse, 0, Math.PI * 2);
-				ctx.fill();
-				ctx.fillStyle = '#ffffff';
-				ctx.globalAlpha = 0.6;
-				ctx.beginPath();
-				ctx.arc(px - radius * 0.25, py - radius * 0.25, radius * 0.3, 0, Math.PI * 2);
-				ctx.fill();
+				ctx.translate(px, py);
+				ctx.scale(scale, scale);
+				ctx.globalCompositeOperation = 'lighter';
+				ctx.globalAlpha = ready ? 0.7 : 0.25;
+				ctx.drawImage(glowTexture(sprite.glow), -glow / 2, -glow / 2, glow, glow);
+				ctx.globalCompositeOperation = 'source-over';
+				ctx.globalAlpha = ready ? 1 : 0.45;
+				ctx.rotate(ready ? Math.sin(time * 2 + phase) * 0.1 : 0);
+				ctx.drawImage(sprite.icon, -13 * u, -13 * u, 26 * u, 26 * u);
 				ctx.restore();
 			} else if (!pickup.visible && pickup.respawnProgress > 0) {
+				const radius = 9 * u;
 				ctx.save();
-				ctx.globalAlpha = 0.25;
-				ctx.strokeStyle = '#ffffff';
-				ctx.lineWidth = Math.max(1, s * 0.06);
+				ctx.globalAlpha = 0.35;
+				ctx.strokeStyle = '#ff8a5a';
+				ctx.lineWidth = Math.max(1, 1.4 * u);
 				ctx.beginPath();
 				ctx.arc(px, py, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pickup.respawnProgress);
 				ctx.stroke();
 				if (pickup.pendingKind) {
-					const color = PICKUP_COLORS[pickup.pendingKind] ?? '#ffffff';
-					ctx.globalAlpha = 0.2;
-					ctx.fillStyle = color;
-					ctx.beginPath();
-					ctx.arc(px, py, radius * 0.5, 0, Math.PI * 2);
-					ctx.fill();
+					const sprite = pickupSprite(pickup.pendingKind);
+					ctx.globalAlpha = 0.18;
+					ctx.drawImage(sprite.icon, px - 8 * u, py - 8 * u, 16 * u, 16 * u);
 				}
 				ctx.restore();
 			}
@@ -191,27 +194,22 @@ export class DoomCombatView {
 		time: number
 	): void {
 		const s = layout.tileSize;
+		const u = s / DOOM_TILE;
 		for (const barrel of doom.barrelList) {
 			const px = layout.offsetX + (barrel.x + 0.5) * s;
 			const py = layout.offsetY + (barrel.y + 0.5) * s;
-			const w = Math.max(4, s * 0.5);
-			const h = Math.max(5, s * 0.6);
 			const flash = barrel.timer < 2 ? Math.abs(Math.sin(time * 8)) : 0;
 			ctx.save();
 			ctx.translate(px, py);
-			ctx.fillStyle = flash > 0.5 ? '#ff6600' : '#8B4513';
-			ctx.fillRect(-w / 2, -h / 2, w, h);
-			ctx.strokeStyle = '#333333';
-			ctx.lineWidth = Math.max(1, s * 0.04);
-			ctx.strokeRect(-w / 2, -h / 2, w, h);
-			ctx.fillStyle = '#666666';
-			ctx.fillRect(-w / 2, -h * 0.15, w, h * 0.12);
-			ctx.fillRect(-w / 2, h * 0.1, w, h * 0.12);
-			ctx.fillStyle = '#ff4400';
-			ctx.globalAlpha = 0.6 + flash * 0.4;
-			ctx.beginPath();
-			ctx.arc(0, -h * 0.35, Math.max(1.5, s * 0.06), 0, Math.PI * 2);
-			ctx.fill();
+			if (flash > 0) {
+				const glow = 22 * u;
+				ctx.globalCompositeOperation = 'lighter';
+				ctx.globalAlpha = flash * 0.8;
+				ctx.drawImage(glowTexture(0xff6a1a), -glow / 2, -glow / 2, glow, glow);
+				ctx.globalCompositeOperation = 'source-over';
+				ctx.globalAlpha = 1;
+			}
+			ctx.drawImage(barrelSprite(), -12 * u, -12 * u, 24 * u, 24 * u);
 			ctx.restore();
 		}
 	}

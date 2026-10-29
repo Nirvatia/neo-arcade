@@ -1,6 +1,7 @@
 export interface PacmanDebugActions {
 	gotoLevel: (level: number) => void;
 	spawnBonus: () => void;
+	damageBoss: () => void;
 	completeLevel: () => void;
 	killPlayer: () => void;
 	enterHell: () => void;
@@ -37,6 +38,14 @@ export function debugSpawnBonus(): void {
 		return;
 	}
 	actions.spawnBonus();
+}
+
+export function debugDamageBoss(): void {
+	if (!actions) {
+		console.error('debugActions.debugDamageBoss', 'actions are not initialized');
+		return;
+	}
+	actions.damageBoss();
 }
 
 export function debugCompleteLevel(): void {

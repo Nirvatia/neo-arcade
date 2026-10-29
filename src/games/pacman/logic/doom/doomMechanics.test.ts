@@ -57,7 +57,12 @@ function pathTo(
 			const nx = cur.x + dx;
 			const ny = cur.y + dy;
 			const avoided = avoid !== undefined && avoid.x === nx && avoid.y === ny;
-			if (avoided || !grid.isPlayerWalkable(nx, ny) || grid.isTeleport(nx, ny) || prev.has(key(nx, ny))) {
+			if (
+				avoided ||
+				!grid.isPlayerWalkable(nx, ny) ||
+				grid.isTeleport(nx, ny) ||
+				prev.has(key(nx, ny))
+			) {
 				continue;
 			}
 			prev.set(key(nx, ny), { x: cur.x, y: cur.y, dir });

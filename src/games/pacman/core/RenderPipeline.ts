@@ -10,6 +10,8 @@ import { GoldenEggView } from '../render/GoldenEggView';
 import { EchoCloneView } from '../render/EchoCloneView';
 import { AbyssBossView } from '../render/AbyssBossView';
 import { DoomCombatView } from '../render/DoomCombatView';
+import { DoomWorld } from '../render/doom/DoomWorld';
+import type { DoomLight } from '../render/doom/DoomWorld';
 import { DeathWaveView, deathWaveEase, deathWaveMaxRadius } from '../render/DeathWaveView';
 import { LevelClearView } from '../render/LevelClearView';
 import { OverlayView } from '../render/OverlayView';
@@ -40,6 +42,8 @@ export class RenderPipeline {
 	private height = 0;
 	private pixelRatio = 1;
 	private bundle: SeasonRenderBundle | null = null;
+	private doomWorld: DoomWorld | null = null;
+	private doomWorldGrid: GridService | null = null;
 	private bundleKey = '';
 	private lastRenderTime = 0;
 	private timeValue = 0;
@@ -99,6 +103,11 @@ export class RenderPipeline {
 		this.ctx.globalCompositeOperation = 'source-over';
 		this.ctx.imageSmoothingEnabled = true;
 
+		if (this.level.hellMode) {
+			this.renderHell(dt, season, grid);
+			return;
+		}
+
 		const ratio = this.dayNightRatio();
 		this.ctx.fillStyle = lerpHex(season.palette.background, season.palette.backgroundNight, ratio);
 		this.ctx.fillRect(0, 0, this.width, this.height);
@@ -123,29 +132,7 @@ export class RenderPipeline {
 			season.palette, ratio, bundle, this.timeValue, mask, this.level.mazeScale
 		);
 
-		const fruit = this.level.fruit;
-		if (fruit && fruit.active !== null && !this.erased(fruit.position, mask)) {
-			this.fruitView.draw(this.ctx, fruit, drawnLayout);
-		}
-
-		const egg = this.level.egg;
-		if (egg && egg.phase === 'egg' && !this.erased(egg.eggPosition, mask)) {
-			this.goldenEggView.draw(this.ctx, egg, drawnLayout);
-		}
-
-		const echo = this.level.echo;
-		if (echo && (echo.phase === 'token' || echo.phase === 'clone') && !this.erased(echo.position, mask)) {
-			this.echoCloneView.draw(this.ctx, echo, drawnLayout);
-		}
-
-		const doomBoss = this.level.doomBoss;
-		const doom = this.level.doom;
-		if (doomBoss && doom && this.level.hellMode && !doomBoss.defeated) {
-			if (!this.erased(doomBoss.position, mask)) {
-				this.abyssBossView.draw(this.ctx, doomBoss, drawnLayout, this.timeValue);
-			}
-			this.doomCombatView.draw(this.ctx, doomBoss, doom, grid, drawnLayout, this.timeValue);
-		}
+		this.drawCollectibles(drawnLayout, mask);
 
 		const ghosts = this.level.ghosts;
 		if (ghosts) {
@@ -190,6 +177,89 @@ export class RenderPipeline {
 		this.canvas.remove();
 	}
 
+	// Hell level: the CLAUDE_GRID_DOOM_v3 world (baked maze + meadow), the actors, then the
+	// atmosphere. Ash storm and night follow the boss phase.
+	private renderHell(dt: number, season: SeasonData, grid: GridService): void {
+		const world = this.doomWorldFor(season, grid);
+		world.resize(this.width, this.height, this.pixelRatio);
+		const boss = this.level.doomBoss;
+		const doom = this.level.doom;
+		const phase = boss ? boss.phase : 1;
+		world.setMood(phase >= 2, phase >= 3);
+		world.update(dt);
+		world.drawWorld(this.ctx);
+		const layout = world.layout;
+
+		const state = this.director.stateName;
+		if (state === 'level-clear') {
+			const clear = this.director.levelClear;
+			if (clear && clear.phase === 'cutscene') {
+				this.levelClearView.draw(this.ctx, clear, grid, layout, this.level.profile);
+			}
+			world.drawPost(this.ctx);
+			this.drawOverlay(layout, grid);
+			return;
+		}
+
+		const mask = this.disintegrationMask(grid);
+		this.drawCollectibles(layout, mask);
+		const lights: DoomLight[] = [];
+		if (boss && doom && !boss.defeated) {
+			this.doomCombatView.drawGround(this.ctx, boss, doom, grid, layout, this.timeValue);
+			if (!this.erased(boss.position, mask)) {
+				this.abyssBossView.draw(this.ctx, boss, layout, this.timeValue);
+				lights.push({ x: boss.position.x, y: boss.position.y, r: 1.6, tint: 0xff2a1a, a: 0.45 });
+			}
+			this.doomCombatView.drawAir(this.ctx, boss, doom, layout, this.timeValue);
+		}
+
+		if (state === 'death') {
+			const wave = this.director.deathWave;
+			if (wave) {
+				this.deathWaveView.draw(this.ctx, layout, grid.width, grid.height, wave.x, wave.y, wave.progress);
+			}
+			world.drawPost(this.ctx, lights);
+			this.drawOverlay(layout, grid);
+			return;
+		}
+
+		const player = this.level.player;
+		if (player) {
+			this.playerView.draw(this.ctx, player, layout, this.level.profile);
+			const p = player.position;
+			lights.push({ x: p.x, y: p.y, r: 2.4, tint: 0xffd890, a: 0.55 });
+		}
+		world.drawPost(this.ctx, lights);
+		this.drawOverlay(layout, grid);
+	}
+
+	private doomWorldFor(season: SeasonData, grid: GridService): DoomWorld {
+		if (!this.doomWorld || this.doomWorldGrid !== grid) {
+			const doom = this.level.doom;
+			const pickupTiles = doom ? doom.pickupList.map((pickup) => pickup.tile) : [];
+			this.doomWorld = new DoomWorld(season.grid, pickupTiles);
+			this.doomWorldGrid = grid;
+		}
+		return this.doomWorld;
+	}
+
+	private drawCollectibles(layout: GridLayout, mask: DisintegrationMask | null): void {
+		const fruit = this.level.fruit;
+		if (fruit && fruit.active !== null && !this.erased(fruit.position, mask)) {
+			this.fruitView.draw(this.ctx, fruit, layout);
+		}
+
+		const egg = this.level.egg;
+		if (egg && egg.phase === 'egg' && !this.erased(egg.eggPosition, mask)) {
+			this.goldenEggView.draw(this.ctx, egg, layout);
+		}
+
+		const echo = this.level.echo;
+		if (echo && (echo.phase === 'token' || echo.phase === 'clone') && !this.erased(echo.position, mask)) {
+			this.echoCloneView.draw(this.ctx, echo, layout);
+		}
+	}
+
 	private syncSize(): boolean {
 		const rectWidth = this.container.clientWidth;
 		const rectHeight = this.container.clientHeight;
@@ -215,12 +285,11 @@ export class RenderPipeline {
 
 	// Bundles keep animation state (weather particles), so they must survive between frames.
 	private currentBundle(season: SeasonData): SeasonRenderBundle {
-		const key = `${season.name}:${this.level.secretMode}:${this.level.hellMode}:${this.level.level}`;
+		const key = `${season.name}:${this.level.secretMode}:${this.level.level}`;
 		if (!this.bundle || key !== this.bundleKey) {
 			this.bundle = seasonRenderBundleFor({
 				season,
 				secret: this.level.secretMode,
-				hell: this.level.hellMode,
 				level: this.level.level
 			});
 			this.bundleKey = key;
@@ -298,7 +367,8 @@ export class RenderPipeline {
 		}
 		this.overlayView.draw(
 			this.ctx, snapshot, layout,
-			grid.width * layout.tileSize, grid.height * layout.tileSize
+			grid.width * layout.tileSize, grid.height * layout.tileSize,
+			!this.level.hellMode
 		);
 	}
 

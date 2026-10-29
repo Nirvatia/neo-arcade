@@ -26,7 +26,9 @@ export class SvelteHudAdapter {
 				dots: payload.dots,
 				power: payload.power,
 				mode: payload.mode,
-				result: payload.result
+				result: payload.result,
+				level: payload.level,
+				hell: payload.hell
 			}));
 		});
 

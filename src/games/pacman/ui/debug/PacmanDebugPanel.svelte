@@ -2,6 +2,7 @@
 	import {
 		debugGotoLevel,
 		debugSpawnBonus,
+		debugDamageBoss,
 		debugCompleteLevel,
 		debugKillPlayer,
 		debugEnterHell,
@@ -82,6 +83,9 @@
 			</div>
 			<button type="button" tabindex={-1} on:click={(e) => run(debugSpawnBonus, e)}>
 				SPAWN BONUS
+			</button>
+			<button type="button" tabindex={-1} on:click={(e) => run(debugDamageBoss, e)}>
+				BOSS -250 HP
 			</button>
 			<button type="button" tabindex={-1} on:click={(e) => run(debugCompleteLevel, e)}>
 				COMPLETE LEVEL

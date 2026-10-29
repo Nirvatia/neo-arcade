@@ -33,6 +33,19 @@ export interface PacmanStateChangedPayload {
 	state: PacmanStateName;
 }
 
+export type PacmanHellWeapon = 'bfg' | 'barrel' | 'berserk' | '';
+
+export interface PacmanHellHud {
+	hp: number;
+	hpMax: number;
+	bossHp: number;
+	bossHpMax: number;
+	bossPhase: number;
+	weapon: PacmanHellWeapon;
+	/** Seconds of berserk left, rounded to 0.1. */
+	berserk: number;
+}
+
 export interface PacmanHudPayload {
 	score: number;
 	lives: number;
@@ -40,6 +53,9 @@ export interface PacmanHudPayload {
 	power: number;
 	mode: PacmanProfile;
 	result: PacmanGameResult;
+	level: number;
+	/** Present only on the hell level. */
+	hell: PacmanHellHud | null;
 }
 
 export interface PacmanAudioCuePayload {

@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import type { PacmanProfile, PacmanStateName } from '../../core/Events';
+import type { PacmanHellHud, PacmanProfile, PacmanStateName } from '../../core/Events';
 
 export type PacmanHudResult = 'none' | 'win' | 'lose';
 
@@ -10,6 +10,8 @@ export interface PacmanHudState {
 	power: number;
 	mode: PacmanProfile;
 	result: PacmanHudResult;
+	level: number;
+	hell: PacmanHellHud | null;
 	state: PacmanStateName;
 }
 
@@ -20,5 +22,7 @@ export const pacmanHudStore = writable<PacmanHudState>({
 	power: 0,
 	mode: 'pacman',
 	result: 'none',
+	level: 1,
+	hell: null,
 	state: 'menu'
 });

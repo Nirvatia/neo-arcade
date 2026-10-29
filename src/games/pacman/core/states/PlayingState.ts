@@ -135,7 +135,7 @@ export class PlayingState implements GameState {
 			return;
 		}
 		const hud = ctx.level.hudPayload();
-		const hudKey = `${hud.score}:${hud.lives}:${hud.dots}:${hud.power}:${hud.mode}:${hud.result}`;
+		const hudKey = JSON.stringify(hud);
 		if (hudKey !== this.lastHudKey) {
 			this.lastHudKey = hudKey;
 			ctx.events.emit('ui:hudChanged', hud);

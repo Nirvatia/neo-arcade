@@ -3,6 +3,7 @@
 	import { GameMain } from '../../../games/pacman/core/GameMain';
 	import PacmanOverlay from '../../../games/pacman/ui/overlay/PacmanOverlay.svelte';
 	import PacmanDebugPanel from '../../../games/pacman/ui/debug/PacmanDebugPanel.svelte';
+	import HellHud from '../../../games/pacman/ui/hud/HellHud.svelte';
 
 	const isDev = import.meta.env.DEV;
 
@@ -25,6 +26,8 @@
 
 <div class="pacman-page">
 	<div class="stage" bind:this={container}></div>
+
+	<HellHud />
 
 	<div class="overlay-slot">
 		<PacmanOverlay />

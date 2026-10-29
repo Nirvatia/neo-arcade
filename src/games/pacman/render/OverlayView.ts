@@ -26,7 +26,8 @@ export class OverlayView {
 		snapshot: OverlaySnapshot,
 		layout: GridLayout,
 		boardWidth: number,
-		boardHeight: number
+		boardHeight: number,
+		showTopBar = true
 	): void {
 		if (!ctx) {
 			console.error('OverlayView.draw', 'missing context');
@@ -69,7 +70,9 @@ export class OverlayView {
 			return;
 		}
 		ctx.save();
-		this.drawTopBar(ctx, snapshot, layout, boardWidth, boardHeight);
+		if (showTopBar) {
+			this.drawTopBar(ctx, snapshot, layout, boardWidth, boardHeight);
+		}
 		this.drawCenter(ctx, snapshot, layout, boardWidth, boardHeight);
 		ctx.restore();
 	}

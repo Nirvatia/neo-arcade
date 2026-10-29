@@ -96,6 +96,10 @@ export class GameMain implements GameModule {
 		setDebugActions({
 			gotoLevel: (value) => level.setPendingStartLevel(value),
 			spawnBonus: () => level.debugSpawnBonus(),
+			damageBoss: () => {
+				level.debugDamageBoss();
+				level.emitHud();
+			},
 			completeLevel: () => director.debugCompleteLevel(),
 			killPlayer: () => director.debugKillPlayer(),
 			enterHell: () => director.debugEnterHell(),
