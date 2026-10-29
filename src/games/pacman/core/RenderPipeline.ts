@@ -4,6 +4,10 @@ import type { GridService } from '../logic/GridService';
 import { GridView } from '../render/GridView';
 import type { GridLayout, DisintegrationMask } from '../render/GridView';
 import { PlayerView } from '../render/PlayerView';
+import type { PlayerDrawOptions } from '../render/PlayerView';
+import { DoomFxView } from '../render/doom/DoomFxView';
+import type { EventBus } from '../engine/EventBus';
+import type { PacmanEventMap } from './Events';
 import { GhostView } from '../render/GhostView';
 import { FruitView } from '../render/FruitView';
 import { GoldenEggView } from '../render/GoldenEggView';
@@ -30,6 +34,8 @@ export class RenderPipeline {
 	private readonly level: LevelLoader;
 	private readonly gridView: GridView;
 	private readonly playerView: PlayerView;
+	private readonly fxView: DoomFxView;
+	private readonly unsubscribeCues: () => void;
 	private readonly ghostView: GhostView;
 	private readonly fruitView: FruitView;
 	private readonly goldenEggView: GoldenEggView;
@@ -53,7 +59,12 @@ export class RenderPipeline {
 	private lastRenderTime = 0;
 	private timeValue = 0;
 
-	constructor(container: HTMLElement, director: Director, level: LevelLoader) {
+	constructor(
+		container: HTMLElement,
+		director: Director,
+		level: LevelLoader,
+		events?: EventBus<PacmanEventMap>
+	) {
 		if (typeof document === 'undefined') {
 			throw new Error('RenderPipeline.constructor: document is unavailable');
 		}
@@ -66,6 +77,10 @@ export class RenderPipeline {
 		this.level = level;
 		this.gridView = new GridView();
 		this.playerView = new PlayerView();
+		this.fxView = new DoomFxView();
+		this.unsubscribeCues = events
+			? events.on('audio:cue', (payload) => this.playerView.trigger(payload.cue))
+			: () => {};
 		this.ghostView = new GhostView();
 		this.fruitView = new FruitView();
 		this.goldenEggView = new GoldenEggView();
@@ -159,13 +174,21 @@ export class RenderPipeline {
 					wave.x, wave.y, wave.progress
 				);
 			}
+			const dead = this.level.player;
+			if (dead) {
+				this.playerView.draw(
+					this.ctx, dead, drawnLayout, this.level.profile, this.timeValue, this.playerOptions(state)
+				);
+			}
 			this.drawOverlay(drawnLayout, grid);
 			return;
 		}
 
 		const player = this.level.player;
 		if (player) {
-			this.playerView.draw(this.ctx, player, drawnLayout, this.level.profile);
+			this.playerView.draw(
+				this.ctx, player, drawnLayout, this.level.profile, this.timeValue, this.playerOptions(state)
+			);
 		}
 
 		this.drawDimming(drawnLayout, grid, ratio);
@@ -180,7 +203,27 @@ export class RenderPipeline {
 	}
 
 	destroy(): void {
+		this.unsubscribeCues();
 		this.canvas.remove();
+	}
+
+	private playerOptions(state: string): PlayerDrawOptions {
+		const dying = state === 'death';
+		if (this.level.hellMode) {
+			const doom = this.level.doom;
+			return {
+				supernova: Boolean(doom && doom.berserkActive),
+				charge: doom && doom.bfgCharging ? doom.bfgChargeProgress : 0,
+				dying
+			};
+		}
+		const combat = this.level.combat;
+		const hypnosis = this.level.hypnosis;
+		const powered =
+			this.level.profile === 'ms-pacman'
+				? Boolean(hypnosis && hypnosis.overdriveActive)
+				: Boolean(combat && combat.isPowerActive);
+		return { supernova: powered, charge: 0, dying };
 	}
 
 	// Hell level: the CLAUDE_GRID_DOOM_v3 world (baked maze + meadow), its atmosphere (ash
@@ -198,8 +241,18 @@ export class RenderPipeline {
 		const state = this.director.stateName;
 		const fighting = Boolean(boss && doom && !boss.defeated);
 
+		if (doom) {
+			for (const event of doom.consumeFx()) {
+				this.fxView.spawn(event);
+				if (event.kind === 'bfg-fire') {
+					this.playerView.fireBurst();
+				}
+			}
+			this.fxView.update(dt, doom.shots, doom.barrelList);
+		}
+
 		// camera shake moves the world and the actors, never the screen-space overlay
-		const shake = boss ? boss.shake : 0;
+		const shake = Math.max(boss ? boss.shake : 0, this.fxView.shake);
 		const amp = shake * shake * layout.tileSize * 0.35;
 		this.ctx.save();
 		this.ctx.translate((Math.random() - 0.5) * amp, (Math.random() - 0.5) * amp);
@@ -213,6 +266,7 @@ export class RenderPipeline {
 			}
 		} else {
 			const mask = this.disintegrationMask(grid);
+			this.fxView.drawGround(this.ctx, layout);
 			this.drawCollectibles(layout, mask);
 			if (boss && doom && fighting) {
 				this.doomCombatView.drawGround(this.ctx, boss, doom, grid, layout, this.timeValue);
@@ -234,7 +288,7 @@ export class RenderPipeline {
 						this.timeValue
 					);
 				}
-				this.doomCombatView.drawAir(this.ctx, boss, doom, layout, this.timeValue);
+				this.doomCombatView.drawAir(this.ctx, boss, layout, this.timeValue);
 			}
 			const player = this.level.player;
 			if (state === 'death') {
@@ -242,17 +296,23 @@ export class RenderPipeline {
 				if (wave) {
 					this.deathWaveView.draw(this.ctx, layout, grid.width, grid.height, wave.x, wave.y, wave.progress);
 				}
-			} else if (player) {
-				if (boss && fighting) {
-					this.doomCombatView.drawPull(this.ctx, boss, player.position, layout, this.timeValue);
-				}
-				this.playerView.draw(this.ctx, player, layout, this.level.profile);
+			} else if (player && boss && fighting) {
+				this.doomCombatView.drawPull(this.ctx, boss, player.position, layout, this.timeValue);
+			}
+			if (player) {
+				this.playerView.draw(
+					this.ctx, player, layout, this.level.profile, this.timeValue, this.playerOptions(state)
+				);
+			}
+			if (doom) {
+				this.fxView.draw(this.ctx, layout, doom.shots, doom.tracerList);
 			}
 		}
 		this.trackTeleport(world);
 		world.drawFx(this.ctx);
 		this.ctx.restore();
 		world.drawOverlay(this.ctx);
+		this.fxView.drawHurt(this.ctx, this.width, this.height);
 		this.drawOverlay(layout, grid);
 	}
 
@@ -344,6 +404,7 @@ export class RenderPipeline {
 			const doom = this.level.doom;
 			const pickupTiles = doom ? doom.pickupList.map((pickup) => pickup.tile) : [];
 			this.doomWorld = new DoomWorld(season.grid, pickupTiles);
+			this.fxView.reset();
 			this.doomWorldGrid = grid;
 		}
 		return this.doomWorld;

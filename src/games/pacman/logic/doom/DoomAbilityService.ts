@@ -4,7 +4,7 @@ import type { PlayerService } from '../PlayerService';
 import { DoomPickupService } from './DoomPickupService';
 import type { DoomPickupKind, DoomPickupModel } from './DoomPickupModel';
 import { DoomWeaponService } from './DoomWeaponService';
-import type { DoomBfgShot, DoomBarrel, DoomBfgTracer } from './DoomWeaponService';
+import type { DoomBfgShot, DoomBarrel, DoomBfgTracer, DoomFxEvent } from './DoomWeaponService';
 import type { DoomBossService } from './DoomBossService';
 import { minionPosition } from './DoomMinions';
 import { assertDoomMap } from './DoomMapValidation';
@@ -96,6 +96,19 @@ export class DoomAbilityService {
 		return this.weapons.tracerList;
 	}
 
+	get bfgCharging(): boolean {
+		return this.weapons.bfgCharging;
+	}
+
+	get berserkActive(): boolean {
+		return this.weapons.berserkActive;
+	}
+
+	/** Effects that happened since the last call (consumed by the renderer). */
+	consumeFx(): DoomFxEvent[] {
+		return this.weapons.consumeFx();
+	}
+
 	update(dt: number, player: PlayerService): void {
 		if (!Number.isFinite(dt) || dt < 0) {
 			console.error('DoomAbilityService.update', 'invalid delta time', dt);
@@ -120,6 +133,8 @@ export class DoomAbilityService {
 		const collected = this.pickups.update(dt, player, this.playerHpValue, slotOccupied);
 		if (collected) {
 			this.applyPickup(collected);
+			const p = player.position;
+			this.weapons.pushFx({ kind: 'pickup', x: p.x, y: p.y, detail: collected });
 		}
 		if (this.boss.consumeBossContactHit()) {
 			if (this.weapons.berserkActive) {
@@ -189,6 +204,7 @@ export class DoomAbilityService {
 			return;
 		}
 		this.playerHpValue = Math.max(0, this.playerHpValue - amount);
+		this.weapons.pushFx({ kind: 'player-hit', x: player.position.x, y: player.position.y });
 		this.weapons.cancelBfgCharge();
 		if (this.playerHpValue <= 0) {
 			this.playerDeadValue = true;
@@ -259,6 +275,7 @@ export class DoomAbilityService {
 		}
 		this.boss.takeDamage(BERSERK_BITE_DAMAGE);
 		this.boss.applyStun(BERSERK_BITE_STUN);
+		this.weapons.pushFx({ kind: 'bite', x: this.boss.position.x, y: this.boss.position.y });
 	}
 
 	private resolveShotCollisions(player: PlayerService): void {
@@ -271,6 +288,7 @@ export class DoomAbilityService {
 			if (bdx * bdx + bdy * bdy < BOSS_SHOT_HIT_RADIUS_SQ) {
 				this.boss.takeDamage(BFG_ORB_DAMAGE);
 				this.boss.applyStun(BFG_ORB_STUN);
+				this.weapons.pushFx({ kind: 'boss-hit', x: bossPos.x, y: bossPos.y });
 				this.weapons.detonateShot(i);
 				this.ballHitBossValue = true;
 				continue;
@@ -347,6 +365,7 @@ export class DoomAbilityService {
 		for (const neighbor of this.grid.walkableNeighbors(barrel.x, barrel.y)) {
 			affectedKeys.add(`${neighbor.x},${neighbor.y}`);
 		}
+		this.weapons.pushFx({ kind: 'barrel-blast', x: barrel.x + 0.5, y: barrel.y + 0.5 });
 		const bossTile = this.boss.tile;
 		if (affectedKeys.has(`${bossTile.x},${bossTile.y}`)) {
 			this.boss.takeDamage(BARREL_DAMAGE);

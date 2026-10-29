@@ -23,6 +23,25 @@ export interface DoomBarrel {
 	timer: number;
 }
 
+/** Something the renderer should show an effect for (tile-center coordinates). */
+export interface DoomFxEvent {
+	readonly kind:
+		| 'bfg-fire'
+		| 'bfg-impact'
+		| 'barrel-place'
+		| 'barrel-blast'
+		| 'barrel-fizzle'
+		| 'bite'
+		| 'pickup'
+		| 'boss-hit'
+		| 'player-hit';
+	readonly x: number;
+	readonly y: number;
+	readonly dx?: number;
+	readonly dy?: number;
+	readonly detail?: string;
+}
+
 export interface DoomBfgTracer {
 	x: number;
 	y: number;
@@ -38,6 +57,7 @@ export class DoomWeaponService {
 	private readonly bfgShots: DoomBfgShot[] = [];
 	private readonly barrels: DoomBarrel[] = [];
 	private readonly tracers: DoomBfgTracer[] = [];
+	private readonly fxQueue: DoomFxEvent[] = [];
 
 	constructor(grid: GridService) {
 		if (!grid) {
@@ -78,6 +98,16 @@ export class DoomWeaponService {
 
 	get tracerList(): readonly DoomBfgTracer[] {
 		return this.tracers;
+	}
+
+	pushFx(event: DoomFxEvent): void {
+		if (this.fxQueue.length < 64) {
+			this.fxQueue.push(event);
+		}
+	}
+
+	consumeFx(): DoomFxEvent[] {
+		return this.fxQueue.splice(0, this.fxQueue.length);
 	}
 
 	handlePickup(kind: DoomPickupKind): void {
@@ -133,6 +163,7 @@ export class DoomWeaponService {
 		}
 		this.barrels.length = 0;
 		this.barrels.push({ x: barrelX, y: barrelY, timer: BARREL_LIFETIME });
+		this.pushFx({ kind: 'barrel-place', x: barrelX + 0.5, y: barrelY + 0.5 });
 		return true;
 	}
 
@@ -155,6 +186,7 @@ export class DoomWeaponService {
 			vx = BFG_BALL_SPEED;
 		}
 		this.bfgShots.push({ x: pos.x, y: pos.y, vx, vy, life: BFG_SHOT_LIFETIME });
+		this.pushFx({ kind: 'bfg-fire', x: pos.x, y: pos.y, dx: Math.sign(vx), dy: Math.sign(vy) });
 	}
 
 	detonateShot(index: number): void {
@@ -200,6 +232,7 @@ export class DoomWeaponService {
 		for (let i = this.barrels.length - 1; i >= 0; i -= 1) {
 			this.barrels[i].timer -= dt;
 			if (this.barrels[i].timer <= 0) {
+				this.pushFx({ kind: 'barrel-fizzle', x: this.barrels[i].x + 0.5, y: this.barrels[i].y + 0.5 });
 				this.barrels.splice(i, 1);
 			}
 		}
@@ -220,6 +253,7 @@ export class DoomWeaponService {
 		this.bfgShots.length = 0;
 		this.barrels.length = 0;
 		this.tracers.length = 0;
+		this.fxQueue.length = 0;
 	}
 
 	private hitWall(x: number, y: number): boolean {
@@ -232,6 +266,7 @@ export class DoomWeaponService {
 	}
 
 	private spawnTracers(x: number, y: number): void {
+		this.pushFx({ kind: 'bfg-impact', x, y });
 		const directions = [
 			{ dx: 1, dy: 0 },
 			{ dx: -1, dy: 0 },

@@ -32,17 +32,9 @@ export class DoomCombatView {
 		this.drawBarrels(ctx, doom, layout, time);
 	}
 
-	/** Projectiles and minions, drawn over the boss. */
-	drawAir(
-		ctx: CanvasRenderingContext2D,
-		boss: DoomBossService,
-		doom: DoomAbilityService,
-		layout: GridLayout,
-		time: number
-	): void {
+	/** Hazard blasts and minions, drawn over the boss (projectiles live in DoomFxView). */
+	drawAir(ctx: CanvasRenderingContext2D, boss: DoomBossService, layout: GridLayout, time: number): void {
 		this.drawHazardBlasts(ctx, boss, layout, time);
-		this.drawShots(ctx, doom, layout);
-		this.drawTracers(ctx, doom, layout);
 		this.drawMinions(ctx, boss, layout, time);
 	}
 
@@ -447,69 +439,6 @@ export class DoomCombatView {
 				ctx.globalAlpha = 1;
 			}
 			ctx.drawImage(barrelSprite(), -12 * u, -12 * u, 24 * u, 24 * u);
-			ctx.restore();
-		}
-	}
-
-	private drawShots(
-		ctx: CanvasRenderingContext2D,
-		doom: DoomAbilityService,
-		layout: GridLayout
-	): void {
-		const s = layout.tileSize;
-		for (const shot of doom.shots) {
-			const px = layout.offsetX + shot.x * s;
-			const py = layout.offsetY + shot.y * s;
-			const radius = Math.max(3, s * 0.25);
-			ctx.save();
-			ctx.globalAlpha = 0.4;
-			ctx.fillStyle = '#00ff00';
-			ctx.beginPath();
-			ctx.arc(px, py, radius * 2, 0, Math.PI * 2);
-			ctx.fill();
-			ctx.globalAlpha = 1;
-			ctx.fillStyle = '#44ff44';
-			ctx.beginPath();
-			ctx.arc(px, py, radius, 0, Math.PI * 2);
-			ctx.fill();
-			ctx.fillStyle = '#ffffff';
-			ctx.globalAlpha = 0.8;
-			ctx.beginPath();
-			ctx.arc(px, py, radius * 0.4, 0, Math.PI * 2);
-			ctx.fill();
-			ctx.restore();
-		}
-	}
-
-	private drawTracers(
-		ctx: CanvasRenderingContext2D,
-		doom: DoomAbilityService,
-		layout: GridLayout
-	): void {
-		const s = layout.tileSize;
-		for (const tracer of doom.tracerList) {
-			const startX = layout.offsetX + tracer.x * s;
-			const startY = layout.offsetY + tracer.y * s;
-			const endX = startX + tracer.dx * tracer.length * s;
-			const endY = startY + tracer.dy * tracer.length * s;
-			const alpha = Math.min(1, tracer.timer / 0.1);
-			ctx.save();
-			ctx.globalAlpha = alpha;
-			ctx.strokeStyle = '#00ff00';
-			ctx.lineWidth = Math.max(2, s * 0.15);
-			ctx.shadowColor = '#00ff00';
-			ctx.shadowBlur = 8;
-			ctx.beginPath();
-			ctx.moveTo(startX, startY);
-			ctx.lineTo(endX, endY);
-			ctx.stroke();
-			ctx.shadowBlur = 0;
-			ctx.strokeStyle = '#ffffff';
-			ctx.lineWidth = Math.max(1, s * 0.05);
-			ctx.beginPath();
-			ctx.moveTo(startX, startY);
-			ctx.lineTo(endX, endY);
-			ctx.stroke();
 			ctx.restore();
 		}
 	}

@@ -30,7 +30,7 @@ export class GameMain implements GameModule {
 		const level = new LevelLoader(events);
 		const audio = new PacmanAudioPlayer(events);
 		const director = new Director(events, level);
-		const render = new RenderPipeline(container, director, level);
+		const render = new RenderPipeline(container, director, level, events);
 		const hudAdapter = new SvelteHudAdapter(events, pacmanHudStore);
 		const loop = new GameLoop(
 			(dt) => {
