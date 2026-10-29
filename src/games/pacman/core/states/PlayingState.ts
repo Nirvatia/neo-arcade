@@ -23,53 +23,12 @@ export class PlayingState implements GameState {
 			console.error('PlayingState.update', 'invalid delta time', dt);
 			return;
 		}
-		const player = ctx.level.player;
-		const fruit = ctx.level.fruit;
-		const egg = ctx.level.egg;
-		const echo = ctx.level.echo;
-		const doomBoss = ctx.level.doomBoss;
-		const doom = ctx.level.doom;
-		const ghosts = ctx.level.ghosts;
-		const combat = ctx.level.combat;
-		const progress = ctx.level.progress;
-		const lairCode = ctx.level.lairCode;
-		const grid = ctx.level.grid;
-		if (!player) {
-			console.error('PlayingState.update', 'player is not initialized');
+		const session = ctx.level.session;
+		if (!session) {
+			console.error('PlayingState.update', 'level is not initialized');
 			return;
 		}
-		if (!fruit) {
-			console.error('PlayingState.update', 'fruit is not initialized');
-			return;
-		}
-		if (!egg) {
-			console.error('PlayingState.update', 'golden egg is not initialized');
-			return;
-		}
-		if (!echo) {
-			console.error('PlayingState.update', 'echo clone is not initialized');
-			return;
-		}
-		if (!ghosts) {
-			console.error('PlayingState.update', 'ghosts are not initialized');
-			return;
-		}
-		if (!combat) {
-			console.error('PlayingState.update', 'combat is not initialized');
-			return;
-		}
-		if (!progress) {
-			console.error('PlayingState.update', 'progress is not initialized');
-			return;
-		}
-		if (!lairCode) {
-			console.error('PlayingState.update', 'lair code is not initialized');
-			return;
-		}
-		if (!grid) {
-			console.error('PlayingState.update', 'grid is not initialized');
-			return;
-		}
+		const { player, fruit, egg, echo, ghosts, combat, lairCode } = session;
 		if (combat.deathActive) {
 			ctx.director.showDeath();
 			return;
@@ -96,15 +55,8 @@ export class PlayingState implements GameState {
 			return;
 		}
 		const fireRequested = ctx.level.consumeFireRequest();
-		if (ctx.level.hellMode) {
-			if (!doomBoss) {
-				console.error('PlayingState.update', 'doom boss is not initialized');
-				return;
-			}
-			if (!doom) {
-				console.error('PlayingState.update', 'doom abilities are not initialized');
-				return;
-			}
+		if (session.doom) {
+			const { boss: doomBoss, abilities: doom } = session.doom;
 			doomBoss.update(dt, player);
 			doom.update(dt, player);
 			if (!combat.endRequested && doom.consumePlayerDeath()) {

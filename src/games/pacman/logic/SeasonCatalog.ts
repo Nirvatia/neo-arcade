@@ -155,3 +155,22 @@ export function hellSeason(): SeasonData {
 		grid: GRID_DOOM
 	};
 }
+
+/** Per-season gameplay tuning (durations in seconds, speeds as multipliers). */
+export interface SeasonModifiers {
+	readonly powerDuration: number;
+	readonly fruitDuration: number;
+	readonly ghostSpeedModifier: number;
+	readonly playerSpeedModifier: number;
+}
+
+const SEASON_MODIFIERS: Record<SeasonName, SeasonModifiers> = {
+	spring: { powerDuration: 6.5, fruitDuration: 12, ghostSpeedModifier: 1, playerSpeedModifier: 1 },
+	summer: { powerDuration: 6, fruitDuration: 14, ghostSpeedModifier: 1, playerSpeedModifier: 1 },
+	autumn: { powerDuration: 6, fruitDuration: 12, ghostSpeedModifier: 0.97, playerSpeedModifier: 1 },
+	winter: { powerDuration: 6, fruitDuration: 12, ghostSpeedModifier: 1, playerSpeedModifier: 0.97 }
+};
+
+export function seasonModifiers(season: SeasonName): SeasonModifiers {
+	return SEASON_MODIFIERS[season];
+}

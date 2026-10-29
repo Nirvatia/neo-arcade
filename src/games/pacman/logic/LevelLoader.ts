@@ -1,18 +1,15 @@
-import { GridModel } from './GridModel';
-import { GridService } from './GridService';
-import { PlayerService } from './PlayerService';
-import { GhostService } from './GhostService';
-import { ScoreModel } from './ScoreModel';
-import { LevelProgress } from './LevelProgress';
-import { CombatService } from './CombatService';
-import { FruitService } from './FruitService';
-import { GoldenEggService } from './GoldenEggService';
-import { HypnosisService } from './HypnosisService';
-import { SpawnLocator } from './SpawnLocator';
-import { LairCodeService } from './LairCodeService';
-import { EchoCloneService } from './EchoCloneService';
-import { DoomBossService } from './doom/DoomBossService';
-import { DoomAbilityService } from './doom/DoomAbilityService';
+import type { GridService } from './GridService';
+import type { PlayerService } from './PlayerService';
+import type { GhostService } from './GhostService';
+import type { LevelProgress } from './LevelProgress';
+import type { CombatService } from './CombatService';
+import type { FruitService } from './FruitService';
+import type { GoldenEggService } from './GoldenEggService';
+import type { HypnosisService } from './HypnosisService';
+import type { LairCodeService } from './LairCodeService';
+import type { EchoCloneService } from './EchoCloneService';
+import type { DoomBossService } from './doom/DoomBossService';
+import type { DoomAbilityService } from './doom/DoomAbilityService';
 import { SECRET_LEVEL_NUMBER, HELL_LEVEL_INTERVAL } from '../config/gridConfig';
 import type { GameProfile } from './HypnosisService';
 import type { PlayerDirection } from './PlayerModel';
@@ -25,19 +22,18 @@ import type {
 } from '../core/Events';
 import { BOSS_HP, PLAYER_MAX_HP } from './doom/DoomBalance';
 import { seasonForLevel, secretSeason, hellSeason } from './SeasonCatalog';
-import type { SeasonData, SeasonName } from './SeasonCatalog';
-
-interface SeasonModifiers {
-	readonly powerDuration: number;
-	readonly fruitDuration: number;
-	readonly ghostSpeedModifier: number;
-	readonly playerSpeedModifier: number;
-}
+import type { SeasonData } from './SeasonCatalog';
+import { buildLevelSession, resetForNextLevel, resetLevelSession } from './LevelSession';
+import type { LevelSession } from './LevelSession';
 
 const MAZE_SCALE_DEFAULT = 0.8;
 const MAZE_SCALE_MIN = 0.3;
 const MAZE_SCALE_MAX = 1.5;
 
+/**
+ * Owns the run (level number, profile, secret/hell routing, settings) and the current
+ * `LevelSession`. Level changes rebuild the session and carry over score and lives.
+ */
 export class LevelLoader {
 	private readonly events: EventBus<PacmanEventMap>;
 	private profileValue: GameProfile = 'pacman';
@@ -48,20 +44,8 @@ export class LevelLoader {
 	private fireRequestedValue = false;
 	private secretReturnLevelValue = 1;
 	private mazeScaleValue = MAZE_SCALE_DEFAULT;
-	private seasonValue: SeasonData | null = null;
-	private gridValue: GridService | null = null;
-	private playerValue: PlayerService | null = null;
-	private ghostsValue: GhostService | null = null;
-	private scoreValue: ScoreModel | null = null;
-	private progressValue: LevelProgress | null = null;
-	private combatValue: CombatService | null = null;
-	private fruitValue: FruitService | null = null;
-	private eggValue: GoldenEggService | null = null;
-	private hypnosisValue: HypnosisService | null = null;
-	private echoValue: EchoCloneService | null = null;
-	private doomBossValue: DoomBossService | null = null;
-	private doomValue: DoomAbilityService | null = null;
-	private lairCodeValue: LairCodeService | null = null;
+	private godModeValue = false;
+	private sessionValue: LevelSession | null = null;
 
 	constructor(events: EventBus<PacmanEventMap>) {
 		if (!events) {
@@ -95,60 +79,65 @@ export class LevelLoader {
 		return this.mazeScaleValue;
 	}
 
+	/** The current level; null only before the first build. */
+	get session(): LevelSession | null {
+		return this.sessionValue;
+	}
+
 	get season(): SeasonData | null {
-		return this.seasonValue;
+		return this.sessionValue?.season ?? null;
 	}
 
 	get grid(): GridService | null {
-		return this.gridValue;
+		return this.sessionValue?.grid ?? null;
 	}
 
 	get player(): PlayerService | null {
-		return this.playerValue;
+		return this.sessionValue?.player ?? null;
 	}
 
 	get ghosts(): GhostService | null {
-		return this.ghostsValue;
+		return this.sessionValue?.ghosts ?? null;
 	}
 
 	get progress(): LevelProgress | null {
-		return this.progressValue;
+		return this.sessionValue?.progress ?? null;
 	}
 
 	get combat(): CombatService | null {
-		return this.combatValue;
+		return this.sessionValue?.combat ?? null;
 	}
 
 	get fruit(): FruitService | null {
-		return this.fruitValue;
+		return this.sessionValue?.fruit ?? null;
 	}
 
 	get egg(): GoldenEggService | null {
-		return this.eggValue;
+		return this.sessionValue?.egg ?? null;
 	}
 
 	get hypnosis(): HypnosisService | null {
-		return this.hypnosisValue;
+		return this.sessionValue?.hypnosis ?? null;
 	}
 
 	get echo(): EchoCloneService | null {
-		return this.echoValue;
+		return this.sessionValue?.echo ?? null;
 	}
 
 	get doomBoss(): DoomBossService | null {
-		return this.doomBossValue;
+		return this.sessionValue?.doom?.boss ?? null;
 	}
 
 	get doom(): DoomAbilityService | null {
-		return this.doomValue;
+		return this.sessionValue?.doom?.abilities ?? null;
 	}
 
 	get lairCode(): LairCodeService | null {
-		return this.lairCodeValue;
+		return this.sessionValue?.lairCode ?? null;
 	}
 
 	get score(): number {
-		return this.scoreValue ? this.scoreValue.score : 0;
+		return this.sessionValue ? this.sessionValue.score.score : 0;
 	}
 
 	setPendingStartLevel(level: number): void {
@@ -179,36 +168,18 @@ export class LevelLoader {
 
 	toggleProfile(): void {
 		this.profileValue = this.profileValue === 'pacman' ? 'ms-pacman' : 'pacman';
-		if (this.combatValue) {
-			this.combatValue.setProfile(this.profileValue);
-		}
-		if (this.hypnosisValue) {
-			this.hypnosisValue.reset();
-		}
-		if (this.ghostsValue) {
-			this.ghostsValue.setMsOverdrive(false);
+		const session = this.sessionValue;
+		if (session) {
+			session.combat.setProfile(this.profileValue);
+			session.hypnosis.reset();
+			session.ghosts.setMsOverdrive(false);
 		}
 		this.emitHud();
 	}
 
-	ensure(): void {
-		if (
-			this.gridValue &&
-			this.playerValue &&
-			this.ghostsValue &&
-			this.scoreValue &&
-			this.progressValue &&
-			this.combatValue &&
-			this.fruitValue &&
-			this.eggValue &&
-			this.hypnosisValue &&
-			this.echoValue &&
-			this.lairCodeValue &&
-			(!this.hellModeValue || (this.doomBossValue && this.doomValue))
-		) {
-			return;
-		}
-		this.buildLevel();
+	/** Returns the current level, building it first if nothing is built yet. */
+	ensure(): LevelSession {
+		return this.sessionValue ?? this.buildLevel();
 	}
 
 	startNewGame(): void {
@@ -222,62 +193,23 @@ export class LevelLoader {
 	}
 
 	resetGameplay(): void {
-		if (
-			!this.playerValue ||
-			!this.progressValue ||
-			!this.ghostsValue ||
-			!this.combatValue ||
-			!this.fruitValue ||
-			!this.eggValue ||
-			!this.hypnosisValue ||
-			!this.echoValue ||
-			!this.lairCodeValue
-		) {
-			console.error('LevelLoader.resetGameplay', 'level is not initialized');
-			return;
-		}
-		if (this.hellModeValue && (!this.doomBossValue || !this.doomValue)) {
-			console.error('LevelLoader.resetGameplay', 'doom services are not initialized');
-			return;
-		}
-		this.playerValue.reset();
-		this.progressValue.reset();
-		this.ghostsValue.reset();
-		this.combatValue.reset();
-		this.fruitValue.reset();
-		this.eggValue.reset();
-		this.hypnosisValue.reset();
-		this.echoValue.reset();
-		if (this.doomBossValue) {
-			this.doomBossValue.reset();
-		}
-		if (this.doomValue) {
-			this.doomValue.reset();
-		}
-		this.lairCodeValue.reset();
+		resetLevelSession(this.ensure());
 	}
 
 	prepareAfterDeath(): void {
-		this.ensure();
-		if (!this.combatValue) {
-			console.error('LevelLoader.prepareAfterDeath', 'level is not initialized');
-			return;
-		}
-		this.combatValue.finishDeath();
-		if (this.hellModeValue) {
-			if (this.doomBossValue) {
-				this.doomBossValue.reset();
-			}
-			if (this.doomValue) {
-				this.doomValue.reset();
-			}
+		const session = this.ensure();
+		session.combat.finishDeath();
+		if (session.doom) {
+			session.doom.boss.reset();
+			session.doom.abilities.reset();
 		}
 		this.emitHud();
 	}
 
 	syncLairOpen(): void {
-		if (this.gridValue && this.lairCodeValue) {
-			this.gridValue.setLairOpen(this.lairCodeValue.open);
+		const session = this.sessionValue;
+		if (session) {
+			session.grid.setLairOpen(session.lairCode.open);
 		}
 	}
 
@@ -285,95 +217,37 @@ export class LevelLoader {
 		if (this.secretModeValue) {
 			return;
 		}
-		this.ensure();
-		if (!this.scoreValue || !this.combatValue) {
-			console.error('LevelLoader.enterSecretLevel', 'level is not initialized');
-			return;
-		}
-		const keptScore = this.scoreValue.score;
-		const keptLives = this.combatValue.lives;
-		const keptLifeThreshold = this.combatValue.nextLifeThreshold;
-		this.secretModeValue = true;
-		this.secretReturnLevelValue = this.levelNumber + 1;
-		this.levelNumber = SECRET_LEVEL_NUMBER;
-		this.buildLevel();
-		if (
-			!this.playerValue ||
-			!this.progressValue ||
-			!this.ghostsValue ||
-			!this.scoreValue ||
-			!this.combatValue ||
-			!this.fruitValue ||
-			!this.eggValue ||
-			!this.hypnosisValue ||
-			!this.echoValue ||
-			!this.lairCodeValue
-		) {
-			console.error('LevelLoader.enterSecretLevel', 'level is not initialized after build');
-			return;
-		}
-		this.scoreValue.add(keptScore);
-		this.combatValue.setLives(keptLives);
-		this.combatValue.setNextLifeThreshold(keptLifeThreshold);
-		this.resetNextLevel();
-		this.emitHud();
+		this.changeLevel(() => {
+			this.secretModeValue = true;
+			this.secretReturnLevelValue = this.levelNumber + 1;
+			this.levelNumber = SECRET_LEVEL_NUMBER;
+		});
 	}
 
 	advanceLevel(): void {
-		this.ensure();
-		if (!this.scoreValue || !this.combatValue) {
-			console.error('LevelLoader.advanceLevel', 'level is not initialized');
-			return;
-		}
-		const keptScore = this.scoreValue.score;
-		const keptLives = this.combatValue.lives;
-		const keptLifeThreshold = this.combatValue.nextLifeThreshold;
-		if (this.secretModeValue) {
-			this.secretModeValue = false;
-			this.levelNumber =
-				Number.isFinite(this.secretReturnLevelValue) && this.secretReturnLevelValue >= 1
-					? Math.floor(this.secretReturnLevelValue)
-					: 1;
-		} else {
-			this.levelNumber += 1;
-		}
-		this.buildLevel();
-		if (
-			!this.playerValue ||
-			!this.progressValue ||
-			!this.ghostsValue ||
-			!this.scoreValue ||
-			!this.combatValue ||
-			!this.fruitValue ||
-			!this.eggValue ||
-			!this.hypnosisValue ||
-			!this.echoValue ||
-			!this.lairCodeValue
-		) {
-			console.error('LevelLoader.advanceLevel', 'level is not initialized after build');
-			return;
-		}
-		if (this.hellModeValue && (!this.doomBossValue || !this.doomValue)) {
-			console.error('LevelLoader.advanceLevel', 'doom services are not initialized');
-			return;
-		}
-		this.scoreValue.add(keptScore);
-		this.combatValue.setLives(keptLives);
-		this.combatValue.setNextLifeThreshold(keptLifeThreshold);
-		this.resetNextLevel();
-		this.emitHud();
+		this.changeLevel(() => {
+			if (this.secretModeValue) {
+				this.secretModeValue = false;
+				this.levelNumber =
+					Number.isFinite(this.secretReturnLevelValue) && this.secretReturnLevelValue >= 1
+						? Math.floor(this.secretReturnLevelValue)
+						: 1;
+			} else {
+				this.levelNumber += 1;
+			}
+		});
 	}
 
 	debugSpawnBonus(): void {
-		if (this.hellModeValue) {
-			if (this.doomValue) {
-				this.doomValue.debugSpawn();
-			}
+		const session = this.sessionValue;
+		if (!session) {
 			return;
 		}
-		if (this.echoValue) {
-			this.echoValue.debugSpawn();
+		if (this.hellModeValue) {
+			session.doom?.abilities.debugSpawn();
+			return;
 		}
+		session.echo.debugSpawn();
 	}
 
 	debugEnterHell(): void {
@@ -381,38 +255,9 @@ export class LevelLoader {
 			return;
 		}
 		this.profileValue = 'pacman';
-		this.ensure();
-		if (!this.scoreValue || !this.combatValue) {
-			console.error('LevelLoader.debugEnterHell', 'level is not initialized');
-			return;
-		}
-		const keptScore = this.scoreValue.score;
-		const keptLives = this.combatValue.lives;
-		const keptLifeThreshold = this.combatValue.nextLifeThreshold;
-		this.levelNumber = HELL_LEVEL_INTERVAL;
-		this.buildLevel();
-		if (
-			!this.playerValue ||
-			!this.progressValue ||
-			!this.ghostsValue ||
-			!this.scoreValue ||
-			!this.combatValue ||
-			!this.fruitValue ||
-			!this.eggValue ||
-			!this.hypnosisValue ||
-			!this.echoValue ||
-			!this.lairCodeValue ||
-			!this.doomBossValue ||
-			!this.doomValue
-		) {
-			console.error('LevelLoader.debugEnterHell', 'level is not initialized after build');
-			return;
-		}
-		this.scoreValue.add(keptScore);
-		this.combatValue.setLives(keptLives);
-		this.combatValue.setNextLifeThreshold(keptLifeThreshold);
-		this.resetNextLevel();
-		this.emitHud();
+		this.changeLevel(() => {
+			this.levelNumber = HELL_LEVEL_INTERVAL;
+		});
 	}
 
 	debugEnterSecret(): void {
@@ -420,10 +265,7 @@ export class LevelLoader {
 	}
 
 	setDesiredDirection(direction: PlayerDirection): void {
-		if (!this.playerValue) {
-			return;
-		}
-		this.playerValue.setDesiredDirection(direction);
+		this.sessionValue?.player.setDesiredDirection(direction);
 	}
 
 	emitHud(): void {
@@ -431,54 +273,69 @@ export class LevelLoader {
 	}
 
 	hudPayload(): PacmanHudPayload {
-		const result: PacmanHudPayload['result'] = this.combatValue ? this.combatValue.result : 'none';
+		const session = this.sessionValue;
 		return {
-			score: this.scoreValue ? this.scoreValue.score : 0,
-			lives: this.combatValue ? this.combatValue.lives : 3,
-			dots: this.progressValue ? this.progressValue.remainingDots : 0,
+			score: session ? session.score.score : 0,
+			lives: session ? session.combat.lives : 3,
+			dots: session ? session.progress.remainingDots : 0,
 			power: this.currentPower(),
 			mode: this.profileValue,
-			result,
+			result: session ? session.combat.result : 'none',
 			level: this.levelNumber,
 			hell: this.hellHud()
 		};
 	}
 
-	private godModeValue = false;
-
 	debugToggleGodMode(): boolean {
 		this.godModeValue = !this.godModeValue;
-		this.doomValue?.setGodMode(this.godModeValue);
+		this.sessionValue?.doom?.abilities.setGodMode(this.godModeValue);
 		return this.godModeValue;
 	}
 
 	debugDamageBoss(): void {
-		if (this.hellModeValue && this.doomBossValue) {
-			this.doomBossValue.takeDamage(250);
+		if (this.hellModeValue) {
+			this.sessionValue?.doom?.boss.takeDamage(250);
 		}
+	}
+
+	/**
+	 * Moves the run to another level: `route` updates the level number and secret routing,
+	 * then a fresh session is built with the score, lives and next-life threshold kept.
+	 */
+	private changeLevel(route: () => void): void {
+		const previous = this.ensure();
+		const keptScore = previous.score.score;
+		const keptLives = previous.combat.lives;
+		const keptLifeThreshold = previous.combat.nextLifeThreshold;
+		route();
+		const session = this.buildLevel();
+		session.score.add(keptScore);
+		session.combat.setLives(keptLives);
+		session.combat.setNextLifeThreshold(keptLifeThreshold);
+		resetForNextLevel(session);
+		this.emitHud();
 	}
 
 	private hellHud(): PacmanHellHud | null {
-		const boss = this.doomBossValue;
-		const doom = this.doomValue;
-		if (!this.hellModeValue || !boss || !doom) {
+		const doom = this.sessionValue?.doom;
+		if (!this.hellModeValue || !doom) {
 			return null;
 		}
-		const armed = doom.armed;
+		const armed = doom.abilities.armed;
 		const weapon: PacmanHellWeapon =
 			armed === 'bfg' || armed === 'barrel' || armed === 'berserk' ? armed : '';
 		return {
-			hp: doom.playerHp,
+			hp: doom.abilities.playerHp,
 			hpMax: PLAYER_MAX_HP,
-			bossHp: Math.max(0, Math.round(boss.hp)),
+			bossHp: Math.max(0, Math.round(doom.boss.hp)),
 			bossHpMax: BOSS_HP,
-			bossPhase: boss.phase,
+			bossPhase: doom.boss.phase,
 			weapon,
-			berserk: weapon === 'berserk' ? Math.ceil(doom.berserkTimer * 10) / 10 : 0
+			berserk: weapon === 'berserk' ? Math.ceil(doom.abilities.berserkTimer * 10) / 10 : 0
 		};
 	}
 
-	private buildLevel(): void {
+	private buildLevel(): LevelSession {
 		const hell =
 			!this.secretModeValue &&
 			this.profileValue === 'pacman' &&
@@ -489,153 +346,28 @@ export class LevelLoader {
 			: hell
 				? hellSeason()
 				: seasonForLevel(this.levelNumber);
-		this.seasonValue = season;
-		const grid = new GridService(new GridModel(season.grid));
-		if (hell) {
-			grid.setLairOpen(true);
-		}
-		const score = new ScoreModel();
-		const progress = new LevelProgress(grid, score, this.events);
-		const locator = new SpawnLocator(grid, progress);
-		const player = new PlayerService(grid, progress, this.events);
-		const ghosts = new GhostService(grid, player, progress);
-		const lairCode = new LairCodeService(this.levelNumber, this.events);
-		const hypnosis = new HypnosisService(score, lairCode);
-		const combat = new CombatService(
-			player,
-			ghosts,
-			progress,
-			score,
-			this.events,
-			hypnosis,
-			lairCode
-		);
-		const fruit = new FruitService(
-			this.profileValue,
-			this.levelNumber,
-			grid,
-			locator,
-			progress,
-			score,
-			this.events
-		);
-		const egg = new GoldenEggService(
-			this.levelNumber,
-			grid,
-			lairCode,
-			progress,
-			this.events,
-			score
-		);
-		const echo = new EchoCloneService(grid, progress, locator, this.events);
-		let doomBoss: DoomBossService | null = null;
-		let doom: DoomAbilityService | null = null;
-		if (hell) {
-			const bossSpawn = grid.bossSpawn();
-			if (!bossSpawn) {
-				console.error('LevelLoader.buildLevel', 'boss spawn tile DB is not found');
-				throw new Error('LevelLoader.buildLevel: boss spawn tile DB is not found');
-			}
-			doomBoss = new DoomBossService(grid, bossSpawn);
-			doom = new DoomAbilityService(grid, doomBoss);
-			doom.setGodMode(this.godModeValue);
-		}
-		combat.setProfile(this.profileValue);
-		combat.setHellMode(hell);
-		player.setTrainMode(this.secretModeValue);
-		ghosts.setTrainMode(this.secretModeValue);
-		combat.setSecretMode(this.secretModeValue);
-		const mods = this.modifiersFor(season.name);
-		combat.setPowerDuration(mods.powerDuration);
-		fruit.setFruitDuration(mods.fruitDuration);
-		ghosts.setSpeedModifier(mods.ghostSpeedModifier);
-		player.setSpeedModifier(mods.playerSpeedModifier);
-		this.gridValue = grid;
-		this.scoreValue = score;
-		this.progressValue = progress;
-		this.playerValue = player;
-		this.ghostsValue = ghosts;
-		this.combatValue = combat;
-		this.fruitValue = fruit;
-		this.eggValue = egg;
-		this.hypnosisValue = hypnosis;
-		this.echoValue = echo;
-		this.doomBossValue = doomBoss;
-		this.doomValue = doom;
-		this.lairCodeValue = lairCode;
-	}
-
-	private resetNextLevel(): void {
-		if (
-			!this.playerValue ||
-			!this.progressValue ||
-			!this.ghostsValue ||
-			!this.combatValue ||
-			!this.fruitValue ||
-			!this.eggValue ||
-			!this.hypnosisValue ||
-			!this.echoValue ||
-			!this.lairCodeValue
-		) {
-			console.error('LevelLoader.resetNextLevel', 'level is not initialized');
-			return;
-		}
-		if (this.hellModeValue && (!this.doomBossValue || !this.doomValue)) {
-			console.error('LevelLoader.resetNextLevel', 'doom services are not initialized');
-			return;
-		}
-		this.playerValue.reset();
-		this.progressValue.resetDots();
-		this.ghostsValue.reset();
-		this.fruitValue.reset();
-		this.eggValue.reset();
-		this.hypnosisValue.reset();
-		this.echoValue.reset();
-		if (this.doomBossValue) {
-			this.doomBossValue.reset();
-		}
-		if (this.doomValue) {
-			this.doomValue.reset();
-		}
-		this.combatValue.nextLevel();
-	}
-
-	private modifiersFor(season: SeasonName): SeasonModifiers {
-		if (season === 'spring') {
-			return {
-				powerDuration: 6.5,
-				fruitDuration: 12,
-				ghostSpeedModifier: 1,
-				playerSpeedModifier: 1
-			};
-		}
-		if (season === 'summer') {
-			return { powerDuration: 6, fruitDuration: 14, ghostSpeedModifier: 1, playerSpeedModifier: 1 };
-		}
-		if (season === 'autumn') {
-			return {
-				powerDuration: 6,
-				fruitDuration: 12,
-				ghostSpeedModifier: 0.97,
-				playerSpeedModifier: 1
-			};
-		}
-		return {
-			powerDuration: 6,
-			fruitDuration: 12,
-			ghostSpeedModifier: 1,
-			playerSpeedModifier: 0.97
-		};
+		const session = buildLevelSession({
+			events: this.events,
+			level: this.levelNumber,
+			profile: this.profileValue,
+			season,
+			hell,
+			secret: this.secretModeValue,
+			godMode: this.godModeValue
+		});
+		this.sessionValue = session;
+		return session;
 	}
 
 	private currentPower(): number {
+		const session = this.sessionValue;
 		let timer = 0;
 		if (this.profileValue === 'ms-pacman') {
-			if (this.hypnosisValue && this.hypnosisValue.overdriveActive) {
-				timer = this.hypnosisValue.overdriveTimer;
+			if (session && session.hypnosis.overdriveActive) {
+				timer = session.hypnosis.overdriveTimer;
 			}
-		} else if (this.combatValue && this.combatValue.isPowerActive) {
-			timer = this.combatValue.powerTimer;
+		} else if (session && session.combat.isPowerActive) {
+			timer = session.combat.powerTimer;
 		}
 		if (!Number.isFinite(timer) || timer <= 0) {
 			return 0;
