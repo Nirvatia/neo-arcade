@@ -7,3 +7,6 @@ bun.lockb
 
 # Miscellaneous
 /static/
+
+# Hand-tuned standalone art prototypes
+/prototypes/

@@ -156,6 +156,12 @@ Order matters: each stage builds on the ones before it.
 3. **Replace the level disintegration on death.** Pac-Man's own death is done; replace the
    reaction of the level around it (`render/transitions/DeathWaveView.ts`, the
    disintegration mask in `SharedLayers`).
+   - Decision: no PixiJS. Effects that need per-pixel maths run as a WebGL2 post pass over
+     the Canvas2D world layer (upload the frame as a texture only while the effect runs).
+   - Prototype: `prototypes/pacman/winter-decay.html` (open in a browser, no build). Winter
+     art from the owner's mock-up, live layer ported to Canvas2D, decay shader: geodesic
+     front through the corridors, domain-warped edge, Voronoi ice shards, frost, abyss,
+     shock ring, rebuild from the respawn point. Waiting for the owner's verdict.
 4. **Level-complete animation.** Built on stage 2's transitions.
 5. **New regular HUD.** The hell HUD is the reference for quality.
 6. **Integrate the 4 seasons.** Largest stage; one season per chat, from the owner's
