@@ -3,6 +3,7 @@
 import type { GridMatrix } from '../../config/gridConfig';
 import { isTeleportToken } from '../../config/gridConfig';
 import type { GridLayout } from '../GridView';
+import { DoomLightmap } from './DoomLightmap';
 import { bakeDoomWorld, doomDecor, DOOM_BG, DOOM_TILE, streamY } from './DoomBake';
 import {
 	fogTexture,
@@ -17,6 +18,7 @@ import {
 
 const T = DOOM_TILE;
 const REBAKE_DELAY_MS = 160;
+const SHADE_SCALE = 0.25;
 
 export interface DoomLight {
 	readonly x: number;
@@ -89,7 +91,12 @@ export class DoomWorld {
 	private readonly R: number;
 	private readonly C: number;
 	private readonly objects: WorldObject[] = [];
+	/** Lamps and cabins outside the maze: radial glows as in the prototype. */
 	private readonly lights: StaticLight[] = [];
+	/** Portals, pickups and the lair: sources of the maze light map. */
+	private readonly mazeLights: DoomLight[] = [];
+	private readonly lightmap: DoomLightmap;
+	private shade: HTMLCanvasElement | null = null;
 	private readonly smoke: Array<{ cx: number; cy: number; u: number; ph: number }> = [];
 	private readonly mist: Mist[];
 	private readonly dust: Dust[];
@@ -130,18 +137,21 @@ export class DoomWorld {
 				if (isTeleportToken(tt)) {
 					const p = ctr(r, c);
 					this.objects.push(this.portal(p.x, p.y, portalIndex++, r + c));
-					this.lights.push({ x: p.x, y: p.y, r: 1.6 * T, tint: 0xff3a2a, a: 0.7, flicker: false });
+					this.mazeLights.push({ x: c + 0.5, y: r + 0.5, r: 2.5, tint: 0xff3a2a, a: 0.8 });
 				}
 			})
 		);
 		for (const tile of pickupTiles) {
-			const p = ctr(tile.y, tile.x);
-			this.lights.push({ x: p.x, y: p.y, r: 1.7 * T, tint: 0xff7a2a, a: 0.8, flicker: false });
+			this.mazeLights.push({ x: tile.x + 0.5, y: tile.y + 0.5, r: 2.5, tint: 0xff7a2a, a: 0.8 });
 		}
-		{
-			const p = ctr(Math.floor((this.R - 1) / 2), Math.floor((this.C - 1) / 2));
-			this.lights.push({ x: p.x, y: p.y, r: 3.4 * T, tint: 0xffd9a0, a: 0.4, flicker: false });
-		}
+		this.mazeLights.push({
+			x: Math.floor((this.C - 1) / 2) + 0.5,
+			y: Math.floor((this.R - 1) / 2) + 0.5,
+			r: 4,
+			tint: 0xffd9a0,
+			a: 0.55
+		});
+		this.lightmap = new DoomLightmap(S);
 		for (let i = 0; i < 22; i++) {
 			const x = (-18 + (i * (this.C + 36)) / 22) * T + Math.random() * T * 2;
 			const y = streamY(this.R, x) + (Math.random() - 0.5) * 10;
@@ -303,10 +313,12 @@ export class DoomWorld {
 	}
 
 	/**
-	 * Screen-space atmosphere drawn over the actors. `actorLights` are extra night lights
-	 * in tile-center coordinates (e.g. the player) so the actors stay readable at night.
+	 * Atmosphere under the actors: mist, dust and wash, the ash storm tint and the hellish
+	 * night. At night the darkness is cut away by a per-tile light map that spreads along
+	 * corridors and stops at walls; `actorLights` (tile-center coordinates, radius in
+	 * tiles) are added to the maze's own lights.
 	 */
-	drawPost(ctx: CanvasRenderingContext2D, actorLights: readonly DoomLight[] = []): void {
+	drawMood(ctx: CanvasRenderingContext2D, actorLights: readonly DoomLight[] = []): void {
 		const vw = this.vw;
 		const vh = this.vh;
 		const t = this.t;
@@ -327,6 +339,30 @@ export class DoomWorld {
 			ctx.fillStyle = 'rgb(138,42,16)';
 			ctx.fillRect(0, 0, vw, vh);
 		}
+		// darker than the prototype's red wash so the light map actually reads as light
+		const na = (0.82 + 0.06 * Math.sin(t * 3.2)) * this.nightV;
+		if (na > 0) {
+			const light = this.lightmap.compute([...this.mazeLights, ...actorLights]);
+			const shade = this.shadeLayer(light, t);
+			ctx.globalCompositeOperation = 'multiply';
+			ctx.globalAlpha = na;
+			ctx.drawImage(shade, 0, 0, vw, vh);
+			// the prototype's glows around lamps and cabins outside the maze
+			ctx.save();
+			ctx.translate(this.wx, this.wy);
+			ctx.scale(this.sc, this.sc);
+			for (const g of this.lights) {
+				const a = this.nightV * g.a * (g.flicker ? 0.88 + 0.12 * Math.sin(t * 7 + g.x) : 1);
+				img(ctx, glowTexture(g.tint), g.x - g.r, g.y - g.r, 2 * g.r, 2 * g.r, a, true);
+			}
+			ctx.restore();
+		}
+		ctx.restore();
+	}
+
+	/** Screen-space layer over the actors: wind-blown embers and the vignette. */
+	drawOverlay(ctx: CanvasRenderingContext2D): void {
+		ctx.save();
 		for (const p of this.flakes) {
 			if (!p.vis) {
 				continue;
@@ -344,31 +380,44 @@ export class DoomWorld {
 				img(ctx, p.im, p.px - s / 2, p.py - s / 2, s, s, p.alpha, true);
 			}
 		}
-		const na = (0.6 + 0.08 * Math.sin(t * 3.2)) * this.nightV;
-		if (na > 0) {
-			ctx.globalCompositeOperation = 'multiply';
-			ctx.globalAlpha = na;
-			ctx.fillStyle = 'rgb(224,80,42)';
-			ctx.fillRect(0, 0, vw, vh);
-		}
-		img(ctx, vignetteTexture(), 0, 0, vw, vh);
-		if (this.nightV > 0.01) {
-			ctx.save();
-			ctx.translate(this.wx, this.wy);
-			ctx.scale(this.sc, this.sc);
-			for (const g of this.lights) {
-				const a = this.nightV * g.a * (g.flicker ? 0.88 + 0.12 * Math.sin(t * 7 + g.x) : 1);
-				img(ctx, glowTexture(g.tint), g.x - g.r, g.y - g.r, 2 * g.r, 2 * g.r, a, true);
-			}
-			for (const g of actorLights) {
-				const x = g.x * T;
-				const y = g.y * T;
-				const r = g.r * T;
-				img(ctx, glowTexture(g.tint), x - r, y - r, 2 * r, 2 * r, this.nightV * g.a, true);
-			}
-			ctx.restore();
-		}
+		img(ctx, vignetteTexture(), 0, 0, this.vw, this.vh);
 		ctx.restore();
+	}
+
+	/**
+	 * Night tint with holes where light falls, multiplied over the world. Rendered at a
+	 * quarter of the screen resolution: upscaling it is the blur, and it stays cheap.
+	 */
+	private shadeLayer(light: HTMLCanvasElement, t: number): HTMLCanvasElement {
+		const q = SHADE_SCALE;
+		const w = Math.max(1, Math.ceil(this.vw * q));
+		const h = Math.max(1, Math.ceil(this.vh * q));
+		if (!this.shade || this.shade.width !== w || this.shade.height !== h) {
+			this.shade = document.createElement('canvas');
+			this.shade.width = w;
+			this.shade.height = h;
+		}
+		const g = this.shade.getContext('2d');
+		if (!g) {
+			return this.shade;
+		}
+		g.setTransform(q, 0, 0, q, 0, 0);
+		g.globalCompositeOperation = 'source-over';
+		g.globalAlpha = 1;
+		g.fillStyle = 'rgb(118,34,22)';
+		g.fillRect(0, 0, this.vw, this.vh);
+		g.globalCompositeOperation = 'destination-out';
+		g.translate(this.wx, this.wy);
+		g.scale(this.sc, this.sc);
+		g.imageSmoothingEnabled = true;
+		g.drawImage(light, 0, 0, this.C * T, this.R * T);
+		for (const l of this.lights) {
+			const a = l.a * (l.flicker ? 0.88 + 0.12 * Math.sin(t * 7 + l.x) : 1);
+			g.globalAlpha = Math.min(1, a);
+			g.drawImage(glowTexture(0xffffff), l.x - l.r, l.y - l.r, 2 * l.r, 2 * l.r);
+		}
+		g.globalAlpha = 1;
+		return this.shade;
 	}
 
 	private portal(x: number, y: number, i: number, ph: number): WorldObject {

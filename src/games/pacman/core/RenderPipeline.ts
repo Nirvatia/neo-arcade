@@ -14,6 +14,7 @@ import type { DoomBossService } from '../logic/doom/DoomBossService';
 import { DoomCombatView } from '../render/DoomCombatView';
 import { DoomWorld } from '../render/doom/DoomWorld';
 import type { DoomLight } from '../render/doom/DoomWorld';
+import { pickupSprite } from '../render/doom/DoomSprites';
 import { DeathWaveView, deathWaveEase, deathWaveMaxRadius } from '../render/DeathWaveView';
 import { LevelClearView } from '../render/LevelClearView';
 import { OverlayView } from '../render/OverlayView';
@@ -181,8 +182,9 @@ export class RenderPipeline {
 		this.canvas.remove();
 	}
 
-	// Hell level: the CLAUDE_GRID_DOOM_v3 world (baked maze + meadow), the actors, then the
-	// atmosphere. Ash storm and night follow the boss phase.
+	// Hell level: the CLAUDE_GRID_DOOM_v3 world (baked maze + meadow), its atmosphere (ash
+	// storm in boss phase 2, night with a corridor light map in phase 3), then the actors on
+	// top so they always stay readable, then embers and vignette.
 	private renderHell(dt: number, season: SeasonData, grid: GridService): void {
 		const world = this.doomWorldFor(season, grid);
 		world.resize(this.width, this.height, this.pixelRatio);
@@ -191,76 +193,105 @@ export class RenderPipeline {
 		const phase = boss ? boss.phase : 1;
 		world.setMood(phase >= 2, phase >= 3);
 		world.update(dt);
-		// camera shake moves the world and the actors, never the screen-space atmosphere
+		const layout = world.layout;
+		const state = this.director.stateName;
+		const fighting = Boolean(boss && doom && !boss.defeated);
+
+		// camera shake moves the world and the actors, never the screen-space overlay
 		const shake = boss ? boss.shake : 0;
-		const amp = shake * shake * world.layout.tileSize * 0.35;
+		const amp = shake * shake * layout.tileSize * 0.35;
 		this.ctx.save();
 		this.ctx.translate((Math.random() - 0.5) * amp, (Math.random() - 0.5) * amp);
 		world.drawWorld(this.ctx);
-		const layout = world.layout;
+		world.drawMood(this.ctx, this.hellLights(state));
 
-		const state = this.director.stateName;
 		if (state === 'level-clear') {
 			const clear = this.director.levelClear;
 			if (clear && clear.phase === 'cutscene') {
 				this.levelClearView.draw(this.ctx, clear, grid, layout, this.level.profile);
 			}
-			this.ctx.restore();
-			world.drawPost(this.ctx);
-			this.drawOverlay(layout, grid);
-			return;
-		}
-
-		const mask = this.disintegrationMask(grid);
-		this.drawCollectibles(layout, mask);
-		const lights: DoomLight[] = [];
-		if (boss && doom && !boss.defeated) {
-			this.doomCombatView.drawGround(this.ctx, boss, doom, grid, layout, this.timeValue);
-			const echo = boss.echo;
-			const echoPos = boss.echoPosition();
-			if (echo && echoPos) {
-				this.echoBossView.draw(
-					this.ctx,
-					this.bossSnapshot(boss, echoPos, true, echo.presence),
-					layout,
-					this.timeValue
-				);
+		} else {
+			const mask = this.disintegrationMask(grid);
+			this.drawCollectibles(layout, mask);
+			if (boss && doom && fighting) {
+				this.doomCombatView.drawGround(this.ctx, boss, doom, grid, layout, this.timeValue);
+				const echo = boss.echo;
+				const echoPos = boss.echoPosition();
+				if (echo && echoPos) {
+					this.echoBossView.draw(
+						this.ctx,
+						this.bossSnapshot(boss, echoPos, true, echo.presence),
+						layout,
+						this.timeValue
+					);
+				}
+				if (!this.erased(boss.position, mask)) {
+					this.abyssBossView.draw(
+						this.ctx,
+						this.bossSnapshot(boss, boss.position, false, 1),
+						layout,
+						this.timeValue
+					);
+				}
+				this.doomCombatView.drawAir(this.ctx, boss, doom, layout, this.timeValue);
 			}
-			if (!this.erased(boss.position, mask)) {
-				this.abyssBossView.draw(
-					this.ctx,
-					this.bossSnapshot(boss, boss.position, false, 1),
-					layout,
-					this.timeValue
-				);
-				lights.push({ x: boss.position.x, y: boss.position.y, r: 1.6, tint: 0xff2a1a, a: 0.45 });
+			const player = this.level.player;
+			if (state === 'death') {
+				const wave = this.director.deathWave;
+				if (wave) {
+					this.deathWaveView.draw(this.ctx, layout, grid.width, grid.height, wave.x, wave.y, wave.progress);
+				}
+			} else if (player) {
+				if (boss && fighting) {
+					this.doomCombatView.drawPull(this.ctx, boss, player.position, layout, this.timeValue);
+				}
+				this.playerView.draw(this.ctx, player, layout, this.level.profile);
 			}
-			this.doomCombatView.drawAir(this.ctx, boss, doom, layout, this.timeValue);
-		}
-
-		if (state === 'death') {
-			const wave = this.director.deathWave;
-			if (wave) {
-				this.deathWaveView.draw(this.ctx, layout, grid.width, grid.height, wave.x, wave.y, wave.progress);
-			}
-			this.ctx.restore();
-			world.drawPost(this.ctx, lights);
-			this.drawOverlay(layout, grid);
-			return;
-		}
-
-		const player = this.level.player;
-		if (player) {
-			if (boss && !boss.defeated) {
-				this.doomCombatView.drawPull(this.ctx, boss, player.position, layout, this.timeValue);
-			}
-			this.playerView.draw(this.ctx, player, layout, this.level.profile);
-			const p = player.position;
-			lights.push({ x: p.x, y: p.y, r: 2.4, tint: 0xffd890, a: 0.55 });
 		}
 		this.ctx.restore();
-		world.drawPost(this.ctx, lights);
+		world.drawOverlay(this.ctx);
 		this.drawOverlay(layout, grid);
+	}
+
+	/** Light-map sources carried by the actors (tile-center coordinates, radius in tiles). */
+	private hellLights(state: string): DoomLight[] {
+		const lights: DoomLight[] = [];
+		const player = this.level.player;
+		if (player && state !== 'death') {
+			const p = player.position;
+			lights.push({ x: p.x, y: p.y, r: 6.5, tint: 0xffe2b0, a: 1 });
+		}
+		const boss = this.level.doomBoss;
+		const doom = this.level.doom;
+		if (!boss || !doom || boss.defeated) {
+			return lights;
+		}
+		lights.push({ x: boss.position.x, y: boss.position.y, r: 3.2, tint: 0xff3a2a, a: 0.85 });
+		const echo = boss.echoPosition();
+		if (echo) {
+			lights.push({ x: echo.x, y: echo.y, r: 2.6, tint: 0x9a6aff, a: 0.7 });
+		}
+		for (const pickup of doom.pickupList) {
+			if (pickup.visible && pickup.kind) {
+				lights.push({
+					x: pickup.tile.x + 0.5,
+					y: pickup.tile.y + 0.5,
+					r: 2.4,
+					tint: pickupSprite(pickup.kind).glow,
+					a: 0.75
+				});
+			}
+		}
+		for (const shot of doom.shots) {
+			lights.push({ x: shot.x, y: shot.y, r: 3.5, tint: 0x60ff70, a: 1 });
+		}
+		for (const hazard of boss.hazardList) {
+			if (hazard.warn <= 0 && hazard.tiles.length > 0) {
+				const mid = hazard.tiles[Math.floor(hazard.tiles.length / 2)];
+				lights.push({ x: mid.x + 0.5, y: mid.y + 0.5, r: 6, tint: 0xff6a3a, a: 1 });
+			}
+		}
+		return lights;
 	}
 
 	private bossSnapshot(

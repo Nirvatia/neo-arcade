@@ -111,7 +111,7 @@ export class GameMain implements GameModule {
 		loop.start();
 		if (import.meta.env.DEV) {
 			// dev only: lets the browser console and automated play-tests inspect the game
-			(window as unknown as { __pacman?: unknown }).__pacman = { level, director };
+			(window as unknown as { __pacman?: unknown }).__pacman = { level, director, render };
 		}
 		this.events = events;
 		this.level = level;
