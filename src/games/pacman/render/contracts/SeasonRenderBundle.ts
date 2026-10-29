@@ -1,5 +1,5 @@
 import type { MazeColors } from './MazePalette';
-import type { GridLayout } from '../GridView';
+import type { GridLayout } from '../maze/GridView';
 
 export type GhostSpawnToken = 'BY' | 'PY' | 'IY' | 'CE';
 

@@ -1,4 +1,4 @@
-import type { GridService } from '../GridService';
+import type { GridService } from '../maze/GridService';
 import type { DoomTile, DoomDirection } from './DoomGraph';
 import { adjacentTile, doomTileKey } from './DoomGraph';
 import { canEscape } from './DoomHazards';

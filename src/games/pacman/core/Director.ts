@@ -1,6 +1,6 @@
 import type { EventBus } from '../engine/EventBus';
 import type { PacmanEventMap, PacmanStateName } from './Events';
-import type { LevelLoader } from '../logic/LevelLoader';
+import type { LevelLoader } from '../logic/level/LevelLoader';
 import type { DeathWaveSnapshot } from './states/DeathState';
 import type { LevelClearSnapshot } from './states/LevelClearState';
 import { MenuState } from './states/MenuState';

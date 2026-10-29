@@ -1,4 +1,4 @@
-import type { GridPoint } from '../GridModel';
+import type { GridPoint } from '../maze/GridModel';
 import type { DoomDirection } from './DoomGraph';
 import { adjacentTile } from './DoomGraph';
 import type { DoomAttackKind } from './DoomAttackCore';

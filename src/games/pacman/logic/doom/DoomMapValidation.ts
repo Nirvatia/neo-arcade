@@ -1,6 +1,6 @@
-import type { GridPoint } from '../GridModel';
-import type { GridService } from '../GridService';
-import { isLairTile } from '../LairExit';
+import type { GridPoint } from '../maze/GridModel';
+import type { GridService } from '../maze/GridService';
+import { isLairTile } from '../maze/LairExit';
 
 interface CornerQuadrant {
 	readonly anchorX: number;

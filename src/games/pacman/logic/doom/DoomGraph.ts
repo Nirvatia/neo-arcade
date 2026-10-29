@@ -1,4 +1,4 @@
-import type { GridService } from '../GridService';
+import type { GridService } from '../maze/GridService';
 
 export interface DoomTile {
 	readonly x: number;

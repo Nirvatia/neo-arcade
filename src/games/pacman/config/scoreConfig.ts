@@ -1,4 +1,4 @@
-import type { FruitKind } from '../logic/fruitCatalog';
+import type { FruitKind } from '../logic/bonuses/fruitCatalog';
 
 export interface ScoreTable {
 	readonly dot: number;

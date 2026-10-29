@@ -1,5 +1,5 @@
 import type { WeatherView } from '../../contracts/SeasonRenderBundle';
-import type { GridLayout } from '../../GridView';
+import type { GridLayout } from '../../maze/GridView';
 
 interface Spark {
 	x: number;

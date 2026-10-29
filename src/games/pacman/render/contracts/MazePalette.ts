@@ -1,4 +1,4 @@
-import type { SeasonPalette } from '../../logic/SeasonCatalog';
+import type { SeasonPalette } from '../../logic/level/SeasonCatalog';
 
 export interface MazeColors {
 	readonly wall: string;

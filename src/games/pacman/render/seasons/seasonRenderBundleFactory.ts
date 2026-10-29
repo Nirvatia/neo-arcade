@@ -1,4 +1,4 @@
-import type { SeasonData } from '../../logic/SeasonCatalog';
+import type { SeasonData } from '../../logic/level/SeasonCatalog';
 import type { SeasonRenderBundle } from '../contracts/SeasonRenderBundle';
 import { SpringRenderBundle } from './spring/SpringRenderBundle';
 import { SummerRenderBundle } from './summer/SummerRenderBundle';

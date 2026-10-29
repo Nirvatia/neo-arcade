@@ -2,7 +2,7 @@
 // screen-space post effects (mist, ash dust, embers storm, hellish night with lights).
 import type { GridMatrix } from '../../config/gridConfig';
 import { isTeleportToken } from '../../config/gridConfig';
-import type { GridLayout } from '../GridView';
+import type { GridLayout } from '../maze/GridView';
 import { DoomLightmap } from './DoomLightmap';
 import { bakeDoomWorld, doomDecor, DOOM_BG, DOOM_TILE, streamY } from './DoomBake';
 import {

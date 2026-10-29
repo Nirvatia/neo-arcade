@@ -4,7 +4,7 @@ import type {
 	DoomBfgTracer,
 	DoomBarrel
 } from '../../logic/doom/DoomWeaponService';
-import type { GridLayout } from '../GridView';
+import type { GridLayout } from '../maze/GridView';
 import { glowTexture } from './DoomSprites';
 import { rgba } from '../common/color';
 

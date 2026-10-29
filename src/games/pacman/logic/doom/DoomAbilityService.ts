@@ -1,6 +1,6 @@
-import type { GridService } from '../GridService';
-import type { GridPoint } from '../GridModel';
-import type { PlayerService } from '../PlayerService';
+import type { GridService } from '../maze/GridService';
+import type { GridPoint } from '../maze/GridModel';
+import type { PlayerService } from '../actors/PlayerService';
 import { DoomPickupService } from './DoomPickupService';
 import type { DoomPickupKind, DoomPickupModel } from './DoomPickupModel';
 import { DoomWeaponService } from './DoomWeaponService';
