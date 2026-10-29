@@ -21,6 +21,7 @@ export class GameMain implements GameModule {
 	private render: RenderPipeline | null = null;
 	private hudAdapter: SvelteHudAdapter | null = null;
 	private audio: PacmanAudioPlayer | null = null;
+	private detachAutoPause: (() => void) | null = null;
 
 	async init(container: HTMLDivElement): Promise<void> {
 		if (this.loop) {
@@ -68,7 +69,8 @@ export class GameMain implements GameModule {
 				director.togglePause();
 			},
 			menu: () => {
-				if (director.stateName === 'playing') {
+				const state = director.stateName;
+				if (state === 'playing' || state === 'death' || state === 'level-clear') {
 					director.togglePause();
 					return;
 				}
@@ -87,6 +89,19 @@ export class GameMain implements GameModule {
 			}
 		});
 		input.attach();
+		// a hidden tab or an unfocused window pauses the game; resuming is left to the player
+		const onVisibility = (): void => {
+			if (document.hidden) {
+				director.autoPause();
+			}
+		};
+		const onBlur = (): void => director.autoPause();
+		document.addEventListener('visibilitychange', onVisibility);
+		window.addEventListener('blur', onBlur);
+		this.detachAutoPause = () => {
+			document.removeEventListener('visibilitychange', onVisibility);
+			window.removeEventListener('blur', onBlur);
+		};
 		setPacmanActions({
 			confirm: () => input.pressConfirm(),
 			pause: () => input.pressPause(),
@@ -129,6 +144,8 @@ export class GameMain implements GameModule {
 		}
 		this.loop?.stop();
 		this.input?.detach();
+		this.detachAutoPause?.();
+		this.detachAutoPause = null;
 		clearPacmanActions();
 		clearDebugActions();
 		this.render?.destroy();

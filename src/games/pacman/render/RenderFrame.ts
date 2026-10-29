@@ -1,4 +1,4 @@
-import type { Director } from '../core/Director';
+import type { Director, FlowSnapshot } from '../core/Director';
 import type { PacmanStateName } from '../core/Events';
 import type { LevelLoader } from '../logic/level/LevelLoader';
 import type { LevelProgress } from '../logic/level/LevelProgress';
@@ -15,7 +15,11 @@ export interface RenderFrame {
 	/** Seconds since the previous frame (capped) and total render time. */
 	readonly dt: number;
 	readonly time: number;
+	/** The state on screen; while paused, the suspended one (see `paused`). */
 	readonly state: PacmanStateName;
+	readonly paused: boolean;
+	/** Phase and progress of the state on screen, for animations to hook into. */
+	readonly flow: FlowSnapshot;
 	readonly director: Director;
 	readonly level: LevelLoader;
 	readonly season: SeasonData;

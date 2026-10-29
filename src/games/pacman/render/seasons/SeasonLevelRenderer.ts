@@ -81,7 +81,7 @@ export class SeasonLevelRenderer implements LevelRenderer {
 		this.shared.drawPlayer(frame, drawnLayout);
 		this.drawDimming(frame, drawnLayout, ratio);
 
-		if (state !== 'menu' && state !== 'paused') {
+		if (state !== 'menu' && !frame.paused) {
 			bundle.weather.draw(ctx, drawnLayout, width, height, dt, time);
 		}
 

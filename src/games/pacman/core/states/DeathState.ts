@@ -1,6 +1,8 @@
-import type { GameState, GameStateContext } from '../Director';
+import type { GameState, GameStateContext } from '../flow/GameState';
+import { StateClock } from '../flow/StateClock';
+import type { FlowTiming } from '../flow/StateClock';
 import type { PacmanStateName } from '../Events';
-import { OVERLAY_STATE_DURATION } from './ReadyState';
+import { FLOW } from '../../config/flowConfig';
 
 export interface DeathWaveSnapshot {
 	readonly x: number;
@@ -10,40 +12,33 @@ export interface DeathWaveSnapshot {
 	readonly duration: number;
 }
 
-const DEATH_TIME = OVERLAY_STATE_DURATION;
+export type DeathPhase = 'dying';
 
 export class DeathState implements GameState {
 	readonly name: PacmanStateName = 'death';
-	private timer = DEATH_TIME;
+	readonly pausable = true;
+	private readonly clock = new StateClock<DeathPhase>([{ name: 'dying', duration: FLOW.death }]);
 	private centerX = 0;
 	private centerY = 0;
 	private hasCenter = false;
-
-	get overlayTimer(): number {
-		return this.timer;
-	}
+	private resolved = false;
 
 	get deathWave(): DeathWaveSnapshot | null {
 		if (!this.hasCenter) {
 			return null;
 		}
-		const duration = DEATH_TIME;
-		const remaining = Math.min(duration, Math.max(0, this.timer));
-		const elapsed = duration - remaining;
-		const progress = duration > 0 ? Math.min(1, Math.max(0, elapsed / duration)) : 1;
+		const timing = this.clock.timing;
 		return {
 			x: this.centerX,
 			y: this.centerY,
-			progress,
-			timer: remaining,
-			duration
+			progress: timing.progress,
+			timer: timing.remaining,
+			duration: timing.duration
 		};
 	}
 
 	enter(ctx: GameStateContext): void {
 		ctx.level.ensure();
-		this.timer = DEATH_TIME;
-		this.hasCenter = false;
 		const player = ctx.level.player;
 		if (player) {
 			const position = player.position;
@@ -76,37 +71,27 @@ export class DeathState implements GameState {
 	}
 
 	update(ctx: GameStateContext, dt: number): void {
-		if (!Number.isFinite(dt) || dt < 0) {
-			console.error('DeathState.update', 'invalid delta time', dt);
+		if (this.resolved || !this.clock.advance(dt)) {
 			return;
 		}
-		this.timer = Math.max(0, this.timer - dt);
-		if (this.timer > 0) {
-			return;
-		}
-		const combat = ctx.level.combat;
-		if (!combat) {
-			console.error('DeathState.update', 'combat is not initialized');
-			ctx.director.showGameOver();
-			return;
-		}
+		this.resolved = true;
+		const combat = ctx.level.ensure().combat;
 		if (combat.hellDefeat) {
-			ctx.level.advanceLevel();
-			ctx.director.showReady();
+			// falling into the abyss ends the hell level, not the run
+			ctx.director.changeLevel(() => ctx.level.advanceLevel());
 			return;
 		}
 		if (combat.lives > 0) {
 			ctx.level.prepareAfterDeath();
-			ctx.director.showReady();
+			ctx.director.showReady('short');
 			return;
 		}
 		ctx.director.showGameOver();
 	}
 
-	exit(): void {
-		this.timer = DEATH_TIME;
-		this.centerX = 0;
-		this.centerY = 0;
-		this.hasCenter = false;
+	exit(): void {}
+
+	timing(): FlowTiming {
+		return this.clock.timing;
 	}
 }

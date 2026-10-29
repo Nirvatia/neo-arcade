@@ -1,20 +1,15 @@
-import type { GameState, GameStateContext } from '../Director';
+import type { GameState, GameStateContext } from '../flow/GameState';
+import { idleTiming } from '../flow/GameState';
+import type { FlowTiming } from '../flow/StateClock';
 import type { PacmanStateName } from '../Events';
 
 export class PlayingState implements GameState {
 	readonly name: PacmanStateName = 'playing';
-	private readonly resume: boolean;
+	readonly pausable = true;
 	private lastHudKey = '';
-
-	constructor(resume: boolean) {
-		this.resume = resume;
-	}
 
 	enter(ctx: GameStateContext): void {
 		ctx.level.ensure();
-		if (!this.resume) {
-			ctx.level.resetGameplay();
-		}
 		ctx.level.emitHud();
 	}
 
@@ -50,8 +45,7 @@ export class PlayingState implements GameState {
 			echo.update(dt, player);
 		}
 		if (egg.consumeSecretRequested()) {
-			ctx.level.enterSecretLevel();
-			ctx.director.showReady();
+			ctx.director.changeLevel(() => ctx.level.enterSecretLevel());
 			return;
 		}
 		const fireRequested = ctx.level.consumeFireRequest();
@@ -103,5 +97,9 @@ export class PlayingState implements GameState {
 
 	exit(): void {
 		this.lastHudKey = '';
+	}
+
+	timing(): FlowTiming {
+		return idleTiming('run');
 	}
 }

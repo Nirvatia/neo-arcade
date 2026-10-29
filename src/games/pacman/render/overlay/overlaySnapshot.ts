@@ -4,7 +4,8 @@ import type { OverlayMode, OverlaySnapshot } from './OverlayView';
 
 /** What the canvas overlay shows for the current game state. */
 export function buildOverlaySnapshot(director: Director, level: LevelLoader): OverlaySnapshot {
-	const state = director.stateName;
+	const flow = director.flow;
+	const state = flow.state;
 	const combat = level.combat;
 
 	let mode: OverlayMode = 'none';
@@ -12,27 +13,25 @@ export function buildOverlaySnapshot(director: Director, level: LevelLoader): Ov
 	let timer = 0;
 	let duration = 0;
 
-	if (state === 'ready') {
-		mode = 'ready';
-		title = 'READY';
-		timer = director.overlayTimer;
-	} else if (state === 'playing') {
-		mode = 'playing';
-	} else if (state === 'paused') {
+	if (flow.paused) {
 		mode = 'paused';
 		title = 'PAUSED';
+	} else if (state === 'ready') {
+		mode = 'ready';
+		title = 'READY';
+		timer = flow.remaining;
+	} else if (state === 'playing') {
+		mode = 'playing';
 	} else if (state === 'death') {
 		mode = 'death';
 		title = 'DEATH';
-		const wave = director.deathWave;
-		timer = wave ? wave.timer : director.overlayTimer;
-		duration = wave ? wave.duration : 0;
+		timer = flow.remaining;
+		duration = flow.duration;
 	} else if (state === 'level-clear') {
 		mode = 'level-clear';
 		title = 'LEVEL CLEAR';
-		const clear = director.levelClear;
-		timer = clear ? clear.timer : director.overlayTimer;
-		duration = clear ? clear.duration : 0;
+		timer = flow.remaining;
+		duration = flow.duration;
 	} else if (state === 'game-over') {
 		mode = 'game-over';
 		title = 'GAME OVER';
@@ -40,7 +39,7 @@ export function buildOverlaySnapshot(director: Director, level: LevelLoader): Ov
 
 	let powerLabel = '';
 	let powerTimer = 0;
-	if (state === 'playing') {
+	if (mode === 'playing') {
 		if (level.profile === 'pacman' && combat && combat.isPowerActive) {
 			powerLabel = 'POWER';
 			powerTimer = combat.powerTimer;

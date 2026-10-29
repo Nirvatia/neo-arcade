@@ -7,6 +7,9 @@ import { SeasonLevelRenderer } from './seasons/SeasonLevelRenderer';
 import { DoomLevelRenderer } from './doom/DoomLevelRenderer';
 import type { LevelRenderer } from './RenderFrame';
 
+/** Same as the page background, so a full fade reads as an empty stage. */
+const FADE_COLOR = '#030509';
+
 /**
  * Owns the canvas (HiDPI sizing, render clock) and hands each frame to the renderer of the
  * current level kind. Renderers live as long as the pipeline so their animation state
@@ -81,6 +84,7 @@ export class RenderPipeline {
 		this.ctx.globalCompositeOperation = 'source-over';
 		this.ctx.imageSmoothingEnabled = true;
 
+		const flow = this.director.flow;
 		const renderer = this.level.hellMode ? this.doomRenderer : this.seasonRenderer;
 		renderer.render({
 			ctx: this.ctx,
@@ -89,18 +93,34 @@ export class RenderPipeline {
 			pixelRatio: this.pixelRatio,
 			dt,
 			time: this.timeValue,
-			state: this.director.stateName,
+			state: flow.state,
+			paused: flow.paused,
+			flow,
 			director: this.director,
 			level: this.level,
 			season,
 			grid,
 			progress
 		});
+		this.drawFade(flow.fade);
 	}
 
 	destroy(): void {
 		this.unsubscribeCues();
 		this.canvas.remove();
+	}
+
+	/** Screen fade between menu and game and between levels; covers everything. */
+	private drawFade(cover: number): void {
+		if (!(cover > 0)) {
+			return;
+		}
+		this.ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
+		this.ctx.globalAlpha = Math.min(1, cover);
+		this.ctx.globalCompositeOperation = 'source-over';
+		this.ctx.fillStyle = FADE_COLOR;
+		this.ctx.fillRect(0, 0, this.width, this.height);
+		this.ctx.globalAlpha = 1;
 	}
 
 	private syncSize(): boolean {

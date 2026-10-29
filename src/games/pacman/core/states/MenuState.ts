@@ -1,8 +1,11 @@
-import type { GameState, GameStateContext } from '../Director';
+import type { GameState, GameStateContext } from '../flow/GameState';
+import { idleTiming } from '../flow/GameState';
+import type { FlowTiming } from '../flow/StateClock';
 import type { PacmanStateName } from '../Events';
 
 export class MenuState implements GameState {
 	readonly name: PacmanStateName = 'menu';
+	readonly pausable = false;
 
 	enter(ctx: GameStateContext): void {
 		ctx.level.ensure();
@@ -12,4 +15,8 @@ export class MenuState implements GameState {
 	update(): void {}
 
 	exit(): void {}
+
+	timing(): FlowTiming {
+		return idleTiming('idle');
+	}
 }

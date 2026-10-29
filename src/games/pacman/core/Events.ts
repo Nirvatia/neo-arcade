@@ -6,6 +6,7 @@ export type PacmanGameResult = 'none' | 'win' | 'lose';
 export type PacmanProfile = 'pacman' | 'ms-pacman';
 
 export type PacmanAudioCue =
+	| 'intro'
 	| 'dot'
 	| 'energizer'
 	| 'power-start'

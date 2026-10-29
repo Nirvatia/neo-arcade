@@ -69,9 +69,6 @@ export class PacmanAudioPlayer {
 		if (next !== 'ready') {
 			this.stop('start.wav');
 		}
-		if (next === 'ready' && this.state !== 'ready') {
-			this.play('start.wav', 0.8);
-		}
 		if (next === 'menu' || next === 'game-over') {
 			this.powerActive = false;
 		}
@@ -80,6 +77,11 @@ export class PacmanAudioPlayer {
 	}
 
 	private handleCue(cue: PacmanAudioCue): void {
+		if (cue === 'intro') {
+			// the new-game jingle; leaving READY stops it (see handleState)
+			this.play('start.wav', 0.8);
+			return;
+		}
 		if (cue === 'dot') {
 			this.dotToggle = !this.dotToggle;
 			this.play(this.dotToggle ? 'eat_dot_0.wav' : 'eat_dot_1.wav', 0.55);
