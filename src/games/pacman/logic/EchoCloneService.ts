@@ -180,7 +180,7 @@ export class EchoCloneService {
 				this.finishClone();
 				return;
 			}
-			this.moveClone(dt, player);
+			this.moveClone(dt);
 		}
 	}
 
@@ -215,7 +215,7 @@ export class EchoCloneService {
 		this.events.emit('audio:cue', { cue: 'power-start' });
 	}
 
-	private moveClone(dt: number, player: PlayerService): void {
+	private moveClone(dt: number): void {
 		let remaining = Math.min(0.25, Math.max(0, dt));
 		let guard = 0;
 		while (remaining > EPSILON && this.phaseValue === 'clone' && guard < 512) {
@@ -226,7 +226,7 @@ export class EchoCloneService {
 					this.finishClone();
 					return;
 				}
-				const direction = this.chooseDirection(player);
+				const direction = this.chooseDirection();
 				if (!direction) {
 					this.finishClone();
 					return;
@@ -286,7 +286,7 @@ export class EchoCloneService {
 		}
 	}
 
-	private chooseDirection(player: PlayerService): EchoDirection | null {
+	private chooseDirection(): EchoDirection | null {
 		const tile = this.cloneTileValue;
 		if (!tile) {
 			return null;

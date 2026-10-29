@@ -90,9 +90,7 @@ export class SecretMaze implements MazeView {
 		px: number,
 		py: number,
 		tileSize: number,
-		colors: MazeColors,
-		tx: number,
-		ty: number
+		colors: MazeColors
 	): void {
 		if (!(tileSize > 0)) {
 			return;
@@ -168,9 +166,7 @@ export class SecretMaze implements MazeView {
 		px: number,
 		py: number,
 		tileSize: number,
-		colors: MazeColors,
-		tx: number,
-		ty: number
+		colors: MazeColors
 	): void {
 		if (!(tileSize > 0)) {
 			return;
@@ -207,10 +203,7 @@ export class SecretMaze implements MazeView {
 		px: number,
 		py: number,
 		tileSize: number,
-		token: GhostSpawnToken,
-		colors: MazeColors,
-		tx: number,
-		ty: number
+		token: GhostSpawnToken
 	): void {
 		if (!(tileSize > 0)) {
 			return;

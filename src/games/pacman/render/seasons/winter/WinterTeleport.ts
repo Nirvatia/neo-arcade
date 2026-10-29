@@ -1,13 +1,7 @@
 import type { TeleportView } from '../../contracts/SeasonRenderBundle';
 
 export class WinterTeleport implements TeleportView {
-	draw(
-		ctx: CanvasRenderingContext2D,
-		cx: number,
-		cy: number,
-		tileSize: number,
-		token: string
-	): void {
+	draw(ctx: CanvasRenderingContext2D, cx: number, cy: number, tileSize: number): void {
 		if (!(tileSize > 0)) {
 			return;
 		}

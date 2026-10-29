@@ -65,7 +65,7 @@ export class OverlayView {
 		}
 		ctx.save();
 		if (showTopBar) {
-			this.drawTopBar(ctx, snapshot, layout, boardWidth, boardHeight);
+			this.drawTopBar(ctx, snapshot, layout, boardWidth);
 		}
 		this.drawCenter(ctx, snapshot, layout, boardWidth, boardHeight);
 		ctx.restore();
@@ -111,8 +111,7 @@ export class OverlayView {
 		ctx: CanvasRenderingContext2D,
 		snapshot: OverlaySnapshot,
 		layout: GridLayout,
-		boardWidth: number,
-		boardHeight: number
+		boardWidth: number
 	): void {
 		const fontSize = Math.max(10, Math.floor(layout.tileSize * 0.55));
 		const pad = Math.max(4, Math.floor(layout.tileSize * 0.25));

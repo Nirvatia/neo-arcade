@@ -1,5 +1,4 @@
 import type { SeasonRenderBundle } from '../../contracts/SeasonRenderBundle';
-import type { SeasonPalette } from '../../../logic/SeasonCatalog';
 import { SecretScene } from './SecretScene';
 import { SecretMaze } from './SecretMaze';
 import { SecretPellet } from './SecretPellet';
@@ -15,7 +14,7 @@ export class SecretRenderBundle implements SeasonRenderBundle {
 	readonly teleport: SecretTeleport;
 	readonly weather: SecretWeather;
 
-	constructor(_palette: SeasonPalette) {
+	constructor() {
 		this.scene = new SecretScene();
 		this.maze = new SecretMaze();
 		this.pellet = new SecretPellet();

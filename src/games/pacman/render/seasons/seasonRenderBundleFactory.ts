@@ -18,19 +18,19 @@ export function seasonRenderBundleFor(request: SeasonBundleRequest): SeasonRende
 		throw new Error('seasonRenderBundleFor: missing request or season');
 	}
 	if (request.secret) {
-		return new SecretRenderBundle(request.season.palette);
+		return new SecretRenderBundle();
 	}
 	if (request.season.name === 'spring') {
-		return new SpringRenderBundle(request.season.palette);
+		return new SpringRenderBundle();
 	}
 	if (request.season.name === 'summer') {
-		return new SummerRenderBundle(request.season.palette);
+		return new SummerRenderBundle();
 	}
 	if (request.season.name === 'autumn') {
-		return new AutumnRenderBundle(request.season.palette);
+		return new AutumnRenderBundle();
 	}
 	if (request.season.name === 'winter') {
-		return new WinterRenderBundle(request.season.palette);
+		return new WinterRenderBundle();
 	}
 	console.error('seasonRenderBundleFor', 'unknown season', request.season.name);
 	throw new Error(`seasonRenderBundleFor: unknown season ${request.season.name}`);

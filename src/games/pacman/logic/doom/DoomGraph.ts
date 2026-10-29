@@ -37,11 +37,6 @@ export function oppositeDirection(direction: DoomDirection): DoomDirection {
 	}
 }
 
-export function doomDistanceSq(a: DoomTile, b: DoomTile): number {
-	const dx = a.x - b.x;
-	const dy = a.y - b.y;
-	return dx * dx + dy * dy;
-}
 
 export function bfsDistanceFrom(grid: GridService, origin: DoomTile): Map<string, number> {
 	const distances = new Map<string, number>();

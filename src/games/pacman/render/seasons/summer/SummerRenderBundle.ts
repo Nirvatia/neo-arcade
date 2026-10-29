@@ -1,5 +1,4 @@
 import type { SeasonRenderBundle } from '../../contracts/SeasonRenderBundle';
-import type { SeasonPalette } from '../../../logic/SeasonCatalog';
 import { SummerScene } from './SummerScene';
 import { SummerMaze } from './SummerMaze';
 import { SummerPellet } from './SummerPellet';
@@ -15,7 +14,7 @@ export class SummerRenderBundle implements SeasonRenderBundle {
 	readonly teleport: SummerTeleport;
 	readonly weather: SummerWeather;
 
-	constructor(_palette: SeasonPalette) {
+	constructor() {
 		this.scene = new SummerScene();
 		this.maze = new SummerMaze();
 		this.pellet = new SummerPellet();

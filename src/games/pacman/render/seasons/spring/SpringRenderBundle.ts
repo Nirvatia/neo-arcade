@@ -1,5 +1,4 @@
 import type { SeasonRenderBundle } from '../../contracts/SeasonRenderBundle';
-import type { SeasonPalette } from '../../../logic/SeasonCatalog';
 import { SpringScene } from './SpringScene';
 import { SpringMaze } from './SpringMaze';
 import { SpringPellet } from './SpringPellet';
@@ -15,7 +14,7 @@ export class SpringRenderBundle implements SeasonRenderBundle {
 	readonly teleport: SpringTeleport;
 	readonly weather: SpringWeather;
 
-	constructor(_palette: SeasonPalette) {
+	constructor() {
 		this.scene = new SpringScene();
 		this.maze = new SpringMaze();
 		this.pellet = new SpringPellet();

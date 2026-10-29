@@ -90,15 +90,7 @@ export class SpringMaze implements MazeView {
 		}
 	}
 
-	drawGate(
-		ctx: CanvasRenderingContext2D,
-		px: number,
-		py: number,
-		tileSize: number,
-		colors: MazeColors,
-		tx: number,
-		ty: number
-	): void {
+	drawGate(ctx: CanvasRenderingContext2D, px: number, py: number, tileSize: number): void {
 		if (!(tileSize > 0)) {
 			return;
 		}
@@ -159,15 +151,7 @@ export class SpringMaze implements MazeView {
 		}
 	}
 
-	drawPlayerSpawn(
-		ctx: CanvasRenderingContext2D,
-		px: number,
-		py: number,
-		tileSize: number,
-		colors: MazeColors,
-		tx: number,
-		ty: number
-	): void {
+	drawPlayerSpawn(ctx: CanvasRenderingContext2D, px: number, py: number, tileSize: number): void {
 		if (!(tileSize > 0)) {
 			return;
 		}
@@ -203,10 +187,7 @@ export class SpringMaze implements MazeView {
 		px: number,
 		py: number,
 		tileSize: number,
-		token: GhostSpawnToken,
-		colors: MazeColors,
-		tx: number,
-		ty: number
+		token: GhostSpawnToken
 	): void {
 		if (!(tileSize > 0)) {
 			return;
