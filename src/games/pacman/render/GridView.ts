@@ -1,6 +1,9 @@
 import type { GridService } from '../logic/GridService';
 import type { LevelProgress } from '../logic/LevelProgress';
 import type { SeasonPalette } from '../logic/SeasonCatalog';
+import { mazeColorsFor } from './contracts/MazePalette';
+import { isTeleportToken } from '../config/gridConfig';
+import type { SeasonRenderBundle } from './contracts/SeasonRenderBundle';
 
 export interface GridLayout {
 	readonly tileSize: number;
@@ -8,187 +11,136 @@ export interface GridLayout {
 	readonly offsetY: number;
 }
 
+export interface DisintegrationMask {
+	readonly centerX: number;
+	readonly centerY: number;
+	readonly radius: number;
+}
+
 export class GridView {
+	computeLayout(grid: GridService, width: number, height: number, mazeScale: number): GridLayout {
+		if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
+			return { tileSize: 1, offsetX: 0, offsetY: 0 };
+		}
+
+		if (!(grid.width > 0) || !(grid.height > 0)) {
+			console.error('GridView.computeLayout', 'invalid grid size');
+			return { tileSize: 1, offsetX: 0, offsetY: 0 };
+		}
+
+		const safeScale = Number.isFinite(mazeScale) && mazeScale > 0 ? mazeScale : 1;
+		const baseTile = Math.min(width / grid.width, height / grid.height);
+		const tileSize = Math.max(1, Math.floor(baseTile * safeScale));
+		const offsetX = Math.max(0, Math.floor((width - tileSize * grid.width) / 2));
+		const offsetY = Math.max(0, Math.floor((height - tileSize * grid.height) / 2));
+
+		return { tileSize, offsetX, offsetY };
+	}
+
 	draw(
 		ctx: CanvasRenderingContext2D,
 		grid: GridService,
 		progress: LevelProgress,
 		width: number,
 		height: number,
-		palette: SeasonPalette | null,
-		dayNightRatio: number
+		palette: SeasonPalette,
+		dayNightRatio: number,
+		bundle: SeasonRenderBundle,
+		time: number,
+		disintegration: DisintegrationMask | null = null,
+		mazeScale: number = 1
 	): GridLayout {
-		if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
-			console.error('GridView.draw', 'invalid view size', { width, height });
-			return { tileSize: 1, offsetX: 0, offsetY: 0 };
+		const layout = this.computeLayout(grid, width, height, mazeScale);
+
+		if (!(layout.tileSize > 0)) {
+			return layout;
 		}
-		if (!Number.isFinite(grid.width) || grid.width <= 0 || !Number.isFinite(grid.height) || grid.height <= 0) {
-			console.error('GridView.draw', 'invalid grid size', {
-				width: grid.width,
-				height: grid.height
-			});
-			return { tileSize: 1, offsetX: 0, offsetY: 0 };
-		}
+
 		const ratio = Math.min(1, Math.max(0, Number.isFinite(dayNightRatio) ? dayNightRatio : 0));
-		const wall = palette ? this.lerpColor(palette.wall, palette.wallNight, ratio) : '#1d2c5c';
-		const floor = palette ? this.lerpColor(palette.floor, palette.floorNight, ratio) : '#060a14';
-		const dot = palette ? this.lerpColor(palette.dot, palette.dotNight, ratio) : '#c9d4ff';
-		const energizer = palette ? this.lerpColor(palette.energizer, palette.energizerNight, ratio) : '#ffcf4d';
-		const tileSize = Math.max(1, Math.floor(Math.min(width / grid.width, height / grid.height)));
-		const gridWidth = tileSize * grid.width;
-		const gridHeight = tileSize * grid.height;
-		const offsetX = Math.max(0, Math.floor((width - gridWidth) / 2));
-		const offsetY = Math.max(0, Math.floor((height - gridHeight) / 2));
+		const colors = mazeColorsFor(palette, ratio);
+		const safeTime = Number.isFinite(time) && time >= 0 ? time : 0;
+		const tileSize = layout.tileSize;
+		const mask = this.validMask(disintegration);
+
 		for (let y = 0; y < grid.height; y += 1) {
 			for (let x = 0; x < grid.width; x += 1) {
-				const tile = grid.tileAt(x, y);
-				const px = offsetX + x * tileSize;
-				const py = offsetY + y * tileSize;
-				const cx = px + tileSize / 2;
-				const cy = py + tileSize / 2;
-				if (tile === 'WL') {
-					const wallInset = tileSize >= 3 ? 1 : 0;
-					const wallSize = Math.max(1, tileSize - wallInset * 2);
-					ctx.fillStyle = wall;
-					ctx.fillRect(px + wallInset, py + wallInset, wallSize, wallSize);
+				if (mask && this.isErased(x, y, mask)) {
 					continue;
 				}
-				ctx.fillStyle = floor;
-				ctx.fillRect(px, py, tileSize, tileSize);
+
+				const tile = grid.tileAt(x, y);
+				const px = layout.offsetX + x * tileSize;
+				const py = layout.offsetY + y * tileSize;
+				const cx = px + tileSize / 2;
+				const cy = py + tileSize / 2;
+
+				if (tile === 'WL') {
+					bundle.maze.drawWall(ctx, px, py, tileSize, colors, x, y);
+					continue;
+				}
+
+				bundle.maze.drawFloor(ctx, px, py, tileSize, colors, x, y);
+
+				if (isTeleportToken(tile)) {
+					bundle.teleport.draw(ctx, cx, cy, tileSize, tile);
+					continue;
+				}
+
 				switch (tile) {
-					case 'DT': {
-						if (progress.isCollected(x, y)) {
-							break;
+					case 'DT':
+						if (!progress.isCollected(x, y)) {
+							bundle.pellet.draw(ctx, cx, cy, tileSize, colors, x, y);
 						}
-						const radius = Math.max(1, Math.min(tileSize * 0.5, tileSize * 0.12));
-						ctx.fillStyle = dot;
-						ctx.beginPath();
-						ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-						ctx.fill();
 						break;
-					}
-					case 'EU': {
-						if (progress.isCollected(x, y)) {
-							break;
+					case 'EU':
+						if (!progress.isCollected(x, y)) {
+							bundle.energizer.draw(ctx, cx, cy, tileSize, colors, safeTime, x, y);
 						}
-						const radius = Math.max(1, Math.min(tileSize * 0.5, tileSize * 0.28));
-						ctx.fillStyle = energizer;
-						ctx.beginPath();
-						ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-						ctx.fill();
 						break;
-					}
-					case 'LE': {
-						const gateInset = tileSize >= 3 ? 1 : 0;
-						const gateWidth = Math.max(1, tileSize - gateInset * 2);
-						const gateHeight = Math.max(2, Math.floor(tileSize * 0.28));
-						const gateY = py + Math.max(0, Math.floor((tileSize - gateHeight) / 2));
-						ctx.fillStyle = '#ff69b4';
-						ctx.fillRect(px + gateInset, gateY, gateWidth, gateHeight);
+					case 'LE':
+						bundle.maze.drawGate(ctx, px, py, tileSize, colors, x, y);
 						break;
-					}
-					case 'LT': {
-						ctx.fillStyle = '#30173d';
-						ctx.fillRect(px + 1, py + 1, Math.max(1, tileSize - 2), Math.max(1, tileSize - 2));
+					case 'LT':
+						bundle.maze.drawLairFloor(ctx, px, py, tileSize, colors, x, y);
 						break;
-					}
-					case 'PM': {
-						const radius = Math.max(1, Math.min(tileSize * 0.5, tileSize * 0.26));
-						ctx.strokeStyle = '#ffe24b';
-						ctx.lineWidth = Math.max(1, Math.floor(tileSize * 0.08));
-						ctx.beginPath();
-						ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-						ctx.stroke();
+					case 'PM':
+						bundle.maze.drawPlayerSpawn(ctx, px, py, tileSize, colors, x, y);
 						break;
-					}
 					case 'BY':
 					case 'PY':
 					case 'IY':
-					case 'CE': {
-						const markerSize = Math.min(tileSize, Math.max(1, Math.floor(tileSize * 0.45)));
-						const markerOffset = Math.max(0, Math.floor((tileSize - markerSize) / 2));
-						if (tile === 'BY') {
-							ctx.fillStyle = '#ff4d4d';
-						} else if (tile === 'PY') {
-							ctx.fillStyle = '#ff9de2';
-						} else if (tile === 'IY') {
-							ctx.fillStyle = '#59f0ff';
-						} else {
-							ctx.fillStyle = '#ffb14d';
-						}
-						ctx.fillRect(px + markerOffset, py + markerOffset, markerSize, markerSize);
+					case 'CE':
+						bundle.maze.drawGhostSpawn(ctx, px, py, tileSize, tile, colors, x, y);
 						break;
-					}
-					case '0A':
-					case '0B':
-					case '0C': {
-						const radius = Math.max(1, Math.min(tileSize * 0.5, tileSize * 0.3));
-						if (tile === '0A') {
-							ctx.strokeStyle = '#56d9ff';
-						} else if (tile === '0B') {
-							ctx.strokeStyle = '#79ff6f';
-						} else {
-							ctx.strokeStyle = '#ff69d8';
-						}
-						ctx.fillStyle = '#041018';
-						ctx.lineWidth = Math.max(1, Math.floor(tileSize * 0.1));
-						ctx.beginPath();
-						ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-						ctx.fill();
-						ctx.stroke();
+					default:
 						break;
-					}
-					case 'RT': {
-						const trapSize = Math.min(tileSize, Math.max(2, Math.floor(tileSize * 0.55)));
-						const trapOffset = Math.max(0, Math.floor((tileSize - trapSize) / 2));
-						ctx.fillStyle = '#7f1818';
-						ctx.fillRect(px + trapOffset, py + trapOffset, trapSize, trapSize);
-						const coreSize = Math.max(1, Math.floor(trapSize * 0.45));
-						const coreOffset = Math.max(0, Math.floor((trapSize - coreSize) / 2));
-						ctx.fillStyle = '#200404';
-						ctx.fillRect(
-							px + trapOffset + coreOffset,
-							py + trapOffset + coreOffset,
-							coreSize,
-							coreSize
-						);
-						break;
-					}
-					case 'ES': {
-						break;
-					}
-					default: {
-						console.error('GridView.draw', 'unsupported tile', { tile, x, y });
-						break;
-					}
 				}
 			}
 		}
-		return { tileSize, offsetX, offsetY };
+
+		return layout;
 	}
 
-	private lerpColor(dayHex: string, nightHex: string, t: number): string {
-		const d = this.parseHex(dayHex);
-		const n = this.parseHex(nightHex);
-		if (!d || !n) {
-			return dayHex;
+	private validMask(mask: DisintegrationMask | null): DisintegrationMask | null {
+		if (!mask) {
+			return null;
 		}
-		const r = Math.round(d.r + (n.r - d.r) * t);
-		const g = Math.round(d.g + (n.g - d.g) * t);
-		const b = Math.round(d.b + (n.b - d.b) * t);
-		return `rgb(${r},${g},${b})`;
+
+		if (
+			!Number.isFinite(mask.centerX) ||
+			!Number.isFinite(mask.centerY) ||
+			!Number.isFinite(mask.radius) ||
+			mask.radius <= 0
+		) {
+			return null;
+		}
+
+		return mask;
 	}
 
-	private parseHex(hex: string): { r: number; g: number; b: number } | null {
-		if (!hex || hex.length !== 7 || hex[0] !== '#') {
-			return null;
-		}
-		const r = parseInt(hex.slice(1, 3), 16);
-		const g = parseInt(hex.slice(3, 5), 16);
-		const b = parseInt(hex.slice(5, 7), 16);
-		if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b)) {
-			return null;
-		}
-		return { r, g, b };
+	private isErased(x: number, y: number, mask: DisintegrationMask): boolean {
+		const dx = x + 0.5 - mask.centerX;
+		const dy = y + 0.5 - mask.centerY;
+		return dx * dx + dy * dy <= mask.radius * mask.radius;
 	}
 }

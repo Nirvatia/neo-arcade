@@ -1,8 +1,13 @@
-import { isTeleportId } from './GridModel';
 import type { GhostKind, GridModel, GridPoint, TileType } from './GridModel';
+import { isTeleportToken } from '../config/gridConfig';
+import { isLairToken } from './LairExit';
 
 export class GridService {
 	private readonly model: GridModel;
+	private lairOpenValue = false;
+	private lairEggTileValue: GridPoint | null = null;
+	private lairEggTileResolved = false;
+	private readonly voidBlockedTiles = new Set<string>();
 
 	constructor(model: GridModel) {
 		if (
@@ -42,20 +47,12 @@ export class GridService {
 		return this.model.ghostSpawns;
 	}
 
-	get switchSpawn(): GridPoint | null {
-		return this.model.switchSpawn;
+	get lairOpen(): boolean {
+		return this.lairOpenValue;
 	}
 
-	get trapSpawn(): GridPoint | null {
-		return this.model.trapSpawn;
-	}
-
-	get eggSpawn(): GridPoint | null {
-		return this.model.eggSpawn;
-	}
-
-	get extraLifeSpawns(): readonly GridPoint[] {
-		return this.model.extraLifeSpawns;
+	setLairOpen(value: boolean): void {
+		this.lairOpenValue = value;
 	}
 
 	tileAt(x: number, y: number): TileType {
@@ -75,16 +72,16 @@ export class GridService {
 			return false;
 		}
 		const tile = this.tileAt(x, y);
-		return (
-			tile !== 'WL' &&
-			tile !== 'ES' &&
-			tile !== 'LE' &&
-			tile !== 'LT' &&
-			tile !== 'BY' &&
-			tile !== 'PY' &&
-			tile !== 'IY' &&
-			tile !== 'CE'
-		);
+		if (tile === 'WL' || tile === 'ES') {
+			return false;
+		}
+		if (this.voidBlockedTiles.has(`${x},${y}`)) {
+			return false;
+		}
+		if (isLairToken(tile)) {
+			return this.lairOpenValue;
+		}
+		return true;
 	}
 
 	isGhostWalkable(x: number, y: number, allowLair: boolean): boolean {
@@ -92,28 +89,13 @@ export class GridService {
 			return false;
 		}
 		const tile = this.tileAt(x, y);
-		if (tile === 'WL' || tile === 'ES' || tile === 'RT') {
+		if (tile === 'WL' || tile === 'ES') {
 			return false;
 		}
 		if (allowLair) {
 			return true;
 		}
-		return (
-			tile !== 'LE' &&
-			tile !== 'LT' &&
-			tile !== 'BY' &&
-			tile !== 'PY' &&
-			tile !== 'IY' &&
-			tile !== 'CE'
-		);
-	}
-
-	isUltraWalkable(x: number, y: number): boolean {
-		if (!this.isInside(x, y)) {
-			return false;
-		}
-		const tile = this.tileAt(x, y);
-		return tile !== 'WL' && tile !== 'ES' && tile !== 'LE' && tile !== 'LT';
+		return !isLairToken(tile);
 	}
 
 	isDot(x: number, y: number): boolean {
@@ -125,15 +107,68 @@ export class GridService {
 	}
 
 	isTeleport(x: number, y: number): boolean {
-		return isTeleportId(this.model.tileAt(x, y));
+		return isTeleportToken(this.model.tileAt(x, y));
 	}
 
 	teleportDestination(x: number, y: number): GridPoint | undefined {
 		const tile = this.model.tileAt(x, y);
-		if (!isTeleportId(tile)) {
+		if (!isTeleportToken(tile)) {
 			return undefined;
 		}
 		return this.model.getTeleportDestination(tile, x, y);
+	}
+
+	bossSpawn(): GridPoint | null {
+		for (let y = 0; y < this.height; y += 1) {
+			for (let x = 0; x < this.width; x += 1) {
+				if (this.tileAt(x, y) === 'DB') {
+					return { x, y };
+				}
+			}
+		}
+		return null;
+	}
+
+	setVoidBlocked(x: number, y: number, blocked: boolean): void {
+		const key = `${x},${y}`;
+		if (blocked) {
+			this.voidBlockedTiles.add(key);
+		} else {
+			this.voidBlockedTiles.delete(key);
+		}
+	}
+
+	clearVoidBlocked(): void {
+		this.voidBlockedTiles.clear();
+	}
+
+	isVoidBlocked(x: number, y: number): boolean {
+		return this.voidBlockedTiles.has(`${x},${y}`);
+	}
+
+	lairEggTile(): GridPoint | null {
+		if (this.lairEggTileResolved) {
+			return this.lairEggTileValue;
+		}
+		this.lairEggTileResolved = true;
+		for (let y = 0; y < this.height; y += 1) {
+			for (let x = 0; x < this.width; x += 1) {
+				if (this.tileAt(x, y) === 'LT') {
+					this.lairEggTileValue = { x, y };
+					return this.lairEggTileValue;
+				}
+			}
+		}
+		for (let y = 0; y < this.height; y += 1) {
+			for (let x = 0; x < this.width; x += 1) {
+				if (this.tileAt(x, y) === 'LE') {
+					this.lairEggTileValue = { x, y };
+					return this.lairEggTileValue;
+				}
+			}
+		}
+		this.lairEggTileValue = null;
+		return null;
 	}
 
 	neighbors(x: number, y: number): GridPoint[] {
@@ -148,5 +183,9 @@ export class GridService {
 
 	walkableNeighbors(x: number, y: number): GridPoint[] {
 		return this.neighbors(x, y).filter((point) => this.isWalkable(point.x, point.y));
+	}
+
+	exitsCount(x: number, y: number): number {
+		return this.walkableNeighbors(x, y).length;
 	}
 }

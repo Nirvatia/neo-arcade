@@ -1,42 +1,61 @@
 import type { PlayerService } from './PlayerService';
 import type { LevelProgress } from './LevelProgress';
 import type { ScoreModel } from './ScoreModel';
+import type { GridService } from './GridService';
+import type { SpawnLocator } from './SpawnLocator';
+import type { GridPoint } from './GridModel';
+import type { GameProfile } from './HypnosisService';
 import type { EventBus } from '../engine/EventBus';
 import type { PacmanEventMap } from '../core/Events';
+import type { FruitKind } from './fruitCatalog';
+import { fruitForLevel, randomFruitKind } from './fruitCatalog';
+import { SCORE_TABLE } from '../config/scoreConfig';
 
-export type FruitKind = 'CF' | 'SF' | 'OF' | 'AF' | 'MF' | 'GF' | 'BF' | 'KF';
+export type { FruitKind };
 
-const FRUIT_ORDER: readonly FruitKind[] = ['CF', 'SF', 'OF', 'AF', 'MF', 'GF', 'BF', 'KF'];
-const FRUIT_SCORES: Record<FruitKind, number> = {
-	CF: 100,
-	SF: 300,
-	OF: 500,
-	AF: 700,
-	MF: 1000,
-	GF: 2000,
-	BF: 3000,
-	KF: 5000
-};
 const DEFAULT_FRUIT_DURATION = 12;
-const FRUIT_DOT_STEP = 40;
-const FRUIT_SPAWN = { x: 12, y: 9 };
+const FRUIT_THRESHOLDS: readonly number[] = [70, 170];
 const CONTACT_DISTANCE_SQ = 0.25;
 
 export class FruitService {
+	private readonly profileValue: GameProfile;
+	private readonly levelValue: number;
+	private readonly grid: GridService;
+	private readonly locator: SpawnLocator;
 	private readonly progress: LevelProgress;
 	private readonly scoreModel: ScoreModel;
 	private readonly events: EventBus<PacmanEventMap>;
 	private activeKindValue: FruitKind | null = null;
+	private spawnTileValue: GridPoint | null = null;
 	private timerValue = 0;
 	private fruitDurationValue = DEFAULT_FRUIT_DURATION;
 	private spawnedCountValue = 0;
-	private nextThresholdValue = FRUIT_DOT_STEP;
 
 	constructor(
+		profile: GameProfile,
+		level: number,
+		grid: GridService,
+		locator: SpawnLocator,
 		progress: LevelProgress,
 		scoreModel: ScoreModel,
 		events: EventBus<PacmanEventMap>
 	) {
+		if (profile !== 'pacman' && profile !== 'ms-pacman') {
+			console.error('FruitService.constructor', 'invalid profile', profile);
+			throw new Error('FruitService.constructor: invalid profile');
+		}
+		if (!Number.isFinite(level) || level < 1) {
+			console.error('FruitService.constructor', 'invalid level', level);
+			throw new Error('FruitService.constructor: level must be positive');
+		}
+		if (!grid) {
+			console.error('FruitService.constructor', 'missing grid service');
+			throw new Error('FruitService.constructor: missing grid service');
+		}
+		if (!locator) {
+			console.error('FruitService.constructor', 'missing spawn locator');
+			throw new Error('FruitService.constructor: missing spawn locator');
+		}
 		if (!progress) {
 			console.error('FruitService.constructor', 'missing level progress');
 			throw new Error('FruitService.constructor: missing level progress');
@@ -49,6 +68,10 @@ export class FruitService {
 			console.error('FruitService.constructor', 'missing event bus');
 			throw new Error('FruitService.constructor: missing event bus');
 		}
+		this.profileValue = profile;
+		this.levelValue = Math.floor(level);
+		this.grid = grid;
+		this.locator = locator;
 		this.progress = progress;
 		this.scoreModel = scoreModel;
 		this.events = events;
@@ -63,10 +86,12 @@ export class FruitService {
 	}
 
 	get position(): { x: number; y: number } {
-		return {
-			x: FRUIT_SPAWN.x + 0.5,
-			y: FRUIT_SPAWN.y + 0.5
-		};
+		const tile = this.spawnTileValue;
+		if (!tile) {
+			console.error('FruitService.position', 'spawn tile is not assigned');
+			return { x: 0, y: 0 };
+		}
+		return { x: tile.x + 0.5, y: tile.y + 0.5 };
 	}
 
 	setFruitDuration(value: number): void {
@@ -79,9 +104,9 @@ export class FruitService {
 
 	reset(): void {
 		this.activeKindValue = null;
+		this.spawnTileValue = null;
 		this.timerValue = 0;
 		this.spawnedCountValue = 0;
-		this.nextThresholdValue = FRUIT_DOT_STEP;
 	}
 
 	update(dt: number, player: PlayerService): void {
@@ -108,21 +133,51 @@ export class FruitService {
 			}
 			return;
 		}
-		if (this.progress.remainingDots > 0 && this.progress.collectedDots >= this.nextThresholdValue) {
+		if (this.spawnedCountValue >= FRUIT_THRESHOLDS.length) {
+			return;
+		}
+		const threshold = FRUIT_THRESHOLDS[this.spawnedCountValue];
+		if (typeof threshold !== 'number' || !Number.isFinite(threshold)) {
+			console.error('FruitService.update', 'invalid spawn threshold', {
+				index: this.spawnedCountValue
+			});
+			return;
+		}
+		if (this.progress.remainingDots > 0 && this.progress.collectedDots >= threshold) {
 			this.spawn();
 		}
 	}
 
 	private spawn(): void {
-		const index = Math.min(this.spawnedCountValue, FRUIT_ORDER.length - 1);
-		const kind = FRUIT_ORDER[index];
-		if (!kind) {
-			console.error('FruitService.spawn', 'missing fruit kind', { index });
+		const kind =
+			this.profileValue === 'ms-pacman' ? randomFruitKind() : fruitForLevel(this.levelValue);
+		const tile = this.chooseSpawnTile();
+		if (!tile) {
 			return;
 		}
+		this.spawnTileValue = tile;
 		this.activeKindValue = kind;
 		this.timerValue = this.fruitDurationValue;
 		this.events.emit('audio:cue', { cue: 'fruit-spawn' });
+	}
+
+	private chooseSpawnTile(): GridPoint | null {
+		const pad = this.findFruitPad();
+		if (pad) {
+			return pad;
+		}
+		return this.locator.findSafeTile(this.levelValue + this.spawnedCountValue);
+	}
+
+	private findFruitPad(): GridPoint | null {
+		for (let y = 0; y < this.grid.height; y += 1) {
+			for (let x = 0; x < this.grid.width; x += 1) {
+				if (this.grid.tileAt(x, y) === 'FT') {
+					return { x, y };
+				}
+			}
+		}
+		return null;
 	}
 
 	private collect(): void {
@@ -130,19 +185,19 @@ export class FruitService {
 		if (!kind) {
 			return;
 		}
-		this.scoreModel.add(FRUIT_SCORES[kind]);
+		this.scoreModel.add(SCORE_TABLE.fruit[kind]);
 		this.activeKindValue = null;
+		this.spawnTileValue = null;
 		this.timerValue = 0;
 		this.spawnedCountValue += 1;
-		this.nextThresholdValue += FRUIT_DOT_STEP;
 		this.events.emit('audio:cue', { cue: 'fruit-collect' });
 	}
 
 	private expire(): void {
 		this.activeKindValue = null;
+		this.spawnTileValue = null;
 		this.timerValue = 0;
 		this.spawnedCountValue += 1;
-		this.nextThresholdValue += FRUIT_DOT_STEP;
 		this.events.emit('audio:cue', { cue: 'fruit-expire' });
 	}
 }

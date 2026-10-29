@@ -1,8 +1,14 @@
-// src/games/pacman/core/states/ReadyState.ts
 import type { GameState, GameStateContext } from '../Director';
 import type { PacmanStateName } from '../Events';
 
-const READY_TIME = 5;
+export const OVERLAY_STATE_DURATION = 5;
+const READY_TIME = OVERLAY_STATE_DURATION;
+
+export interface ReadySnapshot {
+	readonly timer: number;
+	readonly duration: number;
+	readonly progress: number;
+}
 
 export class ReadyState implements GameState {
 	readonly name: PacmanStateName = 'ready';
@@ -14,11 +20,24 @@ export class ReadyState implements GameState {
 			this.timer = READY_TIME;
 			return;
 		}
-		this.timer = initialTimer;
+		this.timer = Math.min(READY_TIME, Math.max(0, initialTimer));
 	}
 
 	get overlayTimer(): number {
 		return this.timer;
+	}
+
+	get snapshot(): ReadySnapshot {
+		const remaining = Math.min(READY_TIME, Math.max(0, this.timer));
+		const progress =
+			READY_TIME > 0
+				? Math.min(1, Math.max(0, 1 - remaining / READY_TIME))
+				: 1;
+		return {
+			timer: remaining,
+			duration: READY_TIME,
+			progress
+		};
 	}
 
 	enter(ctx: GameStateContext): void {
@@ -37,5 +56,7 @@ export class ReadyState implements GameState {
 		}
 	}
 
-	exit(): void {}
+	exit(): void {
+		this.timer = READY_TIME;
+	}
 }

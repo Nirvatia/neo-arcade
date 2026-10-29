@@ -1,15 +1,16 @@
-// src/games/pacman/core/states/DeathState.ts
 import type { GameState, GameStateContext } from '../Director';
 import type { PacmanStateName } from '../Events';
+import { OVERLAY_STATE_DURATION } from './ReadyState';
 
 export interface DeathWaveSnapshot {
 	readonly x: number;
 	readonly y: number;
 	readonly progress: number;
+	readonly timer: number;
+	readonly duration: number;
 }
 
-const DEATH_TIME = 1.35;
-const WAVE_DURATION = 1.15;
+const DEATH_TIME = OVERLAY_STATE_DURATION;
 
 export class DeathState implements GameState {
 	readonly name: PacmanStateName = 'death';
@@ -26,12 +27,19 @@ export class DeathState implements GameState {
 		if (!this.hasCenter) {
 			return null;
 		}
-		const elapsed = DEATH_TIME - this.timer;
-		const progress = Math.min(1, Math.max(0, elapsed / WAVE_DURATION));
+		const duration = DEATH_TIME;
+		const remaining = Math.min(duration, Math.max(0, this.timer));
+		const elapsed = duration - remaining;
+		const progress =
+			duration > 0
+				? Math.min(1, Math.max(0, elapsed / duration))
+				: 1;
 		return {
 			x: this.centerX,
 			y: this.centerY,
-			progress
+			progress,
+			timer: remaining,
+			duration
 		};
 	}
 
@@ -39,7 +47,6 @@ export class DeathState implements GameState {
 		ctx.level.ensure();
 		this.timer = DEATH_TIME;
 		this.hasCenter = false;
-
 		const player = ctx.level.player;
 		if (player) {
 			const position = player.position;
@@ -58,7 +65,6 @@ export class DeathState implements GameState {
 		} else {
 			console.error('DeathState.enter', 'player is not initialized');
 		}
-
 		if (!this.hasCenter) {
 			const grid = ctx.level.grid;
 			if (grid) {
@@ -69,7 +75,6 @@ export class DeathState implements GameState {
 				console.error('DeathState.enter', 'grid is not initialized');
 			}
 		}
-
 		ctx.level.emitHud();
 	}
 
@@ -82,20 +87,22 @@ export class DeathState implements GameState {
 		if (this.timer > 0) {
 			return;
 		}
-
 		const combat = ctx.level.combat;
 		if (!combat) {
 			console.error('DeathState.update', 'combat is not initialized');
 			ctx.director.showGameOver();
 			return;
 		}
-
+		if (combat.hellDefeat) {
+			ctx.level.advanceLevel();
+			ctx.director.showReady();
+			return;
+		}
 		if (combat.lives > 0) {
 			ctx.level.prepareAfterDeath();
 			ctx.director.showReady();
 			return;
 		}
-
 		ctx.director.showGameOver();
 	}
 

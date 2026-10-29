@@ -1,4 +1,3 @@
-// src/games/pacman/core/states/PausedState.ts
 import type { GameState, GameStateContext } from '../Director';
 import type { PacmanStateName } from '../Events';
 
@@ -16,7 +15,6 @@ export class PausedState implements GameState {
 		} else {
 			this.resumeTarget = resumeTarget;
 		}
-
 		if (!Number.isFinite(readyTimer) || readyTimer < 0) {
 			console.error('PausedState.constructor', 'invalid ready timer', readyTimer);
 			this.readyTimer = 0;

@@ -3,6 +3,7 @@ export type InputDirection = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 export interface InputHandlers {
 	direction?: (direction: InputDirection) => void;
 	confirm?: () => void;
+	fire?: () => void;
 	pause?: () => void;
 	menu?: () => void;
 	profile?: () => void;
@@ -20,12 +21,10 @@ export class InputController {
 		if (this.attached) {
 			return;
 		}
-
 		if (typeof window === 'undefined') {
 			console.error('InputController.attach', 'window is unavailable');
 			return;
 		}
-
 		window.addEventListener('keydown', this.handleKeyDown);
 		this.attached = true;
 	}
@@ -34,12 +33,10 @@ export class InputController {
 		if (!this.attached) {
 			return;
 		}
-
 		if (typeof window === 'undefined') {
 			this.attached = false;
 			return;
 		}
-
 		window.removeEventListener('keydown', this.handleKeyDown);
 		this.attached = false;
 	}
@@ -50,6 +47,10 @@ export class InputController {
 
 	pressConfirm(): void {
 		this.handlers.confirm?.();
+	}
+
+	pressFire(): void {
+		this.handlers.fire?.();
 	}
 
 	pressPause(): void {
@@ -68,7 +69,6 @@ export class InputController {
 		if (event.repeat) {
 			return;
 		}
-
 		switch (event.code) {
 			case 'ArrowUp':
 			case 'KeyW':
@@ -93,6 +93,12 @@ export class InputController {
 			case 'Enter':
 				event.preventDefault();
 				this.pressConfirm();
+				break;
+			case 'ShiftLeft':
+			case 'ShiftRight':
+			case 'KeyF':
+				event.preventDefault();
+				this.pressFire();
 				break;
 			case 'Space':
 			case 'KeyP':

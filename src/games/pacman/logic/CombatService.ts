@@ -2,19 +2,16 @@ import type { PlayerService } from './PlayerService';
 import type { GhostService } from './GhostService';
 import type { LevelProgress } from './LevelProgress';
 import type { ScoreModel } from './ScoreModel';
-import type { GhostModel } from './GhostModel';
+import type { GhostModel, GhostKind } from './GhostModel';
 import type { PacmanGameResult, PacmanEventMap } from '../core/Events';
 import type { EventBus } from '../engine/EventBus';
 import type { GameProfile, HypnosisService } from './HypnosisService';
+import type { LairCodeService } from './LairCodeService';
+import { SCORE_TABLE } from '../config/scoreConfig';
 
 const DEFAULT_POWER_DURATION = 6;
-const CONTACT_DISTANCE_SQ = 0.36;
-const CLEAR_BONUS = 1000;
-const PERFECT_BONUS = 2000;
-const GOLDEN_EXIT_BONUS = 500;
-const REMAINING_DOT_VALUE = 20;
-const FIRST_LIFE_THRESHOLD = 10000;
-const LIFE_THRESHOLD_STEP = 30000;
+const CONTACT_DISTANCE_SQ = 0.25;
+const SECRET_CLEAR_BONUS = 10000;
 
 export class CombatService {
 	private readonly player: PlayerService;
@@ -23,6 +20,7 @@ export class CombatService {
 	private readonly scoreModel: ScoreModel;
 	private readonly events: EventBus<PacmanEventMap>;
 	private readonly hypnosis: HypnosisService;
+	private readonly lairCode: LairCodeService | null;
 	private livesValue = 3;
 	private deathsValue = 0;
 	private powerTimerValue = 0;
@@ -30,12 +28,14 @@ export class CombatService {
 	private chainValue = 0;
 	private gameOverValue = false;
 	private completedValue = false;
-	private goldenExitValue = false;
-	private contractActiveValue = false;
 	private deathActiveValue = false;
+	private hellModeValue = false;
+	private hellDefeatValue = false;
 	private profileValue: GameProfile = 'pacman';
 	private resultValue: PacmanGameResult = 'none';
-	private nextLifeThresholdValue = FIRST_LIFE_THRESHOLD;
+	private nextLifeThresholdValue = SCORE_TABLE.firstLifeThreshold;
+	private lastDeathReasonValue = 'none';
+	private secretModeValue = false;
 
 	constructor(
 		player: PlayerService,
@@ -43,38 +43,46 @@ export class CombatService {
 		progress: LevelProgress,
 		scoreModel: ScoreModel,
 		events: EventBus<PacmanEventMap>,
-		hypnosis: HypnosisService
+		hypnosis: HypnosisService,
+		lairCode: LairCodeService | null
 	) {
 		if (!player) {
 			console.error('CombatService.constructor', 'missing player service');
 			throw new Error('CombatService.constructor: missing player service');
 		}
+
 		if (!ghosts) {
 			console.error('CombatService.constructor', 'missing ghost service');
 			throw new Error('CombatService.constructor: missing ghost service');
 		}
+
 		if (!progress) {
 			console.error('CombatService.constructor', 'missing level progress');
 			throw new Error('CombatService.constructor: missing level progress');
 		}
+
 		if (!scoreModel) {
 			console.error('CombatService.constructor', 'missing score model');
 			throw new Error('CombatService.constructor: missing score model');
 		}
+
 		if (!events) {
 			console.error('CombatService.constructor', 'missing event bus');
 			throw new Error('CombatService.constructor: missing event bus');
 		}
+
 		if (!hypnosis) {
 			console.error('CombatService.constructor', 'missing hypnosis service');
 			throw new Error('CombatService.constructor: missing hypnosis service');
 		}
+
 		this.player = player;
 		this.ghosts = ghosts;
 		this.progress = progress;
 		this.scoreModel = scoreModel;
 		this.events = events;
 		this.hypnosis = hypnosis;
+		this.lairCode = lairCode ?? null;
 	}
 
 	get lives(): number {
@@ -93,10 +101,6 @@ export class CombatService {
 		return this.resultValue;
 	}
 
-	get goldenExit(): boolean {
-		return this.goldenExitValue;
-	}
-
 	get deathActive(): boolean {
 		return this.deathActiveValue;
 	}
@@ -109,12 +113,54 @@ export class CombatService {
 		return this.scoreModel.score;
 	}
 
+	get nextLifeThreshold(): number {
+		return this.nextLifeThresholdValue;
+	}
+
+	get lastDeathReason(): string {
+		return this.lastDeathReasonValue;
+	}
+
+	get hellDefeat(): boolean {
+		return this.hellDefeatValue;
+	}
+
 	setPowerDuration(value: number): void {
 		if (!Number.isFinite(value) || value <= 0) {
 			console.error('CombatService.setPowerDuration', 'invalid duration', value);
 			return;
 		}
+
 		this.powerDurationValue = value;
+	}
+
+	setLives(value: number): void {
+		if (!Number.isFinite(value) || value < 0) {
+			console.error('CombatService.setLives', 'invalid lives value', value);
+			this.livesValue = 0;
+			return;
+		}
+
+		this.livesValue = Math.floor(value);
+	}
+
+	setNextLifeThreshold(value: number): void {
+		if (!Number.isFinite(value) || value <= 0) {
+			console.error('CombatService.setNextLifeThreshold', 'invalid threshold value', value);
+			this.nextLifeThresholdValue = SCORE_TABLE.firstLifeThreshold;
+			return;
+		}
+
+		this.nextLifeThresholdValue = Math.floor(value);
+	}
+
+	setSecretMode(value: boolean): void {
+		this.secretModeValue = value;
+	}
+
+	setHellMode(value: boolean): void {
+		this.hellModeValue = value;
+		this.ghosts.setVisible(!value);
 	}
 
 	reset(): void {
@@ -124,26 +170,17 @@ export class CombatService {
 		this.chainValue = 0;
 		this.gameOverValue = false;
 		this.completedValue = false;
-		this.goldenExitValue = false;
-		this.contractActiveValue = false;
 		this.deathActiveValue = false;
+		this.hellDefeatValue = false;
 		this.resultValue = 'none';
-		this.nextLifeThresholdValue = FIRST_LIFE_THRESHOLD;
+		this.nextLifeThresholdValue = SCORE_TABLE.firstLifeThreshold;
+		this.lastDeathReasonValue = 'none';
 		this.ghosts.setPowerActive(false);
+		this.ghosts.setVisible(!this.hellModeValue);
 	}
 
 	setProfile(profile: GameProfile): void {
 		this.profileValue = profile;
-	}
-
-	setContractActive(value: boolean): void {
-		if (this.contractActiveValue === value) {
-			return;
-		}
-		if (value) {
-			this.clearPower();
-		}
-		this.contractActiveValue = value;
 	}
 
 	update(dt: number): void {
@@ -151,53 +188,106 @@ export class CombatService {
 			console.error('CombatService.update', 'invalid delta time', dt);
 			return;
 		}
+
 		if (this.gameOverValue || this.completedValue || this.deathActiveValue) {
 			return;
 		}
+
 		this.checkLifeRewards();
+
+		if (this.hellModeValue) {
+			return;
+		}
+
 		if (this.progress.remainingDots <= 0) {
 			this.completeLevel();
 			return;
 		}
+
+		if (this.secretModeValue) {
+			this.progress.consumePendingEnergizer();
+			return;
+		}
+
 		if (this.progress.consumePendingEnergizer()) {
 			this.activatePower();
 		}
+
 		if (this.profileValue === 'ms-pacman') {
 			this.hypnosis.update(dt, this.ghosts);
 		} else if (this.powerTimerValue > 0) {
 			this.powerTimerValue = Math.max(0, this.powerTimerValue - dt);
+
 			if (this.powerTimerValue <= 0) {
 				this.ghosts.endFrightened();
 				this.events.emit('audio:cue', { cue: 'power-end' });
 			}
 		}
+
 		this.ghosts.setPowerActive(this.powerTimerValue > 0);
 		this.checkCollisions();
 	}
 
-	completeViaGoldenExit(): void {
-		if (this.gameOverValue || this.completedValue || this.deathActiveValue) {
+	debugComplete(): void {
+		if (this.completedValue || this.gameOverValue || this.deathActiveValue) {
 			return;
 		}
-		const converted = this.progress.convertRemainingDots();
-		this.scoreModel.add(converted * REMAINING_DOT_VALUE);
-		this.completedValue = true;
-		this.resultValue = 'win';
-		this.goldenExitValue = true;
-		this.clearPower();
-		this.clearMsMode();
-		this.events.emit('audio:cue', { cue: 'win' });
+
+		if (this.hellModeValue) {
+			this.completeHellLevel();
+			return;
+		}
+
+		this.completeLevel();
 	}
 
-	killPlayerByUltra(): void {
-		this.handleDeath();
+	debugKill(): void {
+		if (this.deathActiveValue || this.gameOverValue || this.completedValue) {
+			return;
+		}
+
+		if (this.hellModeValue) {
+			this.killPlayerInHell();
+			return;
+		}
+
+		this.handleDeath('debug');
+	}
+
+	killPlayerInHell(): void {
+		if (this.deathActiveValue || this.gameOverValue || this.completedValue) {
+			return;
+		}
+
+		this.lastDeathReasonValue = 'abyss';
+
+		console.warn('CombatService.killPlayerInHell', 'player death in hell level', {
+			lives: this.livesValue
+		});
+
+		this.deathsValue += 1;
+		this.deathActiveValue = true;
+		this.hellDefeatValue = true;
+		this.events.emit('audio:cue', { cue: 'death' });
+	}
+
+	completeHellLevel(): void {
+		if (this.completedValue || this.gameOverValue || this.deathActiveValue) {
+			return;
+		}
+
+		this.completedValue = true;
+		this.resultValue = 'win';
+		this.scoreModel.add(SCORE_TABLE.hellBossDefeated);
 	}
 
 	finishDeath(): void {
 		if (!this.deathActiveValue) {
 			return;
 		}
+
 		this.deathActiveValue = false;
+
 		if (this.livesValue > 0) {
 			this.player.reset();
 			this.ghosts.reset();
@@ -210,23 +300,22 @@ export class CombatService {
 		this.chainValue = 0;
 		this.gameOverValue = false;
 		this.completedValue = false;
-		this.goldenExitValue = false;
-		this.contractActiveValue = false;
 		this.deathActiveValue = false;
+		this.hellDefeatValue = false;
 		this.resultValue = 'none';
+		this.lastDeathReasonValue = 'none';
 		this.ghosts.setPowerActive(false);
+		this.ghosts.setVisible(!this.hellModeValue);
 	}
 
 	private checkLifeRewards(): void {
-		if (this.progress.consumePendingExtraLife()) {
-			this.awardExtraLife();
-		}
 		while (this.scoreModel.score >= this.nextLifeThresholdValue) {
 			this.awardExtraLife();
-			if (this.nextLifeThresholdValue === FIRST_LIFE_THRESHOLD) {
-				this.nextLifeThresholdValue = LIFE_THRESHOLD_STEP;
+
+			if (this.nextLifeThresholdValue === SCORE_TABLE.firstLifeThreshold) {
+				this.nextLifeThresholdValue = SCORE_TABLE.lifeThresholdStep;
 			} else {
-				this.nextLifeThresholdValue += LIFE_THRESHOLD_STEP;
+				this.nextLifeThresholdValue += SCORE_TABLE.lifeThresholdStep;
 			}
 		}
 	}
@@ -241,6 +330,7 @@ export class CombatService {
 			this.events.emit('audio:cue', { cue: 'power-start' });
 			return;
 		}
+
 		this.powerTimerValue = this.powerDurationValue;
 		this.chainValue = 0;
 		this.ghosts.frightenActive();
@@ -249,40 +339,65 @@ export class CombatService {
 	}
 
 	private checkCollisions(): void {
-		if (this.contractActiveValue) {
-			return;
-		}
 		if (this.profileValue === 'ms-pacman') {
 			this.checkMsCollisions();
 			return;
 		}
+
 		if (this.player.isInvulnerable) {
 			return;
 		}
+
 		const playerPosition = this.player.position;
+
+		if (!Number.isFinite(playerPosition.x) || !Number.isFinite(playerPosition.y)) {
+			console.error('CombatService.checkCollisions', 'invalid player position', playerPosition);
+			return;
+		}
+
 		for (const ghost of this.ghosts.list) {
 			if (ghost.state !== 'active' && ghost.state !== 'frightened') {
 				continue;
 			}
+
 			const ghostPosition = ghost.position;
+
+			if (!Number.isFinite(ghostPosition.x) || !Number.isFinite(ghostPosition.y)) {
+				console.error('CombatService.checkCollisions', 'invalid ghost position', {
+					kind: ghost.kind,
+					position: ghostPosition
+				});
+				continue;
+			}
+
 			const dx = playerPosition.x - ghostPosition.x;
 			const dy = playerPosition.y - ghostPosition.y;
+
 			if (dx * dx + dy * dy > CONTACT_DISTANCE_SQ) {
 				continue;
 			}
+
 			if (ghost.state === 'frightened') {
 				this.eatGhost(ghost);
 			} else {
-				this.killPlayer();
-				break;
+				this.killPlayerByGhost(ghost.kind);
 			}
+
+			break;
 		}
 	}
 
 	private checkMsCollisions(): void {
 		const playerPosition = this.player.position;
+
+		if (!Number.isFinite(playerPosition.x) || !Number.isFinite(playerPosition.y)) {
+			console.error('CombatService.checkMsCollisions', 'invalid player position', playerPosition);
+			return;
+		}
+
 		for (const ghost of this.ghosts.list) {
 			const state = ghost.state;
+
 			if (
 				state === 'lair' ||
 				state === 'exiting' ||
@@ -291,25 +406,40 @@ export class CombatService {
 			) {
 				continue;
 			}
+
 			const ghostPosition = ghost.position;
+
+			if (!Number.isFinite(ghostPosition.x) || !Number.isFinite(ghostPosition.y)) {
+				console.error('CombatService.checkMsCollisions', 'invalid ghost position', {
+					kind: ghost.kind,
+					position: ghostPosition
+				});
+				continue;
+			}
+
 			const dx = playerPosition.x - ghostPosition.x;
 			const dy = playerPosition.y - ghostPosition.y;
+
 			if (dx * dx + dy * dy > CONTACT_DISTANCE_SQ) {
 				continue;
 			}
-			if (state === 'enraged') {
-				this.killPlayer();
-				break;
-			}
+
 			if (this.hypnosis.overdriveActive) {
 				this.hypnosis.handleContact(ghost.kind, this.ghosts);
 				break;
 			}
+
 			if (this.player.isInvulnerable) {
 				continue;
 			}
+
+			if (state === 'enraged') {
+				this.killPlayerByEnraged(ghost.kind);
+				break;
+			}
+
 			if (state === 'active' || state === 'frightened') {
-				this.killPlayer();
+				this.killPlayerByGhost(ghost.kind);
 				break;
 			}
 		}
@@ -320,45 +450,79 @@ export class CombatService {
 		this.chainValue = Math.min(3, this.chainValue + 1);
 		this.ghosts.toEyes(ghost);
 		this.events.emit('audio:cue', { cue: 'ghost-eaten' });
+
+		if (this.lairCode) {
+			this.lairCode.register(ghost.kind);
+		}
 	}
 
 	private chainPoints(): number {
-		if (this.chainValue <= 0) {
-			return 200;
+		const points = SCORE_TABLE.ghostChain[this.chainValue];
+
+		if (typeof points === 'number' && Number.isFinite(points) && points > 0) {
+			return points;
 		}
-		if (this.chainValue === 1) {
-			return 400;
+
+		console.error('CombatService.chainPoints', 'missing chain score', { chain: this.chainValue });
+
+		const first = SCORE_TABLE.ghostChain[0];
+
+		if (typeof first === 'number' && Number.isFinite(first) && first > 0) {
+			return first;
 		}
-		if (this.chainValue === 2) {
-			return 800;
-		}
-		return 1600;
+
+		return 0;
 	}
 
 	private completeLevel(): void {
 		this.completedValue = true;
 		this.resultValue = 'win';
-		this.goldenExitValue = false;
 		this.clearPower();
 		this.clearMsMode();
-		this.scoreModel.add(CLEAR_BONUS);
-		if (this.deathsValue === 0 && this.progress.destroyedDots === 0) {
-			this.scoreModel.add(PERFECT_BONUS);
+
+		if (this.secretModeValue) {
+			this.scoreModel.add(SECRET_CLEAR_BONUS);
+		} else {
+			this.scoreModel.add(SCORE_TABLE.levelClear);
+
+			if (this.deathsValue === 0 && this.progress.destroyedDots === 0) {
+				this.scoreModel.add(SCORE_TABLE.perfectClear);
+			}
 		}
-		this.events.emit('audio:cue', { cue: 'win' });
 	}
 
-	private killPlayer(): void {
-		this.handleDeath();
+	private killPlayerByGhost(kind: GhostKind): void {
+		this.handleDeath(`ghost:${kind}`);
 	}
 
-	private handleDeath(): void {
+	private killPlayerByEnraged(kind: GhostKind): void {
+		this.handleDeath(`ghost:${kind}:enraged`);
+	}
+
+	private handleDeath(reason: string): void {
+		if (this.secretModeValue) {
+			return;
+		}
+
+		if (this.deathActiveValue || this.gameOverValue || this.completedValue) {
+			return;
+		}
+
+		const safeReason = typeof reason === 'string' && reason.length > 0 ? reason : 'unknown';
+		this.lastDeathReasonValue = safeReason;
+
+		console.warn('CombatService.handleDeath', 'player death', {
+			reason: safeReason,
+			lives: this.livesValue
+		});
+
 		this.deathsValue += 1;
 		this.livesValue = Math.max(0, this.livesValue - 1);
 		this.clearPower();
 		this.clearMsMode();
 		this.deathActiveValue = true;
 		this.events.emit('audio:cue', { cue: 'death' });
+
 		if (this.livesValue <= 0) {
 			this.gameOverValue = true;
 			this.resultValue = 'lose';
@@ -370,6 +534,7 @@ export class CombatService {
 		if (this.powerTimerValue > 0) {
 			this.events.emit('audio:cue', { cue: 'power-end' });
 		}
+
 		this.powerTimerValue = 0;
 		this.chainValue = 0;
 		this.ghosts.endFrightened();
@@ -380,6 +545,7 @@ export class CombatService {
 		if (this.profileValue !== 'ms-pacman') {
 			return;
 		}
+
 		this.hypnosis.reset();
 		this.ghosts.setMsOverdrive(false);
 	}

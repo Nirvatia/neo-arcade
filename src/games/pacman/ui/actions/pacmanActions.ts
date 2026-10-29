@@ -12,7 +12,6 @@ export function setPacmanActions(next: PacmanActions): void {
 		console.error('pacmanActions.setPacmanActions', 'missing actions');
 		throw new Error('pacmanActions.setPacmanActions: missing actions');
 	}
-
 	actions = next;
 }
 
@@ -25,7 +24,6 @@ export function pressConfirm(): void {
 		console.error('pacmanActions.pressConfirm', 'actions are not initialized');
 		return;
 	}
-
 	actions.confirm();
 }
 
@@ -34,7 +32,6 @@ export function pressPause(): void {
 		console.error('pacmanActions.pressPause', 'actions are not initialized');
 		return;
 	}
-
 	actions.pause();
 }
 
@@ -43,7 +40,6 @@ export function pressMenu(): void {
 		console.error('pacmanActions.pressMenu', 'actions are not initialized');
 		return;
 	}
-
 	actions.menu();
 }
 
@@ -52,6 +48,5 @@ export function pressProfile(): void {
 		console.error('pacmanActions.pressProfile', 'actions are not initialized');
 		return;
 	}
-
 	actions.profile();
 }

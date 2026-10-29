@@ -2,35 +2,46 @@ import type { PlayerService } from './PlayerService';
 import type { LevelProgress } from './LevelProgress';
 import type { ScoreModel } from './ScoreModel';
 import type { GridService } from './GridService';
+import type { LairCodeService } from './LairCodeService';
 import type { GridPoint } from './GridModel';
 import type { EventBus } from '../engine/EventBus';
 import type { PacmanEventMap } from '../core/Events';
+import { SCORE_TABLE } from '../config/scoreConfig';
 
-export type GoldenEggPhase = 'waiting' | 'egg' | 'exit' | 'spent';
+export type GoldenEggPhase = 'waiting' | 'egg' | 'spent';
 
-const EGG_DELAY = 30;
-const EGG_DURATION = 10;
-const EXIT_DURATION = 5;
-const EGG_SCORE = 500;
+const REQUIRED_LEVEL = 7;
+const EGG_OPEN_DELAY = 1;
 const CONTACT_DISTANCE_SQ = 0.25;
-const FALLBACK_EGG_TILE: GridPoint = { x: 12, y: 15 };
 
 export class GoldenEggService {
+	private readonly levelValue: number;
+	private readonly grid: GridService;
+	private readonly lairCode: LairCodeService | null;
 	private readonly progress: LevelProgress;
 	private readonly events: EventBus<PacmanEventMap>;
 	private readonly scoreModel: ScoreModel;
-	private readonly grid: GridService;
 	private phaseValue: GoldenEggPhase = 'waiting';
-	private delayValue = EGG_DELAY;
-	private eggTimerValue = 0;
-	private exitReachedValue = false;
+	private delayValue = 0;
+	private spawnTileValue: GridPoint | null = null;
+	private secretRequestedValue = false;
 
 	constructor(
+		level: number,
+		grid: GridService,
+		lairCode: LairCodeService | null,
 		progress: LevelProgress,
 		events: EventBus<PacmanEventMap>,
-		scoreModel: ScoreModel,
-		grid: GridService
+		scoreModel: ScoreModel
 	) {
+		if (!Number.isFinite(level) || level < 1) {
+			console.error('GoldenEggService.constructor', 'invalid level', level);
+			throw new Error('GoldenEggService.constructor: level must be positive');
+		}
+		if (!grid) {
+			console.error('GoldenEggService.constructor', 'missing grid service');
+			throw new Error('GoldenEggService.constructor: missing grid service');
+		}
 		if (!progress) {
 			console.error('GoldenEggService.constructor', 'missing level progress');
 			throw new Error('GoldenEggService.constructor: missing level progress');
@@ -43,42 +54,32 @@ export class GoldenEggService {
 			console.error('GoldenEggService.constructor', 'missing score model');
 			throw new Error('GoldenEggService.constructor: missing score model');
 		}
-		if (!grid) {
-			console.error('GoldenEggService.constructor', 'missing grid service');
-			throw new Error('GoldenEggService.constructor: missing grid service');
-		}
+		this.levelValue = Math.floor(level);
+		this.grid = grid;
+		this.lairCode = lairCode ?? null;
 		this.progress = progress;
 		this.events = events;
 		this.scoreModel = scoreModel;
-		this.grid = grid;
 	}
 
 	get phase(): GoldenEggPhase {
 		return this.phaseValue;
 	}
 
-	get eggTimer(): number {
-		return this.eggTimerValue;
-	}
-
-	get exitOpen(): boolean {
-		return this.phaseValue === 'exit';
-	}
-
 	get eggPosition(): { x: number; y: number } {
-		const tile = this.eggTile();
+		const tile = this.spawnTileValue;
+		if (!tile) {
+			console.error('GoldenEggService.eggPosition', 'spawn tile is not assigned');
+			return { x: 0, y: 0 };
+		}
 		return { x: tile.x + 0.5, y: tile.y + 0.5 };
-	}
-
-	get exitPosition(): { x: number; y: number } {
-		return this.eggPosition;
 	}
 
 	reset(): void {
 		this.phaseValue = 'waiting';
-		this.delayValue = EGG_DELAY;
-		this.eggTimerValue = 0;
-		this.exitReachedValue = false;
+		this.delayValue = 0;
+		this.spawnTileValue = null;
+		this.secretRequestedValue = false;
 	}
 
 	update(dt: number, player: PlayerService): void {
@@ -90,61 +91,54 @@ export class GoldenEggService {
 			console.error('GoldenEggService.update', 'missing player service');
 			return;
 		}
+		if (this.levelValue !== REQUIRED_LEVEL || !this.lairCode || !this.lairCode.active) {
+			return;
+		}
 		if (this.phaseValue === 'waiting') {
+			if (!this.lairCode.open) {
+				return;
+			}
+			if (this.delayValue <= 0) {
+				this.delayValue = EGG_OPEN_DELAY;
+			}
 			this.delayValue = Math.max(0, this.delayValue - dt);
-			if (this.delayValue > 0) {
-				return;
+			if (this.delayValue <= 0) {
+				this.spawnEgg();
 			}
-			if (this.progress.remainingDots <= 0) {
-				this.phaseValue = 'spent';
-				return;
-			}
-			this.phaseValue = 'egg';
-			this.eggTimerValue = EGG_DURATION;
-			this.events.emit('audio:cue', { cue: 'egg-spawn' });
 			return;
 		}
 		if (this.phaseValue === 'egg') {
-			this.eggTimerValue = Math.max(0, this.eggTimerValue - dt);
-			if (this.eggTimerValue <= 0) {
-				this.phaseValue = 'spent';
-				return;
-			}
 			if (this.touchesPlayer(player, this.eggPosition)) {
-				this.scoreModel.add(EGG_SCORE);
-				this.phaseValue = 'exit';
-				this.eggTimerValue = EXIT_DURATION;
-				this.events.emit('audio:cue', { cue: 'egg-collect' });
-				this.events.emit('audio:cue', { cue: 'exit-open' });
+				this.collect();
 			}
+		}
+	}
+
+	consumeSecretRequested(): boolean {
+		const requested = this.secretRequestedValue;
+		this.secretRequestedValue = false;
+		return requested;
+	}
+
+	private spawnEgg(): void {
+		const tile = this.grid.lairEggTile();
+		if (!tile) {
+			console.error('GoldenEggService.spawnEgg', 'lair tile is not found');
+			this.phaseValue = 'spent';
 			return;
 		}
-		if (this.phaseValue === 'exit') {
-			this.eggTimerValue = Math.max(0, this.eggTimerValue - dt);
-			if (this.eggTimerValue <= 0) {
-				this.phaseValue = 'spent';
-				return;
-			}
-			if (this.touchesPlayer(player, this.exitPosition)) {
-				this.exitReachedValue = true;
-				this.phaseValue = 'spent';
-				this.events.emit('audio:cue', { cue: 'exit-enter' });
-			}
-		}
+		this.spawnTileValue = tile;
+		this.phaseValue = 'egg';
+		this.events.emit('audio:cue', { cue: 'egg-spawn' });
 	}
 
-	consumeExitReached(): boolean {
-		const reached = this.exitReachedValue;
-		this.exitReachedValue = false;
-		return reached;
-	}
-
-	private eggTile(): GridPoint {
-		const spawn = this.grid.eggSpawn;
-		if (spawn) {
-			return spawn;
-		}
-		return FALLBACK_EGG_TILE;
+	private collect(): void {
+		const converted = this.progress.convertRemainingDots();
+		this.scoreModel.add(converted * SCORE_TABLE.dot);
+		this.scoreModel.add(SCORE_TABLE.goldenEgg);
+		this.phaseValue = 'spent';
+		this.secretRequestedValue = true;
+		this.events.emit('audio:cue', { cue: 'egg-collect' });
 	}
 
 	private touchesPlayer(player: PlayerService, center: { x: number; y: number }): boolean {

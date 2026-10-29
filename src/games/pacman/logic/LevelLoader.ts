@@ -7,14 +7,18 @@ import { LevelProgress } from './LevelProgress';
 import { CombatService } from './CombatService';
 import { FruitService } from './FruitService';
 import { GoldenEggService } from './GoldenEggService';
-import { UltraGhostService } from './UltraGhostService';
 import { HypnosisService } from './HypnosisService';
-import { SpeedBoltService } from './SpeedBoltService';
+import { SpawnLocator } from './SpawnLocator';
+import { LairCodeService } from './LairCodeService';
+import { EchoCloneService } from './EchoCloneService';
+import { DoomBossService } from './doom/DoomBossService';
+import { DoomAbilityService } from './doom/DoomAbilityService';
+import { SECRET_LEVEL_NUMBER, HELL_LEVEL_INTERVAL } from '../config/gridConfig';
 import type { GameProfile } from './HypnosisService';
 import type { PlayerDirection } from './PlayerModel';
 import type { EventBus } from '../engine/EventBus';
 import type { PacmanEventMap, PacmanHudPayload } from '../core/Events';
-import { seasonForLevel } from './SeasonCatalog';
+import { seasonForLevel, secretSeason, hellSeason } from './SeasonCatalog';
 import type { SeasonData, SeasonName } from './SeasonCatalog';
 
 interface SeasonModifiers {
@@ -24,10 +28,20 @@ interface SeasonModifiers {
 	readonly playerSpeedModifier: number;
 }
 
+const MAZE_SCALE_DEFAULT = 0.8;
+const MAZE_SCALE_MIN = 0.3;
+const MAZE_SCALE_MAX = 1.5;
+
 export class LevelLoader {
 	private readonly events: EventBus<PacmanEventMap>;
 	private profileValue: GameProfile = 'pacman';
 	private levelNumber = 1;
+	private pendingStartLevelValue = 1;
+	private secretModeValue = false;
+	private hellModeValue = false;
+	private fireRequestedValue = false;
+	private secretReturnLevelValue = 1;
+	private mazeScaleValue = MAZE_SCALE_DEFAULT;
 	private seasonValue: SeasonData | null = null;
 	private gridValue: GridService | null = null;
 	private playerValue: PlayerService | null = null;
@@ -37,9 +51,11 @@ export class LevelLoader {
 	private combatValue: CombatService | null = null;
 	private fruitValue: FruitService | null = null;
 	private eggValue: GoldenEggService | null = null;
-	private ultraValue: UltraGhostService | null = null;
 	private hypnosisValue: HypnosisService | null = null;
-	private boltValue: SpeedBoltService | null = null;
+	private echoValue: EchoCloneService | null = null;
+	private doomBossValue: DoomBossService | null = null;
+	private doomValue: DoomAbilityService | null = null;
+	private lairCodeValue: LairCodeService | null = null;
 
 	constructor(events: EventBus<PacmanEventMap>) {
 		if (!events) {
@@ -55,6 +71,22 @@ export class LevelLoader {
 
 	get level(): number {
 		return this.levelNumber;
+	}
+
+	get pendingStartLevel(): number {
+		return this.pendingStartLevelValue;
+	}
+
+	get secretMode(): boolean {
+		return this.secretModeValue;
+	}
+
+	get hellMode(): boolean {
+		return this.hellModeValue;
+	}
+
+	get mazeScale(): number {
+		return this.mazeScaleValue;
 	}
 
 	get season(): SeasonData | null {
@@ -89,20 +121,54 @@ export class LevelLoader {
 		return this.eggValue;
 	}
 
-	get ultra(): UltraGhostService | null {
-		return this.ultraValue;
-	}
-
 	get hypnosis(): HypnosisService | null {
 		return this.hypnosisValue;
 	}
 
-	get bolt(): SpeedBoltService | null {
-		return this.boltValue;
+	get echo(): EchoCloneService | null {
+		return this.echoValue;
+	}
+
+	get doomBoss(): DoomBossService | null {
+		return this.doomBossValue;
+	}
+
+	get doom(): DoomAbilityService | null {
+		return this.doomValue;
+	}
+
+	get lairCode(): LairCodeService | null {
+		return this.lairCodeValue;
 	}
 
 	get score(): number {
 		return this.scoreValue ? this.scoreValue.score : 0;
+	}
+
+	setPendingStartLevel(level: number): void {
+		if (!Number.isFinite(level) || level < 1) {
+			console.error('LevelLoader.setPendingStartLevel', 'invalid level', level);
+			return;
+		}
+		this.pendingStartLevelValue = Math.floor(level);
+	}
+
+	setMazeScale(value: number): void {
+		if (!Number.isFinite(value) || value <= 0) {
+			console.error('LevelLoader.setMazeScale', 'invalid maze scale', value);
+			return;
+		}
+		this.mazeScaleValue = Math.min(MAZE_SCALE_MAX, Math.max(MAZE_SCALE_MIN, value));
+	}
+
+	requestFire(): void {
+		this.fireRequestedValue = true;
+	}
+
+	consumeFireRequest(): boolean {
+		const requested = this.fireRequestedValue;
+		this.fireRequestedValue = false;
+		return requested;
 	}
 
 	toggleProfile(): void {
@@ -129,9 +195,10 @@ export class LevelLoader {
 			this.combatValue &&
 			this.fruitValue &&
 			this.eggValue &&
-			this.ultraValue &&
 			this.hypnosisValue &&
-			this.boltValue
+			this.echoValue &&
+			this.lairCodeValue &&
+			(!this.hellModeValue || (this.doomBossValue && this.doomValue))
 		) {
 			return;
 		}
@@ -139,7 +206,10 @@ export class LevelLoader {
 	}
 
 	startNewGame(): void {
-		this.levelNumber = 1;
+		this.levelNumber = this.pendingStartLevelValue;
+		this.pendingStartLevelValue = 1;
+		this.secretModeValue = false;
+		this.secretReturnLevelValue = 1;
 		this.buildLevel();
 		this.resetGameplay();
 		this.emitHud();
@@ -153,11 +223,15 @@ export class LevelLoader {
 			!this.combatValue ||
 			!this.fruitValue ||
 			!this.eggValue ||
-			!this.ultraValue ||
 			!this.hypnosisValue ||
-			!this.boltValue
+			!this.echoValue ||
+			!this.lairCodeValue
 		) {
 			console.error('LevelLoader.resetGameplay', 'level is not initialized');
+			return;
+		}
+		if (this.hellModeValue && (!this.doomBossValue || !this.doomValue)) {
+			console.error('LevelLoader.resetGameplay', 'doom services are not initialized');
 			return;
 		}
 		this.playerValue.reset();
@@ -166,9 +240,15 @@ export class LevelLoader {
 		this.combatValue.reset();
 		this.fruitValue.reset();
 		this.eggValue.reset();
-		this.ultraValue.reset();
 		this.hypnosisValue.reset();
-		this.boltValue.reset();
+		this.echoValue.reset();
+		if (this.doomBossValue) {
+			this.doomBossValue.reset();
+		}
+		if (this.doomValue) {
+			this.doomValue.reset();
+		}
+		this.lairCodeValue.reset();
 	}
 
 	prepareAfterDeath(): void {
@@ -178,21 +258,159 @@ export class LevelLoader {
 			return;
 		}
 		this.combatValue.finishDeath();
+		if (this.hellModeValue) {
+			if (this.doomBossValue) {
+				this.doomBossValue.reset();
+			}
+			if (this.doomValue) {
+				this.doomValue.reset();
+			}
+		}
+		this.emitHud();
+	}
+
+	syncLairOpen(): void {
+		if (this.gridValue && this.lairCodeValue) {
+			this.gridValue.setLairOpen(this.lairCodeValue.open);
+		}
+	}
+
+	enterSecretLevel(): void {
+		if (this.secretModeValue) {
+			return;
+		}
+		this.ensure();
+		if (!this.scoreValue || !this.combatValue) {
+			console.error('LevelLoader.enterSecretLevel', 'level is not initialized');
+			return;
+		}
+		const keptScore = this.scoreValue.score;
+		const keptLives = this.combatValue.lives;
+		const keptLifeThreshold = this.combatValue.nextLifeThreshold;
+		this.secretModeValue = true;
+		this.secretReturnLevelValue = this.levelNumber + 1;
+		this.levelNumber = SECRET_LEVEL_NUMBER;
+		this.buildLevel();
+		if (
+			!this.playerValue ||
+			!this.progressValue ||
+			!this.ghostsValue ||
+			!this.scoreValue ||
+			!this.combatValue ||
+			!this.fruitValue ||
+			!this.eggValue ||
+			!this.hypnosisValue ||
+			!this.echoValue ||
+			!this.lairCodeValue
+		) {
+			console.error('LevelLoader.enterSecretLevel', 'level is not initialized after build');
+			return;
+		}
+		this.scoreValue.add(keptScore);
+		this.combatValue.setLives(keptLives);
+		this.combatValue.setNextLifeThreshold(keptLifeThreshold);
+		this.resetNextLevel();
 		this.emitHud();
 	}
 
 	advanceLevel(): void {
-		this.levelNumber += 1;
-		const keepScore = this.scoreValue ? this.scoreValue.score : 0;
+		this.ensure();
+		if (!this.scoreValue || !this.combatValue) {
+			console.error('LevelLoader.advanceLevel', 'level is not initialized');
+			return;
+		}
+		const keptScore = this.scoreValue.score;
+		const keptLives = this.combatValue.lives;
+		const keptLifeThreshold = this.combatValue.nextLifeThreshold;
+		if (this.secretModeValue) {
+			this.secretModeValue = false;
+			this.levelNumber =
+				Number.isFinite(this.secretReturnLevelValue) && this.secretReturnLevelValue >= 1
+					? Math.floor(this.secretReturnLevelValue)
+					: 1;
+		} else {
+			this.levelNumber += 1;
+		}
 		this.buildLevel();
-		if (this.scoreValue) {
-			this.scoreValue.add(keepScore);
+		if (
+			!this.playerValue ||
+			!this.progressValue ||
+			!this.ghostsValue ||
+			!this.scoreValue ||
+			!this.combatValue ||
+			!this.fruitValue ||
+			!this.eggValue ||
+			!this.hypnosisValue ||
+			!this.echoValue ||
+			!this.lairCodeValue
+		) {
+			console.error('LevelLoader.advanceLevel', 'level is not initialized after build');
+			return;
 		}
-		this.resetGameplay();
-		if (this.combatValue) {
-			this.combatValue.nextLevel();
+		if (this.hellModeValue && (!this.doomBossValue || !this.doomValue)) {
+			console.error('LevelLoader.advanceLevel', 'doom services are not initialized');
+			return;
 		}
+		this.scoreValue.add(keptScore);
+		this.combatValue.setLives(keptLives);
+		this.combatValue.setNextLifeThreshold(keptLifeThreshold);
+		this.resetNextLevel();
 		this.emitHud();
+	}
+
+	debugSpawnBonus(): void {
+		if (this.hellModeValue) {
+			if (this.doomValue) {
+				this.doomValue.debugSpawn();
+			}
+			return;
+		}
+		if (this.echoValue) {
+			this.echoValue.debugSpawn();
+		}
+	}
+
+	debugEnterHell(): void {
+		if (this.secretModeValue) {
+			return;
+		}
+		this.profileValue = 'pacman';
+		this.ensure();
+		if (!this.scoreValue || !this.combatValue) {
+			console.error('LevelLoader.debugEnterHell', 'level is not initialized');
+			return;
+		}
+		const keptScore = this.scoreValue.score;
+		const keptLives = this.combatValue.lives;
+		const keptLifeThreshold = this.combatValue.nextLifeThreshold;
+		this.levelNumber = HELL_LEVEL_INTERVAL;
+		this.buildLevel();
+		if (
+			!this.playerValue ||
+			!this.progressValue ||
+			!this.ghostsValue ||
+			!this.scoreValue ||
+			!this.combatValue ||
+			!this.fruitValue ||
+			!this.eggValue ||
+			!this.hypnosisValue ||
+			!this.echoValue ||
+			!this.lairCodeValue ||
+			!this.doomBossValue ||
+			!this.doomValue
+		) {
+			console.error('LevelLoader.debugEnterHell', 'level is not initialized after build');
+			return;
+		}
+		this.scoreValue.add(keptScore);
+		this.combatValue.setLives(keptLives);
+		this.combatValue.setNextLifeThreshold(keptLifeThreshold);
+		this.resetNextLevel();
+		this.emitHud();
+	}
+
+	debugEnterSecret(): void {
+		this.enterSecretLevel();
 	}
 
 	setDesiredDirection(direction: PlayerDirection): void {
@@ -207,9 +425,7 @@ export class LevelLoader {
 	}
 
 	hudPayload(): PacmanHudPayload {
-		const result: PacmanHudPayload['result'] = this.combatValue
-			? this.combatValue.result
-			: 'none';
+		const result: PacmanHudPayload['result'] = this.combatValue ? this.combatValue.result : 'none';
 		return {
 			score: this.scoreValue ? this.scoreValue.score : 0,
 			lives: this.combatValue ? this.combatValue.lives : 3,
@@ -221,20 +437,71 @@ export class LevelLoader {
 	}
 
 	private buildLevel(): void {
-		const season = seasonForLevel(this.levelNumber);
+		const hell =
+			!this.secretModeValue &&
+			this.profileValue === 'pacman' &&
+			this.levelNumber % HELL_LEVEL_INTERVAL === 0;
+		this.hellModeValue = hell;
+		const season = this.secretModeValue
+			? secretSeason()
+			: hell
+				? hellSeason()
+				: seasonForLevel(this.levelNumber);
 		this.seasonValue = season;
 		const grid = new GridService(new GridModel(season.grid));
+		if (hell) {
+			grid.setLairOpen(true);
+		}
 		const score = new ScoreModel();
 		const progress = new LevelProgress(grid, score, this.events);
+		const locator = new SpawnLocator(grid, progress);
 		const player = new PlayerService(grid, progress, this.events);
 		const ghosts = new GhostService(grid, player, progress);
-		const hypnosis = new HypnosisService(score);
-		const combat = new CombatService(player, ghosts, progress, score, this.events, hypnosis);
-		const fruit = new FruitService(progress, score, this.events);
-		const egg = new GoldenEggService(progress, this.events, score, grid);
-		const ultra = new UltraGhostService(grid, progress, score, this.levelNumber);
-		const bolt = new SpeedBoltService(progress, this.events);
+		const lairCode = new LairCodeService(this.levelNumber, this.events);
+		const hypnosis = new HypnosisService(score, lairCode);
+		const combat = new CombatService(
+			player,
+			ghosts,
+			progress,
+			score,
+			this.events,
+			hypnosis,
+			lairCode
+		);
+		const fruit = new FruitService(
+			this.profileValue,
+			this.levelNumber,
+			grid,
+			locator,
+			progress,
+			score,
+			this.events
+		);
+		const egg = new GoldenEggService(
+			this.levelNumber,
+			grid,
+			lairCode,
+			progress,
+			this.events,
+			score
+		);
+		const echo = new EchoCloneService(grid, progress, locator, this.events);
+		let doomBoss: DoomBossService | null = null;
+		let doom: DoomAbilityService | null = null;
+		if (hell) {
+			const bossSpawn = grid.bossSpawn();
+			if (!bossSpawn) {
+				console.error('LevelLoader.buildLevel', 'boss spawn tile DB is not found');
+				throw new Error('LevelLoader.buildLevel: boss spawn tile DB is not found');
+			}
+			doomBoss = new DoomBossService(grid, bossSpawn);
+			doom = new DoomAbilityService(grid, doomBoss);
+		}
 		combat.setProfile(this.profileValue);
+		combat.setHellMode(hell);
+		player.setTrainMode(this.secretModeValue);
+		ghosts.setTrainMode(this.secretModeValue);
+		combat.setSecretMode(this.secretModeValue);
 		const mods = this.modifiersFor(season.name);
 		combat.setPowerDuration(mods.powerDuration);
 		fruit.setFruitDuration(mods.fruitDuration);
@@ -248,22 +515,74 @@ export class LevelLoader {
 		this.combatValue = combat;
 		this.fruitValue = fruit;
 		this.eggValue = egg;
-		this.ultraValue = ultra;
 		this.hypnosisValue = hypnosis;
-		this.boltValue = bolt;
+		this.echoValue = echo;
+		this.doomBossValue = doomBoss;
+		this.doomValue = doom;
+		this.lairCodeValue = lairCode;
+	}
+
+	private resetNextLevel(): void {
+		if (
+			!this.playerValue ||
+			!this.progressValue ||
+			!this.ghostsValue ||
+			!this.combatValue ||
+			!this.fruitValue ||
+			!this.eggValue ||
+			!this.hypnosisValue ||
+			!this.echoValue ||
+			!this.lairCodeValue
+		) {
+			console.error('LevelLoader.resetNextLevel', 'level is not initialized');
+			return;
+		}
+		if (this.hellModeValue && (!this.doomBossValue || !this.doomValue)) {
+			console.error('LevelLoader.resetNextLevel', 'doom services are not initialized');
+			return;
+		}
+		this.playerValue.reset();
+		this.progressValue.resetDots();
+		this.ghostsValue.reset();
+		this.fruitValue.reset();
+		this.eggValue.reset();
+		this.hypnosisValue.reset();
+		this.echoValue.reset();
+		if (this.doomBossValue) {
+			this.doomBossValue.reset();
+		}
+		if (this.doomValue) {
+			this.doomValue.reset();
+		}
+		this.combatValue.nextLevel();
 	}
 
 	private modifiersFor(season: SeasonName): SeasonModifiers {
 		if (season === 'spring') {
-			return { powerDuration: 6.5, fruitDuration: 12, ghostSpeedModifier: 1, playerSpeedModifier: 1 };
+			return {
+				powerDuration: 6.5,
+				fruitDuration: 12,
+				ghostSpeedModifier: 1,
+				playerSpeedModifier: 1
+			};
 		}
 		if (season === 'summer') {
 			return { powerDuration: 6, fruitDuration: 14, ghostSpeedModifier: 1, playerSpeedModifier: 1 };
 		}
 		if (season === 'autumn') {
-			return { powerDuration: 6, fruitDuration: 12, ghostSpeedModifier: 0.97, playerSpeedModifier: 1 };
+			return {
+				powerDuration: 6,
+				fruitDuration: 12,
+				ghostSpeedModifier: 0.97,
+				playerSpeedModifier: 1
+			};
 		}
-		return { powerDuration: 6, fruitDuration: 12, ghostSpeedModifier: 1, playerSpeedModifier: 0.97 };
+		return {
+			powerDuration: 6,
+			fruitDuration: 12,
+			ghostSpeedModifier: 1,
+			playerSpeedModifier: 0.97
+		};
 	}
 
 	private currentPower(): number {

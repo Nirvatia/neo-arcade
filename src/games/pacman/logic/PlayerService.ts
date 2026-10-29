@@ -11,11 +11,12 @@ const VECTORS: Record<PlayerDirection, { x: number; y: number }> = {
 	LEFT: { x: -1, y: 0 },
 	RIGHT: { x: 1, y: 0 }
 };
-const DIRECTIONS: readonly PlayerDirection[] = ['UP', 'LEFT', 'DOWN', 'RIGHT'];
 const EPSILON = 1e-6;
-const BOLT_SPEED = 12;
-const BOLT_MAX_TILES = 8;
-const BOLT_LOOKAHEAD = 3;
+const IMPULSE_SPEED = 1.5;
+const RECOIL_SPEED = 9;
+const DASH_SPEED = 10;
+const DASH_INVULNERABILITY = 0.5;
+const TRAIN_TRAIL_LENGTH = 96;
 
 export class PlayerService {
 	private readonly grid: GridService;
@@ -23,8 +24,14 @@ export class PlayerService {
 	private readonly events: EventBus<PacmanEventMap>;
 	private readonly player: PlayerModel;
 	private speedModifierValue = 1;
-	private boltRemainingValue = 0;
-	private boltDirectionValue: PlayerDirection | null = null;
+	private trainActiveValue = false;
+	private trailValue: PlayerTile[] = [];
+	private lastTrailTileValue: PlayerTile | null = null;
+	private recoilRemainingValue = 0;
+	private recoilDirectionValue: PlayerDirection | null = null;
+	private dashRemainingValue = 0;
+	private dashDirectionValue: PlayerDirection | null = null;
+	private movementLockedValue = false;
 
 	constructor(grid: GridService, progress: LevelProgress, events: EventBus<PacmanEventMap>) {
 		if (!grid) {
@@ -62,11 +69,31 @@ export class PlayerService {
 	}
 
 	get isInvulnerable(): boolean {
-		return this.player.isInvulnerable || this.isBolting;
+		return this.player.isInvulnerable;
 	}
 
-	get isBolting(): boolean {
-		return this.boltRemainingValue > 0;
+	get invulnerableTimer(): number {
+		return this.player.invulnerableTimer;
+	}
+
+	get isRecoiling(): boolean {
+		return this.recoilRemainingValue > 0;
+	}
+
+	get isDashing(): boolean {
+		return this.dashRemainingValue > 0;
+	}
+
+	get trail(): readonly PlayerTile[] {
+		return this.trailValue;
+	}
+
+	get isMovementLocked(): boolean {
+		return this.movementLockedValue;
+	}
+
+	get baseSpeed(): number {
+		return this.player.speed;
 	}
 
 	setSpeedModifier(value: number): void {
@@ -81,18 +108,81 @@ export class PlayerService {
 		this.player.setDesired(direction);
 	}
 
-	startBolt(direction: PlayerDirection): void {
-		if (this.isBolting) {
+	setTrainMode(value: boolean): void {
+		this.trainActiveValue = value;
+		if (!value) {
+			this.clearTrail();
+		}
+	}
+
+	setMovementLocked(value: boolean): void {
+		this.movementLockedValue = value;
+	}
+
+	grantInvulnerability(seconds: number): void {
+		this.player.grantInvulnerability(seconds);
+	}
+
+	startRecoilBackward(tiles: number): void {
+		if (this.isRecoiling || this.isDashing) {
 			return;
 		}
-		this.boltRemainingValue = BOLT_MAX_TILES;
-		this.boltDirectionValue = direction;
-		this.player.setDesired(direction);
+		if (!Number.isFinite(tiles) || tiles <= 0) {
+			console.error('PlayerService.startRecoilBackward', 'invalid tile count', tiles);
+			return;
+		}
+		const facing = this.player.facing;
+		if (!facing) {
+			return;
+		}
+		this.recoilDirectionValue = this.oppositeDirection(facing);
+		this.recoilRemainingValue = Math.floor(tiles);
+		this.player.setDesired(this.recoilDirectionValue);
+	}
+
+	startDash(tiles: number): void {
+		if (this.isDashing || this.isRecoiling) {
+			return;
+		}
+		if (!Number.isFinite(tiles) || tiles <= 0) {
+			console.error('PlayerService.startDash', 'invalid tile count', tiles);
+			return;
+		}
+		const facing = this.player.facing;
+		if (!facing) {
+			return;
+		}
+		this.dashDirectionValue = facing;
+		this.dashRemainingValue = Math.floor(tiles);
+		this.player.setDesired(facing);
+		this.player.grantInvulnerability(DASH_INVULNERABILITY);
 	}
 
 	reset(): void {
 		this.player.reset(this.grid.playerSpawn);
-		this.endBolt();
+		this.endRecoil();
+		this.endDash();
+		this.clearTrail();
+		this.movementLockedValue = false;
+	}
+
+	getTrainTarget(offset: number): PlayerTile {
+		const tile = this.player.tile;
+		if (!this.trainActiveValue) {
+			return tile;
+		}
+		if (!Number.isFinite(offset) || offset <= 0) {
+			return tile;
+		}
+		if (this.trailValue.length === 0) {
+			return tile;
+		}
+		const index = Math.min(
+			this.trailValue.length - 1,
+			Math.max(0, Math.floor(offset) - 1)
+		);
+		const target = this.trailValue[index];
+		return target ? target : tile;
 	}
 
 	update(dt: number): void {
@@ -100,12 +190,28 @@ export class PlayerService {
 			console.error('PlayerService.update', 'invalid delta time', dt);
 			return;
 		}
-		if (this.isBolting) {
-			this.updateBolt(dt);
+
+		if (this.movementLockedValue) {
+			const remaining = Math.min(0.25, Math.max(0, dt));
+			this.player.decreaseInvulnerability(remaining);
+			this.player.decreaseImpulse(remaining);
+			return;
+		}
+
+		if (this.isDashing) {
+			this.updateDash(dt);
+			this.recordTrail();
+			return;
+		}
+		if (this.isRecoiling) {
+			this.updateRecoil(dt);
+			this.recordTrail();
 			return;
 		}
 		let remaining = Math.min(0.25, Math.max(0, dt));
 		this.player.decreaseInvulnerability(remaining);
+		this.player.decreaseImpulse(remaining);
+		const speed = this.effectiveSpeed();
 		let guard = 0;
 		while (remaining > EPSILON && guard < 512) {
 			guard += 1;
@@ -128,12 +234,12 @@ export class PlayerService {
 				}
 				continue;
 			}
-			const step = this.player.speed * this.speedModifierValue * remaining;
+			const step = speed * remaining;
 			if (step < needed) {
 				this.player.addProgress(step);
 				remaining = 0;
 			} else {
-				remaining -= needed / (this.player.speed * this.speedModifierValue);
+				remaining -= needed / speed;
 				this.player.completeMove();
 				if (this.handleArrival()) {
 					break;
@@ -143,131 +249,123 @@ export class PlayerService {
 		if (guard >= 512) {
 			console.error('PlayerService.update', 'movement guard exhausted');
 		}
+		this.recordTrail();
 	}
 
-	private updateBolt(dt: number): void {
+	private updateRecoil(dt: number): void {
 		let remaining = Math.min(0.25, Math.max(0, dt));
 		this.player.decreaseInvulnerability(remaining);
+		this.player.decreaseImpulse(remaining);
 		let guard = 0;
-		while (remaining > EPSILON && this.boltRemainingValue > 0 && guard < 512) {
+		while (remaining > EPSILON && this.recoilRemainingValue > 0 && guard < 512) {
 			guard += 1;
 			if (!this.player.target) {
-				const direction = this.chooseBoltDirection();
+				const direction = this.recoilDirectionValue;
 				if (!direction) {
-					this.endBolt();
+					this.endRecoil();
 					break;
 				}
 				const target = this.targetFor(this.player.tile, direction);
 				if (!this.grid.isPlayerWalkable(target.x, target.y)) {
-					this.endBolt();
+					this.endRecoil();
 					break;
 				}
 				this.player.beginMove(direction, target);
-				this.boltDirectionValue = direction;
 			}
 			const needed = Math.max(0, 1 - this.player.progress);
 			if (needed <= EPSILON) {
 				this.player.completeMove();
-				this.handleBoltArrival();
+				this.handleRecoilArrival();
 				continue;
 			}
-			const step = BOLT_SPEED * remaining;
+			const step = RECOIL_SPEED * remaining;
 			if (step < needed) {
 				this.player.addProgress(step);
 				remaining = 0;
 			} else {
-				remaining -= needed / BOLT_SPEED;
+				remaining -= needed / RECOIL_SPEED;
 				this.player.completeMove();
-				this.handleBoltArrival();
+				this.handleRecoilArrival();
 			}
 		}
 		if (guard >= 512) {
-			console.error('PlayerService.updateBolt', 'movement guard exhausted');
+			console.error('PlayerService.updateRecoil', 'movement guard exhausted');
 		}
 	}
 
-	private handleBoltArrival(): void {
-		this.boltRemainingValue = Math.max(0, this.boltRemainingValue - 1);
-		const tile = this.player.tile;
-		this.progress.collectDotOnly(tile.x, tile.y);
-		if (this.boltRemainingValue <= 0) {
-			this.endBolt();
-		}
-	}
-
-	private endBolt(): void {
-		this.boltRemainingValue = 0;
-		this.boltDirectionValue = null;
-	}
-
-	private chooseBoltDirection(): PlayerDirection | null {
-		const facing = this.boltDirectionValue;
-		const opposite = facing ? this.oppositeDirection(facing) : null;
-		const desired = this.player.desired;
-		const candidates: PlayerDirection[] = [];
-		for (const direction of DIRECTIONS) {
-			if (direction === opposite) {
+	private updateDash(dt: number): void {
+		let remaining = Math.min(0.25, Math.max(0, dt));
+		this.player.decreaseInvulnerability(remaining);
+		this.player.decreaseImpulse(remaining);
+		let guard = 0;
+		while (remaining > EPSILON && this.dashRemainingValue > 0 && guard < 512) {
+			guard += 1;
+			if (!this.player.target) {
+				const direction = this.dashDirectionValue;
+				if (!direction) {
+					this.endDash();
+					break;
+				}
+				const target = this.targetFor(this.player.tile, direction);
+				if (!this.grid.isPlayerWalkable(target.x, target.y)) {
+					this.endDash();
+					break;
+				}
+				this.player.beginMove(direction, target);
+			}
+			const needed = Math.max(0, 1 - this.player.progress);
+			if (needed <= EPSILON) {
+				this.player.completeMove();
+				this.handleDashArrival();
 				continue;
 			}
-			const target = this.targetFor(this.player.tile, direction);
-			if (this.grid.isPlayerWalkable(target.x, target.y)) {
-				candidates.push(direction);
+			const step = DASH_SPEED * remaining;
+			if (step < needed) {
+				this.player.addProgress(step);
+				remaining = 0;
+			} else {
+				remaining -= needed / DASH_SPEED;
+				this.player.completeMove();
+				this.handleDashArrival();
 			}
 		}
-		if (candidates.length === 0) {
-			return null;
+		if (guard >= 512) {
+			console.error('PlayerService.updateDash', 'movement guard exhausted');
 		}
-		if (candidates.length === 1) {
-			return candidates[0];
-		}
-		if (desired && candidates.includes(desired) && this.countDotsAhead(desired) > 0) {
-			return desired;
-		}
-		let best: PlayerDirection | null = null;
-		let bestDots = -1;
-		for (const direction of candidates) {
-			const dots = this.countDotsAhead(direction);
-			if (dots > bestDots) {
-				bestDots = dots;
-				best = direction;
-			}
-		}
-		return best ?? candidates[0];
 	}
 
-	private countDotsAhead(direction: PlayerDirection): number {
-		let count = 0;
-		let x = this.player.tile.x;
-		let y = this.player.tile.y;
-		const vector = VECTORS[direction];
-		for (let step = 0; step < BOLT_LOOKAHEAD; step += 1) {
-			x += vector.x;
-			y += vector.y;
-			if (!this.grid.isInside(x, y)) {
-				break;
-			}
-			const tile = this.grid.tileAt(x, y);
-			if (tile === 'WL' || tile === 'ES') {
-				break;
-			}
-			if (tile === 'DT' && !this.progress.isCollected(x, y)) {
-				count += 1;
-			}
+	private handleRecoilArrival(): void {
+		this.recoilRemainingValue = Math.max(0, this.recoilRemainingValue - 1);
+		this.handleArrival();
+		if (this.recoilRemainingValue <= 0) {
+			this.endRecoil();
 		}
-		return count;
 	}
 
-	private oppositeDirection(direction: PlayerDirection): PlayerDirection {
-		if (direction === 'UP') {
-			return 'DOWN';
+	private handleDashArrival(): void {
+		this.dashRemainingValue = Math.max(0, this.dashRemainingValue - 1);
+		this.handleArrival();
+		if (this.dashRemainingValue <= 0) {
+			this.endDash();
 		}
-		if (direction === 'DOWN') {
-			return 'UP';
+	}
+
+	private endRecoil(): void {
+		this.recoilRemainingValue = 0;
+		this.recoilDirectionValue = null;
+	}
+
+	private endDash(): void {
+		this.dashRemainingValue = 0;
+		this.dashDirectionValue = null;
+	}
+
+	private effectiveSpeed(): number {
+		const base = this.player.speed * this.speedModifierValue;
+		if (this.player.isImpulsing) {
+			return base * IMPULSE_SPEED;
 		}
-		if (direction === 'LEFT') {
-			return 'RIGHT';
-		}
-		return 'LEFT';
+		return base;
 	}
 
 	private chooseDirection(): PlayerDirection | null {
@@ -292,6 +390,19 @@ export class PlayerService {
 		return { x: tile.x + vector.x, y: tile.y + vector.y };
 	}
 
+	private oppositeDirection(direction: PlayerDirection): PlayerDirection {
+		if (direction === 'UP') {
+			return 'DOWN';
+		}
+		if (direction === 'DOWN') {
+			return 'UP';
+		}
+		if (direction === 'LEFT') {
+			return 'RIGHT';
+		}
+		return 'LEFT';
+	}
+
 	private handleArrival(): boolean {
 		const tile = this.player.tile;
 		this.progress.collectAt(tile.x, tile.y);
@@ -307,5 +418,29 @@ export class PlayerService {
 		this.events.emit('audio:cue', { cue: 'teleport' });
 		this.progress.collectAt(destination.x, destination.y);
 		return true;
+	}
+
+	private recordTrail(): void {
+		if (!this.trainActiveValue) {
+			return;
+		}
+		const tile = this.player.tile;
+		if (
+			this.lastTrailTileValue &&
+			this.lastTrailTileValue.x === tile.x &&
+			this.lastTrailTileValue.y === tile.y
+		) {
+			return;
+		}
+		this.lastTrailTileValue = { x: tile.x, y: tile.y };
+		this.trailValue.unshift({ x: tile.x, y: tile.y });
+		if (this.trailValue.length > TRAIN_TRAIL_LENGTH) {
+			this.trailValue.pop();
+		}
+	}
+
+	private clearTrail(): void {
+		this.trailValue = [];
+		this.lastTrailTileValue = null;
 	}
 }

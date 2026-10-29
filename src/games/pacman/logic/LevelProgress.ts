@@ -1,7 +1,9 @@
 import type { GridService } from './GridService';
 import type { ScoreModel } from './ScoreModel';
+import type { GridPoint } from './GridModel';
 import type { EventBus } from '../engine/EventBus';
 import type { PacmanEventMap } from '../core/Events';
+import { SCORE_TABLE } from '../config/scoreConfig';
 
 export class LevelProgress {
 	private readonly grid: GridService;
@@ -11,7 +13,6 @@ export class LevelProgress {
 	private remainingDotsValue: number;
 	private remainingEnergizersValue: number;
 	private pendingEnergizerValue = false;
-	private pendingExtraLifeValue = false;
 	private destroyedDotsValue = 0;
 
 	constructor(grid: GridService, scoreModel: ScoreModel, events: EventBus<PacmanEventMap>) {
@@ -64,19 +65,27 @@ export class LevelProgress {
 		return this.collected.has(this.key(x, y));
 	}
 
+	safeSpawnTiles(): GridPoint[] {
+		const tiles: GridPoint[] = [];
+		for (let y = 0; y < this.grid.height; y += 1) {
+			for (let x = 0; x < this.grid.width; x += 1) {
+				if (this.grid.tileAt(x, y) !== 'DT') {
+					continue;
+				}
+				if (!this.collected.has(this.key(x, y))) {
+					continue;
+				}
+				tiles.push({ x, y });
+			}
+		}
+		return tiles;
+	}
+
 	consumePendingEnergizer(): boolean {
 		if (!this.pendingEnergizerValue) {
 			return false;
 		}
 		this.pendingEnergizerValue = false;
-		return true;
-	}
-
-	consumePendingExtraLife(): boolean {
-		if (!this.pendingExtraLifeValue) {
-			return false;
-		}
-		this.pendingExtraLifeValue = false;
 		return true;
 	}
 
@@ -143,7 +152,7 @@ export class LevelProgress {
 			}
 			this.collected.add(id);
 			this.remainingDotsValue = Math.max(0, this.remainingDotsValue - 1);
-			this.scoreModel.add(10);
+			this.scoreModel.add(SCORE_TABLE.dot);
 			this.events.emit('audio:cue', { cue: 'dot' });
 			return;
 		}
@@ -153,14 +162,9 @@ export class LevelProgress {
 			}
 			this.collected.add(id);
 			this.remainingEnergizersValue = Math.max(0, this.remainingEnergizersValue - 1);
-			this.scoreModel.add(50);
+			this.scoreModel.add(SCORE_TABLE.energizer);
 			this.pendingEnergizerValue = true;
 			this.events.emit('audio:cue', { cue: 'energizer' });
-			return;
-		}
-		if (tile === 'LU') {
-			this.collected.add(id);
-			this.pendingExtraLifeValue = true;
 		}
 	}
 
@@ -186,8 +190,16 @@ export class LevelProgress {
 		}
 		this.collected.add(id);
 		this.remainingDotsValue = Math.max(0, this.remainingDotsValue - 1);
-		this.scoreModel.add(10);
+		this.scoreModel.add(SCORE_TABLE.dot);
 		this.events.emit('audio:cue', { cue: 'dot' });
+	}
+
+	resetDots(): void {
+		this.collected.clear();
+		this.remainingDotsValue = this.grid.dotCount;
+		this.remainingEnergizersValue = this.grid.energizerCount;
+		this.pendingEnergizerValue = false;
+		this.destroyedDotsValue = 0;
 	}
 
 	reset(): void {
@@ -195,7 +207,6 @@ export class LevelProgress {
 		this.remainingDotsValue = this.grid.dotCount;
 		this.remainingEnergizersValue = this.grid.energizerCount;
 		this.pendingEnergizerValue = false;
-		this.pendingExtraLifeValue = false;
 		this.destroyedDotsValue = 0;
 		this.scoreModel.reset();
 	}

@@ -1,59 +1,13 @@
-export type TeleportId = '0A' | '0B' | '0C';
+import type { GridMatrix, TeleportType, TileType } from '../config/gridConfig';
+import { isTeleportToken, isTileToken } from '../config/gridConfig';
 
-export type TileType =
-	| 'WL'
-	| 'DT'
-	| 'EU'
-	| 'ES'
-	| 'LE'
-	| 'LT'
-	| 'PM'
-	| 'BY'
-	| 'PY'
-	| 'IY'
-	| 'CE'
-	| 'RT'
-	| 'GU'
-	| 'SW'
-	| 'LU'
-	| TeleportId;
+export type { GridMatrix, TeleportType, TileType };
 
 export type GhostKind = 'BLINKY' | 'PINKY' | 'INKY' | 'CLYDE';
 
 export interface GridPoint {
 	readonly x: number;
 	readonly y: number;
-}
-
-const TELEPORT_TOKENS: ReadonlySet<string> = new Set<string>(['0A', '0B', '0C']);
-
-const KNOWN_TOKENS: ReadonlySet<string> = new Set<string>([
-	'WL',
-	'DT',
-	'EU',
-	'ES',
-	'LE',
-	'LT',
-	'PM',
-	'BY',
-	'PY',
-	'IZ',
-	'CE',
-	'RT',
-	'GU',
-	'SW',
-	'LU',
-	'0A',
-	'0B',
-	'0C'
-]);
-
-export function isTeleportId(token: string): token is TeleportId {
-	return TELEPORT_TOKENS.has(token);
-}
-
-function isTileToken(token: string): token is TileType {
-	return KNOWN_TOKENS.has(token);
 }
 
 export class GridModel {
@@ -63,14 +17,10 @@ export class GridModel {
 	readonly energizerCount: number;
 	readonly playerSpawn: GridPoint;
 	readonly ghostSpawns: Record<GhostKind, GridPoint>;
-	readonly switchSpawn: GridPoint | null;
-	readonly trapSpawn: GridPoint | null;
-	readonly eggSpawn: GridPoint | null;
-	readonly extraLifeSpawns: readonly GridPoint[];
 	private readonly tiles: ReadonlyArray<ReadonlyArray<TileType>>;
-	private readonly teleportPositions: ReadonlyMap<TeleportId, ReadonlyArray<GridPoint>>;
+	private readonly teleportPositions: ReadonlyMap<TeleportType, ReadonlyArray<GridPoint>>;
 
-	constructor(raw: readonly string[]) {
+	constructor(raw: GridMatrix) {
 		if (!Array.isArray(raw) || raw.length === 0) {
 			console.error('GridModel.constructor', 'level map is empty');
 			throw new Error('GridModel.constructor: level map is empty');
@@ -86,36 +36,26 @@ export class GridModel {
 			INKY: null,
 			CLYDE: null
 		};
-		let switchSpawn: GridPoint | null = null;
-		let trapSpawn: GridPoint | null = null;
-		let eggSpawn: GridPoint | null = null;
-		const extraLifeSpawns: GridPoint[] = [];
-		const teleportPositions = new Map<TeleportId, GridPoint[]>();
+		const teleportPositions = new Map<TeleportType, GridPoint[]>();
 		for (let y = 0; y < raw.length; y += 1) {
 			const row = raw[y];
-			if (typeof row !== 'string') {
-				console.error('GridModel.constructor', 'invalid row type', { y });
-				throw new Error('GridModel.constructor: invalid row type');
+			if (!Array.isArray(row) || row.length === 0) {
+				console.error('GridModel.constructor', 'invalid row', { y });
+				throw new Error('GridModel.constructor: invalid row');
 			}
-			const trimmed = row.trim();
-			if (trimmed.length === 0) {
-				console.error('GridModel.constructor', 'empty row', { y });
-				throw new Error('GridModel.constructor: empty row');
-			}
-			const tokens = trimmed.split(/\s+/);
 			if (width === 0) {
-				width = tokens.length;
-			} else if (tokens.length !== width) {
+				width = row.length;
+			} else if (row.length !== width) {
 				console.error('GridModel.constructor', 'row width mismatch', {
 					y,
 					expected: width,
-					actual: tokens.length
+					actual: row.length
 				});
 				throw new Error('GridModel.constructor: row width mismatch');
 			}
 			const tileRow: TileType[] = [];
-			for (let x = 0; x < tokens.length; x += 1) {
-				const token = tokens[x];
+			for (let x = 0; x < row.length; x += 1) {
+				const token = row[x];
 				if (typeof token !== 'string' || !isTileToken(token)) {
 					console.error('GridModel.constructor', 'unknown tile token', { x, y, token });
 					throw new Error('GridModel.constructor: unknown tile token');
@@ -161,31 +101,7 @@ export class GridModel {
 					}
 					ghostSpawns.CLYDE = { x, y };
 				}
-				if (token === 'SW') {
-					if (switchSpawn) {
-						console.error('GridModel.constructor', 'duplicate lair switch', { x, y });
-						throw new Error('GridModel.constructor: duplicate lair switch');
-					}
-					switchSpawn = { x, y };
-				}
-				if (token === 'RT') {
-					if (trapSpawn) {
-						console.error('GridModel.constructor', 'duplicate rune trap', { x, y });
-						throw new Error('GridModel.constructor: duplicate rune trap');
-					}
-					trapSpawn = { x, y };
-				}
-				if (token === 'GU') {
-					if (eggSpawn) {
-						console.error('GridModel.constructor', 'duplicate golden egg', { x, y });
-						throw new Error('GridModel.constructor: duplicate golden egg');
-					}
-					eggSpawn = { x, y };
-				}
-				if (token === 'LU') {
-					extraLifeSpawns.push({ x, y });
-				}
-				if (isTeleportId(token)) {
+				if (isTeleportToken(token)) {
 					let positions = teleportPositions.get(token);
 					if (!positions) {
 						positions = [];
@@ -236,10 +152,6 @@ export class GridModel {
 			INKY: inkySpawn,
 			CLYDE: clydeSpawn
 		};
-		this.switchSpawn = switchSpawn;
-		this.trapSpawn = trapSpawn;
-		this.eggSpawn = eggSpawn;
-		this.extraLifeSpawns = extraLifeSpawns;
 		this.tiles = rows;
 		this.teleportPositions = teleportPositions;
 	}
@@ -272,7 +184,7 @@ export class GridModel {
 		return tile;
 	}
 
-	getTeleportDestination(id: TeleportId, x: number, y: number): GridPoint | undefined {
+	getTeleportDestination(id: TeleportType, x: number, y: number): GridPoint | undefined {
 		const positions = this.teleportPositions.get(id);
 		if (!positions) {
 			return undefined;

@@ -2,6 +2,27 @@ import type { GridLayout } from './GridView';
 
 const DEBRIS_COUNT = 14;
 
+export function deathWaveEase(progress: number): number {
+	const clamped = Math.min(1, Math.max(0, Number.isFinite(progress) ? progress : 0));
+	return 1 - Math.pow(1 - clamped, 1.6);
+}
+
+export function deathWaveMaxRadius(gridWidth: number, gridHeight: number): number {
+	if (
+		!Number.isFinite(gridWidth) ||
+		gridWidth <= 0 ||
+		!Number.isFinite(gridHeight) ||
+		gridHeight <= 0
+	) {
+		console.error('deathWaveMaxRadius', 'invalid grid size', {
+			gridWidth,
+			gridHeight
+		});
+		return 0;
+	}
+	return Math.sqrt(gridWidth * gridWidth + gridHeight * gridHeight);
+}
+
 export class DeathWaveView {
 	draw(
 		ctx: CanvasRenderingContext2D,
@@ -23,47 +44,23 @@ export class DeathWaveView {
 			console.error('DeathWaveView.draw', 'invalid tile size', layout.tileSize);
 			return;
 		}
-		const clamped = Math.min(1, Math.max(0, progress));
-		const eased = 1 - Math.pow(1 - clamped, 1.6);
+		const eased = deathWaveEase(progress);
+		const radius =
+			eased * deathWaveMaxRadius(gridWidth, gridHeight) * layout.tileSize;
+		if (!Number.isFinite(radius) || radius < 1) {
+			return;
+		}
 		const px = layout.offsetX + centerX * layout.tileSize;
 		const py = layout.offsetY + centerY * layout.tileSize;
 		const gridPixelWidth = gridWidth * layout.tileSize;
 		const gridPixelHeight = gridHeight * layout.tileSize;
-		const maxRadius = Math.sqrt(
-			gridPixelWidth * gridPixelWidth + gridPixelHeight * gridPixelHeight
-		);
-		const radius = eased * maxRadius;
-		if (radius < 1) {
-			return;
-		}
 		ctx.save();
 		ctx.beginPath();
 		ctx.rect(layout.offsetX, layout.offsetY, gridPixelWidth, gridPixelHeight);
 		ctx.clip();
-		this.drawConsumption(ctx, px, py, radius, layout.offsetX, layout.offsetY, gridPixelWidth, gridPixelHeight);
-		this.drawFront(ctx, px, py, radius, clamped, layout.tileSize);
-		this.drawDebris(ctx, px, py, radius, clamped, layout.tileSize);
+		this.drawFront(ctx, px, py, radius, eased, layout.tileSize);
+		this.drawDebris(ctx, px, py, radius, eased, layout.tileSize);
 		ctx.restore();
-	}
-
-	private drawConsumption(
-		ctx: CanvasRenderingContext2D,
-		cx: number,
-		cy: number,
-		radius: number,
-		ox: number,
-		oy: number,
-		w: number,
-		h: number
-	): void {
-		const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
-		gradient.addColorStop(0, 'rgba(2, 3, 6, 0.97)');
-		gradient.addColorStop(0.6, 'rgba(2, 3, 6, 0.94)');
-		gradient.addColorStop(0.82, 'rgba(12, 5, 3, 0.8)');
-		gradient.addColorStop(0.93, 'rgba(255, 110, 40, 0.22)');
-		gradient.addColorStop(1, 'rgba(255, 110, 40, 0)');
-		ctx.fillStyle = gradient;
-		ctx.fillRect(ox, oy, w, h);
 	}
 
 	private drawFront(

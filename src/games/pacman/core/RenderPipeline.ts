@@ -1,19 +1,25 @@
 import type { Director } from './Director';
 import type { LevelLoader } from '../logic/LevelLoader';
+import type { GridService } from '../logic/GridService';
 import { GridView } from '../render/GridView';
-import type { GridLayout } from '../render/GridView';
+import type { GridLayout, DisintegrationMask } from '../render/GridView';
 import { PlayerView } from '../render/PlayerView';
 import { GhostView } from '../render/GhostView';
 import { FruitView } from '../render/FruitView';
 import { GoldenEggView } from '../render/GoldenEggView';
-import { UltraGhostView } from '../render/UltraGhostView';
-import { DeathWaveView } from '../render/DeathWaveView';
-import { WeatherView } from '../render/WeatherView';
-import { SpeedBoltView } from '../render/SpeedBoltView';
-
-const DEATH_TOTAL_DURATION = 1.35;
+import { EchoCloneView } from '../render/EchoCloneView';
+import { AbyssBossView } from '../render/AbyssBossView';
+import { DoomCombatView } from '../render/DoomCombatView';
+import { DeathWaveView, deathWaveEase, deathWaveMaxRadius } from '../render/DeathWaveView';
+import { LevelClearView } from '../render/LevelClearView';
+import { OverlayView } from '../render/OverlayView';
+import type { OverlayMode, OverlaySnapshot } from '../render/OverlayView';
+import { lerpHex } from '../render/contracts/MazePalette';
+import { seasonRenderBundleFor } from '../render/seasons/seasonRenderBundleFactory';
+import type { SeasonRenderBundle, RenderBoard } from '../render/contracts/SeasonRenderBundle';
 
 export class RenderPipeline {
+	private readonly container: HTMLElement;
 	private readonly director: Director;
 	private readonly level: LevelLoader;
 	private readonly gridView: GridView;
@@ -21,37 +27,28 @@ export class RenderPipeline {
 	private readonly ghostView: GhostView;
 	private readonly fruitView: FruitView;
 	private readonly goldenEggView: GoldenEggView;
-	private readonly ultraGhostView: UltraGhostView;
+	private readonly echoCloneView: EchoCloneView;
+	private readonly abyssBossView: AbyssBossView;
+	private readonly doomCombatView: DoomCombatView;
 	private readonly deathWaveView: DeathWaveView;
-	private readonly weatherView: WeatherView;
-	private readonly speedBoltView: SpeedBoltView;
+	private readonly levelClearView: LevelClearView;
+	private readonly overlayView: OverlayView;
 	private readonly canvas: HTMLCanvasElement;
 	private readonly ctx: CanvasRenderingContext2D;
-	private readonly width: number;
-	private readonly height: number;
+	private width = 0;
+	private height = 0;
 	private lastRenderTime = 0;
+	private timeValue = 0;
 
-	constructor(container: HTMLElement, director: Director, level: LevelLoader, width = 560, height = 620) {
+	constructor(container: HTMLElement, director: Director, level: LevelLoader) {
 		if (typeof document === 'undefined') {
-			console.error('RenderPipeline.constructor', 'document is unavailable');
 			throw new Error('RenderPipeline.constructor: document is unavailable');
 		}
-		if (!container) {
-			console.error('RenderPipeline.constructor', 'missing container');
-			throw new Error('RenderPipeline.constructor: missing container');
+		if (!container || !director || !level) {
+			console.error('RenderPipeline.constructor', 'missing dependency');
+			throw new Error('RenderPipeline.constructor: missing dependency');
 		}
-		if (!director) {
-			console.error('RenderPipeline.constructor', 'missing director');
-			throw new Error('RenderPipeline.constructor: missing director');
-		}
-		if (!level) {
-			console.error('RenderPipeline.constructor', 'missing level loader');
-			throw new Error('RenderPipeline.constructor: missing level loader');
-		}
-		if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
-			console.error('RenderPipeline.constructor', 'invalid canvas size', { width, height });
-			throw new Error('RenderPipeline.constructor: canvas size must be positive');
-		}
+		this.container = container;
 		this.director = director;
 		this.level = level;
 		this.gridView = new GridView();
@@ -59,21 +56,18 @@ export class RenderPipeline {
 		this.ghostView = new GhostView();
 		this.fruitView = new FruitView();
 		this.goldenEggView = new GoldenEggView();
-		this.ultraGhostView = new UltraGhostView();
+		this.echoCloneView = new EchoCloneView();
+		this.abyssBossView = new AbyssBossView();
+		this.doomCombatView = new DoomCombatView();
 		this.deathWaveView = new DeathWaveView();
-		this.weatherView = new WeatherView();
-		this.speedBoltView = new SpeedBoltView();
-		this.width = Math.floor(width);
-		this.height = Math.floor(height);
+		this.levelClearView = new LevelClearView();
+		this.overlayView = new OverlayView();
 		this.canvas = document.createElement('canvas');
-		this.canvas.width = this.width;
-		this.canvas.height = this.height;
 		this.canvas.style.display = 'block';
 		this.canvas.style.imageRendering = 'pixelated';
 		container.appendChild(this.canvas);
 		const ctx = this.canvas.getContext('2d');
 		if (!ctx) {
-			console.error('RenderPipeline.constructor', '2d context unavailable');
 			throw new Error('RenderPipeline.constructor: 2d context unavailable');
 		}
 		this.ctx = ctx;
@@ -84,120 +78,278 @@ export class RenderPipeline {
 		const now = typeof performance !== 'undefined' ? performance.now() : 0;
 		const dt = this.lastRenderTime > 0 ? Math.min(0.1, (now - this.lastRenderTime) / 1000) : 0;
 		this.lastRenderTime = now;
+		this.timeValue += dt;
+
+		if (!this.syncSize()) {
+			return;
+		}
+
 		const season = this.level.season;
-		const background = season
-			? this.lerpHex(season.palette.background, season.palette.backgroundNight, this.dayNightRatio())
-			: '#030509';
-		this.ctx.fillStyle = background;
-		this.ctx.fillRect(0, 0, this.width, this.height);
 		const grid = this.level.grid;
 		const progress = this.level.progress;
 		const combat = this.level.combat;
-		if (!grid || !progress) {
+		if (!season || !grid || !progress) {
 			return;
 		}
-		const palette = season ? season.palette : null;
+
 		const ratio = this.dayNightRatio();
-		const layout = this.gridView.draw(this.ctx, grid, progress, this.width, this.height, palette, ratio);
+		this.ctx.fillStyle = lerpHex(season.palette.background, season.palette.backgroundNight, ratio);
+		this.ctx.fillRect(0, 0, this.width, this.height);
+
+		const bundle = seasonRenderBundleFor({
+			season,
+			secret: this.level.secretMode,
+			hell: this.level.hellMode,
+			level: this.level.level
+		});
+		const layout = this.gridView.computeLayout(grid, this.width, this.height, this.level.mazeScale);
+		this.drawSeasonScene(bundle, layout, grid);
+
+		const state = this.director.stateName;
+		if (state === 'level-clear') {
+			const clear = this.director.levelClear;
+			if (clear && clear.phase === 'cutscene') {
+				this.levelClearView.draw(this.ctx, clear, grid, layout, this.level.profile);
+			}
+			this.drawOverlay(layout, grid);
+			return;
+		}
+
+		const mask = this.disintegrationMask(grid);
+		const drawnLayout = this.gridView.draw(
+			this.ctx, grid, progress, this.width, this.height,
+			season.palette, ratio, bundle, this.timeValue, mask, this.level.mazeScale
+		);
+
 		const fruit = this.level.fruit;
-		if (fruit) {
-			this.fruitView.draw(this.ctx, fruit, layout);
+		if (fruit && fruit.active !== null && !this.erased(fruit.position, mask)) {
+			this.fruitView.draw(this.ctx, fruit, drawnLayout);
 		}
+
 		const egg = this.level.egg;
-		if (egg) {
-			this.goldenEggView.draw(this.ctx, egg, layout);
+		if (egg && egg.phase === 'egg' && !this.erased(egg.eggPosition, mask)) {
+			this.goldenEggView.draw(this.ctx, egg, drawnLayout);
 		}
-		const bolt = this.level.bolt;
-		const worldVisible = this.director.stateName !== 'menu';
-		if (bolt && worldVisible) {
-			this.speedBoltView.draw(this.ctx, bolt, layout);
+
+		const echo = this.level.echo;
+		if (echo && (echo.phase === 'token' || echo.phase === 'clone') && !this.erased(echo.position, mask)) {
+			this.echoCloneView.draw(this.ctx, echo, drawnLayout);
 		}
-		const ultra = this.level.ultra;
-		if (ultra && worldVisible) {
-			this.ultraGhostView.draw(this.ctx, ultra, layout);
+
+		const doomBoss = this.level.doomBoss;
+		const doom = this.level.doom;
+		if (doomBoss && doom && this.level.hellMode && !doomBoss.defeated) {
+			if (!this.erased(doomBoss.position, mask)) {
+				this.abyssBossView.draw(this.ctx, doomBoss, drawnLayout, this.timeValue);
+			}
+			this.doomCombatView.draw(this.ctx, doomBoss, doom, grid, drawnLayout, this.timeValue);
 		}
+
 		const ghosts = this.level.ghosts;
-		if (ghosts && !(ultra && ultra.contractActive)) {
+		if (ghosts) {
 			const isMs = this.level.profile === 'ms-pacman';
 			const hypnosis = this.level.hypnosis;
 			const ghostTimer = isMs
-				? hypnosis
-					? hypnosis.overdriveTimer
-					: 0
-				: combat
-					? combat.powerTimer
-					: 0;
-			const msOverdrive = Boolean(isMs && hypnosis && hypnosis.overdriveActive);
-			this.ghostView.draw(this.ctx, ghosts, layout, ghostTimer, msOverdrive);
+				? (hypnosis ? hypnosis.overdriveTimer : 0)
+				: (combat ? combat.powerTimer : 0);
+			const overdrive = Boolean(isMs && hypnosis && hypnosis.overdriveActive);
+			this.ghostView.draw(this.ctx, ghosts, drawnLayout, ghostTimer, overdrive, mask);
 		}
-		const state = this.director.stateName;
+
 		if (state === 'death') {
-			this.drawDeathWave(grid.width, grid.height, layout);
+			const wave = this.director.deathWave;
+			if (wave) {
+				this.deathWaveView.draw(
+					this.ctx, drawnLayout, grid.width, grid.height,
+					wave.x, wave.y, wave.progress
+				);
+			}
+			this.drawOverlay(drawnLayout, grid);
 			return;
 		}
+
 		const player = this.level.player;
 		if (player) {
-			this.playerView.draw(this.ctx, player, layout);
+			this.playerView.draw(this.ctx, player, drawnLayout, this.level.profile);
 		}
-		if (season && worldVisible) {
-			this.weatherView.draw(this.ctx, layout, grid.width, grid.height, season.name, dt);
+
+		this.drawDimming(drawnLayout, grid, ratio);
+
+		if (state !== 'menu' && state !== 'paused') {
+			bundle.weather.draw(
+				this.ctx, drawnLayout, this.width, this.height, dt, this.timeValue
+			);
 		}
+
+		this.drawOverlay(drawnLayout, grid);
 	}
 
 	destroy(): void {
 		this.canvas.remove();
 	}
 
-	private dayNightRatio(): number {
-		const progress = this.level.progress;
-		if (!progress) {
-			return 0;
+	private syncSize(): boolean {
+		const rectWidth = this.container.clientWidth;
+		const rectHeight = this.container.clientHeight;
+		if (!(rectWidth > 0) || !(rectHeight > 0)) {
+			return false;
 		}
-		return progress.collectionRatio;
+		const width = Math.floor(rectWidth);
+		const height = Math.floor(rectHeight);
+		if (width === this.width && height === this.height) {
+			return true;
+		}
+		this.width = width;
+		this.height = height;
+		this.canvas.width = width;
+		this.canvas.height = height;
+		this.canvas.style.width = `${width}px`;
+		this.canvas.style.height = `${height}px`;
+		this.ctx.imageSmoothingEnabled = false;
+		return true;
 	}
 
-	private drawDeathWave(gridWidth: number, gridHeight: number, layout: GridLayout): void {
-		const player = this.level.player;
-		if (!player) {
+	private dayNightRatio(): number {
+		return this.level.progress ? this.level.progress.collectionRatio : 0;
+	}
+
+	private drawSeasonScene(bundle: SeasonRenderBundle, layout: GridLayout, grid: GridService): void {
+		const board: RenderBoard = {
+			x: layout.offsetX,
+			y: layout.offsetY,
+			width: grid.width * layout.tileSize,
+			height: grid.height * layout.tileSize
+		};
+		bundle.scene.draw(this.ctx, this.width, this.height, this.sceneSeed(), board);
+	}
+
+	private sceneSeed(): number {
+		const level = Number.isFinite(this.level.level) && this.level.level >= 1
+			? Math.floor(this.level.level)
+			: 1;
+		let seed = level * 7919;
+		if (this.level.secretMode) {
+			seed += 104729;
+		}
+		if (this.level.hellMode) {
+			seed += 31;
+		}
+		return Math.abs(seed % 2147483647);
+	}
+
+	private disintegrationMask(grid: GridService): DisintegrationMask | null {
+		if (this.director.stateName !== 'death') {
+			return null;
+		}
+		const wave = this.director.deathWave;
+		if (!wave || !Number.isFinite(wave.progress) || wave.progress <= 0) {
+			return null;
+		}
+		const radius = deathWaveEase(wave.progress) * deathWaveMaxRadius(grid.width, grid.height);
+		if (!Number.isFinite(radius) || radius <= 0) {
+			return null;
+		}
+		return { centerX: wave.x, centerY: wave.y, radius };
+	}
+
+	private erased(position: { x: number; y: number }, mask: DisintegrationMask | null): boolean {
+		if (!mask) {
+			return false;
+		}
+		const dx = position.x - mask.centerX;
+		const dy = position.y - mask.centerY;
+		return dx * dx + dy * dy <= mask.radius * mask.radius;
+	}
+
+	private drawDimming(layout: GridLayout, grid: GridService, ratio: number): void {
+		if (!(ratio > 0)) {
 			return;
 		}
-		const remaining = this.director.overlayTimer;
-		const linear = 1 - Math.min(1, Math.max(0, remaining / DEATH_TOTAL_DURATION));
-		const position = player.position;
-		this.deathWaveView.draw(
-			this.ctx,
-			layout,
-			gridWidth,
-			gridHeight,
-			position.x,
-			position.y,
-			linear
+		this.ctx.fillStyle = `rgba(2,4,12,${Math.min(0.28, ratio * 0.28)})`;
+		this.ctx.fillRect(
+			layout.offsetX, layout.offsetY,
+			grid.width * layout.tileSize, grid.height * layout.tileSize
 		);
 	}
 
-	private lerpHex(dayHex: string, nightHex: string, t: number): string {
-		const d = this.parseHex(dayHex);
-		const n = this.parseHex(nightHex);
-		if (!d || !n) {
-			return dayHex;
+	private drawOverlay(layout: GridLayout, grid: GridService): void {
+		const snapshot = this.overlaySnapshot();
+		if (snapshot.mode === 'none') {
+			return;
 		}
-		const ratio = Math.min(1, Math.max(0, t));
-		const r = Math.round(d.r + (n.r - d.r) * ratio);
-		const g = Math.round(d.g + (n.g - d.g) * ratio);
-		const b = Math.round(d.b + (n.b - d.b) * ratio);
-		return `rgb(${r},${g},${b})`;
+		this.overlayView.draw(
+			this.ctx, snapshot, layout,
+			grid.width * layout.tileSize, grid.height * layout.tileSize
+		);
 	}
 
-	private parseHex(hex: string): { r: number; g: number; b: number } | null {
-		if (!hex || hex.length !== 7 || hex[0] !== '#') {
-			return null;
+	private overlaySnapshot(): OverlaySnapshot {
+		const state = this.director.stateName;
+		const combat = this.level.combat;
+
+		let mode: OverlayMode = 'none';
+		let title = '';
+		let timer = 0;
+		let duration = 0;
+
+		if (state === 'ready') {
+			mode = 'ready';
+			title = 'READY';
+			timer = this.director.overlayTimer;
+		} else if (state === 'playing') {
+			mode = 'playing';
+		} else if (state === 'paused') {
+			mode = 'paused';
+			title = 'PAUSED';
+		} else if (state === 'death') {
+			mode = 'death';
+			title = 'DEATH';
+			const wave = this.director.deathWave;
+			timer = wave ? wave.timer : this.director.overlayTimer;
+			duration = wave ? wave.duration : 0;
+		} else if (state === 'level-clear') {
+			mode = 'level-clear';
+			title = 'LEVEL CLEAR';
+			const clear = this.director.levelClear;
+			timer = clear ? clear.timer : this.director.overlayTimer;
+			duration = clear ? clear.duration : 0;
+		} else if (state === 'game-over') {
+			mode = 'game-over';
+			title = 'GAME OVER';
 		}
-		const r = parseInt(hex.slice(1, 3), 16);
-		const g = parseInt(hex.slice(3, 5), 16);
-		const b = parseInt(hex.slice(5, 7), 16);
-		if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b)) {
-			return null;
+
+		let powerLabel = '';
+		let powerTimer = 0;
+		if (state === 'playing') {
+			if (this.level.profile === 'pacman' && combat && combat.isPowerActive) {
+				powerLabel = 'POWER';
+				powerTimer = combat.powerTimer;
+			}
+			const hypnosis = this.level.hypnosis;
+			if (hypnosis && hypnosis.overdriveActive) {
+				powerLabel = 'OVERDRIVE';
+				powerTimer = hypnosis.overdriveTimer;
+			}
+			const echo = this.level.echo;
+			if (echo && echo.phase === 'clone') {
+				powerLabel = 'ECHO';
+				powerTimer = echo.timer;
+			}
+			const doom = this.level.doom;
+			if (this.level.hellMode && doom && doom.armed) {
+				powerLabel = doom.armed.toUpperCase();
+			}
 		}
-		return { r, g, b };
+
+		return {
+			mode,
+			title,
+			timer: Number.isFinite(timer) && timer >= 0 ? timer : 0,
+			duration: Number.isFinite(duration) && duration >= 0 ? duration : 0,
+			level: Number.isFinite(this.level.level) && this.level.level >= 1 ? Math.floor(this.level.level) : 1,
+			lives: combat && combat.lives >= 0 ? Math.floor(combat.lives) : 0,
+			powerLabel,
+			powerTimer: Number.isFinite(powerTimer) && powerTimer >= 0 ? powerTimer : 0
+		};
 	}
 }

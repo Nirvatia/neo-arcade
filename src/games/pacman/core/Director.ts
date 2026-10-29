@@ -1,8 +1,8 @@
-// src/games/pacman/core/Director.ts
 import type { EventBus } from '../engine/EventBus';
 import type { PacmanEventMap, PacmanStateName } from './Events';
 import type { LevelLoader } from '../logic/LevelLoader';
 import type { DeathWaveSnapshot } from './states/DeathState';
+import type { LevelClearSnapshot } from './states/LevelClearState';
 import { MenuState } from './states/MenuState';
 import { ReadyState } from './states/ReadyState';
 import { PlayingState } from './states/PlayingState';
@@ -57,6 +57,11 @@ export class Director {
 	get deathWave(): DeathWaveSnapshot | null {
 		const candidate = this.current as GameState & { deathWave?: DeathWaveSnapshot | null };
 		return candidate.deathWave ?? null;
+	}
+
+	get levelClear(): LevelClearSnapshot | null {
+		const candidate = this.current as GameState & { levelClear?: LevelClearSnapshot | null };
+		return candidate.levelClear ?? null;
 	}
 
 	setState(next: GameState): void {
@@ -144,5 +149,39 @@ export class Director {
 		if (this.current.name === 'playing') {
 			this.setState(new LevelClearState());
 		}
+	}
+
+	debugCompleteLevel(): void {
+		const combat = this.context.level.combat;
+		if (!combat) {
+			console.error('Director.debugCompleteLevel', 'combat is not initialized');
+			return;
+		}
+		combat.debugComplete();
+		if (this.current.name === 'playing') {
+			this.setState(new LevelClearState());
+		}
+	}
+
+	debugKillPlayer(): void {
+		const combat = this.context.level.combat;
+		if (!combat) {
+			console.error('Director.debugKillPlayer', 'combat is not initialized');
+			return;
+		}
+		combat.debugKill();
+		if (this.current.name === 'playing') {
+			this.setState(new DeathState());
+		}
+	}
+
+	debugEnterHell(): void {
+		this.context.level.debugEnterHell();
+		this.setState(new ReadyState());
+	}
+
+	debugEnterSecret(): void {
+		this.context.level.debugEnterSecret();
+		this.setState(new ReadyState());
 	}
 }

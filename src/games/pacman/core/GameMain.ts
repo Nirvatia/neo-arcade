@@ -9,6 +9,8 @@ import { LevelLoader } from '../logic/LevelLoader';
 import { PacmanAudioPlayer } from '../audio/PacmanAudioPlayer';
 import { SvelteHudAdapter } from '../ui/hud/SvelteHudAdapter';
 import { pacmanHudStore } from '../ui/hud/hudStore';
+import { setPacmanActions, clearPacmanActions } from '../ui/actions/pacmanActions';
+import { setDebugActions, clearDebugActions } from '../ui/debug/debugActions';
 
 export class GameMain implements GameModule {
 	private events: EventBus<PacmanEventMap> | null = null;
@@ -24,14 +26,12 @@ export class GameMain implements GameModule {
 		if (this.loop) {
 			return;
 		}
-
 		const events = new EventBus<PacmanEventMap>();
 		const level = new LevelLoader(events);
 		const audio = new PacmanAudioPlayer(events);
 		const director = new Director(events, level);
 		const render = new RenderPipeline(container, director, level);
 		const hudAdapter = new SvelteHudAdapter(events, pacmanHudStore);
-
 		const loop = new GameLoop(
 			(dt) => {
 				director.update(dt);
@@ -40,7 +40,6 @@ export class GameMain implements GameModule {
 				render.render();
 			}
 		);
-
 		const input = new InputController({
 			direction: (direction) => {
 				if (director.stateName === 'playing' || director.stateName === 'ready') {
@@ -52,14 +51,17 @@ export class GameMain implements GameModule {
 					director.startGame();
 					return;
 				}
-
 				if (director.stateName === 'paused') {
 					director.togglePause();
 					return;
 				}
-
 				if (director.stateName === 'ready') {
 					director.showPlaying();
+				}
+			},
+			fire: () => {
+				if (director.stateName === 'playing') {
+					level.requestFire();
 				}
 			},
 			pause: () => {
@@ -70,7 +72,6 @@ export class GameMain implements GameModule {
 					director.togglePause();
 					return;
 				}
-
 				if (
 					director.stateName === 'paused' ||
 					director.stateName === 'ready' ||
@@ -85,10 +86,24 @@ export class GameMain implements GameModule {
 				}
 			}
 		});
-
 		input.attach();
+		setPacmanActions({
+			confirm: () => input.pressConfirm(),
+			pause: () => input.pressPause(),
+			menu: () => input.pressMenu(),
+			profile: () => input.pressProfile()
+		});
+		setDebugActions({
+			gotoLevel: (value) => level.setPendingStartLevel(value),
+			spawnBonus: () => level.debugSpawnBonus(),
+			completeLevel: () => director.debugCompleteLevel(),
+			killPlayer: () => director.debugKillPlayer(),
+			enterHell: () => director.debugEnterHell(),
+			enterSecret: () => director.debugEnterSecret(),
+			toggleProfile: () => level.toggleProfile(),
+			setMazeScale: (value) => level.setMazeScale(value)
+		});
 		loop.start();
-
 		this.events = events;
 		this.level = level;
 		this.audio = audio;
@@ -102,11 +117,12 @@ export class GameMain implements GameModule {
 	destroy(): void {
 		this.loop?.stop();
 		this.input?.detach();
+		clearPacmanActions();
+		clearDebugActions();
 		this.render?.destroy();
 		this.hudAdapter?.destroy();
 		this.audio?.destroy();
 		this.events?.clear();
-
 		this.events = null;
 		this.level = null;
 		this.director = null;
