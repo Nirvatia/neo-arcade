@@ -238,6 +238,11 @@ export class DoomBossModel {
 	}
 
 	applyStun(duration: number): void {
+		// A stun must never overwrite death, the phase transition or the intro: damage and
+		// stun arrive together, and a killing blow would otherwise revive the boss at 0 HP.
+		if (this.state === 'DEAD' || this.state === 'TRANSITION' || this.state === 'INTRO') {
+			return;
+		}
 		if (this.stunImmunityTimer > 0) {
 			return;
 		}

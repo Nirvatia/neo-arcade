@@ -211,4 +211,29 @@ describe('doom boss', () => {
 		const after = minionPosition(internals.minions[0]);
 		expect(after).not.toEqual(before);
 	});
+
+	it('stunning weapons can finish the boss and do not skip phase transitions', () => {
+		const { player, boss } = makeWorld();
+		for (let t = 0; t < INTRO_DURATION + 0.1; t += STEP) {
+			boss.update(STEP, player);
+		}
+		const states: string[] = [];
+		for (let i = 0; i < 20 && !boss.defeated; i += 1) {
+			// a BFG orb hit: damage first, then stun, exactly like DoomAbilityService
+			const phase = boss.phase;
+			boss.takeDamage(BFG_ORB_DAMAGE);
+			boss.applyStun(0.5);
+			if (boss.phase !== phase) {
+				states.push(boss.state);
+			}
+			for (let t = 0; t < 4; t += STEP) {
+				boss.update(STEP, player);
+				boss.consumeBossContactHit();
+				boss.consumeMinionContactHit();
+				boss.consumeCrossHit();
+			}
+		}
+		expect(boss.defeated).toBe(true);
+		expect(states).toEqual(['TRANSITION', 'TRANSITION']);
+	});
 });
