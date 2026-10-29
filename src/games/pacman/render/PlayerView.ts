@@ -1,6 +1,7 @@
 import type { PlayerService } from '../logic/PlayerService';
 import type { PacmanAudioCue, PacmanProfile } from '../core/Events';
 import type { GridLayout } from './GridView';
+import { rgba } from './common/color';
 
 export type PlayerLook = 'normal' | 'energized' | 'berserk';
 
@@ -71,11 +72,6 @@ const TAU = Math.PI * 2;
 const TRAIL_LENGTH = 1.7;
 const TRAIL_GAP = 0.1;
 const MORPH_TIME = 0.6;
-
-function rgba(hex: number, a: number): string {
-	const clamped = Math.max(0, Math.min(1, a));
-	return `rgba(${(hex >> 16) & 255},${(hex >> 8) & 255},${hex & 255},${clamped})`;
-}
 
 function mixHex(a: number, b: number, t: number): number {
 	const ch = (shift: number): number => {

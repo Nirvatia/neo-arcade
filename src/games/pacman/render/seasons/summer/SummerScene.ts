@@ -1,4 +1,5 @@
 import type { SceneView, RenderBoard } from '../../contracts/SeasonRenderBundle';
+import { seededRandom } from '../../common/random';
 
 interface SummerDecor {
 	readonly kind: 'sunflower' | 'bush' | 'rock';
@@ -62,7 +63,7 @@ export class SummerScene implements SceneView {
 			return canvas;
 		}
 
-		const random = makeRandom(seed + 41);
+		const random = seededRandom(seed + 41);
 
 		ctx.fillStyle = '#e8cf8f';
 		ctx.fillRect(0, 0, width, height);
@@ -315,17 +316,4 @@ export class SummerScene implements SceneView {
 		);
 		ctx.fill();
 	}
-}
-
-function makeRandom(seed: number): () => number {
-	let state = Math.floor(Math.abs(Number.isFinite(seed) ? seed : 0)) % 2147483647;
-
-	if (state <= 0) {
-		state += 2147483646;
-	}
-
-	return () => {
-		state = (state * 16807) % 2147483647;
-		return state / 2147483647;
-	};
 }

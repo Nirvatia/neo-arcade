@@ -37,7 +37,6 @@ export function oppositeDirection(direction: DoomDirection): DoomDirection {
 	}
 }
 
-
 export function bfsDistanceFrom(grid: GridService, origin: DoomTile): Map<string, number> {
 	const distances = new Map<string, number>();
 	const queue: Array<{ tile: DoomTile; distance: number }> = [];

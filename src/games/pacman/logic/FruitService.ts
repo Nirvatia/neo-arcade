@@ -10,12 +10,12 @@ import type { PacmanEventMap } from '../core/Events';
 import type { FruitKind } from './fruitCatalog';
 import { fruitForLevel, randomFruitKind } from './fruitCatalog';
 import { SCORE_TABLE } from '../config/scoreConfig';
+import { ACTOR_CONTACT_DISTANCE_SQ } from '../config/actorConfig';
 
 export type { FruitKind };
 
 const DEFAULT_FRUIT_DURATION = 12;
 const FRUIT_THRESHOLDS: readonly number[] = [70, 170];
-const CONTACT_DISTANCE_SQ = 0.25;
 
 export class FruitService {
 	private readonly profileValue: GameProfile;
@@ -128,7 +128,7 @@ export class FruitService {
 			const fruitPosition = this.position;
 			const dx = playerPosition.x - fruitPosition.x;
 			const dy = playerPosition.y - fruitPosition.y;
-			if (dx * dx + dy * dy <= CONTACT_DISTANCE_SQ) {
+			if (dx * dx + dy * dy <= ACTOR_CONTACT_DISTANCE_SQ) {
 				this.collect();
 			}
 			return;

@@ -1,4 +1,5 @@
 import type { SceneView, RenderBoard } from '../../contracts/SeasonRenderBundle';
+import { seededRandom } from '../../common/random';
 
 interface SpringDecor {
 	readonly kind: 'tree' | 'bush' | 'flower';
@@ -62,7 +63,7 @@ export class SpringScene implements SceneView {
 			return canvas;
 		}
 
-		const random = makeRandom(seed + 29);
+		const random = seededRandom(seed + 29);
 
 		ctx.fillStyle = '#cfe8c6';
 		ctx.fillRect(0, 0, width, height);
@@ -301,17 +302,4 @@ export class SpringScene implements SceneView {
 			ctx.fill();
 		}
 	}
-}
-
-function makeRandom(seed: number): () => number {
-	let state = Math.floor(Math.abs(Number.isFinite(seed) ? seed : 0)) % 2147483647;
-
-	if (state <= 0) {
-		state += 2147483646;
-	}
-
-	return () => {
-		state = (state * 16807) % 2147483647;
-		return state / 2147483647;
-	};
 }

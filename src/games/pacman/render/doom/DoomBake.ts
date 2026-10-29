@@ -31,7 +31,7 @@ export interface DoomDecor {
 }
 
 /** Seeded per-tile generator (Park–Miller), identical to the prototype's `hs`. */
-export function tileHash(a: number, b: number): Rng {
+export function tileRandom(a: number, b: number): Rng {
 	let s = (((a + 50) * 7919 + (b + 50) * 104729) % 2147483646) + 1;
 	return () => (s = (s * 16807) % 2147483647) / 2147483647;
 }
@@ -469,7 +469,7 @@ export function bakeDoomWorld(
 			if (t === 'ES' || t === 'WL' || !vis(x + T / 2, y + T / 2, T)) {
 				continue;
 			}
-			const k = tileHash(r, c);
+			const k = tileRandom(r, c);
 			if (LAIR.has(t)) {
 				b.fillStyle = '#0e0d0d';
 				b.fillRect(x - 0.5, y - 0.5, T + 1, T + 1);
@@ -617,7 +617,7 @@ export function bakeDoomWorld(
 		b.fill();
 	}
 	for (const [r, c] of WL) {
-		const k = tileHash(r, c);
+		const k = tileRandom(r, c);
 		const v = k();
 		const x = c * T;
 		const y = r * T;
@@ -718,7 +718,7 @@ export function bakeDoomWorld(
 		}
 	}
 	for (const [r, c] of WL) {
-		const k = tileHash(r + 9, c + 9);
+		const k = tileRandom(r + 9, c + 9);
 		for (const [dr, dc] of sides) {
 			const n = S[r + dr] && S[r + dr][c + dc];
 			if ((n && n !== 'ES') || k() < 0.45) {
@@ -744,7 +744,7 @@ export function bakeDoomWorld(
 		if (o.k !== 'tree' || !vis(o.x, o.y, r * 2)) {
 			continue;
 		}
-		const k = tileHash(o.s ?? 0, 7);
+		const k = tileRandom(o.s ?? 0, 7);
 		const pal = o.pk ? ['#8a2a1a', '#4a1410', '#1a0604'] : ['#4a4038', '#2a2420', '#12100e'];
 		blob(o.x + r * 0.3, o.y + r * 0.4, r * 1.3, r, 'rgba(0,0,0,.34)', 0);
 		for (let i = 0; i < 11; i++) {

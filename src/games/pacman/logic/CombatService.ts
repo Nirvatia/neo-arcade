@@ -8,9 +8,9 @@ import type { EventBus } from '../engine/EventBus';
 import type { GameProfile, HypnosisService } from './HypnosisService';
 import type { LairCodeService } from './LairCodeService';
 import { SCORE_TABLE } from '../config/scoreConfig';
+import { ACTOR_CONTACT_DISTANCE_SQ } from '../config/actorConfig';
 
 const DEFAULT_POWER_DURATION = 6;
-const CONTACT_DISTANCE_SQ = 0.25;
 const SECRET_CLEAR_BONUS = 10000;
 
 export class CombatService {
@@ -373,7 +373,7 @@ export class CombatService {
 			const dx = playerPosition.x - ghostPosition.x;
 			const dy = playerPosition.y - ghostPosition.y;
 
-			if (dx * dx + dy * dy > CONTACT_DISTANCE_SQ) {
+			if (dx * dx + dy * dy > ACTOR_CONTACT_DISTANCE_SQ) {
 				continue;
 			}
 
@@ -415,7 +415,7 @@ export class CombatService {
 			const dx = playerPosition.x - ghostPosition.x;
 			const dy = playerPosition.y - ghostPosition.y;
 
-			if (dx * dx + dy * dy > CONTACT_DISTANCE_SQ) {
+			if (dx * dx + dy * dy > ACTOR_CONTACT_DISTANCE_SQ) {
 				continue;
 			}
 

@@ -7,12 +7,12 @@ import type { GridPoint } from './GridModel';
 import type { EventBus } from '../engine/EventBus';
 import type { PacmanEventMap } from '../core/Events';
 import { SCORE_TABLE } from '../config/scoreConfig';
+import { ACTOR_CONTACT_DISTANCE_SQ } from '../config/actorConfig';
 
 export type GoldenEggPhase = 'waiting' | 'egg' | 'spent';
 
 const REQUIRED_LEVEL = 7;
 const EGG_OPEN_DELAY = 1;
-const CONTACT_DISTANCE_SQ = 0.25;
 
 export class GoldenEggService {
 	private readonly levelValue: number;
@@ -145,7 +145,7 @@ export class GoldenEggService {
 		const position = player.position;
 		const dx = position.x - center.x;
 		const dy = position.y - center.y;
-		if (dx * dx + dy * dy <= CONTACT_DISTANCE_SQ) {
+		if (dx * dx + dy * dy <= ACTOR_CONTACT_DISTANCE_SQ) {
 			return true;
 		}
 		const tile = player.tile;

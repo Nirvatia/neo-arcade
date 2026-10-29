@@ -1,4 +1,5 @@
 import type { Cutscene, CutsceneFrame } from './Cutscene';
+import { clamp } from '../common/math';
 
 const LANE_HEIGHT_TILES = 1.7;
 const LANE_MARGIN_TILES = 1.1;
@@ -58,7 +59,7 @@ export class LevelClearCutscene implements Cutscene {
 		const laneTop = frame.height / 2 - laneHeight / 2;
 		const laneCenter = laneTop + laneHeight / 2;
 		const accent = frame.profile === 'ms-pacman' ? '#ff8fd3' : '#ffe24b';
-		const intro = this.clamp(frame.progress / INTRO_SHARE, 0, 1);
+		const intro = clamp(frame.progress / INTRO_SHARE, 0, 1);
 		if (intro <= 0) {
 			return;
 		}
@@ -73,11 +74,7 @@ export class LevelClearCutscene implements Cutscene {
 		const radius = Math.max(1, Math.min(ts * PLAYER_RADIUS_RATIO, laneHeight * 0.32));
 		const runStart = laneLeft + radius;
 		const span = Math.max(0, laneWidth - radius * 2);
-		const travel = this.clamp(
-			(frame.progress - INTRO_SHARE) / Math.max(EPSILON, 1 - INTRO_SHARE),
-			0,
-			1
-		);
+		const travel = clamp((frame.progress - INTRO_SHARE) / Math.max(EPSILON, 1 - INTRO_SHARE), 0, 1);
 		const playerX = runStart + span * travel;
 		const dotCount = Math.max(3, Math.min(MAX_DOTS, Math.floor(laneWidth / (ts * 1.4))));
 		const dotRadius = Math.max(1, ts * DOT_RADIUS_RATIO);
@@ -111,12 +108,5 @@ export class LevelClearCutscene implements Cutscene {
 		);
 		ctx.fill();
 		ctx.restore();
-	}
-
-	private clamp(value: number, min: number, max: number): number {
-		if (!Number.isFinite(value)) {
-			return min;
-		}
-		return Math.min(max, Math.max(min, value));
 	}
 }

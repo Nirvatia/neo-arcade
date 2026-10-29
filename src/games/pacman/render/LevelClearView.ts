@@ -2,6 +2,7 @@ import type { GridLayout } from './GridView';
 import type { GridService } from '../logic/GridService';
 import type { GameProfile } from '../logic/HypnosisService';
 import { LEVEL_CLEAR_MAX_BLINK, type LevelClearSnapshot } from '../core/states/LevelClearState';
+import { clamp } from './common/math';
 
 const LANE_HEIGHT_TILES = 1.7;
 const LANE_MARGIN_TILES = 1.1;
@@ -121,7 +122,7 @@ export class LevelClearView {
 			this.drawCutscene(ctx, left, top, boardWidth, boardHeight, ts, progress, profile);
 		}
 		if (snapshot.phase === 'maze-out') {
-			const alpha = 1 - this.clamp(snapshot.mazeAlpha, 0, 1);
+			const alpha = 1 - clamp(snapshot.mazeAlpha, 0, 1);
 			if (alpha > 0) {
 				ctx.globalAlpha = alpha;
 				ctx.fillStyle = '#030509';
@@ -143,7 +144,7 @@ export class LevelClearView {
 		if (this.reducedMotion) {
 			return;
 		}
-		const depth = this.clamp(amount, 0, LEVEL_CLEAR_MAX_BLINK);
+		const depth = clamp(amount, 0, LEVEL_CLEAR_MAX_BLINK);
 		if (depth <= 0) {
 			return;
 		}
@@ -173,7 +174,7 @@ export class LevelClearView {
 		const laneTop = top + boardHeight / 2 - laneHeight / 2;
 		const laneCenter = laneTop + laneHeight / 2;
 		const accent = profile === 'ms-pacman' ? '#ff8fd3' : '#ffe24b';
-		const intro = this.clamp(progress / INTRO_SHARE, 0, 1);
+		const intro = clamp(progress / INTRO_SHARE, 0, 1);
 		if (intro <= 0) {
 			return;
 		}
@@ -182,7 +183,7 @@ export class LevelClearView {
 		const span = Math.max(0, laneWidth - radius * 2);
 		const travel = this.reducedMotion
 			? 0.5
-			: this.clamp((progress - INTRO_SHARE) / Math.max(EPSILON_DENOM, 1 - INTRO_SHARE), 0, 1);
+			: clamp((progress - INTRO_SHARE) / Math.max(EPSILON_DENOM, 1 - INTRO_SHARE), 0, 1);
 		const playerX = runStart + span * travel;
 		ctx.save();
 		ctx.globalAlpha = intro;
@@ -225,12 +226,5 @@ export class LevelClearView {
 		);
 		ctx.fill();
 		ctx.restore();
-	}
-
-	private clamp(value: number, min: number, max: number): number {
-		if (!Number.isFinite(value)) {
-			return min;
-		}
-		return Math.min(max, Math.max(min, value));
 	}
 }

@@ -5,6 +5,7 @@ import type { PlayerService } from './PlayerService';
 import type { GridPoint } from './GridModel';
 import type { EventBus } from '../engine/EventBus';
 import type { PacmanEventMap } from '../core/Events';
+import { ACTOR_CONTACT_DISTANCE_SQ } from '../config/actorConfig';
 
 export type EchoClonePhase = 'waiting' | 'token' | 'clone' | 'spent';
 
@@ -27,7 +28,6 @@ const TOKEN_DURATION = 8;
 const CLONE_DURATION = 4;
 const CLONE_SPEED = 6;
 const DENSITY_RADIUS = 2;
-const CONTACT_DISTANCE_SQ = 0.25;
 const EPSILON = 1e-6;
 
 export class EchoCloneService {
@@ -417,7 +417,7 @@ export class EchoCloneService {
 		const center = this.position;
 		const dx = position.x - center.x;
 		const dy = position.y - center.y;
-		if (dx * dx + dy * dy <= CONTACT_DISTANCE_SQ) {
+		if (dx * dx + dy * dy <= ACTOR_CONTACT_DISTANCE_SQ) {
 			return true;
 		}
 		const tile = player.tile;

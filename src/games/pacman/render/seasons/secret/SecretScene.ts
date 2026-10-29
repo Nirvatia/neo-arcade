@@ -1,4 +1,5 @@
 import type { SceneView, RenderBoard } from '../../contracts/SeasonRenderBundle';
+import { seededRandom } from '../../common/random';
 
 interface SecretDecor {
 	readonly kind: 'crystal' | 'orb' | 'rune' | 'stars';
@@ -62,7 +63,7 @@ export class SecretScene implements SceneView {
 			return canvas;
 		}
 
-		const random = makeRandom(seed + 67);
+		const random = seededRandom(seed + 67);
 
 		ctx.fillStyle = '#050213';
 		ctx.fillRect(0, 0, width, height);
@@ -304,17 +305,4 @@ export class SecretScene implements SceneView {
 			ctx.fillRect(px, py, size, size);
 		}
 	}
-}
-
-function makeRandom(seed: number): () => number {
-	let state = Math.floor(Math.abs(Number.isFinite(seed) ? seed : 0)) % 2147483647;
-
-	if (state <= 0) {
-		state += 2147483646;
-	}
-
-	return () => {
-		state = (state * 16807) % 2147483647;
-		return state / 2147483647;
-	};
 }

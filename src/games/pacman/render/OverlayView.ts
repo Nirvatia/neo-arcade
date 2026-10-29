@@ -1,4 +1,5 @@
 import type { GridLayout } from './GridView';
+import { clamp } from './common/math';
 
 export type OverlayMode =
 	'none' | 'ready' | 'playing' | 'paused' | 'death' | 'level-clear' | 'game-over';
@@ -210,7 +211,7 @@ export class OverlayView {
 		if (!Number.isFinite(duration) || duration <= 0) {
 			return;
 		}
-		const progress = this.clamp(1 - timer / duration);
+		const progress = clamp(1 - timer / duration, 0, 1);
 		const left = centerX - width / 2;
 		ctx.fillStyle = 'rgba(232, 239, 255, 0.25)';
 		ctx.fillRect(left, y, width, height);
@@ -269,12 +270,5 @@ export class OverlayView {
 			return '#ff4d4d';
 		}
 		return '#e8efff';
-	}
-
-	private clamp(value: number): number {
-		if (!Number.isFinite(value)) {
-			return 0;
-		}
-		return Math.min(1, Math.max(0, value));
 	}
 }

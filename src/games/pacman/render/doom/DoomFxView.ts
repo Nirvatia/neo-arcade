@@ -6,6 +6,7 @@ import type {
 } from '../../logic/doom/DoomWeaponService';
 import type { GridLayout } from '../GridView';
 import { glowTexture } from './DoomSprites';
+import { rgba } from '../common/color';
 
 interface Particle {
 	x: number;
@@ -70,10 +71,6 @@ const PICKUP_TINT: Record<string, number> = {
 	medkit: 0xff3a2a,
 	berserk: 0x40d0ff
 };
-
-function rgba(hex: number, a: number): string {
-	return `rgba(${(hex >> 16) & 255},${(hex >> 8) & 255},${hex & 255},${a})`;
-}
 
 /**
  * Weapon and impact effects of the hell level, in tile coordinates: the plasma orb fired by
