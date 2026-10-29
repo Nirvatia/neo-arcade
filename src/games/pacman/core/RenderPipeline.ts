@@ -48,6 +48,7 @@ export class RenderPipeline {
 	private bundle: SeasonRenderBundle | null = null;
 	private doomWorld: DoomWorld | null = null;
 	private doomWorldGrid: GridService | null = null;
+	private lastPlayerPos: { x: number; y: number } | null = null;
 	private bundleKey = '';
 	private lastRenderTime = 0;
 	private timeValue = 0;
@@ -248,9 +249,30 @@ export class RenderPipeline {
 				this.playerView.draw(this.ctx, player, layout, this.level.profile);
 			}
 		}
+		this.trackTeleport(world);
+		world.drawFx(this.ctx);
 		this.ctx.restore();
 		world.drawOverlay(this.ctx);
 		this.drawOverlay(layout, grid);
+	}
+
+	/** A jump of several tiles between frames is a teleport: fog at both ends, Doom style. */
+	private trackTeleport(world: DoomWorld): void {
+		const player = this.level.player;
+		if (!player) {
+			this.lastPlayerPos = null;
+			return;
+		}
+		const p = player.position;
+		const last = this.lastPlayerPos;
+		if (last && Math.abs(p.x - last.x) + Math.abs(p.y - last.y) > 3) {
+			const state = this.director.stateName;
+			if (state === 'playing') {
+				world.teleportFog(last.x, last.y);
+				world.teleportFog(p.x, p.y);
+			}
+		}
+		this.lastPlayerPos = { x: p.x, y: p.y };
 	}
 
 	/** Light-map sources carried by the actors (tile-center coordinates, radius in tiles). */

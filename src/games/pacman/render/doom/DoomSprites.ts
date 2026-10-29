@@ -193,36 +193,3 @@ export function pickupSprite(kind: DoomPickupKind): { icon: HTMLCanvasElement; g
 }
 
 export const barrelSprite = barrelTexture;
-
-export const swirlTexture = lazy(() =>
-	makeTexture(20, 20, (x) => {
-		x.translate(10, 10);
-		x.lineCap = 'round';
-		for (let arm = 0; arm < 3; arm++) {
-			x.strokeStyle = 'rgba(255,255,255,.9)';
-			x.lineWidth = 1.2;
-			x.beginPath();
-			for (let i = 0; i <= 20; i++) {
-				const u = i / 20;
-				const a = u * 3.6 + (arm * Math.PI * 2) / 3;
-				const r = 1 + u * 6.8;
-				if (i) {
-					x.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-				} else {
-					x.moveTo(Math.cos(a) * r, Math.sin(a) * r);
-				}
-			}
-			x.stroke();
-		}
-	})
-);
-
-export const ringTexture = lazy(() =>
-	makeTexture(20, 20, (x) => {
-		x.strokeStyle = 'rgba(255,100,70,.95)';
-		x.lineWidth = 1.2;
-		x.beginPath();
-		x.arc(10, 10, 8.8, 0, 7);
-		x.stroke();
-	})
-);

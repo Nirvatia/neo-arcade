@@ -548,34 +548,7 @@ export function bakeDoomWorld(
 				b.stroke();
 			}
 		}
-		blob(px + 1.5, py + 2, 10, 9.5, 'rgba(0,0,0,.38)', 0);
-		b.fillStyle = lin(x, y, x + T, y + T, '#5a5f68', '#24262a');
-		rp(x + 1.5, y + 1.5, T - 3, T - 3, [6, 6, 6, 6]);
-		b.fill();
-		b.strokeStyle = 'rgba(255,255,255,.55)';
-		b.lineWidth = 1;
-		rp(x + 2.5, y + 2.5, T - 5, T - 5, [5, 5, 5, 5]);
-		b.stroke();
-		const q2 = b.createRadialGradient(px, py, 1, px, py, 8.5);
-		q2.addColorStop(0, '#ffd8c8');
-		q2.addColorStop(0.45, '#ff3020');
-		q2.addColorStop(1, '#3a0404');
-		b.fillStyle = q2;
-		b.beginPath();
-		b.arc(px, py, 8.5, 0, 7);
-		b.fill();
-		b.strokeStyle = '#ff8a6a';
-		b.lineWidth = 1.2;
-		b.stroke();
-		const bolts: ReadonlyArray<readonly [number, number]> = [
-			[5, 5],
-			[T - 5, 5],
-			[5, T - 5],
-			[T - 5, T - 5]
-		];
-		for (const [dx, dy] of bolts) {
-			blob(x + dx, y + dy, 1.5, 1.2, '#9aa0a8', 0);
-		}
+		drawTeleporterPad(b, x, y, dir, blob, rp, lin);
 	}
 
 	/* walls: seen strictly from above. A rounded moss bed with loose stone blocks set into it. */
@@ -845,4 +818,96 @@ export function bakeDoomWorld(
 		b.fillRect(f, gg, i, j);
 	}
 	return cv;
+}
+
+/**
+ * Doom-style teleporter pad: a riveted iron frame around a recessed plate with an
+ * engraved pentagram, and a chevron pointing into the tunnel. The live layer makes the
+ * engraving glow; this is the cold, baked part.
+ */
+function drawTeleporterPad(
+	b: CanvasRenderingContext2D,
+	x: number,
+	y: number,
+	dir: number,
+	blob: (x: number, y: number, rx: number, ry: number, col: string, rot?: number) => void,
+	rp: (
+		x: number,
+		y: number,
+		w: number,
+		h: number,
+		r: readonly [number, number, number, number]
+	) => void,
+	lin: (a: number, c: number, d: number, e: number, f: string, g: string) => CanvasGradient
+): void {
+	const px = x + T / 2;
+	const py = y + T / 2;
+	blob(px + 1.5, py + 2.5, 12, 11, 'rgba(0,0,0,.45)', 0);
+	// iron frame with a bevel
+	b.fillStyle = lin(x, y, x + T, y + T, '#4a4e56', '#141518');
+	rp(x + 0.5, y + 0.5, T - 1, T - 1, [2.5, 2.5, 2.5, 2.5]);
+	b.fill();
+	b.strokeStyle = 'rgba(255,255,255,.35)';
+	b.lineWidth = 0.8;
+	b.beginPath();
+	b.moveTo(x + 1.2, y + T - 2);
+	b.lineTo(x + 1.2, y + 1.2);
+	b.lineTo(x + T - 2, y + 1.2);
+	b.stroke();
+	b.strokeStyle = 'rgba(0,0,0,.6)';
+	b.beginPath();
+	b.moveTo(x + T - 1.2, y + 2);
+	b.lineTo(x + T - 1.2, y + T - 1.2);
+	b.lineTo(x + 2, y + T - 1.2);
+	b.stroke();
+	// recessed plate, warm from below
+	const inset = 3.6;
+	const plate = b.createRadialGradient(px, py, 1, px, py, T / 2);
+	plate.addColorStop(0, '#4a0a04');
+	plate.addColorStop(0.6, '#1c0503');
+	plate.addColorStop(1, '#0a0404');
+	b.fillStyle = plate;
+	b.fillRect(x + inset, y + inset, T - inset * 2, T - inset * 2);
+	b.strokeStyle = 'rgba(0,0,0,.8)';
+	b.lineWidth = 1;
+	b.strokeRect(x + inset, y + inset, T - inset * 2, T - inset * 2);
+	// engraving
+	const r = 6.6;
+	b.strokeStyle = '#6a160a';
+	b.lineWidth = 1.1;
+	b.beginPath();
+	b.arc(px, py, r, 0, 7);
+	b.stroke();
+	b.lineWidth = 0.8;
+	b.beginPath();
+	for (let i = 0; i <= 5; i++) {
+		const a = -Math.PI / 2 + (i * 4 * Math.PI) / 5;
+		const ex = px + Math.cos(a) * r * 0.93;
+		const ey = py + Math.sin(a) * r * 0.93;
+		if (i) {
+			b.lineTo(ex, ey);
+		} else {
+			b.moveTo(ex, ey);
+		}
+	}
+	b.stroke();
+	// rivets
+	for (const [dx, dy] of [
+		[2.2, 2.2],
+		[T - 2.2, 2.2],
+		[2.2, T - 2.2],
+		[T - 2.2, T - 2.2]
+	]) {
+		blob(x + dx, y + dy, 1.2, 1.2, '#8a9098', 0);
+		blob(x + dx - 0.35, y + dy - 0.4, 0.5, 0.4, '#e0e4ea', 0);
+	}
+	// chevron toward the tunnel
+	const cx = dir < 0 ? x + 1.8 : x + T - 1.8;
+	b.fillStyle = '#d9a020';
+	b.beginPath();
+	b.moveTo(cx + dir * 1.4, py);
+	b.lineTo(cx - dir * 0.6, py - 2.6);
+	b.lineTo(cx - dir * 0.6, py + 2.6);
+	b.closePath();
+	b.fill();
 }

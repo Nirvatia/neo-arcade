@@ -9,9 +9,7 @@ import {
 	fogTexture,
 	glowTexture,
 	litTexture,
-	ringTexture,
 	streakTexture,
-	swirlTexture,
 	vignetteTexture,
 	washTexture
 } from './DoomSprites';
@@ -19,6 +17,7 @@ import {
 const T = DOOM_TILE;
 const REBAKE_DELAY_MS = 160;
 const SHADE_SCALE = 0.25;
+const FOG_LIFE = 0.85;
 
 export interface DoomLight {
 	readonly x: number;
@@ -97,6 +96,12 @@ export class DoomWorld {
 	private readonly mazeLights: DoomLight[] = [];
 	private readonly lightmap: DoomLightmap;
 	private shade: HTMLCanvasElement | null = null;
+	private readonly fogs: Array<{
+		x: number;
+		y: number;
+		age: number;
+		sparks: Array<{ a: number; v: number; s: number; up: number }>;
+	}> = [];
 	private readonly smoke: Array<{ cx: number; cy: number; u: number; ph: number }> = [];
 	private readonly mist: Mist[];
 	private readonly dust: Dust[];
@@ -275,6 +280,12 @@ export class DoomWorld {
 		for (const q of this.smoke) {
 			q.u = (q.u + 0.0025 * d) % 1;
 		}
+		for (let i = this.fogs.length - 1; i >= 0; i -= 1) {
+			this.fogs[i].age += ms / 1000;
+			if (this.fogs[i].age >= FOG_LIFE) {
+				this.fogs.splice(i, 1);
+			}
+		}
 	}
 
 	/** Background, maze and animated world objects. Leaves the context untransformed. */
@@ -420,36 +431,112 @@ export class DoomWorld {
 		return this.shade;
 	}
 
+	/** Live teleporter: the engraving smoulders and pulses, embers rise off the plate. */
 	private portal(x: number, y: number, i: number, ph: number): WorldObject {
 		return {
 			draw(ctx, t) {
 				ctx.save();
 				ctx.translate(x, y);
-				const gs = (64 * 0.9) / 3;
-				img(
-					ctx,
-					glowTexture(0xff3a2a),
-					-gs / 2,
-					-gs / 2,
-					gs,
-					gs,
-					0.5 + 0.3 * Math.sin(t * 1.8 + i),
-					true
-				);
-				ctx.save();
-				ctx.rotate(t * 0.9);
-				img(ctx, swirlTexture(), -10, -10, 20, 20, 0.7 + 0.2 * Math.sin(t * 1.6 + ph));
-				ctx.restore();
-				ctx.save();
-				ctx.rotate(-t * 1.5);
-				img(ctx, swirlTexture(), -6.2, -6.2, 12.4, 12.4, 0.75);
-				ctx.restore();
-				const br = 0.5 + 0.5 * Math.sin(t * 1.8 + ph);
-				const rs = 20 * (0.94 + 0.08 * br);
-				img(ctx, ringTexture(), -rs / 2, -rs / 2, rs, rs, 0.45 + 0.5 * br);
+				const pulse = 0.5 + 0.5 * Math.sin(t * 2.2 + ph);
+				const gs = 26;
+				img(ctx, glowTexture(0xff3a1a), -gs / 2, -gs / 2, gs, gs, 0.35 + 0.35 * pulse, true);
+				ctx.globalCompositeOperation = 'lighter';
+				ctx.globalAlpha = 0.55 + 0.45 * pulse;
+				ctx.lineJoin = 'round';
+				const r = 6.6;
+				for (const [color, width] of [
+					['rgba(255,60,20,.55)', 2.6],
+					['#ffb070', 0.8]
+				] as const) {
+					ctx.strokeStyle = color;
+					ctx.lineWidth = width;
+					ctx.beginPath();
+					ctx.arc(0, 0, r, 0, Math.PI * 2);
+					for (let k = 0; k <= 5; k += 1) {
+						const a = -Math.PI / 2 + (k * 4 * Math.PI) / 5 + Math.sin(t * 0.5 + i) * 0.02;
+						const ex = Math.cos(a) * r * 0.93;
+						const ey = Math.sin(a) * r * 0.93;
+						if (k) {
+							ctx.lineTo(ex, ey);
+						} else {
+							ctx.moveTo(ex, ey);
+						}
+					}
+					ctx.stroke();
+				}
+				// embers drifting up from the plate
+				for (let k = 0; k < 9; k += 1) {
+					const u = (t * (0.35 + (k % 3) * 0.08) + k / 9 + i * 0.37) % 1;
+					const ex = Math.sin(k * 12.7 + i) * 6 + Math.sin(t * 2 + k) * 1.5;
+					const ey = 5 - u * 22;
+					const sz = 3.2 * (1 - u);
+					img(
+						ctx,
+						glowTexture(k % 2 ? 0xff8a2a : 0xffd27a),
+						ex - sz,
+						ey - sz,
+						sz * 2,
+						sz * 2,
+						(1 - u) * 0.9,
+						true
+					);
+				}
 				ctx.restore();
 			}
 		};
+	}
+
+	/** Doom's teleport fog, in tile-center coordinates. */
+	teleportFog(x: number, y: number): void {
+		const sparks = Array.from({ length: 26 }, () => {
+			const a = Math.random() * Math.PI * 2;
+			const v = 24 + Math.random() * 56;
+			return { a, v, s: 1.6 + Math.random() * 2.6, up: 14 + Math.random() * 34 };
+		});
+		this.fogs.push({ x: x * T, y: y * T, age: 0, sparks });
+	}
+
+	/** Short-lived effects drawn over the actors (inside the shaken world transform). */
+	drawFx(ctx: CanvasRenderingContext2D): void {
+		if (this.fogs.length === 0) {
+			return;
+		}
+		ctx.save();
+		ctx.translate(this.wx, this.wy);
+		ctx.scale(this.sc, this.sc);
+		for (const fog of this.fogs) {
+			const u = fog.age / FOG_LIFE;
+			const k = 1 - u;
+			// column of light, then green-white sparks and a ring
+			const flash = Math.min(1, u * 8) * k;
+			img(
+				ctx,
+				glowTexture(0xd8ffd0),
+				fog.x - 18,
+				fog.y - 64 * k - 10,
+				36,
+				74 * k + 20,
+				flash,
+				true
+			);
+			img(ctx, glowTexture(0x40ff50), fog.x - 34, fog.y - 34, 68, 68, flash, true);
+			img(ctx, glowTexture(0xffffff), fog.x - 12, fog.y - 12, 24, 24, flash * 0.8, true);
+			ctx.globalCompositeOperation = 'lighter';
+			ctx.strokeStyle = `rgba(150,255,150,${0.8 * k})`;
+			ctx.lineWidth = 1.6 * k + 0.3;
+			ctx.globalAlpha = 1;
+			ctx.beginPath();
+			ctx.arc(fog.x, fog.y, 4 + Math.sqrt(u) * 30, 0, Math.PI * 2);
+			ctx.stroke();
+			for (const sp of fog.sparks) {
+				const d = sp.v * Math.sqrt(u);
+				const sx = fog.x + Math.cos(sp.a) * d;
+				const sy = fog.y + Math.sin(sp.a) * d * 0.6 - sp.up * u;
+				const r = sp.s * k + 0.4;
+				img(ctx, glowTexture(0xd8ffd0), sx - r * 2, sy - r * 2, r * 4, r * 4, k, true);
+			}
+		}
+		ctx.restore();
 	}
 
 	private makeFlakes(): Flake[] {
