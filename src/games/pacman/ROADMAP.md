@@ -165,7 +165,8 @@ on the real game code for the owner to approve.
      1:1 once into a canvas, its two bloom copies are blurred once (canvas `filter`, or
      down-up sampling where unsupported), and each frame draws sprite + additive blooms with
      the mock-up's breathing, sway and shimmer. Each fruit file holds its texture code, the
-     object bounds (glow excluded) and the mock-up's display sizes; `FruitView` fits the
+     object bounds (glow excluded), the mock-up's display sizes and, when its ticker differs
+     (pretzel), its own motion; `FruitView` fits the
      object's larger side to `FRUIT_EXTENT` = 0.9 tile, centred on the tile, and still
      blinks while the timer runs out. The strawberry stays a stub on `fruitPrimitive`
      until its art arrives. The orange's skin pores are random, as in its mock-up (placed
