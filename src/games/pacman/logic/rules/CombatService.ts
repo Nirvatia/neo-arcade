@@ -94,6 +94,11 @@ export class CombatService {
 		return this.powerTimerValue;
 	}
 
+	/** How long an energizer lasts on this level (season-tuned). */
+	get powerDuration(): number {
+		return this.powerDurationValue;
+	}
+
 	get isPowerActive(): boolean {
 		return this.powerTimerValue > 0;
 	}

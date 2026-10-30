@@ -2,6 +2,7 @@
 // one IIFE and inlines it into <name>/index.html, writing <name>.html next to this file.
 // Run from the repo root: node prototypes/pacman/build.mjs <name>   (e.g. level-clear)
 import { build } from 'vite';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -17,6 +18,8 @@ const out = mkdtempSync(join(tmpdir(), `${name}-`));
 await build({
 	configFile: false,
 	logLevel: 'warn',
+	// prototypes may mount the game's own Svelte components (CSS injected into the page)
+	plugins: [svelte({ configFile: false, compilerOptions: { css: 'injected' } })],
 	build: {
 		outDir: out,
 		emptyOutDir: true,
