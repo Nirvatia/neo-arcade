@@ -150,7 +150,9 @@ and covers the canvas only (Svelte buttons stay on top); replace it there.
 
 ## Plan (v2, set by the owner after plan v1)
 
-Order matters; new boss worlds come last. Each art or effect stage starts with a prototype
+Order matters; new boss worlds come last. **Owner's order after stage 2: 5 → 3 → 4 →
+6 → 7 → 8 → 9** (the full HUD and screens come before the hell rework and the Pac-Man
+art); the numbers below stay as they are. Each art or effect stage starts with a prototype
 on the real game code for the owner to approve.
 
 1. **Migrate the remaining art.**
@@ -232,7 +234,7 @@ on the real game code for the owner to approve.
    - Triple-pentagram attack: it almost always misses, and its art spills out of the tile
      — aim it (lead the player's path) and keep the art inside the tile.
 4. **Pac-Man art rework** + bug: Pac-Man blinks before the game starts.
-5. **Full HUD and overlays.** A regular HUD for every season (the hell HUD is the quality
+5. **Full HUD and overlays.** **Next (moved before stages 3 and 4 by the owner).** A regular HUD for every season (the hell HUD is the quality
    reference) and Svelte screens for menu, ready, pause, death, game over, replacing the
    canvas `OverlayView` and its top bar; the screen fade should cover them too.
 6. **Secret level rework.** The original Pac-Man: original arcade art, animation at a
