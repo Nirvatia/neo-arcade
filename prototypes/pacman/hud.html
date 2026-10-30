@@ -10581,6 +10581,254 @@ createHTML: (html) => {
 	/** `$t('score')` in components. */
 	var t = derived$1(lang, (value) => (key) => value === "ru" ? RU[key] : EN[key]);
 	//#endregion
+	//#region src/games/pacman/ui/hud/GameHud.svelte
+	var root$5 = /* @__PURE__ */ from_html(`<span class="meter svelte-lyvoco"><i class="svelte-lyvoco"></i></span>`);
+	var root_1$3 = /* @__PURE__ */ from_html(`<span class="sub svelte-lyvoco">&nbsp;</span>`);
+	var root_2$2 = /* @__PURE__ */ from_html(`<div><span class="label svelte-lyvoco"> </span> <span class="value svelte-lyvoco"> </span> <!></div>`);
+	var root_3$1 = /* @__PURE__ */ from_html(`<div><span class="label svelte-lyvoco"> </span> <span class="value svelte-lyvoco"> </span> <span class="meter svelte-lyvoco"><i class="svelte-lyvoco"></i></span></div>`);
+	var root_4$1 = /* @__PURE__ */ from_html(`<div class="dots svelte-lyvoco"><i class="svelte-lyvoco"></i> <em class="svelte-lyvoco"></em> <em class="svelte-lyvoco"></em></div>`);
+	var root_5$1 = /* @__PURE__ */ from_html(`<div class="seg svelte-lyvoco"><b class="trail svelte-lyvoco"></b> <b class="fill svelte-lyvoco"></b></div>`);
+	var root_6$1 = /* @__PURE__ */ from_html(`<div class="row svelte-lyvoco"><span class="name svelte-lyvoco"> </span> <span class="phase svelte-lyvoco"> </span></div> <div class="bar svelte-lyvoco"></div>`, 1);
+	var root_7$1 = /* @__PURE__ */ from_html(`<div class="hint svelte-lyvoco"> </div>`);
+	var root_8$1 = /* @__PURE__ */ from_svg(`<svg viewBox="0 0 24 22" width="16" height="14" aria-hidden="true"><path d="M12 21s-9-6.2-9-12.2C3 5.6 5.4 3 8.4 3c1.6 0 2.9.8 3.6 2 .7-1.2 2-2 3.6-2 3 0 5.4 2.6 5.4 5.8C21 14.8 12 21 12 21z"></path></svg>`);
+	var root_9$1 = /* @__PURE__ */ from_html(`<div><!> <div class="row svelte-lyvoco"><span class="hp svelte-lyvoco"><span class="label svelte-lyvoco"> </span> <!></span></div></div>`);
+	var root_10 = /* @__PURE__ */ from_html(`<div class="hud svelte-lyvoco"><div class="box main svelte-lyvoco"><div class="cell score svelte-lyvoco"><span class="label svelte-lyvoco"> </span> <span class="value svelte-lyvoco"> </span> <span class="sub svelte-lyvoco"> </span></div> <div class="cell svelte-lyvoco"><span class="label svelte-lyvoco"> </span> <span class="value svelte-lyvoco"> </span> <span class="sub world svelte-lyvoco"> </span></div> <div class="cell svelte-lyvoco"><span class="label svelte-lyvoco"> </span> <span class="value svelte-lyvoco"> </span> <span class="sub svelte-lyvoco">&nbsp;</span></div> <!> <!></div> <!></div>`);
+	var $$css$4 = {
+		hash: "svelte-lyvoco",
+		code: ".hud.svelte-lyvoco {position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:20;display:grid;gap:8px;width:min(560px, calc(100vw - 20px));pointer-events:none;color:#f3f1ec;font-family:'Segoe UI', 'Roboto', system-ui, sans-serif;}.box.svelte-lyvoco {position:relative;background:rgba(12, 13, 17, 0.9);border:1px solid rgba(255, 255, 255, 0.1);border-radius:8px;box-shadow:0 6px 18px rgba(0, 0, 0, 0.4);}.main.svelte-lyvoco {display:grid;grid-template-columns:1.4fr 1fr 0.8fr 1.2fr;overflow:hidden;}.cell.svelte-lyvoco {display:grid;gap:1px;padding:8px 14px 10px;}.cell.svelte-lyvoco + .cell:where(.svelte-lyvoco) {border-left:1px solid rgba(255, 255, 255, 0.07);}.label.svelte-lyvoco {font-size:10px;font-weight:600;letter-spacing:1.5px;color:rgba(243, 241, 236, 0.55);}.value.svelte-lyvoco {font-size:22px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;}.sub.svelte-lyvoco {font-size:11px;color:rgba(243, 241, 236, 0.55);font-variant-numeric:tabular-nums;}.world.svelte-lyvoco {color:var(--accent);}.idle.svelte-lyvoco .value:where(.svelte-lyvoco) {color:rgba(243, 241, 236, 0.3);}.meter.svelte-lyvoco {display:block;height:4px;margin-top:5px;border-radius:2px;background:rgba(255, 255, 255, 0.1);overflow:hidden;}.meter.svelte-lyvoco i:where(.svelte-lyvoco) {display:block;height:100%;background:var(--accent);}.dots.svelte-lyvoco {position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255, 255, 255, 0.06);}.dots.svelte-lyvoco i:where(.svelte-lyvoco) {display:block;height:100%;background:var(--accent);}.dots.svelte-lyvoco em:where(.svelte-lyvoco) {position:absolute;bottom:0;width:1px;height:6px;background:rgba(255, 255, 255, 0.7);}.boss.svelte-lyvoco {display:grid;gap:7px;padding:9px 14px 10px;}.row.svelte-lyvoco {display:flex;align-items:center;justify-content:space-between;}.name.svelte-lyvoco {font-size:12px;font-weight:700;letter-spacing:2px;}.phase.svelte-lyvoco {font-size:11px;font-weight:600;color:var(--accent);}.bar.svelte-lyvoco {display:grid;grid-template-columns:repeat(3, 1fr);gap:3px;}.seg.svelte-lyvoco {position:relative;height:10px;border-radius:2px;background:rgba(255, 255, 255, 0.08);overflow:hidden;}.seg.svelte-lyvoco b:where(.svelte-lyvoco) {position:absolute;top:0;bottom:0;left:0;}.trail.svelte-lyvoco {background:rgba(255, 240, 220, 0.85);transition:width 0.5s ease-in 0.3s;}.fill.svelte-lyvoco {background:linear-gradient(#ff7a3d, #c8331a);transition:width 0.08s;}.enraged.svelte-lyvoco .fill:where(.svelte-lyvoco) {background:linear-gradient(#ff3d3d, #a01414);}.hp.svelte-lyvoco {display:flex;align-items:center;gap:4px;}.hp.svelte-lyvoco .label:where(.svelte-lyvoco) {margin-right:4px;}.hint.svelte-lyvoco {padding:4px 0;text-align:center;font-size:13px;font-weight:700;color:var(--accent);}\n	@media (max-width: 480px) {.cell.svelte-lyvoco {padding:6px 8px 8px;}.value.svelte-lyvoco {font-size:17px;}\n	}"
+	};
+	function GameHud($$anchor, $$props) {
+		push($$props, true);
+		append_styles$1($$anchor, $$css$4);
+		const $t = () => store_get(t, "$t", $$stores);
+		const [$$stores, $$cleanup] = setup_stores();
+		const ACCENT = {
+			spring: "#ff8fc8",
+			summer: "#ffc04a",
+			autumn: "#ff9a4d",
+			winter: "#8fdcff",
+			hell: "#ff6a3a",
+			secret: "#ffd23f"
+		};
+		const WEAPON_KEY = {
+			bfg: "bfg",
+			barrel: "barrel",
+			berserk: "berserk",
+			"": "none"
+		};
+		const fmt = (n) => Math.max(0, Math.floor(n)).toLocaleString("en-US");
+		const timerRatio = /* @__PURE__ */ user_derived(() => $$props.snap.timer && $$props.snap.timer.duration > 0 ? Math.max(0, Math.min(1, $$props.snap.timer.remaining / $$props.snap.timer.duration)) : 0);
+		const boss = /* @__PURE__ */ user_derived(() => $$props.snap.boss);
+		/** The boss bar in three phase segments, left = the last to go; each 0..1. */
+		const segments = /* @__PURE__ */ user_derived(() => {
+			if (!get(boss)) return [];
+			const edges = [
+				1,
+				...get(boss).marks,
+				0
+			].map((m) => m * get(boss).hpMax);
+			const out = [];
+			for (let i = 0; i < edges.length - 1; i++) out.push(Math.max(0, Math.min(1, (get(boss).hp - edges[i + 1]) / (edges[i] - edges[i + 1]))));
+			return out.reverse();
+		});
+		var div = root_10();
+		let styles;
+		var div_1 = child(div);
+		var div_2 = child(div_1);
+		var span = child(div_2);
+		var text = only_child(span, true);
+		var span_1 = sibling(span, 2);
+		var text_1 = only_child(span_1, true);
+		var text_2 = only_child(sibling(span_1, 2));
+		reset(div_2);
+		var div_3 = sibling(div_2, 2);
+		var span_3 = child(div_3);
+		var text_3 = only_child(span_3, true);
+		var span_4 = sibling(span_3, 2);
+		var text_4 = only_child(span_4, true);
+		var text_5 = only_child(sibling(span_4, 2), true);
+		reset(div_3);
+		var div_4 = sibling(div_3, 2);
+		var span_6 = child(div_4);
+		var text_6 = only_child(span_6, true);
+		var text_7 = only_child(sibling(span_6, 2), true);
+		next(2);
+		reset(div_4);
+		var node = sibling(div_4, 2);
+		var consequent_2 = ($$anchor) => {
+			var div_5 = root_2$2();
+			let classes;
+			var span_8 = child(div_5);
+			var text_8 = only_child(span_8, true);
+			var span_9 = sibling(span_8, 2);
+			var text_9 = only_child(span_9, true);
+			var node_1 = sibling(span_9, 2);
+			var consequent = ($$anchor) => {
+				var span_10 = root$5();
+				var i_1 = child(span_10);
+				let styles_1;
+				reset(span_10);
+				template_effect(($0) => styles_1 = set_style(i_1, "", styles_1, { width: $0 }), [() => `${Math.min(1, get(boss).berserk / 10) * 100}%`]);
+				append($$anchor, span_10);
+			};
+			var consequent_1 = ($$anchor) => {
+				var span_11 = root$5();
+				var i_2 = child(span_11);
+				let styles_2;
+				reset(span_11);
+				template_effect(() => styles_2 = set_style(i_2, "", styles_2, { width: `${get(boss).charge * 100}%` }));
+				append($$anchor, span_11);
+			};
+			var alternate = ($$anchor) => {
+				append($$anchor, root_1$3());
+			};
+			if_block(node_1, ($$render) => {
+				if (get(boss).weapon === "berserk") $$render(consequent);
+				else if (get(boss).charge > 0) $$render(consequent_1, 1);
+				else $$render(alternate, -1);
+			});
+			reset(div_5);
+			template_effect(($0, $1) => {
+				classes = set_class(div_5, 1, "cell wide svelte-lyvoco", null, classes, { idle: get(boss).weapon === "" });
+				set_text(text_8, $0);
+				set_text(text_9, $1);
+			}, [() => $t()("weapon"), () => $t()(WEAPON_KEY[get(boss).weapon])]);
+			append($$anchor, div_5);
+		};
+		var alternate_1 = ($$anchor) => {
+			var div_6 = root_3$1();
+			let classes_1;
+			var span_13 = child(div_6);
+			var text_10 = only_child(span_13, true);
+			var span_14 = sibling(span_13, 2);
+			var text_11 = only_child(span_14, true);
+			var span_15 = sibling(span_14, 2);
+			var i_3 = child(span_15);
+			let styles_3;
+			reset(span_15);
+			reset(div_6);
+			template_effect(($0, $1) => {
+				classes_1 = set_class(div_6, 1, "cell wide svelte-lyvoco", null, classes_1, { idle: !$$props.snap.timer });
+				set_text(text_10, $0);
+				set_text(text_11, $1);
+				styles_3 = set_style(i_3, "", styles_3, { width: `${get(timerRatio) * 100}%` });
+			}, [() => $$props.snap.timer ? $t()($$props.snap.timer.kind) : $t()("power"), () => $$props.snap.timer ? $$props.snap.timer.remaining.toFixed(1) : "—"]);
+			append($$anchor, div_6);
+		};
+		if_block(node, ($$render) => {
+			if (get(boss)) $$render(consequent_2);
+			else $$render(alternate_1, -1);
+		});
+		var node_2 = sibling(node, 2);
+		var consequent_3 = ($$anchor) => {
+			var div_7 = root_4$1();
+			var i_4 = child(div_7);
+			let styles_4;
+			var em = sibling(i_4, 2);
+			set_style(em, "", {}, { left: "50%" });
+			set_style(sibling(em, 2), "", {}, { left: "75%" });
+			reset(div_7);
+			template_effect(($0, $1) => {
+				set_attribute(div_7, "title", `${$0 ?? ""} 50% · ${$1 ?? ""} 75%`);
+				styles_4 = set_style(i_4, "", styles_4, { width: `${$$props.snap.dots * 100}%` });
+			}, [() => $t()("weather"), () => $t()("night")]);
+			append($$anchor, div_7);
+		};
+		if_block(node_2, ($$render) => {
+			if (!get(boss)) $$render(consequent_3);
+		});
+		reset(div_1);
+		var node_3 = sibling(div_1, 2);
+		var consequent_6 = ($$anchor) => {
+			var div_8 = root_9$1();
+			let classes_2;
+			var node_4 = child(div_8);
+			var consequent_4 = ($$anchor) => {
+				var fragment = root_6$1();
+				var div_9 = first_child(fragment);
+				var span_16 = child(div_9);
+				var text_12 = only_child(span_16, true);
+				var text_13 = only_child(sibling(span_16, 2));
+				reset(div_9);
+				var div_10 = sibling(div_9, 2);
+				each(div_10, 21, () => get(segments), index, ($$anchor, fill) => {
+					var div_11 = root_5$1();
+					var b = child(div_11);
+					let styles_5;
+					var b_1 = sibling(b, 2);
+					let styles_6;
+					reset(div_11);
+					template_effect(() => {
+						styles_5 = set_style(b, "", styles_5, { width: `${get(fill) * 100}%` });
+						styles_6 = set_style(b_1, "", styles_6, { width: `${get(fill) * 100}%` });
+					});
+					append($$anchor, div_11);
+				});
+				reset(div_10);
+				template_effect(($0, $1) => {
+					set_text(text_12, $0);
+					set_text(text_13, `${$1 ?? ""} ${get(boss).phase ?? ""}/3`);
+				}, [() => $t()("boss_hell"), () => $t()("phase")]);
+				append($$anchor, fragment);
+			};
+			var consequent_5 = ($$anchor) => {
+				var div_12 = root_7$1();
+				var text_14 = only_child(div_12, true);
+				template_effect(($0) => set_text(text_14, $0), [() => $t()("rewardHint")]);
+				append($$anchor, div_12);
+			};
+			if_block(node_4, ($$render) => {
+				if (!get(boss).defeated) $$render(consequent_4);
+				else if (get(boss).rewardOffered) $$render(consequent_5, 1);
+			});
+			var div_13 = sibling(node_4, 2);
+			var span_18 = child(div_13);
+			var span_19 = child(span_18);
+			var text_15 = only_child(span_19, true);
+			each(sibling(span_19, 2), 16, () => Array.from({ length: get(boss).playerHpMax }, (_, k) => k), (i) => i, ($$anchor, i) => {
+				var svg = root_8$1();
+				var path = only_child(svg);
+				template_effect(() => set_attribute(path, "fill", i < get(boss).playerHp ? "#e5383b" : "rgba(255,255,255,.15)"));
+				append($$anchor, svg);
+			});
+			reset(span_18);
+			reset(div_13);
+			reset(div_8);
+			template_effect(($0) => {
+				classes_2 = set_class(div_8, 1, "box boss svelte-lyvoco", null, classes_2, { enraged: get(boss).phase >= 3 });
+				set_text(text_15, $0);
+			}, [() => $t()("hp")]);
+			append($$anchor, div_8);
+		};
+		if_block(node_3, ($$render) => {
+			if (get(boss)) $$render(consequent_6);
+		});
+		reset(div);
+		template_effect(($0, $1, $2, $3, $4, $5, $6, $7) => {
+			styles = set_style(div, "", styles, { "--accent": ACCENT[$$props.snap.world] });
+			set_text(text, $0);
+			set_text(text_1, $1);
+			set_text(text_2, `${$2 ?? ""} ${$3 ?? ""}`);
+			set_text(text_3, $4);
+			set_text(text_4, $$props.snap.level);
+			set_text(text_5, $5);
+			set_text(text_6, $6);
+			set_text(text_7, $7);
+		}, [
+			() => $t()("score"),
+			() => fmt($$props.snap.score),
+			() => $t()("high"),
+			() => fmt($$props.snap.highScore),
+			() => $t()("level"),
+			() => $t()(`world_${$$props.snap.world}`),
+			() => $t()("lives"),
+			() => Math.max(0, $$props.snap.lives)
+		]);
+		append($$anchor, div);
+		pop();
+		$$cleanup();
+	}
+	//#endregion
 	//#region src/games/pacman/logic/bonuses/fruitCatalog.ts
 	var FRUIT = {
 		CHERRY: "CHERRY",
@@ -12972,14 +13220,14 @@ createHTML: (html) => {
 	}
 	//#endregion
 	//#region src/games/pacman/ui/hud/FruitIcon.svelte
-	var root$5 = /* @__PURE__ */ from_html(`<canvas class="svelte-j99v9c"></canvas>`);
-	var $$css$4 = {
+	var root$4 = /* @__PURE__ */ from_html(`<canvas class="svelte-j99v9c"></canvas>`);
+	var $$css$3 = {
 		hash: "svelte-j99v9c",
 		code: "canvas.svelte-j99v9c {display:block;}"
 	};
 	function FruitIcon($$anchor, $$props) {
 		push($$props, true);
-		append_styles$1($$anchor, $$css$4);
+		append_styles$1($$anchor, $$css$3);
 		/** One fruit drawn by the game's own fruit art, still (no breathing), `size` css px. */
 		let size = prop($$props, "size", 3, 22);
 		let canvas = /* @__PURE__ */ state(void 0);
@@ -12994,7 +13242,7 @@ createHTML: (html) => {
 			ctx.clearRect(0, 0, size(), size());
 			drawFruit(ctx, $$props.kind, size() / 2, size() / 2, size() * .95, 0);
 		});
-		var canvas_1 = root$5();
+		var canvas_1 = root$4();
 		let styles;
 		bind_this(canvas_1, ($$value) => set(canvas, $$value), () => get(canvas));
 		template_effect(() => styles = set_style(canvas_1, "", styles, {
@@ -13003,276 +13251,6 @@ createHTML: (html) => {
 		}));
 		append($$anchor, canvas_1);
 		pop();
-	}
-	//#endregion
-	//#region src/games/pacman/ui/hud/GameHud.svelte
-	var root$4 = /* @__PURE__ */ from_html(`<div class="progress svelte-lyvoco"><i class="svelte-lyvoco"></i> <em class="svelte-lyvoco"></em> <em class="svelte-lyvoco"></em></div>`);
-	var root_1$3 = /* @__PURE__ */ from_html(`<div class="power svelte-lyvoco"><svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true" class="svelte-lyvoco"><circle cx="16" cy="16" r="15" fill="rgba(0,0,0,.35)" class="svelte-lyvoco"></circle><path fill="var(--accent)" class="svelte-lyvoco"></path></svg> <span class="label svelte-lyvoco"> </span> <span class="sec svelte-lyvoco"> </span></div>`);
-	var root_2$2 = /* @__PURE__ */ from_html(`<i></i>`);
-	var root_3$1 = /* @__PURE__ */ from_html(`<span class="gauge svelte-lyvoco"><i class="svelte-lyvoco"></i></span>`);
-	var root_4$1 = /* @__PURE__ */ from_html(`<div><b class="trail svelte-lyvoco"></b> <b class="fill svelte-lyvoco"></b></div>`);
-	var root_5$1 = /* @__PURE__ */ from_html(`<div><div class="boss-title svelte-lyvoco"><span class="boss-name svelte-lyvoco"> </span> <span class="boss-phase svelte-lyvoco"> </span></div> <div class="bar svelte-lyvoco"></div></div>`);
-	var root_6$1 = /* @__PURE__ */ from_html(`<div class="boss hint svelte-lyvoco"><span class="svelte-lyvoco"> </span></div>`);
-	var root_7$1 = /* @__PURE__ */ from_html(`<div class="band bottom svelte-lyvoco"></div> <div class="corner bl svelte-lyvoco"><div class="hp svelte-lyvoco"></div> <div><span class="label svelte-lyvoco"> </span> <span class="name svelte-lyvoco"> </span> <!></div></div> <!>`, 1);
-	var root_8$1 = /* @__PURE__ */ from_html(`<div class="fruits svelte-lyvoco"></div>`);
-	var root_9$1 = /* @__PURE__ */ from_html(`<div class="hud svelte-lyvoco"><div class="band top svelte-lyvoco"></div> <div class="corner tl svelte-lyvoco"><span class="label svelte-lyvoco"> </span> <span class="score svelte-lyvoco"> </span> <span class="minor svelte-lyvoco"><i class="dot svelte-lyvoco"></i> </span></div> <div class="corner tr svelte-lyvoco"><div class="stat svelte-lyvoco"><span class="label svelte-lyvoco"> </span> <span class="num svelte-lyvoco"> </span> <span class="minor svelte-lyvoco"> </span></div> <div class="stat svelte-lyvoco"><span class="label svelte-lyvoco"> </span> <span class="num svelte-lyvoco"> </span></div></div> <!> <!> <!> <!></div>`);
-	var $$css$3 = {
-		hash: "svelte-lyvoco",
-		code: ".hud.svelte-lyvoco {position:fixed;inset:0;pointer-events:none;z-index:20;color:#fbf7ee;font-family:'Bahnschrift', 'DIN Condensed', 'Arial Narrow', 'Roboto Condensed', system-ui, sans-serif;--shadow: 0 1px 0 rgba(0, 0, 0, 0.55), 0 0 12px rgba(0, 0, 0, 0.5);}.band.svelte-lyvoco {position:absolute;left:0;right:0;height:96px;}.band.top.svelte-lyvoco {top:0;background:linear-gradient(rgba(4, 5, 8, 0.62), rgba(4, 5, 8, 0));}.band.bottom.svelte-lyvoco {bottom:0;height:120px;background:linear-gradient(rgba(4, 5, 8, 0), rgba(4, 5, 8, 0.7));}.corner.svelte-lyvoco {position:absolute;display:grid;text-shadow:var(--shadow);}.tl.svelte-lyvoco {top:14px;left:22px;}.tr.svelte-lyvoco {top:14px;right:22px;grid-auto-flow:column;gap:26px;}.bl.svelte-lyvoco {bottom:18px;left:22px;gap:8px;}.label.svelte-lyvoco {font-size:10px;font-weight:700;letter-spacing:3px;opacity:0.7;}.score.svelte-lyvoco {font-size:40px;font-weight:700;line-height:0.95;letter-spacing:1px;font-variant-numeric:tabular-nums;}.minor.svelte-lyvoco {display:flex;align-items:center;gap:6px;margin-top:3px;font-size:11px;font-weight:600;letter-spacing:2px;opacity:0.75;}.dot.svelte-lyvoco {width:6px;height:6px;background:var(--accent);transform:rotate(45deg);}.stat.svelte-lyvoco {display:grid;justify-items:end;}.num.svelte-lyvoco {font-size:34px;font-weight:700;line-height:0.95;font-variant-numeric:tabular-nums;}.stat.svelte-lyvoco .minor:where(.svelte-lyvoco) {color:var(--accent);opacity:1;}.progress.svelte-lyvoco {position:absolute;top:0;left:0;right:0;height:3px;background:rgba(0, 0, 0, 0.35);}.progress.svelte-lyvoco i:where(.svelte-lyvoco) {display:block;height:100%;background:var(--accent);box-shadow:0 0 8px var(--accent);}.progress.svelte-lyvoco em:where(.svelte-lyvoco) {position:absolute;top:0;width:2px;height:7px;background:#fbf7ee;}.power.svelte-lyvoco {position:absolute;top:16px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;text-shadow:var(--shadow);}.power.svelte-lyvoco .label:where(.svelte-lyvoco) {opacity:1;color:var(--accent);}.sec.svelte-lyvoco {font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;min-width:3ch;}.fruits.svelte-lyvoco {position:absolute;right:18px;bottom:14px;display:flex;gap:4px;filter:drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));}\n	/* ── boss levels ───────────────────────────────────────────── */.hp.svelte-lyvoco {display:flex;gap:6px;}.hp.svelte-lyvoco i:where(.svelte-lyvoco) {width:16px;height:16px;clip-path:polygon(50% 0, 100% 50%, 50% 100%, 0 50%);background:rgba(255, 255, 255, 0.18);}.hp.svelte-lyvoco i.on:where(.svelte-lyvoco) {background:linear-gradient(#ff6b5a, #c4141c);box-shadow:0 0 10px #ff3b2f;}.weapon.svelte-lyvoco {display:grid;gap:2px;}.weapon.svelte-lyvoco .name:where(.svelte-lyvoco) {font-size:24px;font-weight:700;line-height:1;letter-spacing:2px;}.weapon.svelte-lyvoco:not(.armed) .name:where(.svelte-lyvoco) {opacity:0.35;}.gauge.svelte-lyvoco {display:block;width:120px;height:4px;background:rgba(255, 255, 255, 0.12);}.gauge.svelte-lyvoco i:where(.svelte-lyvoco) {display:block;height:100%;background:var(--accent);box-shadow:0 0 8px var(--accent);}.boss.svelte-lyvoco {position:absolute;left:50%;bottom:22px;transform:translateX(-50%);width:min(560px, calc(100vw - 340px));min-width:280px;}.boss-title.svelte-lyvoco {display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px;text-shadow:var(--shadow);}.boss-name.svelte-lyvoco {font-size:15px;font-weight:700;letter-spacing:6px;}.boss-phase.svelte-lyvoco {font-family:'Georgia', 'Times New Roman', serif;font-size:22px;font-weight:700;color:var(--accent);}.bar.svelte-lyvoco {display:grid;grid-template-columns:repeat(3, 1fr);gap:5px;padding:4px;background:rgba(8, 4, 3, 0.75);clip-path:polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);}.seg.svelte-lyvoco {position:relative;height:12px;background:rgba(255, 255, 255, 0.07);clip-path:polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);}.seg.svelte-lyvoco b:where(.svelte-lyvoco) {position:absolute;top:0;bottom:0;left:0;}\n	/* the chunk just lost lingers white, then drains */.trail.svelte-lyvoco {background:#fff6e8;transition:width 0.5s ease-in 0.35s;}.fill.svelte-lyvoco {background:linear-gradient(#ff8a3a, #c2300c 60%, #7a1606);transition:width 0.08s;}.enraged.svelte-lyvoco .fill:where(.svelte-lyvoco) {background:linear-gradient(#ff4434, #a40e10 60%, #4c0405);\n		animation: svelte-lyvoco-throb 0.9s ease-in-out infinite;}.seg.spent.svelte-lyvoco {background:rgba(255, 255, 255, 0.04);}.hint.svelte-lyvoco {display:grid;place-items:center;padding:10px 18px;background:rgba(8, 4, 3, 0.75);clip-path:polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%);font-size:15px;font-weight:700;letter-spacing:3px;color:var(--accent);\n		animation: svelte-lyvoco-throb 1.2s ease-in-out infinite;}\n	@keyframes svelte-lyvoco-throb {\n		50% {\n			filter: brightness(1.35);\n		}\n	}\n	@media (max-width: 640px) {.score.svelte-lyvoco {font-size:28px;}.num.svelte-lyvoco {font-size:24px;}.boss.svelte-lyvoco {width:calc(100vw - 32px);bottom:92px;}\n	}"
-	};
-	function GameHud($$anchor, $$props) {
-		push($$props, true);
-		append_styles$1($$anchor, $$css$3);
-		const $t = () => store_get(t, "$t", $$stores);
-		const [$$stores, $$cleanup] = setup_stores();
-		const ACCENT = {
-			spring: "#ff8fc8",
-			summer: "#ffc04a",
-			autumn: "#ff8a3d",
-			winter: "#8fdcff",
-			hell: "#ff5a2a",
-			secret: "#ffd23f"
-		};
-		const WEAPON_KEY = {
-			bfg: "bfg",
-			barrel: "barrel",
-			berserk: "berserk",
-			"": "none"
-		};
-		const ROMAN = [
-			"",
-			"I",
-			"II",
-			"III"
-		];
-		const fmt = (n) => Math.max(0, Math.floor(n)).toLocaleString("en-US");
-		const ratio = /* @__PURE__ */ user_derived(() => $$props.snap.timer && $$props.snap.timer.duration > 0 ? Math.max(0, Math.min(1, $$props.snap.timer.remaining / $$props.snap.timer.duration)) : 0);
-		/** The power timer as Pac-Man: the mouth opens wider as the time runs out. */
-		const pie = /* @__PURE__ */ user_derived(() => {
-			const open = (1 - get(ratio)) * Math.PI * .98;
-			const a0 = open / 2;
-			const a1 = Math.PI * 2 - open / 2;
-			const r = 15;
-			const p = (a) => `${(16 + Math.cos(a) * r).toFixed(2)} ${(16 + Math.sin(a) * r).toFixed(2)}`;
-			return `M16 16 L${p(a0)} A${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${p(a1)} Z`;
-		});
-		const boss = /* @__PURE__ */ user_derived(() => $$props.snap.boss);
-		/** The bar in three phase segments (top band first), each 0..1 full. */
-		const segments = /* @__PURE__ */ user_derived(() => {
-			if (!get(boss)) return [];
-			const edges = [
-				1,
-				...get(boss).marks,
-				0
-			].map((m) => m * get(boss).hpMax);
-			const out = [];
-			for (let i = 0; i < edges.length - 1; i++) {
-				const hi = edges[i];
-				const lo = edges[i + 1];
-				out.push(Math.max(0, Math.min(1, (get(boss).hp - lo) / (hi - lo))));
-			}
-			return out.reverse();
-		});
-		var div = root_9$1();
-		let styles;
-		var div_1 = sibling(child(div), 2);
-		var span = child(div_1);
-		var text = only_child(span, true);
-		var span_1 = sibling(span, 2);
-		var text_1 = only_child(span_1, true);
-		var span_2 = sibling(span_1, 2);
-		var text_2 = sibling(child(span_2));
-		reset(span_2);
-		reset(div_1);
-		var div_2 = sibling(div_1, 2);
-		var div_3 = child(div_2);
-		var span_3 = child(div_3);
-		var text_3 = only_child(span_3, true);
-		var span_4 = sibling(span_3, 2);
-		var text_4 = only_child(span_4, true);
-		var text_5 = only_child(sibling(span_4, 2), true);
-		reset(div_3);
-		var div_4 = sibling(div_3, 2);
-		var span_6 = child(div_4);
-		var text_6 = only_child(span_6, true);
-		var text_7 = only_child(sibling(span_6, 2), true);
-		reset(div_4);
-		reset(div_2);
-		var node = sibling(div_2, 2);
-		var consequent = ($$anchor) => {
-			var div_5 = root$4();
-			var i_1 = child(div_5);
-			let styles_1;
-			var em = sibling(i_1, 2);
-			set_style(em, "", {}, { left: "50%" });
-			set_style(sibling(em, 2), "", {}, { left: "75%" });
-			reset(div_5);
-			template_effect(($0, $1) => {
-				set_attribute(div_5, "title", `${$0 ?? ""} 50% · ${$1 ?? ""} 75%`);
-				styles_1 = set_style(i_1, "", styles_1, { width: `${$$props.snap.dots * 100}%` });
-			}, [() => $t()("weather"), () => $t()("night")]);
-			append($$anchor, div_5);
-		};
-		if_block(node, ($$render) => {
-			if (!get(boss)) $$render(consequent);
-		});
-		var node_1 = sibling(node, 2);
-		var consequent_1 = ($$anchor) => {
-			var div_6 = root_1$3();
-			var svg = child(div_6);
-			var path = sibling(child(svg));
-			reset(svg);
-			var span_8 = sibling(svg, 2);
-			var text_8 = only_child(span_8, true);
-			var text_9 = only_child(sibling(span_8, 2), true);
-			reset(div_6);
-			template_effect(($0, $1) => {
-				set_attribute(path, "d", get(pie));
-				set_text(text_8, $0);
-				set_text(text_9, $1);
-			}, [() => $t()($$props.snap.timer.kind), () => $$props.snap.timer.remaining.toFixed(1)]);
-			append($$anchor, div_6);
-		};
-		if_block(node_1, ($$render) => {
-			if ($$props.snap.timer) $$render(consequent_1);
-		});
-		var node_2 = sibling(node_1, 2);
-		var consequent_6 = ($$anchor) => {
-			var fragment = root_7$1();
-			var div_7 = sibling(first_child(fragment), 2);
-			var div_8 = child(div_7);
-			each(div_8, 20, () => Array.from({ length: get(boss).playerHpMax }, (_, k) => k), (i) => i, ($$anchor, i) => {
-				var i_2 = root_2$2();
-				let classes;
-				template_effect(() => classes = set_class(i_2, 1, "svelte-lyvoco", null, classes, { on: i < get(boss).playerHp }));
-				append($$anchor, i_2);
-			});
-			reset(div_8);
-			var div_9 = sibling(div_8, 2);
-			let classes_1;
-			var span_10 = child(div_9);
-			var text_10 = only_child(span_10, true);
-			var span_11 = sibling(span_10, 2);
-			var text_11 = only_child(span_11, true);
-			var node_3 = sibling(span_11, 2);
-			var consequent_2 = ($$anchor) => {
-				var span_12 = root_3$1();
-				var i_3 = child(span_12);
-				let styles_2;
-				reset(span_12);
-				template_effect(($0) => styles_2 = set_style(i_3, "", styles_2, { width: $0 }), [() => `${Math.min(1, get(boss).berserk / 10) * 100}%`]);
-				append($$anchor, span_12);
-			};
-			var consequent_3 = ($$anchor) => {
-				var span_13 = root_3$1();
-				var i_4 = child(span_13);
-				let styles_3;
-				reset(span_13);
-				template_effect(() => styles_3 = set_style(i_4, "", styles_3, { width: `${get(boss).charge * 100}%` }));
-				append($$anchor, span_13);
-			};
-			if_block(node_3, ($$render) => {
-				if (get(boss).weapon === "berserk") $$render(consequent_2);
-				else if (get(boss).charge > 0) $$render(consequent_3, 1);
-			});
-			reset(div_9);
-			reset(div_7);
-			var node_4 = sibling(div_7, 2);
-			var consequent_4 = ($$anchor) => {
-				var div_10 = root_5$1();
-				let classes_2;
-				var div_11 = child(div_10);
-				var span_14 = child(div_11);
-				var text_12 = only_child(span_14, true);
-				var text_13 = only_child(sibling(span_14, 2), true);
-				reset(div_11);
-				var div_12 = sibling(div_11, 2);
-				each(div_12, 21, () => get(segments), index, ($$anchor, fill) => {
-					var div_13 = root_4$1();
-					let classes_3;
-					var b = child(div_13);
-					let styles_4;
-					var b_1 = sibling(b, 2);
-					let styles_5;
-					reset(div_13);
-					template_effect(() => {
-						classes_3 = set_class(div_13, 1, "seg svelte-lyvoco", null, classes_3, { spent: get(fill) <= 0 });
-						styles_4 = set_style(b, "", styles_4, { width: `${get(fill) * 100}%` });
-						styles_5 = set_style(b_1, "", styles_5, { width: `${get(fill) * 100}%` });
-					});
-					append($$anchor, div_13);
-				});
-				reset(div_12);
-				reset(div_10);
-				template_effect(($0) => {
-					classes_2 = set_class(div_10, 1, "boss svelte-lyvoco", null, classes_2, { enraged: get(boss).phase >= 3 });
-					set_text(text_12, $0);
-					set_text(text_13, ROMAN[get(boss).phase] ?? get(boss).phase);
-				}, [() => $t()("boss_hell")]);
-				append($$anchor, div_10);
-			};
-			var consequent_5 = ($$anchor) => {
-				var div_14 = root_6$1();
-				var text_14 = only_child(child(div_14), true);
-				reset(div_14);
-				template_effect(($0) => set_text(text_14, $0), [() => $t()("rewardHint")]);
-				append($$anchor, div_14);
-			};
-			if_block(node_4, ($$render) => {
-				if (!get(boss).defeated) $$render(consequent_4);
-				else if (get(boss).rewardOffered) $$render(consequent_5, 1);
-			});
-			template_effect(($0, $1) => {
-				classes_1 = set_class(div_9, 1, "weapon svelte-lyvoco", null, classes_1, { armed: get(boss).weapon !== "" });
-				set_text(text_10, $0);
-				set_text(text_11, $1);
-			}, [() => $t()("weapon"), () => $t()(WEAPON_KEY[get(boss).weapon])]);
-			append($$anchor, fragment);
-		};
-		if_block(node_2, ($$render) => {
-			if (get(boss)) $$render(consequent_6);
-		});
-		var node_5 = sibling(node_2, 2);
-		var consequent_7 = ($$anchor) => {
-			var div_15 = root_8$1();
-			each(div_15, 21, () => $$props.snap.fruits, index, ($$anchor, kind) => {
-				FruitIcon($$anchor, {
-					get kind() {
-						return get(kind);
-					},
-					size: 26
-				});
-			});
-			reset(div_15);
-			append($$anchor, div_15);
-		};
-		if_block(node_5, ($$render) => {
-			if (!get(boss)) $$render(consequent_7);
-		});
-		reset(div);
-		template_effect(($0, $1, $2, $3, $4, $5, $6, $7) => {
-			styles = set_style(div, "", styles, { "--accent": ACCENT[$$props.snap.world] });
-			set_text(text, $0);
-			set_text(text_1, $1);
-			set_text(text_2, `${$2 ?? ""} ${$3 ?? ""}`);
-			set_text(text_3, $4);
-			set_text(text_4, $$props.snap.level);
-			set_text(text_5, $5);
-			set_text(text_6, $6);
-			set_text(text_7, $7);
-		}, [
-			() => $t()("score"),
-			() => fmt($$props.snap.score),
-			() => $t()("high"),
-			() => fmt($$props.snap.highScore),
-			() => $t()("level"),
-			() => $t()(`world_${$$props.snap.world}`),
-			() => $t()("lives"),
-			() => Math.max(0, $$props.snap.lives)
-		]);
-		append($$anchor, div);
-		pop();
-		$$cleanup();
 	}
 	//#endregion
 	//#region src/games/pacman/ui/hud/LifeIcon.svelte
@@ -13383,7 +13361,7 @@ createHTML: (html) => {
 	var root_9 = /* @__PURE__ */ from_html(`<div><!></div>`);
 	var $$css$1 = {
 		hash: "svelte-xk92eo",
-		code: ".screens.svelte-xk92eo {position:fixed;inset:0;z-index:30;pointer-events:none;display:grid;place-items:center;color:#f4f1ea;font-family:'Bahnschrift', 'DIN Condensed', 'Arial Narrow', 'Roboto Condensed', system-ui, sans-serif;--glass: linear-gradient(180deg, rgba(28, 32, 42, 0.9), rgba(8, 10, 14, 0.94));}.veil.svelte-xk92eo {position:absolute;inset:0;background:radial-gradient(ellipse at center, rgba(4, 6, 10, 0.35), rgba(4, 6, 10, 0.7));}.card.svelte-xk92eo {position:relative;pointer-events:auto;display:grid;justify-items:center;gap:12px;min-width:260px;max-width:calc(100vw - 32px);padding:22px 26px;box-sizing:border-box;background:rgba(8, 9, 12, 0.88);clip-path:polygon(\n			18px 0,\n			100% 0,\n			100% calc(100% - 18px),\n			calc(100% - 18px) 100%,\n			0 100%,\n			0 18px\n		);filter:drop-shadow(0 20px 40px rgba(0, 0, 0, 0.5));backdrop-filter:blur(6px);}.card.wide.svelte-xk92eo {min-width:340px;}h1.svelte-xk92eo,\n	h2.svelte-xk92eo {margin:0;font-weight:700;letter-spacing:3px;}h1.svelte-xk92eo {font-size:44px;color:var(--accent);text-shadow:0 0 18px color-mix(in srgb, var(--accent) 60%, transparent);}h2.svelte-xk92eo {font-size:30px;}h2.over.svelte-xk92eo {color:#ff4d4d;}.modes.svelte-xk92eo {display:flex;gap:8px;}.modes.svelte-xk92eo button:where(.svelte-xk92eo) {display:flex;align-items:center;gap:6px;}.stat.svelte-xk92eo {font-size:12px;letter-spacing:2px;color:rgba(244, 241, 234, 0.6);}.stat.svelte-xk92eo b:where(.svelte-xk92eo) {font-weight:700;font-size:22px;color:#fff;margin-left:6px;}.record.svelte-xk92eo {padding:3px 10px;clip-path:polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);background:var(--accent);color:#120d06;font-size:11px;font-weight:800;letter-spacing:2px;\n		animation: svelte-xk92eo-pop 0.9s ease-in-out infinite alternate;}.buttons.svelte-xk92eo {display:grid;gap:8px;width:100%;}button.svelte-xk92eo {pointer-events:auto;border:0;border-left:3px solid rgba(255, 255, 255, 0.18);background:rgba(255, 255, 255, 0.06);clip-path:polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);text-align:left;color:#f4f1ea;font:inherit;font-size:13px;font-weight:700;letter-spacing:2px;padding:10px 16px;cursor:pointer;transition:background 0.15s,\n			border-color 0.15s;}button.svelte-xk92eo:hover,\n	button.on.svelte-xk92eo {border-left-color:var(--accent);background:color-mix(in srgb, var(--accent) 18%, transparent);}button.primary.svelte-xk92eo {background:var(--accent);border-color:var(--accent);color:#120d06;}button.primary.svelte-xk92eo:hover {filter:brightness(1.08);}button.ghost.svelte-xk92eo {background:none;font-size:11px;color:rgba(244, 241, 234, 0.6);}button.small.svelte-xk92eo {padding:6px 12px;}.help.svelte-xk92eo {margin:0;font-size:11px;line-height:1.6;text-align:center;color:rgba(244, 241, 234, 0.5);}.ready.svelte-xk92eo {display:grid;justify-items:center;gap:8px;transform:translateY(18%);}.ready.svelte-xk92eo .title:where(.svelte-xk92eo) {font-size:42px;letter-spacing:4px;color:#fff;-webkit-text-stroke:1.5px rgba(10, 8, 6, 0.85);paint-order:stroke fill;text-shadow:0 3px 0 rgba(0, 0, 0, 0.55),\n			0 0 22px var(--accent),\n			0 0 44px color-mix(in srgb, var(--accent) 60%, transparent);}.ready.svelte-xk92eo .where:where(.svelte-xk92eo) {padding:4px 14px;background:rgba(8, 9, 12, 0.8);clip-path:polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);font-size:12px;font-weight:700;letter-spacing:2px;}.ready.svelte-xk92eo .bar:where(.svelte-xk92eo) {width:140px;height:3px;border-radius:2px;background:rgba(0, 0, 0, 0.45);overflow:hidden;}.ready.svelte-xk92eo .bar:where(.svelte-xk92eo) i:where(.svelte-xk92eo) {display:block;height:100%;background:var(--accent);}.banner.svelte-xk92eo {align-self:end;margin-bottom:64px;display:flex;align-items:center;gap:10px;padding:8px 20px;background:rgba(8, 9, 12, 0.82);clip-path:polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);font-size:13px;font-weight:700;letter-spacing:2px;}.banner.svelte-xk92eo .count:where(.svelte-xk92eo) {font-size:20px;color:var(--accent);}\n	/* the original game's titles: yellow READY!, red GAME OVER, blocky letters */.arcade.svelte-xk92eo .ready:where(.svelte-xk92eo) .title:where(.svelte-xk92eo),\n	.arcade.svelte-xk92eo h2:where(.svelte-xk92eo) {font-family:'Press Start 2P', 'Courier New', monospace;font-weight:700;font-size:22px;letter-spacing:2px;color:#ffff00;text-shadow:none;}.arcade.svelte-xk92eo h2.over:where(.svelte-xk92eo) {color:#ff0000;}\n	@keyframes svelte-xk92eo-pop {\n		to {\n			transform: scale(1.06);\n		}\n	}"
+		code: ".screens.svelte-xk92eo {position:fixed;inset:0;z-index:30;pointer-events:none;display:grid;place-items:center;color:#f4f1ea;font-family:'Bahnschrift', 'DIN Condensed', 'Arial Narrow', 'Roboto Condensed', system-ui, sans-serif;--glass: linear-gradient(180deg, rgba(28, 32, 42, 0.9), rgba(8, 10, 14, 0.94));}.veil.svelte-xk92eo {position:absolute;inset:0;background:radial-gradient(ellipse at center, rgba(4, 6, 10, 0.35), rgba(4, 6, 10, 0.7));}.card.svelte-xk92eo {position:relative;pointer-events:auto;display:grid;justify-items:center;gap:12px;min-width:260px;max-width:calc(100vw - 32px);padding:22px 26px;box-sizing:border-box;background:rgba(8, 9, 12, 0.88);border:1px solid rgba(255, 255, 255, 0.1);border-radius:10px;box-shadow:0 16px 40px rgba(0, 0, 0, 0.5);backdrop-filter:blur(6px);}.card.wide.svelte-xk92eo {min-width:340px;}h1.svelte-xk92eo,\n	h2.svelte-xk92eo {margin:0;font-weight:700;letter-spacing:3px;}h1.svelte-xk92eo {font-size:44px;color:var(--accent);text-shadow:0 0 18px color-mix(in srgb, var(--accent) 60%, transparent);}h2.svelte-xk92eo {font-size:30px;}h2.over.svelte-xk92eo {color:#ff4d4d;}.modes.svelte-xk92eo {display:flex;gap:8px;}.modes.svelte-xk92eo button:where(.svelte-xk92eo) {display:flex;align-items:center;gap:6px;}.stat.svelte-xk92eo {font-size:12px;letter-spacing:2px;color:rgba(244, 241, 234, 0.6);}.stat.svelte-xk92eo b:where(.svelte-xk92eo) {font-weight:700;font-size:22px;color:#fff;margin-left:6px;}.record.svelte-xk92eo {padding:3px 10px;border-radius:6px;background:var(--accent);color:#120d06;font-size:11px;font-weight:800;letter-spacing:2px;\n		animation: svelte-xk92eo-pop 0.9s ease-in-out infinite alternate;}.buttons.svelte-xk92eo {display:grid;gap:8px;width:100%;}button.svelte-xk92eo {pointer-events:auto;border:1px solid rgba(255, 255, 255, 0.12);border-radius:6px;background:rgba(255, 255, 255, 0.05);color:#f4f1ea;font:inherit;font-size:13px;font-weight:700;letter-spacing:2px;padding:10px 16px;cursor:pointer;transition:background 0.15s,\n			border-color 0.15s;}button.svelte-xk92eo:hover,\n	button.on.svelte-xk92eo {border-color:var(--accent);background:color-mix(in srgb, var(--accent) 14%, transparent);}button.primary.svelte-xk92eo {background:var(--accent);border-color:var(--accent);color:#120d06;}button.primary.svelte-xk92eo:hover {filter:brightness(1.08);}button.ghost.svelte-xk92eo {background:none;font-size:11px;color:rgba(244, 241, 234, 0.6);}button.small.svelte-xk92eo {padding:6px 12px;}.help.svelte-xk92eo {margin:0;font-size:11px;line-height:1.6;text-align:center;color:rgba(244, 241, 234, 0.5);}.ready.svelte-xk92eo {display:grid;justify-items:center;gap:8px;transform:translateY(18%);}.ready.svelte-xk92eo .title:where(.svelte-xk92eo) {font-size:42px;letter-spacing:4px;color:#fff;-webkit-text-stroke:1.5px rgba(10, 8, 6, 0.85);paint-order:stroke fill;text-shadow:0 3px 0 rgba(0, 0, 0, 0.55),\n			0 0 22px var(--accent),\n			0 0 44px color-mix(in srgb, var(--accent) 60%, transparent);}.ready.svelte-xk92eo .where:where(.svelte-xk92eo) {padding:4px 14px;background:rgba(8, 9, 12, 0.8);border-radius:6px;font-size:12px;font-weight:700;letter-spacing:2px;}.ready.svelte-xk92eo .bar:where(.svelte-xk92eo) {width:140px;height:3px;border-radius:2px;background:rgba(0, 0, 0, 0.45);overflow:hidden;}.ready.svelte-xk92eo .bar:where(.svelte-xk92eo) i:where(.svelte-xk92eo) {display:block;height:100%;background:var(--accent);}.banner.svelte-xk92eo {align-self:end;margin-bottom:64px;display:flex;align-items:center;gap:10px;padding:8px 20px;background:rgba(8, 9, 12, 0.82);border-radius:6px;font-size:13px;font-weight:700;letter-spacing:2px;}.banner.svelte-xk92eo .count:where(.svelte-xk92eo) {font-size:20px;color:var(--accent);}\n	/* the original game's titles: yellow READY!, red GAME OVER, blocky letters */.arcade.svelte-xk92eo .ready:where(.svelte-xk92eo) .title:where(.svelte-xk92eo),\n	.arcade.svelte-xk92eo h2:where(.svelte-xk92eo) {font-family:'Press Start 2P', 'Courier New', monospace;font-weight:700;font-size:22px;letter-spacing:2px;color:#ffff00;text-shadow:none;}.arcade.svelte-xk92eo h2.over:where(.svelte-xk92eo) {color:#ff0000;}\n	@keyframes svelte-xk92eo-pop {\n		to {\n			transform: scale(1.06);\n		}\n	}"
 	};
 	function GameScreens($$anchor, $$props) {
 		push($$props, true);

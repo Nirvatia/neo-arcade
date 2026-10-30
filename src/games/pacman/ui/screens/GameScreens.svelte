@@ -154,15 +154,9 @@
 		padding: 22px 26px;
 		box-sizing: border-box;
 		background: rgba(8, 9, 12, 0.88);
-		clip-path: polygon(
-			18px 0,
-			100% 0,
-			100% calc(100% - 18px),
-			calc(100% - 18px) 100%,
-			0 100%,
-			0 18px
-		);
-		filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.5));
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		border-radius: 10px;
+		box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
 		backdrop-filter: blur(6px);
 	}
 	.card.wide {
@@ -207,7 +201,7 @@
 	}
 	.record {
 		padding: 3px 10px;
-		clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+		border-radius: 6px;
 		background: var(--accent);
 		color: #120d06;
 		font-size: 11px;
@@ -222,11 +216,9 @@
 	}
 	button {
 		pointer-events: auto;
-		border: 0;
-		border-left: 3px solid rgba(255, 255, 255, 0.18);
-		background: rgba(255, 255, 255, 0.06);
-		clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
-		text-align: left;
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		border-radius: 6px;
+		background: rgba(255, 255, 255, 0.05);
 		color: #f4f1ea;
 		font: inherit;
 		font-size: 13px;
@@ -240,8 +232,8 @@
 	}
 	button:hover,
 	button.on {
-		border-left-color: var(--accent);
-		background: color-mix(in srgb, var(--accent) 18%, transparent);
+		border-color: var(--accent);
+		background: color-mix(in srgb, var(--accent) 14%, transparent);
 	}
 	button.primary {
 		background: var(--accent);
@@ -286,7 +278,7 @@
 	.ready .where {
 		padding: 4px 14px;
 		background: rgba(8, 9, 12, 0.8);
-		clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+		border-radius: 6px;
 		font-size: 12px;
 		font-weight: 700;
 		letter-spacing: 2px;
@@ -311,7 +303,7 @@
 		gap: 10px;
 		padding: 8px 20px;
 		background: rgba(8, 9, 12, 0.82);
-		clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+		border-radius: 6px;
 		font-size: 13px;
 		font-weight: 700;
 		letter-spacing: 2px;
