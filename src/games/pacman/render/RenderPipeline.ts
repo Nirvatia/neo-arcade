@@ -8,18 +8,27 @@ import { DoomLevelRenderer } from './doom/DoomLevelRenderer';
 import { MeadowLevelRenderer } from './seasons/meadow/MeadowLevelRenderer';
 import { meadowThemeFor } from './seasons/meadow/meadowThemes';
 import { EMBER_PALETTE, ICE_PALETTE, LevelDecay } from './transitions/decay/LevelDecay';
-import type { LevelRenderer, RenderFrame } from './RenderFrame';
+import type { LevelRenderer, RenderFrame, WorldPreview } from './RenderFrame';
+import { SeasonTurn } from './transitions/seasonTurn/SeasonTurn';
+import type { SeasonTurnRequest } from './transitions/seasonTurn/SeasonTurn';
+import { glowTexture } from './common/textures';
+import { FLOW } from '../config/flowConfig';
+import type { NextLevel } from '../logic/level/LevelLoader';
 import type { DecayPalette } from './transitions/decay/DecayPass';
 
 /** Same as the page background, so a full fade reads as an empty stage. */
 const FADE_COLOR = '#030509';
 
+/** Light of the season turn into a season; into a boss world it takes the boss palette. */
+const SEASON_LIGHT = { light: 0xffe3a0, gap: 0xfff4d6 };
+
 /**
  * Owns the canvas (HiDPI sizing, render clock) and hands each frame to the renderer of the
  * current level kind. Renderers live as long as the pipeline so their animation state
  * (weather, effects, the baked worlds) survives between frames. While Pac-Man dies, the
- * level is rendered offscreen and shattered by the decay pass; Pac-Man, the overlay and
- * the screen fade are drawn over it.
+ * level is rendered offscreen and shattered by the decay pass; when a level is cleared,
+ * it and the next level's world are rendered offscreen and the season turn flips one into
+ * the other. Pac-Man, the overlay and the screen fade are drawn over both.
  */
 export class RenderPipeline {
 	private readonly container: HTMLElement;
@@ -29,8 +38,9 @@ export class RenderPipeline {
 	private readonly shared: SharedLayers;
 	private readonly seasonRenderer: LevelRenderer;
 	private readonly meadowRenderer: MeadowLevelRenderer;
-	private readonly doomRenderer: LevelRenderer;
+	private readonly doomRenderer: DoomLevelRenderer;
 	private readonly decay = new LevelDecay();
+	private readonly turn = new SeasonTurn();
 	private readonly canvas: HTMLCanvasElement;
 	private readonly ctx: CanvasRenderingContext2D;
 	private width = 0;
@@ -93,8 +103,16 @@ export class RenderPipeline {
 		const pr = this.pixelRatio;
 		const flow = this.director.flow;
 		const death = flow.state === 'death' ? this.director.death : null;
+		const clear = flow.state === 'level-clear' ? this.director.levelClear : null;
+		const next = clear ? this.level.peekNextLevel() : null;
+		const nextView = next ? this.previewFor(next) : null;
+		const turning = clear && next && nextView;
 		const shake = death && !flow.paused ? this.decay.shake(flow.elapsed) : { x: 0, y: 0 };
-		const target = death ? this.decay.begin(this.canvas.width, this.canvas.height) : this.ctx;
+		const target = death
+			? this.decay.begin(this.canvas.width, this.canvas.height)
+			: turning
+				? this.turn.old(this.canvas.width, this.canvas.height)
+				: this.ctx;
 		target.setTransform(pr, 0, 0, pr, pr * shake.x, pr * shake.y);
 		target.globalAlpha = 1;
 		target.globalCompositeOperation = 'source-over';
@@ -131,6 +149,33 @@ export class RenderPipeline {
 			});
 			this.shared.drawPlayer(screen, layout);
 		}
+		if (turning) {
+			const nextCtx = this.turn.next(this.canvas.width, this.canvas.height);
+			nextCtx.setTransform(pr, 0, 0, pr, 0, 0);
+			nextCtx.globalAlpha = 1;
+			nextCtx.globalCompositeOperation = 'source-over';
+			nextView.preview({
+				ctx: nextCtx,
+				width: this.width,
+				height: this.height,
+				pixelRatio: pr,
+				dt,
+				paused: flow.paused,
+				season: next.season
+			});
+			this.ctx.setTransform(pr, 0, 0, pr, 0, 0);
+			this.turn.compose(this.ctx, this.width, this.height, pr, layout, this.timeValue, {
+				grid: season.grid,
+				x: clear.x,
+				y: clear.y,
+				elapsed: flow.elapsed,
+				...this.turnStyle(next)
+			});
+			// Pac-Man stays on the last dot until the world has turned
+			if (flow.elapsed < FLOW.levelClear.lights + FLOW.levelClear.turn) {
+				this.shared.drawPlayer(screen, layout);
+			}
+		}
 		this.shared.drawOverlay(screen, layout);
 		this.drawFade(flow.fade);
 	}
@@ -138,6 +183,31 @@ export class RenderPipeline {
 	destroy(): void {
 		this.unsubscribeCues();
 		this.canvas.remove();
+	}
+
+	/** The renderer that can show the next level's world, or null (then no turn). */
+	private previewFor(next: NextLevel): WorldPreview | null {
+		if (next.hell) {
+			return this.doomRenderer;
+		}
+		return this.meadowRenderer.handles(next.season.name) ? this.meadowRenderer : null;
+	}
+
+	/**
+	 * Colours and particles of the season turn: golden light and the next season's own
+	 * particles into a season; the boss world's palette and embers into a boss level, so
+	 * every boss world is entered the same way.
+	 */
+	private turnStyle(next: NextLevel): Pick<SeasonTurnRequest, 'light' | 'gap' | 'particle'> {
+		if (next.hell) {
+			const ember = glowTexture(EMBER_PALETTE.wisp);
+			return { light: EMBER_PALETTE.rim, gap: EMBER_PALETTE.warm, particle: () => ember };
+		}
+		const theme = meadowThemeFor(next.season.name);
+		return {
+			...SEASON_LIGHT,
+			particle: (i) => (theme ? theme.live.drift.texture(i) : glowTexture(SEASON_LIGHT.light))
+		};
 	}
 
 	private decayPalette(): DecayPalette {

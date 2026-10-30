@@ -111,11 +111,12 @@ describe('game flow', () => {
 		director.debugCompleteLevel();
 		expect(director.stateName).toBe('level-clear');
 		run(director, 3);
-		const phase = director.levelClear?.phase;
+		const turned = director.flow.progress;
 		director.togglePause();
 		run(director, 10);
 		director.togglePause();
-		expect(director.levelClear?.phase).toBe(phase);
+		expect(director.stateName).toBe('level-clear');
+		expect(director.flow.progress).toBeCloseTo(turned, 5);
 	});
 
 	it('uses the short READY after a death, without the jingle', () => {
@@ -131,20 +132,37 @@ describe('game flow', () => {
 		expect(cues).not.toContain('intro');
 	});
 
-	it('moves to the next level behind a fade after level clear', () => {
-		const { director, level } = setup();
+	it('turns the season, then starts the next level in place without a fade', () => {
+		const { director, level, cues } = setup();
 		startToReady(director);
 		director.showPlaying();
 		const start = level.level;
+		const next = level.peekNextLevel();
+		cues.length = 0;
 		director.debugCompleteLevel();
-		const clear = FLOW.levelClear.blink + FLOW.levelClear.cutscene + FLOW.levelClear.mazeOut;
-		run(director, clear + 0.05);
-		expect(director.transitioning).toBe(true);
+		expect(cues).toContain('win');
+		expect(director.levelClear).not.toBeNull();
+		expect(director.flow.phase).toBe('lights');
+		const clear = FLOW.levelClear.lights + FLOW.levelClear.turn + FLOW.levelClear.settle;
+		run(director, clear - 0.05);
+		expect(director.flow.phase).toBe('settle');
 		expect(level.level).toBe(start);
-		run(director, FADE);
+		run(director, 0.1);
+		expect(director.transitioning).toBe(false);
 		expect(level.level).toBe(start + 1);
+		expect(level.season?.name).toBe(next.season.name);
 		expect(director.stateName).toBe('ready');
 		expect(director.flow.phase).toBe('short');
+	});
+
+	it('peeks the next world: a season, or the hell every fifth level', () => {
+		const { level } = setup();
+		level.setPendingStartLevel(4);
+		level.startNewGame();
+		expect(level.peekNextLevel()).toMatchObject({ level: 5, hell: true });
+		level.setPendingStartLevel(1);
+		level.startNewGame();
+		expect(level.peekNextLevel()).toMatchObject({ level: 2, hell: false });
 	});
 
 	it('defers an auto-pause requested during a fade until the fade ends', () => {

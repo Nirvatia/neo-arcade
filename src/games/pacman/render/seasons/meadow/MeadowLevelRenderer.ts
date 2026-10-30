@@ -1,8 +1,9 @@
 import { GhostView } from '../../actors/GhostView';
 import type { GridLayout } from '../../maze/GridView';
 import type { SharedLayers } from '../../SharedLayers';
-import type { LevelRenderer, RenderFrame } from '../../RenderFrame';
-import type { GridService } from '../../../logic/maze/GridService';
+import type { LevelRenderer, PreviewFrame, RenderFrame, WorldPreview } from '../../RenderFrame';
+import type { GridMatrix } from '../../../config/gridConfig';
+import type { SeasonData } from '../../../logic/level/SeasonCatalog';
 import { MeadowWorld } from './MeadowWorld';
 import type { MeadowTheme } from './MeadowTheme';
 
@@ -15,13 +16,12 @@ const NIGHT_AT = 0.75;
  * world and its live layer, the atmosphere under the actors (so they stay readable), then
  * the weather and the vignette on top. Weather and night follow the level's progress.
  */
-export class MeadowLevelRenderer implements LevelRenderer {
+export class MeadowLevelRenderer implements LevelRenderer, WorldPreview {
 	private readonly shared: SharedLayers;
 	private readonly themeFor: (season: string) => MeadowTheme | null;
 	private readonly ghostView = new GhostView();
-	private world: MeadowWorld | null = null;
-	private worldGrid: GridService | null = null;
-	private worldTheme: MeadowTheme | null = null;
+	/** The current level's world and the next one (the season turn needs both at once). */
+	private worlds: Array<{ grid: GridMatrix; theme: MeadowTheme; world: MeadowWorld }> = [];
 
 	constructor(shared: SharedLayers, themeFor: (season: string) => MeadowTheme | null) {
 		this.shared = shared;
@@ -35,7 +35,7 @@ export class MeadowLevelRenderer implements LevelRenderer {
 
 	render(frame: RenderFrame): GridLayout {
 		const { ctx, state, level, progress } = frame;
-		const world = this.worldFor(frame);
+		const world = this.worldFor(frame.season);
 		world.resize(frame.width, frame.height, frame.pixelRatio);
 		const ratio = progress.collectionRatio;
 		world.setMood(ratio >= WEATHER_AT ? 1 : 0, ratio >= NIGHT_AT ? 1 : 0);
@@ -46,9 +46,8 @@ export class MeadowLevelRenderer implements LevelRenderer {
 
 		world.drawWorld(ctx, (x, y) => progress.isCollected(x, y));
 		world.drawMood(ctx);
-		if (state === 'level-clear') {
-			this.shared.drawLevelClear(frame, layout);
-		} else {
+		// on level clear only the world: the season turn flips it over, actors stay out
+		if (state !== 'level-clear') {
 			this.shared.drawCollectibles(frame, layout);
 			const ghosts = level.ghosts;
 			if (ghosts) {
@@ -74,17 +73,39 @@ export class MeadowLevelRenderer implements LevelRenderer {
 		return layout;
 	}
 
-	/** The baked world is rebuilt only when a new level (grid) or season starts. */
-	private worldFor(frame: RenderFrame): MeadowWorld {
-		const theme = this.themeFor(frame.season.name);
+	/** The next level's world, untouched and in its morning mood, for the season turn. */
+	preview(frame: PreviewFrame): GridLayout {
+		const world = this.worldFor(frame.season);
+		world.resize(frame.width, frame.height, frame.pixelRatio);
+		world.setMood(0, 0);
+		if (!frame.paused) {
+			world.update(frame.dt);
+		}
+		world.drawWorld(frame.ctx, () => false);
+		world.drawMood(frame.ctx);
+		world.drawOverlay(frame.ctx);
+		return world.layout;
+	}
+
+	/**
+	 * The world of a season and grid, kept for the next frames. A previewed world becomes
+	 * the level's world when that level starts, so nothing jumps at the hand-over; only the
+	 * two most recent worlds are kept (each holds a large baked background).
+	 */
+	private worldFor(season: SeasonData): MeadowWorld {
+		const theme = this.themeFor(season.name);
 		if (!theme) {
-			throw new Error(`MeadowLevelRenderer: no theme for ${frame.season.name}`);
+			throw new Error(`MeadowLevelRenderer: no theme for ${season.name}`);
 		}
-		if (!this.world || this.worldGrid !== frame.grid || this.worldTheme !== theme) {
-			this.world = new MeadowWorld(frame.season.grid, theme);
-			this.worldGrid = frame.grid;
-			this.worldTheme = theme;
+		const i = this.worlds.findIndex((w) => w.grid === season.grid && w.theme === theme);
+		if (i >= 0) {
+			const [hit] = this.worlds.splice(i, 1);
+			this.worlds.unshift(hit);
+			return hit.world;
 		}
-		return this.world;
+		const world = new MeadowWorld(season.grid, theme);
+		this.worlds.unshift({ grid: season.grid, theme, world });
+		this.worlds.length = Math.min(this.worlds.length, 2);
+		return world;
 	}
 }

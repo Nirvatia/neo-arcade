@@ -4,22 +4,20 @@ import type { PlayerDrawOptions } from './actors/PlayerView';
 import { EchoCloneView } from './actors/EchoCloneView';
 import { FruitView } from './items/fruit/FruitView';
 import { GoldenEggView } from './items/GoldenEggView';
-import { LevelClearView } from './transitions/LevelClearView';
 import { OverlayView } from './overlay/OverlayView';
 import { buildOverlaySnapshot } from './overlay/overlaySnapshot';
 import type { RenderFrame } from './RenderFrame';
 
 /**
- * Layers drawn the same way on every level: Pac-Man, the bonuses, the level-clear
- * cutscene and the canvas overlay. Level renderers place the bonuses and the cutscene in
- * their draw order; the pipeline draws Pac-Man over the level decay and the overlay last.
+ * Layers drawn the same way on every level: Pac-Man, the bonuses and the canvas overlay.
+ * Level renderers place the bonuses in their draw order; the pipeline draws Pac-Man over
+ * the level decay and the season turn, and the overlay last.
  */
 export class SharedLayers {
 	readonly playerView = new PlayerView();
 	private readonly fruitView = new FruitView();
 	private readonly goldenEggView = new GoldenEggView();
 	private readonly echoCloneView = new EchoCloneView();
-	private readonly levelClearView = new LevelClearView();
 	private readonly overlayView = new OverlayView();
 
 	drawCollectibles(frame: RenderFrame, layout: GridLayout): void {
@@ -51,13 +49,6 @@ export class SharedLayers {
 				frame.time,
 				this.playerOptions(frame)
 			);
-		}
-	}
-
-	drawLevelClear(frame: RenderFrame, layout: GridLayout): void {
-		const clear = frame.director.levelClear;
-		if (clear && clear.phase === 'cutscene') {
-			this.levelClearView.draw(frame.ctx, clear, frame.grid, layout, frame.level.profile);
 		}
 	}
 

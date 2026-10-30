@@ -1,8 +1,7 @@
 import type { GridLayout } from '../maze/GridView';
 import { clamp } from '../common/math';
 
-export type OverlayMode =
-	'none' | 'ready' | 'playing' | 'paused' | 'death' | 'level-clear' | 'game-over';
+export type OverlayMode = 'none' | 'ready' | 'playing' | 'paused' | 'death' | 'game-over';
 
 export interface OverlaySnapshot {
 	readonly mode: OverlayMode;
@@ -79,7 +78,6 @@ export class OverlayView {
 			snapshot.mode !== 'playing' &&
 			snapshot.mode !== 'paused' &&
 			snapshot.mode !== 'death' &&
-			snapshot.mode !== 'level-clear' &&
 			snapshot.mode !== 'game-over'
 		) {
 			return false;
@@ -166,8 +164,7 @@ export class OverlayView {
 			titleSize,
 			titleColor
 		);
-		const showsTimer =
-			snapshot.mode === 'ready' || snapshot.mode === 'death' || snapshot.mode === 'level-clear';
+		const showsTimer = snapshot.mode === 'ready' || snapshot.mode === 'death';
 		if (!showsTimer) {
 			return;
 		}
@@ -259,9 +256,6 @@ export class OverlayView {
 		}
 		if (mode === 'death') {
 			return '#ff4d4d';
-		}
-		if (mode === 'level-clear') {
-			return '#ffd93b';
 		}
 		if (mode === 'paused') {
 			return '#56d9ff';

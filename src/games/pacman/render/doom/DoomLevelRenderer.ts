@@ -10,7 +10,8 @@ import { DoomWorld } from './DoomWorld';
 import type { DoomLight } from './DoomWorld';
 import { pickupSprite } from './DoomSprites';
 import type { SharedLayers } from '../SharedLayers';
-import type { LevelRenderer, RenderFrame } from '../RenderFrame';
+import type { LevelRenderer, PreviewFrame, RenderFrame, WorldPreview } from '../RenderFrame';
+import type { GridMatrix } from '../../config/gridConfig';
 import type { GridLayout } from '../maze/GridView';
 
 /**
@@ -18,7 +19,7 @@ import type { GridLayout } from '../maze/GridView';
  * storm in boss phase 2, night with a corridor light map in phase 3), then the actors on
  * top so they always stay readable, then embers and vignette.
  */
-export class DoomLevelRenderer implements LevelRenderer {
+export class DoomLevelRenderer implements LevelRenderer, WorldPreview {
 	private readonly shared: SharedLayers;
 	private readonly fxView = new DoomFxView();
 	private readonly bossView = new LampreyBossView();
@@ -27,6 +28,8 @@ export class DoomLevelRenderer implements LevelRenderer {
 	private bossHitFlash = 0;
 	private world: DoomWorld | null = null;
 	private worldGrid: GridService | null = null;
+	/** The hell world shown by the season turn before the hell level exists. */
+	private previewWorld: { grid: GridMatrix; world: DoomWorld } | null = null;
 	private lastPlayerPos: { x: number; y: number } | null = null;
 
 	constructor(shared: SharedLayers) {
@@ -67,9 +70,8 @@ export class DoomLevelRenderer implements LevelRenderer {
 		world.drawWorld(ctx);
 		world.drawMood(ctx, this.lights(level, state));
 
-		if (state === 'level-clear') {
-			this.shared.drawLevelClear(frame, layout);
-		} else {
+		// on level clear only the world: the season turn flips it over, actors stay out
+		if (state !== 'level-clear') {
 			this.fxView.drawGround(ctx, layout);
 			this.shared.drawCollectibles(frame, layout);
 			if (boss && doom && fighting) {
@@ -117,11 +119,34 @@ export class DoomLevelRenderer implements LevelRenderer {
 		if (!this.world || this.worldGrid !== frame.grid) {
 			const doom = frame.level.doom;
 			const pickupTiles = doom ? doom.pickupList.map((pickup) => pickup.tile) : [];
-			this.world = new DoomWorld(frame.season.grid, pickupTiles);
+			const preview = this.previewWorld;
+			if (preview && preview.grid === frame.season.grid) {
+				// the world the season turn showed becomes the level's world: no jump
+				this.world = preview.world;
+				this.world.addPickupLights(pickupTiles);
+			} else {
+				this.world = new DoomWorld(frame.season.grid, pickupTiles);
+			}
+			this.previewWorld = null;
 			this.fxView.reset();
 			this.worldGrid = frame.grid;
 		}
 		return this.world;
+	}
+
+	/** The hell world before the fight: no boss, no actors, calm (phase 1 mood). */
+	preview(frame: PreviewFrame): GridLayout {
+		if (!this.previewWorld || this.previewWorld.grid !== frame.season.grid) {
+			this.previewWorld = { grid: frame.season.grid, world: new DoomWorld(frame.season.grid, []) };
+		}
+		const world = this.previewWorld.world;
+		world.resize(frame.width, frame.height, frame.pixelRatio);
+		world.setMood(false, false);
+		world.update(frame.paused ? 0 : frame.dt);
+		world.drawWorld(frame.ctx);
+		world.drawMood(frame.ctx, []);
+		world.drawOverlay(frame.ctx);
+		return world.layout;
 	}
 
 	/** A jump of several tiles between frames is a teleport: fog at both ends, Doom style. */

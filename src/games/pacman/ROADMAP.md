@@ -25,14 +25,15 @@ logic/
 render/
   RenderPipeline   canvas, HiDPI, render clock → builds a RenderFrame per frame
   RenderFrame      frame data + the LevelRenderer interface
-  SharedLayers     Pac-Man, bonuses, level clear, overlay (every level)
+  SharedLayers     Pac-Man, bonuses, overlay (every level)
   seasons/meadow/  MeadowBake (static world) + MeadowWorld (live layer) + MeadowLevelRenderer,
                    driven by a MeadowTheme per season (seasons/<season>/<season>Theme.ts)
   seasons/         SeasonLevelRenderer + tile bundle for the secret level only
   doom/            DoomLevelRenderer, baked world, lamprey boss, combat and weapon FX
-  transitions/decay/  level decay on death: field (Dijkstra), timeline, WebGL2 pass, shader
-  maze/ actors/ items/ (fruit stubs: one file per fruit) transitions/ (level clear,
-  cutscenes) overlay/ contracts/ common/ (textures, seededRandom, clamp, rgba)
+  transitions/decay/       level decay on death: field (Dijkstra), timeline, WebGL2 pass
+  transitions/seasonTurn/  level clear: corridor lights + tile cards to the next world
+  maze/ actors/ items/ (fruit stubs: one file per fruit) overlay/ contracts/
+  common/ (textures, GlPass, seededRandom, clamp, rgba)
 ui/          Svelte HUD (hell), overlay, debug panel, action bridges
 ```
 
@@ -53,23 +54,23 @@ Rules of thumb:
   Animations read `frame.flow` (`state`, `phase`, `phaseProgress`, `progress`, `remaining`,
   `paused`, `fade`) and never keep their own timers for flow events.
 - State changes go through `Director`; a change missing from its `TRANSITIONS` table is
-  logged and ignored. Level changes use `director.changeLevel(route)` (fade + short READY).
+  logged and ignored. Level changes use `director.changeLevel(route)` (fade + short READY),
+  or `director.startLevelInPlace(route)` after the season turn (no fade).
 
 ### Game flow (stage 2)
 
 ```
 menu ──fade──▶ ready(intro 5 s, jingle) ──▶ playing ──▶ death 5 s ──▶ ready(short 2 s)
                   ▲   skip: Enter                │  │           └─ no lives ─▶ game-over
-                  │                              │  └─▶ level-clear 8 s ──fade──▶ ready(short)
+                  │                              │  └─▶ level-clear 5.3 s (season turn) ─▶ ready(short)
 game-over ─fade───┘  (input locked 1 s)          └─ golden egg ──fade──▶ secret ready(short)
 hell: dying in the abyss ──fade──▶ next level, ready(short)
 pause (Space/P, Esc in play): ready, playing, death, level-clear — freezes and resumes the
 same state; tab hidden / window blur auto-pauses; requests during a fade apply after it.
 ```
 
-Hooks for later stages: `DeathState` runs `shatter` → `void` → `rebuild`
-(`flowConfig.death`); stage 4 retimes `LevelClearState` phases (`blink`, `cutscene`, `maze-out`), stage 7 draws
-cutscenes in the `cutscene` phase. The fade is a flat colour in `RenderPipeline.drawFade`
+Phases: `DeathState` runs `shatter` → `void` → `rebuild` (`flowConfig.death`),
+`LevelClearState` runs `lights` → `turn` → `settle` (`flowConfig.levelClear`). The fade is a flat colour in `RenderPipeline.drawFade`
 and covers the canvas only (Svelte buttons stay on top); replace it there.
 
 ## Current state
@@ -114,6 +115,8 @@ and covers the canvas only (Svelte buttons stay on top); replace it there.
   ~26); JS cost is ~2 ms/frame, the rest is software rasterisation. Check on real hardware.
 - Art polish postponed: Pac-Man, lamprey and minions are approved directions, not final.
 - Regular levels have no Svelte HUD (only the canvas top bar); stage 5 adds one.
+- `DecayPass` still has its own WebGL boilerplate; move it onto `render/common/GlPass`
+  (the season turn already uses it) when the decay is next touched.
 - Large files left as they are, to be cut when their stage rewrites them:
   `logic/doom/DoomBossService.ts` (~1300 lines), `logic/actors/GhostService.ts`,
   `logic/rules/CombatService.ts`, `render/doom/DoomBake.ts`.
@@ -176,14 +179,25 @@ Order matters: each stage builds on the ones before it.
      cutting, shader-equivalent sampling, 16-bit packing; timeline sweeps and rebuilds).
    - Performance: the pass runs at ≤ 1.5× pixel ratio. Headless Chromium renders it in
      software (~0.8 s/frame), so smoothness must be checked on real hardware.
-4. **Level-complete animation.** Built on stage 2's transitions.
-   - Prototype: `prototypes/pacman/level-clear.html` (built from the game's sources by
-     `node prototypes/pacman/level-clear/build.mjs`; open as a file). The season turns:
-     beads of light run down the corridors from the last dot, then every tile flips like a
-     card from the cleared level (in its weather, at night) to the next season (morning,
-     full of dots), with the new season's leaves / snow / petals thrown up at the front.
-     Code in `render/transitions/seasonTurn/` and `render/common/GlPass.ts`, not wired in
-     yet. Waiting for the owner's verdict.
+4. ✅ **Level-complete animation.** Done in the second chat: the season turn
+   (`render/transitions/seasonTurn/`, prototype `prototypes/pacman/level-clear.html`,
+   rebuilt from the sources by `node prototypes/pacman/level-clear/build.mjs`).
+   - Beads of light run down the corridors from the last dot, then every tile flips like
+     a card from the cleared level (at night, in its weather) to the next level's world
+     (morning, full of dots), with that world's particles thrown up at the front.
+   - It replaces the whole old level clear (blink, cutscene, maze-out, `LevelClearView`):
+     `LevelClearState` runs `lights` 1.3 s → `turn` 3 s → `settle` 1 s, then
+     `director.startLevelInPlace` opens the next level with a short READY and no fade —
+     its world is already on screen. No overlay text during the turn.
+   - The destination is drawn by `WorldPreview.preview()` from
+     `LevelLoader.peekNextLevel()`; the meadow renderer keeps the previewed world and
+     reuses it for the level (no jump at the hand-over), the hell renderer adopts its
+     preview world too.
+   - Boss levels: one transition for every boss world — the same turn, in the boss
+     world's palette (embers instead of golden light). A new boss world only needs a
+     `WorldPreview` and a palette in `RenderPipeline.turnStyle`.
+   - Note: the season after a hell level is autumn (level 6), not summer — the season
+     index follows the level number, unchanged from before.
 5. **New regular HUD.** The hell HUD is the reference for quality.
 6. ✅ **Integrate the 4 seasons.** Largest stage; one season per chat, from the owner's
    mock-ups, following the hell pattern (`*Bake` static world + `*World` live layer).
@@ -203,7 +217,7 @@ Order matters: each stage builds on the ones before it.
    - Decay palettes per season: ice (winter), moss and pink (spring), indigo and amber
      (summer), umber and amber (autumn), ember (hell).
    - The old tile-by-tile spring/summer/autumn/winter bundles are deleted.
-7. **Cutscenes.** One per season (4), then an original one for the secret level. The
-   skeleton is in `render/transitions/cutscenes/` (`Cutscene` interface, catalog,
-   `LevelClearCutscene`); it is not wired in yet — the level-clear state has a `cutscene`
-   phase drawn by `LevelClearView`. Needs stages 2, 4 and the matching season from 6.
+7. **More boss worlds.** The owner wants further boss levels like the hell, in other
+   worlds. Each follows the hell pattern (`*Bake` + `*World` + a level renderer with
+   `preview()`), its own decay palette, and is entered by the season turn in its own
+   palette. (The former cutscene stage is dropped: the season turn replaces it.)

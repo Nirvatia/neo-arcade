@@ -196,6 +196,15 @@ export class Director {
 	}
 
 	/**
+	 * Starts the next level without a fade, when its world is already on screen (after
+	 * the season turn): `route` rebuilds the level, then a short READY opens it.
+	 */
+	startLevelInPlace(route: () => void): void {
+		route();
+		this.setState(new ReadyState('short'));
+	}
+
+	/**
 	 * Moves to another level behind a screen fade: `route` rebuilds the level while the
 	 * screen is covered, then a short READY opens it.
 	 */

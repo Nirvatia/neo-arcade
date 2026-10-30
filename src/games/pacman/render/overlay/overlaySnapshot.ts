@@ -27,11 +27,6 @@ export function buildOverlaySnapshot(director: Director, level: LevelLoader): Ov
 		title = 'DEATH';
 		timer = flow.remaining;
 		duration = flow.duration;
-	} else if (state === 'level-clear') {
-		mode = 'level-clear';
-		title = 'LEVEL CLEAR';
-		timer = flow.remaining;
-		duration = flow.duration;
 	} else if (state === 'game-over') {
 		mode = 'game-over';
 		title = 'GAME OVER';

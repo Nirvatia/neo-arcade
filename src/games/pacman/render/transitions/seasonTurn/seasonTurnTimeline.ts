@@ -1,22 +1,16 @@
 import { TURN_BAND } from './seasonTurnShader';
+import { FLOW } from '../../../config/flowConfig';
 
 /** Front value meaning "not running" for the shader. */
 export const TURN_OFF = -100;
 
-/**
- * Phases of the season turn, seconds from the last dot: the light runs down the corridors
- * (`glow`), the mosaic turns over to the next season (`turn`, overlapping the light), the
- * new world settles (`settle`).
- */
-export const SEASON_TURN = {
-	glowStart: 0.15,
-	glow: 2.2,
-	turnStart: 1.3,
-	turn: 3,
-	settle: 1
-} as const;
+/** When the corridor light starts and how long it runs (it overlaps the turn). */
+const GLOW_START = 0.15;
+const GLOW = 2.2;
 
-export const SEASON_TURN_TOTAL = SEASON_TURN.turnStart + SEASON_TURN.turn + SEASON_TURN.settle;
+/** Seconds from the last dot to the end of the turn animation. */
+export const SEASON_TURN_TOTAL =
+	FLOW.levelClear.lights + FLOW.levelClear.turn + FLOW.levelClear.settle;
 
 export interface SeasonTurnFronts {
 	readonly glow: number;
@@ -35,7 +29,10 @@ export function seasonTurnFronts(elapsed: number, end: number, glowEnd: number):
 	if (!(elapsed >= 0)) {
 		return { glow: TURN_OFF, front: TURN_OFF, progress: 0 };
 	}
-	const { glowStart, glow, turnStart, turn } = SEASON_TURN;
+	const glowStart = GLOW_START;
+	const glow = GLOW;
+	const turnStart = FLOW.levelClear.lights;
+	const turn = FLOW.levelClear.turn;
 	const g = clamp01((elapsed - glowStart) / glow);
 	const glowHead =
 		elapsed < glowStart || g >= 1 ? TURN_OFF : -1 + (glowEnd + 4) * (1 - Math.pow(1 - g, 1.6));

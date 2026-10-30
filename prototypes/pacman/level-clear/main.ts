@@ -6,10 +6,10 @@ import { meadowThemeFor } from '../../../src/games/pacman/render/seasons/meadow/
 import type { MeadowTheme } from '../../../src/games/pacman/render/seasons/meadow/MeadowTheme';
 import { glowTexture } from '../../../src/games/pacman/render/common/textures';
 import { SeasonTurn } from '../../../src/games/pacman/render/transitions/seasonTurn/SeasonTurn';
-import {
-	SEASON_TURN,
-	SEASON_TURN_TOTAL
-} from '../../../src/games/pacman/render/transitions/seasonTurn/seasonTurnTimeline';
+import { SEASON_TURN_TOTAL } from '../../../src/games/pacman/render/transitions/seasonTurn/seasonTurnTimeline';
+import { FLOW } from '../../../src/games/pacman/config/flowConfig';
+
+const { lights, turn: turning, settle: settling } = FLOW.levelClear;
 
 const ORDER = ['summer', 'autumn', 'winter', 'spring'] as const;
 type Season = (typeof ORDER)[number];
@@ -92,12 +92,12 @@ function drawPac(t: number, time: number): void {
 	let scale = 1;
 	let alpha = 1;
 	if (t >= 0) {
-		const end = SEASON_TURN.turnStart + SEASON_TURN.turn;
+		const end = lights + turning;
 		scale = 1 + 0.18 * Math.max(0, Math.sin(Math.min(t, 1.2) * Math.PI * 2.5)) * (1 - Math.min(1, t / 1.2));
 		if (t > end) {
-			alpha = Math.max(0, 1 - (t - end) / SEASON_TURN.settle);
+			alpha = Math.max(0, 1 - (t - end) / settling);
 		}
-		const halo = Math.max(0, 1 - t / (SEASON_TURN.glowStart + SEASON_TURN.glow));
+		const halo = Math.max(0, 1 - t / 2.35);
 		if (halo > 0) {
 			ctx.globalCompositeOperation = 'lighter';
 			ctx.globalAlpha = halo * (0.6 + 0.4 * Math.sin(time * 8));

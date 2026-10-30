@@ -33,7 +33,19 @@ export class SeasonLevelRenderer implements LevelRenderer {
 		this.drawScene(frame, bundle, layout);
 
 		if (state === 'level-clear') {
-			this.shared.drawLevelClear(frame, layout);
+			// the cleared maze, empty: the season turn flips it over
+			this.gridView.draw(
+				ctx,
+				grid,
+				progress,
+				width,
+				height,
+				season.palette,
+				ratio,
+				bundle,
+				time,
+				level.mazeScale
+			);
 			return layout;
 		}
 

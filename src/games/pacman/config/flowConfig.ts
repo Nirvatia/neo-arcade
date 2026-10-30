@@ -16,10 +16,15 @@ export const FLOW = {
 		void: 0.5,
 		rebuild: 1.9
 	},
+	/**
+	 * Level clear: the season turns. Beads of light run down the corridors (`lights`, and
+	 * on into the turn), every tile flips over to the next level's world (`turn`), the new
+	 * world settles (`settle`). The next level then starts in place, without a fade.
+	 */
 	levelClear: {
-		blink: 2,
-		cutscene: 5,
-		mazeOut: 1
+		lights: 1.3,
+		turn: 3,
+		settle: 1
 	},
 	/** Screen fade between menu and game and between levels: each half, out then in. */
 	screenFade: 0.4,

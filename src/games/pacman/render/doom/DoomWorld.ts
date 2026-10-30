@@ -199,6 +199,13 @@ export class DoomWorld {
 		}));
 	}
 
+	/** Adds the light-map sources of weapon pickups placed after the world was built. */
+	addPickupLights(pickupTiles: ReadonlyArray<{ x: number; y: number }>): void {
+		for (const tile of pickupTiles) {
+			this.mazeLights.push({ x: tile.x + 0.5, y: tile.y + 0.5, r: 2.5, tint: 0xff7a2a, a: 0.8 });
+		}
+	}
+
 	/** Board placement for the grid views: one tile = DOOM_TILE world units. */
 	get layout(): GridLayout {
 		return { tileSize: T * this.sc, offsetX: this.wx, offsetY: this.wy };

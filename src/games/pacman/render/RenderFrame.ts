@@ -36,3 +36,23 @@ export interface RenderFrame {
 export interface LevelRenderer {
 	render(frame: RenderFrame): GridLayout;
 }
+
+/** What a renderer needs to draw the next level's world before that level exists. */
+export interface PreviewFrame {
+	readonly ctx: CanvasRenderingContext2D;
+	readonly width: number;
+	readonly height: number;
+	readonly pixelRatio: number;
+	readonly dt: number;
+	readonly paused: boolean;
+	readonly season: SeasonData;
+}
+
+/**
+ * A renderer that can show a level's world on its own (no actors, full of dots, in its
+ * morning mood): the destination of the season turn. Any world that should be reachable
+ * by the turn — every season, every boss world — implements it.
+ */
+export interface WorldPreview {
+	preview(frame: PreviewFrame): GridLayout;
+}

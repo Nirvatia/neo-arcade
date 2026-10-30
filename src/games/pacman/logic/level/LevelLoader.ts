@@ -26,6 +26,13 @@ import type { SeasonData } from './SeasonCatalog';
 import { buildLevelSession, resetForNextLevel, resetLevelSession } from './LevelSession';
 import type { LevelSession } from './LevelSession';
 
+/** The level after the current one, as `peekNextLevel()` sees it. */
+export interface NextLevel {
+	readonly level: number;
+	readonly hell: boolean;
+	readonly season: SeasonData;
+}
+
 const MAZE_SCALE_DEFAULT = 0.8;
 const MAZE_SCALE_MIN = 0.3;
 const MAZE_SCALE_MAX = 1.5;
@@ -228,10 +235,7 @@ export class LevelLoader {
 		this.changeLevel(() => {
 			if (this.secretModeValue) {
 				this.secretModeValue = false;
-				this.levelNumber =
-					Number.isFinite(this.secretReturnLevelValue) && this.secretReturnLevelValue >= 1
-						? Math.floor(this.secretReturnLevelValue)
-						: 1;
+				this.levelNumber = this.secretReturnLevel();
 			} else {
 				this.levelNumber += 1;
 			}
@@ -299,6 +303,28 @@ export class LevelLoader {
 	}
 
 	/**
+	 * The level `advanceLevel()` would build next: the season (world, grid) and whether it
+	 * is a boss level. The renderer shows it while the cleared level turns over.
+	 */
+	peekNextLevel(): NextLevel {
+		const level = this.secretModeValue ? this.secretReturnLevel() : this.levelNumber + 1;
+		return { level, ...this.worldOf(level, false) };
+	}
+
+	/** Which world a level number is: the hell every HELL_LEVEL_INTERVAL, else a season. */
+	private worldOf(level: number, secret: boolean): { hell: boolean; season: SeasonData } {
+		const hell = !secret && this.profileValue === 'pacman' && level % HELL_LEVEL_INTERVAL === 0;
+		const season = secret ? secretSeason() : hell ? hellSeason() : seasonForLevel(level);
+		return { hell, season };
+	}
+
+	private secretReturnLevel(): number {
+		return Number.isFinite(this.secretReturnLevelValue) && this.secretReturnLevelValue >= 1
+			? Math.floor(this.secretReturnLevelValue)
+			: 1;
+	}
+
+	/**
 	 * Moves the run to another level: `route` updates the level number and secret routing,
 	 * then a fresh session is built with the score, lives and next-life threshold kept.
 	 */
@@ -336,16 +362,8 @@ export class LevelLoader {
 	}
 
 	private buildLevel(): LevelSession {
-		const hell =
-			!this.secretModeValue &&
-			this.profileValue === 'pacman' &&
-			this.levelNumber % HELL_LEVEL_INTERVAL === 0;
+		const { hell, season } = this.worldOf(this.levelNumber, this.secretModeValue);
 		this.hellModeValue = hell;
-		const season = this.secretModeValue
-			? secretSeason()
-			: hell
-				? hellSeason()
-				: seasonForLevel(this.levelNumber);
 		const session = buildLevelSession({
 			events: this.events,
 			level: this.levelNumber,
