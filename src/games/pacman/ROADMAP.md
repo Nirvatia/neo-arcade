@@ -234,9 +234,14 @@ on the real game code for the owner to approve.
    - Triple-pentagram attack: it almost always misses, and its art spills out of the tile
      — aim it (lead the player's path) and keep the art inside the tile.
 4. **Pac-Man art rework** + bug: Pac-Man blinks before the game starts.
-5. **Full HUD and overlays.** **Next (moved before stages 3 and 4 by the owner).** A regular HUD for every season (the hell HUD is the quality
-   reference) and Svelte screens for menu, ready, pause, death, game over, replacing the
-   canvas `OverlayView` and its top bar; the screen fade should cover them too.
+5. **Full HUD and overlays.** **Next (moved before stages 3 and 4 by the owner).**
+   Owner's decision: **one** well-designed, beautiful HUD and one set of overlay screens for
+   the whole game, not one per season. Boss levels (the hell, the later boss worlds, and
+   the secret level too) add an extra boss block on top of the same HUD: the boss health
+   bar, the weapon and other boss-level info. The hell HUD (`ui/hud/HellHud.svelte`) is
+   the quality reference and gets folded into this one HUD. Svelte screens for menu,
+   ready, pause, death, game over replace the canvas `OverlayView` and its top bar; the
+   screen fade must cover them too.
 6. **Secret level rework.** The original Pac-Man: original arcade art, animation at a
    stepped 30 fps (the wedge snaps open and shut, no smooth tween), and very light CRT
    effects (scanlines, slight curvature, glow) as a `GlPass`. This replaces the last
