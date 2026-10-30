@@ -83,9 +83,11 @@ export class RenderPipeline {
 		this.ctx = ctx;
 	}
 
-	render(): void {
+	/** `frameDt`: game seconds since the last frame, from the game loop's clock. */
+	render(frameDt?: number): void {
 		const now = typeof performance !== 'undefined' ? performance.now() : 0;
-		const dt = this.lastRenderTime > 0 ? Math.min(0.1, (now - this.lastRenderTime) / 1000) : 0;
+		const wall = this.lastRenderTime > 0 ? Math.min(0.1, (now - this.lastRenderTime) / 1000) : 0;
+		const dt = frameDt === undefined ? wall : Math.min(0.1, Math.max(0, frameDt));
 		this.lastRenderTime = now;
 		this.timeValue += dt;
 

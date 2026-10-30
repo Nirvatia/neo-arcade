@@ -7,6 +7,9 @@ export interface InputHandlers {
 	pause?: () => void;
 	menu?: () => void;
 	profile?: () => void;
+	/** Dev hotkeys: `` ` `` shows the dev panels, F8 steps one frame. */
+	debugToggle?: () => void;
+	debugStep?: () => void;
 }
 
 const DIRECTION_KEYS: Record<string, InputDirection> = {
@@ -147,6 +150,18 @@ export class InputController {
 			case 'KeyM':
 				event.preventDefault();
 				this.pressProfile();
+				break;
+			case 'Backquote':
+				if (this.handlers.debugToggle) {
+					event.preventDefault();
+					this.handlers.debugToggle();
+				}
+				break;
+			case 'F8':
+				if (this.handlers.debugStep) {
+					event.preventDefault();
+					this.handlers.debugStep();
+				}
 				break;
 			default:
 				break;

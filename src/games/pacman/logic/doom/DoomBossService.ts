@@ -142,6 +142,7 @@ export class DoomBossService {
 	private readonly voidCells: VoidCell[] = [];
 	private readonly protectedTileKeys = new Set<string>();
 	private barrelLocatorValue: (() => GridPoint | null) | null = null;
+	private forcedAttack: DoomAttackKind | null = null;
 	private attackRetryTimer = 0;
 	private personalCooldowns: Record<DoomAttackKind, number> = noCooldowns();
 	private readonly hazards = new DoomHazardField();
@@ -464,11 +465,37 @@ export class DoomBossService {
 		}
 	}
 
+	/** Dev: jumps to phase 1–3 (see `DoomBossModel.debugSetPhase`). */
+	debugSetPhase(phase: number): void {
+		this.model.debugSetPhase(phase);
+		this.clearVoidAndMinions();
+		this.phaseTransitionValue = this.model.state === 'TRANSITION';
+	}
+
+	/**
+	 * Dev: the next attack is `kind` as soon as the boss can make it here (phase, range and
+	 * fairness rules still apply; the request waits until they do). Its cooldown is cleared.
+	 */
+	debugForceAttack(kind: DoomAttackKind): void {
+		this.forcedAttack = kind;
+		this.personalCooldowns[kind] = 0;
+		this.attackRetryTimer = 0;
+	}
+
+	get debugForcedAttack(): DoomAttackKind | null {
+		return this.forcedAttack;
+	}
+
+	debugKill(): void {
+		this.model.debugKill();
+	}
+
 	applyStun(duration: number): void {
 		this.model.applyStun(duration);
 	}
 
 	reset(): void {
+		this.forcedAttack = null;
 		this.model.reset();
 		this.minions.length = 0;
 		this.clearVoidAndMinions();
@@ -815,6 +842,15 @@ export class DoomBossService {
 				.some((n) => this.grid.isPlayerWalkable(n.x, n.y))
 		) {
 			available.add('eruption');
+		}
+		const forced = this.forcedAttack;
+		if (forced) {
+			if (!available.has(forced)) {
+				return false;
+			}
+			available.clear();
+			available.add(forced);
+			this.forcedAttack = null;
 		}
 		// never the same attack twice in a row, unless it is the only option
 		if (available.size > 1 && this.lastAttackKind) {

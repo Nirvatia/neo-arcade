@@ -312,6 +312,22 @@ export class CombatService {
 		this.ghosts.setVisible(!this.hellModeValue);
 	}
 
+	/** Dev: adds (or removes) lives; never below one. */
+	debugAddLives(delta: number): void {
+		if (!Number.isFinite(delta)) {
+			return;
+		}
+		this.livesValue = Math.max(1, this.livesValue + Math.trunc(delta));
+	}
+
+	/** Dev: the energizer effect (or the Ms. Pac-Man overdrive) now. */
+	debugPower(): void {
+		if (this.hellModeValue || this.secretModeValue) {
+			return;
+		}
+		this.activatePower();
+	}
+
 	private checkLifeRewards(): void {
 		while (this.scoreModel.score >= this.nextLifeThresholdValue) {
 			this.awardExtraLife();

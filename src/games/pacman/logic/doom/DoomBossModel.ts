@@ -344,6 +344,30 @@ export class DoomBossModel {
 		this.chaos = baseChaosForPhase(this.phase);
 	}
 
+	/** Dev: jumps to `phase` (1–3) at the top of its HP band, through the usual transition. */
+	debugSetPhase(phase: number): void {
+		const target = Math.min(3, Math.max(1, Math.round(phase)));
+		if (this.state === 'DEAD') {
+			return;
+		}
+		if (target === 1) {
+			this.hp = BOSS_HP;
+			this.phase = 1;
+			return;
+		}
+		this.hp = PHASE_THRESHOLDS[target - 2];
+		this.phase = target - 1;
+		this.startTransition();
+	}
+
+	/** Dev: the boss dies now, whatever it was doing. */
+	debugKill(): void {
+		this.hp = 0;
+		this.state = 'DEAD';
+		this.stateTimer = 0;
+		this.attackKind = null;
+	}
+
 	startTransition(): void {
 		const threshold1 = PHASE_THRESHOLDS[0];
 		const threshold2 = PHASE_THRESHOLDS[1];

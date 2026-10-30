@@ -229,6 +229,11 @@ export class DoomAbilityService {
 		this.processedTracers.clear();
 	}
 
+	/** Dev: as if the player had walked over a pickup of `kind`. */
+	debugGiveWeapon(kind: DoomPickupKind): void {
+		this.weapons.handlePickup(kind);
+	}
+
 	debugSpawn(): void {
 		this.pickups.fillEmpty(this.playerHpValue);
 	}

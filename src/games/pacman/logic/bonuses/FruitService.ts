@@ -148,9 +148,15 @@ export class FruitService {
 		}
 	}
 
-	private spawn(): void {
+	/** Dev: puts a fruit of `kind` on the board now (replacing one already there). */
+	debugSpawn(kind: FruitKind): void {
+		this.spawn(kind);
+	}
+
+	private spawn(forced?: FruitKind): void {
 		const kind =
-			this.profileValue === 'ms-pacman' ? randomFruitKind() : fruitForLevel(this.levelValue);
+			forced ??
+			(this.profileValue === 'ms-pacman' ? randomFruitKind() : fruitForLevel(this.levelValue));
 		const tile = this.chooseSpawnTile();
 		if (!tile) {
 			return;

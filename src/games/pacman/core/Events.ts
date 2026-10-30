@@ -58,8 +58,19 @@ export interface PacmanAudioCuePayload {
 	cue: PacmanAudioCue;
 }
 
+/** Dev log channels (the log panel filters by them). */
+export type PacmanDebugChannel = 'damage' | 'debuff' | 'state' | 'spawn' | 'input' | 'boss';
+
+/** One dev log line; emitted only in dev builds (`logic/debug/debugLog`). */
+export interface PacmanDebugLogPayload {
+	channel: PacmanDebugChannel;
+	text: string;
+	value?: number;
+}
+
 export type PacmanEventMap = {
 	'ui:stateChanged': PacmanStateChangedPayload;
 	'ui:hudChanged': PacmanHudPayload;
 	'audio:cue': PacmanAudioCuePayload;
+	'debug:log': PacmanDebugLogPayload;
 };

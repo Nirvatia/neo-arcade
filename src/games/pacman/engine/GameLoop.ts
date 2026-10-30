@@ -1,12 +1,22 @@
 export class GameLoop {
 	private readonly step: number;
 	private readonly update: (dt: number) => void;
-	private readonly render: () => void;
+	private readonly render: (dt: number) => void;
+	private readonly clock: ((real: number) => number) | null;
 	private running = false;
 	private lastTime = 0;
 	private frameHandle = 0;
 
-	constructor(update: (dt: number) => void, render: () => void, step = 1 / 60) {
+	/**
+	 * `clock` turns a real frame time into game time (debug freeze, slow motion, frame
+	 * steps); without it the game runs in real time. `render` gets the same game time.
+	 */
+	constructor(
+		update: (dt: number) => void,
+		render: (dt: number) => void,
+		step = 1 / 60,
+		clock: ((real: number) => number) | null = null
+	) {
 		if (typeof update !== 'function' || typeof render !== 'function') {
 			console.error('GameLoop.constructor', 'update or render is not a function');
 			throw new Error('GameLoop.constructor: update and render are required');
@@ -18,6 +28,7 @@ export class GameLoop {
 		this.update = update;
 		this.render = render;
 		this.step = step;
+		this.clock = clock;
 	}
 
 	start(): void {
@@ -51,14 +62,16 @@ export class GameLoop {
 		try {
 			// Variable step split into chunks of at most `step`: movement advances by the real
 			// frame time, so high refresh displays never get frames without an update (judder).
-			let remaining = Math.min(0.1, Math.max(0, (now - this.lastTime) / 1000));
+			const real = Math.min(0.1, Math.max(0, (now - this.lastTime) / 1000));
 			this.lastTime = now;
+			const frame = this.clock ? this.clock(real) : real;
+			let remaining = frame;
 			while (remaining > 1e-6) {
 				const dt = Math.min(this.step, remaining);
 				this.update(dt);
 				remaining -= dt;
 			}
-			this.render();
+			this.render(frame);
 		} catch (error: unknown) {
 			console.error('GameLoop.tick', error);
 			this.stop();

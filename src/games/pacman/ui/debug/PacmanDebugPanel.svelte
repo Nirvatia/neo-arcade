@@ -1,16 +1,18 @@
 <script lang="ts">
-	import {
-		debugGotoLevel,
-		debugSpawnBonus,
-		debugDamageBoss,
-		debugToggleGodMode,
-		debugCompleteLevel,
-		debugKillPlayer,
-		debugEnterHell,
-		debugEnterSecret,
-		debugToggleProfile,
-		debugSetMazeScale
-	} from './debugActions';
+	import { get } from 'svelte/store';
+	import { debugController } from './debugActions';
+
+	const dev = () => get(debugController);
+	const debugGotoLevel = (value: number) => dev()?.setStartLevel(value);
+	const debugSpawnBonus = () => (dev()?.spawnEcho(), dev()?.spawnPickups());
+	const debugDamageBoss = () => dev()?.damageBoss();
+	const debugToggleGodMode = () => dev()?.toggleGodMode() ?? false;
+	const debugCompleteLevel = () => dev()?.completeLevel();
+	const debugKillPlayer = () => dev()?.die();
+	const debugEnterHell = () => dev()?.enterHell();
+	const debugEnterSecret = () => dev()?.enterSecret();
+	const debugToggleProfile = () => dev()?.toggleProfile();
+	const debugSetMazeScale = (value: number) => dev()?.setMazeScale(value);
 
 	let open = false;
 	let levelInput = 1;

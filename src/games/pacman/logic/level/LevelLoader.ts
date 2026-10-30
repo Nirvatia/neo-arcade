@@ -269,6 +269,17 @@ export class LevelLoader {
 		});
 	}
 
+	/** Dev: moves the run to `level` now (a season or the hell, by its number). */
+	debugGotoLevel(level: number): void {
+		if (!Number.isFinite(level) || level < 1) {
+			return;
+		}
+		this.changeLevel(() => {
+			this.secretModeValue = false;
+			this.levelNumber = Math.floor(level);
+		});
+	}
+
 	debugEnterSecret(): void {
 		this.enterSecretLevel();
 	}

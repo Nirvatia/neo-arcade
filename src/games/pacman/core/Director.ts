@@ -247,6 +247,14 @@ export class Director {
 		this.setState(new ReadyState('short'), true);
 	}
 
+	debugGotoLevel(level: number): void {
+		if (this.fadeValue) {
+			return;
+		}
+		this.context.level.debugGotoLevel(level);
+		this.setState(new ReadyState('short'), true);
+	}
+
 	debugEnterSecret(): void {
 		if (this.fadeValue) {
 			return;

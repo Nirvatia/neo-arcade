@@ -10,7 +10,13 @@ import { PacmanAudioPlayer } from '../audio/PacmanAudioPlayer';
 import { SvelteHudAdapter } from '../ui/hud/SvelteHudAdapter';
 import { pacmanHudStore } from '../ui/hud/hudStore';
 import { setPacmanActions, clearPacmanActions } from '../ui/actions/pacmanActions';
-import { setDebugActions, clearDebugActions } from '../ui/debug/debugActions';
+import {
+	setDebugController,
+	clearDebugController,
+	toggleDebugVisible
+} from '../ui/debug/debugActions';
+import { TimeControl } from '../engine/TimeControl';
+import { DebugController } from './debug/DebugController';
 
 export class GameMain implements GameModule {
 	private events: EventBus<PacmanEventMap> | null = null;
@@ -33,6 +39,7 @@ export class GameMain implements GameModule {
 		const director = new Director(events, level);
 		const render = new RenderPipeline(container, director, level, events);
 		const hudAdapter = new SvelteHudAdapter(events, pacmanHudStore);
+		const time = new TimeControl();
 		const loop = new GameLoop(
 			(dt) => {
 				const held = input.heldDirection;
@@ -41,9 +48,11 @@ export class GameMain implements GameModule {
 				}
 				director.update(dt);
 			},
-			() => {
-				render.render();
-			}
+			(dt) => {
+				render.render(dt);
+			},
+			1 / 60,
+			(real) => time.advance(real)
 		);
 		const input = new InputController({
 			direction: (direction) => {
@@ -90,7 +99,10 @@ export class GameMain implements GameModule {
 				if (director.stateName === 'menu' || director.stateName === 'game-over') {
 					level.toggleProfile();
 				}
-			}
+			},
+			...(import.meta.env.DEV
+				? { debugToggle: () => toggleDebugVisible(), debugStep: () => time.step() }
+				: {})
 		});
 		input.attach();
 		// a hidden tab or an unfocused window pauses the game; resuming is left to the player
@@ -112,21 +124,9 @@ export class GameMain implements GameModule {
 			menu: () => input.pressMenu(),
 			profile: () => input.pressProfile()
 		});
-		setDebugActions({
-			gotoLevel: (value) => level.setPendingStartLevel(value),
-			spawnBonus: () => level.debugSpawnBonus(),
-			toggleGodMode: () => level.debugToggleGodMode(),
-			damageBoss: () => {
-				level.debugDamageBoss();
-				level.emitHud();
-			},
-			completeLevel: () => director.debugCompleteLevel(),
-			killPlayer: () => director.debugKillPlayer(),
-			enterHell: () => director.debugEnterHell(),
-			enterSecret: () => director.debugEnterSecret(),
-			toggleProfile: () => level.toggleProfile(),
-			setMazeScale: (value) => level.setMazeScale(value)
-		});
+		if (import.meta.env.DEV) {
+			setDebugController(new DebugController(director, level, time));
+		}
 		loop.start();
 		if (import.meta.env.DEV) {
 			// dev only: lets the browser console and automated play-tests inspect the game
@@ -151,7 +151,7 @@ export class GameMain implements GameModule {
 		this.detachAutoPause?.();
 		this.detachAutoPause = null;
 		clearPacmanActions();
-		clearDebugActions();
+		clearDebugController();
 		this.render?.destroy();
 		this.hudAdapter?.destroy();
 		this.audio?.destroy();

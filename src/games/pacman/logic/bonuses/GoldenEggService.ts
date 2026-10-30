@@ -120,6 +120,11 @@ export class GoldenEggService {
 		return requested;
 	}
 
+	/** Dev: the egg appears in the lair now. */
+	debugSpawn(): void {
+		this.spawnEgg();
+	}
+
 	private spawnEgg(): void {
 		const tile = this.grid.lairEggTile();
 		if (!tile) {
