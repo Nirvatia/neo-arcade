@@ -1,9 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { GameMain } from '../../../games/pacman/core/GameMain';
-	import PacmanOverlay from '../../../games/pacman/ui/overlay/PacmanOverlay.svelte';
 	import PacmanDebugPanel from '../../../games/pacman/ui/debug/PacmanDebugPanel.svelte';
-	import HellHud from '../../../games/pacman/ui/hud/HellHud.svelte';
+	import PacmanUi from '../../../games/pacman/ui/PacmanUi.svelte';
 
 	const isDev = import.meta.env.DEV;
 
@@ -27,11 +26,7 @@
 <div class="pacman-page">
 	<div class="stage" bind:this={container}></div>
 
-	<HellHud />
-
-	<div class="overlay-slot">
-		<PacmanOverlay />
-	</div>
+	<PacmanUi />
 
 	{#if isDev}
 		<PacmanDebugPanel />
@@ -53,13 +48,5 @@
 		position: absolute;
 		inset: 0;
 		line-height: 0;
-	}
-
-	.overlay-slot {
-		position: absolute;
-		left: 50%;
-		bottom: 12px;
-		transform: translateX(-50%);
-		min-width: 280px;
 	}
 </style>

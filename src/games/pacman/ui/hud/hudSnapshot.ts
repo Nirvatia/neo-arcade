@@ -38,6 +38,8 @@ export interface HudSnapshot {
 	/** The state under the pause screen. */
 	readonly underPause: PacmanStateName;
 	readonly paused: boolean;
+	/** Screen fade cover, 0 (clear) to 1 (black). */
+	readonly fade: number;
 	readonly phase: string;
 	readonly remaining: number;
 	readonly duration: number;
@@ -110,6 +112,7 @@ export function buildHudSnapshot(
 		state: flow.state,
 		underPause: flow.state,
 		paused: flow.paused,
+		fade: flow.fade,
 		phase: flow.phase,
 		remaining: flow.remaining,
 		duration: flow.duration,

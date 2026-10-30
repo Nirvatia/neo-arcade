@@ -8,14 +8,12 @@ import { FruitView, FRUIT_EXTENT } from './items/fruit/FruitView';
 import { GoldenEggView } from './items/GoldenEggView';
 import { drawBonusLife } from './items/BonusLifeView';
 import { drawExit } from './items/ExitView';
-import { OverlayView } from './overlay/OverlayView';
-import { buildOverlaySnapshot } from './overlay/overlaySnapshot';
 import type { RenderFrame } from './RenderFrame';
 
 /**
- * Layers drawn the same way on every level: Pac-Man, the bonuses and the canvas overlay.
- * Level renderers place the bonuses in their draw order; the pipeline draws Pac-Man over
- * the level decay and the season turn, and the overlay last.
+ * Layers drawn the same way on every level: Pac-Man and the bonuses. Level renderers place
+ * the bonuses in their draw order; the pipeline draws Pac-Man over the level decay and the
+ * season turn. The HUD and the screens are Svelte (`ui/PacmanUi`), not canvas.
  */
 export class SharedLayers {
 	readonly playerView = new PlayerView();
@@ -23,7 +21,6 @@ export class SharedLayers {
 	private readonly fruitView = new FruitView();
 	private readonly goldenEggView = new GoldenEggView();
 	private readonly echoCloneView = new EchoCloneView();
-	private readonly overlayView = new OverlayView();
 
 	drawCollectibles(frame: RenderFrame, layout: GridLayout): void {
 		const { ctx, level } = frame;
@@ -82,21 +79,6 @@ export class SharedLayers {
 		} else {
 			this.playerView.draw(frame.ctx, player, layout, frame.time, this.playerOptions(frame));
 		}
-	}
-
-	drawOverlay(frame: RenderFrame, layout: GridLayout): void {
-		const snapshot = buildOverlaySnapshot(frame.director, frame.level);
-		if (snapshot.mode === 'none') {
-			return;
-		}
-		this.overlayView.draw(
-			frame.ctx,
-			snapshot,
-			layout,
-			frame.grid.width * layout.tileSize,
-			frame.grid.height * layout.tileSize,
-			!frame.level.hellMode
-		);
 	}
 
 	private playerOptions(frame: RenderFrame): PlayerDrawOptions {

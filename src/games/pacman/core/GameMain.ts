@@ -7,9 +7,9 @@ import { InputController } from './InputController';
 import { RenderPipeline } from '../render/RenderPipeline';
 import { LevelLoader } from '../logic/level/LevelLoader';
 import { PacmanAudioPlayer } from '../audio/PacmanAudioPlayer';
-import { SvelteHudAdapter } from '../ui/hud/SvelteHudAdapter';
-import { pacmanHudStore } from '../ui/hud/hudStore';
-import { setPacmanActions, clearPacmanActions } from '../ui/actions/pacmanActions';
+import { hudFrame, screenActions } from '../ui/hud/hudFrame';
+import { buildHudSnapshot } from '../ui/hud/hudSnapshot';
+import { getSavedScore, saveScore } from '../../../shared/utils/scoreStore';
 import {
 	setDebugController,
 	clearDebugController,
@@ -27,7 +27,6 @@ export class GameMain implements GameModule {
 	private loop: GameLoop | null = null;
 	private input: InputController | null = null;
 	private render: RenderPipeline | null = null;
-	private hudAdapter: SvelteHudAdapter | null = null;
 	private audio: PacmanAudioPlayer | null = null;
 	private detachAutoPause: (() => void) | null = null;
 
@@ -40,7 +39,8 @@ export class GameMain implements GameModule {
 		const audio = new PacmanAudioPlayer(events);
 		const director = new Director(events, level);
 		const render = new RenderPipeline(container, director, level, events);
-		const hudAdapter = new SvelteHudAdapter(events, pacmanHudStore);
+		let highScore = parseInt(getSavedScore('pacman'), 10) || 0;
+		let lastState = '';
 		const time = new TimeControl();
 		const loop = new GameLoop(
 			(dt) => {
@@ -52,6 +52,13 @@ export class GameMain implements GameModule {
 			},
 			(dt) => {
 				render.render(dt);
+				const state = director.flow.state;
+				if (state === 'game-over' && lastState !== 'game-over') {
+					saveScore('pacman', level.score);
+					highScore = Math.max(highScore, level.score);
+				}
+				lastState = state;
+				hudFrame.set(buildHudSnapshot(director, level, highScore));
 			},
 			1 / 60,
 			(real) => time.advance(real)
@@ -122,11 +129,12 @@ export class GameMain implements GameModule {
 			document.removeEventListener('visibilitychange', onVisibility);
 			window.removeEventListener('blur', onBlur);
 		};
-		setPacmanActions({
+		screenActions.set({
 			confirm: () => input.pressConfirm(),
 			pause: () => input.pressPause(),
 			menu: () => input.pressMenu(),
-			profile: () => input.pressProfile()
+			profile: () => input.pressProfile(),
+			restart: () => director.restartLevel()
 		});
 		if (import.meta.env.DEV) {
 			const dev = new DebugController(director, level, time);
@@ -146,7 +154,6 @@ export class GameMain implements GameModule {
 		this.render = render;
 		this.loop = loop;
 		this.input = input;
-		this.hudAdapter = hudAdapter;
 	}
 
 	destroy(): void {
@@ -157,10 +164,10 @@ export class GameMain implements GameModule {
 		this.input?.detach();
 		this.detachAutoPause?.();
 		this.detachAutoPause = null;
-		clearPacmanActions();
+		screenActions.set(null);
+		hudFrame.set(null);
 		clearDebugController();
 		this.render?.destroy();
-		this.hudAdapter?.destroy();
 		this.audio?.destroy();
 		this.events?.clear();
 		this.events = null;
@@ -169,7 +176,6 @@ export class GameMain implements GameModule {
 		this.loop = null;
 		this.input = null;
 		this.render = null;
-		this.hudAdapter = null;
 		this.audio = null;
 	}
 }

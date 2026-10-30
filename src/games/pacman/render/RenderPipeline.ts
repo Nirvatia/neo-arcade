@@ -19,7 +19,6 @@ import { DebugOverlayView } from './debug/DebugOverlayView';
 import type { DebugRenderFlags } from './debug/DebugOverlayView';
 
 /** Same as the page background, so a full fade reads as an empty stage. */
-const FADE_COLOR = '#030509';
 
 /** Light of the season turn into a season; into a boss world it takes the boss palette. */
 const SEASON_LIGHT = { light: 0xffe3a0, gap: 0xfff4d6 };
@@ -187,8 +186,6 @@ export class RenderPipeline {
 			this.ctx.setTransform(pr, 0, 0, pr, 0, 0);
 			this.debugView.draw(this.ctx, layout, this.level, this.debugFlags, front);
 		}
-		this.shared.drawOverlay(screen, layout);
-		this.drawFade(flow.fade);
 	}
 
 	/** Dev build: the overlay flags of the dev panel (read every frame, never copied). */
@@ -248,18 +245,6 @@ export class RenderPipeline {
 	}
 
 	/** Screen fade between menu and game and between levels; covers everything. */
-	private drawFade(cover: number): void {
-		if (!(cover > 0)) {
-			return;
-		}
-		this.ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
-		this.ctx.globalAlpha = Math.min(1, cover);
-		this.ctx.globalCompositeOperation = 'source-over';
-		this.ctx.fillStyle = FADE_COLOR;
-		this.ctx.fillRect(0, 0, this.width, this.height);
-		this.ctx.globalAlpha = 1;
-	}
-
 	private syncSize(): boolean {
 		const rectWidth = this.container.clientWidth;
 		const rectHeight = this.container.clientHeight;

@@ -248,6 +248,11 @@ export class Director {
 		this.setState(new ReadyState('short'), true);
 	}
 
+	/** The pause screen's RESTART: the current level again, from a short READY. */
+	restartLevel(): void {
+		this.debugGotoLevel(this.context.level.level);
+	}
+
 	debugGotoLevel(level: number): void {
 		if (this.fadeValue) {
 			return;

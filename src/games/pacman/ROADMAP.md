@@ -234,8 +234,23 @@ on the real game code for the owner to approve.
    - Triple-pentagram attack: it almost always misses, and its art spills out of the tile
      — aim it (lead the player's path) and keep the art inside the tile.
 4. **Pac-Man art rework** + bug: Pac-Man blinks before the game starts.
-5. **Full HUD and overlays.** **Next (moved before stages 3 and 4 by the owner). Plan
-   approved in the third chat; work starts with the prototype.**
+5. ✅ **Full HUD and overlays** (third chat; moved before stages 3 and 4 by the owner).
+   **Wired into the game.** After two rejected designs (a glass plate with a rounded accent
+   border; numbers scattered over the screen corners) the owner accepted, as a prototype,
+   a compact boxed HUD: one solid dark box at the top centre right above the board (score
+   + high, level + world, lives as a number, power timer or the weapon, dot progress along
+   its bottom edge) and, on boss levels, a boss box of the same width 8 px below. Lesson:
+   everything important in one place before the eyes, on a background, in a tidy box.
+   In the game: `GameMain` builds `ui/hud/hudSnapshot` every frame into the `hudFrame`
+   store; `ui/PacmanUi.svelte` (on the page) shows `GameHud` (or `ArcadeHud` on the secret
+   level; none in the menu), `ui/screens/GameScreens` (buttons through the input, RESTART =
+   `Director.restartLevel`) and the screen fade as a DOM layer over both. High score from
+   `shared/utils/scoreStore` ('pacman'), saved on game over. Removed: the canvas
+   `OverlayView` + top bar + canvas fade, `HellHud`, `PacmanOverlay`, the HUD adapter and
+   store, `ui/actions`. Language: `ui/i18n` (EN default, RU, remembered).
+   Open: the boss box covers the top row of the hell maze (as the old hell HUD did); the
+   secret level's fruit row shows its big level number's fruit (keys). The plan below is
+   kept for reference.
    Today: the hell HUD (`ui/hud/HellHud.svelte`, metal plate with hazard stripes, Russian
    labels) on the hell only; on other levels only the canvas top bar and canvas titles
    (`render/overlay/OverlayView` + `overlaySnapshot`); buttons in `ui/overlay/PacmanOverlay`

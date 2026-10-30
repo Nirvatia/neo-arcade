@@ -42,6 +42,7 @@
 		state: screen === 'paused' ? 'playing' : screen,
 		underPause: 'playing',
 		paused: screen === 'paused',
+		fade: 0,
 		phase: screen === 'ready' ? 'intro' : 'run',
 		remaining: screen === 'ready' ? 5 - (time % 5) : 0,
 		duration: screen === 'ready' ? 5 : 0,
