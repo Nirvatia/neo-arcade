@@ -78,8 +78,9 @@ function drawWorld(target: CanvasRenderingContext2D, world: MeadowWorld, eaten: 
 	target.setTransform(D, 0, 0, D, 0, 0);
 	target.globalAlpha = 1;
 	target.globalCompositeOperation = 'source-over';
-	world.drawWorld(target, eaten);
+	world.drawWorld(target);
 	world.drawMood(target);
+	world.drawFood(target, eaten);
 	world.drawOverlay(target);
 }
 

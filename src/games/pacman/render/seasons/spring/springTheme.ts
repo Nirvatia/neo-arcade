@@ -144,7 +144,8 @@ export const springTheme: MeadowTheme = {
 			chimneyCap: '#5a4a3a'
 		},
 		rock: ['#b8b8a8', '#6a6a5a', '#7fbf4a', '#9fd46a'],
-		lair: { base: '#4a5236', tiles: ['#cfd6b8', '#c4cdaa', '#d8dec2'] },
+		// muted (owner's review): the ghosts and the Easter egg must read on the lair floor
+		lair: { base: '#2e3424', tiles: ['#5a6446', '#535d40', '#606a4c'] },
 		floor: {
 			tiles: ['#5a4636', '#54402f', '#604b3a'],
 			specks: ['#6e5846', '#3a2c20', '#7a6452']

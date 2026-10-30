@@ -147,8 +147,9 @@ function frame(now: number): void {
 	ctx.setTransform(D, 0, 0, D, 0, 0);
 	ctx.globalAlpha = 1;
 	ctx.globalCompositeOperation = 'source-over';
-	world.drawWorld(ctx, () => false);
+	world.drawWorld(ctx);
 	world.drawMood(ctx);
+	world.drawFood(ctx, () => false);
 	const L = world.layout;
 	ms.draw(ctx, player as unknown as PlayerService, L, time, {
 		look: buffed ? 'energized' : 'normal',

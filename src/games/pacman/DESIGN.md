@@ -84,7 +84,11 @@ blanket, beach umbrella, snowman), meadow decoration, food sprites and weather
 (`render/seasons/<season>/<season>Theme.ts`).
 
 - Food stays calm and small: dots about a fifth of a tile with no inner detail;
-  energizers differ from dots in shape, colour and size.
+  energizers differ from dots in shape, colour and size, and never look like food or a
+  collectible (summer: a little sun, not a watermelon).
+- Food is drawn over the weather and the night, like the actors: it always reads. The
+  floor is dark enough for the dots, the lair floor muted so ghosts and the egg read on
+  it; the weather stays faint (no big pale blobs over the board).
 - **Weather** rises at 50 % of the dots eaten (spring petal wind, summer heat shimmer,
   autumn rain, winter blizzard); **night** falls at 75 %.
 - Gameplay tuning (`SeasonCatalog.seasonModifiers`): spring power 6.5 s; summer fruit

@@ -47,6 +47,7 @@ const SPOTS: ReadonlyArray<[number, number]> = Array.from({ length: 12 }, (_, i)
 let season: Season = 'spring';
 let world: MeadowWorld;
 let night = false;
+let heat = false;
 let blink = false;
 let grid = false;
 let vw = 0;
@@ -55,7 +56,7 @@ let vh = 0;
 function buildWorld(): void {
 	world = new MeadowWorld(GRID_01, meadowThemeFor(season) as MeadowTheme);
 	world.resize(vw, vh, D);
-	world.setMood(night ? 1 : 0, night ? 1 : 0);
+	world.setMood(heat ? 1 : 0, night ? 1 : 0);
 	for (let i = 0; i < 80; i++) world.update(0.1);
 	for (const b of document.querySelectorAll<HTMLButtonElement>('[data-season]')) {
 		b.setAttribute('aria-pressed', String(b.dataset.season === season));
@@ -81,7 +82,13 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('[data-season]')) {
 $('night').addEventListener('click', () => {
 	night = !night;
 	$('night').setAttribute('aria-pressed', String(night));
-	world.setMood(night ? 1 : 0, night ? 1 : 0);
+	world.setMood(heat ? 1 : 0, night ? 1 : 0);
+});
+// the season's weather: heat in summer, wind, snow or rain in the others
+$('heat').addEventListener('click', () => {
+	heat = !heat;
+	$('heat').setAttribute('aria-pressed', String(heat));
+	world.setMood(heat ? 1 : 0, night ? 1 : 0);
 });
 $('blink').addEventListener('click', () => {
 	blink = !blink;
@@ -127,8 +134,9 @@ function frame(now: number): void {
 	ctx.setTransform(D, 0, 0, D, 0, 0);
 	ctx.globalAlpha = 1;
 	ctx.globalCompositeOperation = 'source-over';
-	world.drawWorld(ctx, () => false);
+	world.drawWorld(ctx);
 	world.drawMood(ctx);
+	world.drawFood(ctx, () => false);
 	const L = world.layout;
 	const S = L.tileSize;
 	// the game's blink while the fruit timer runs out

@@ -457,7 +457,8 @@ export function bakeMeadow(
 						b.fill();
 					}
 				}
-				blob(x + k() * T, y + k() * T, 3, 1.4, 'rgba(255,255,255,.9)', 0);
+				// a faint sheen only: a bright spot would hide what stands in the lair
+				blob(x + k() * T, y + k() * T, 3, 1.4, 'rgba(255,255,255,.18)', 0);
 				continue;
 			}
 			b.fillStyle = P.floor.tiles[(k() * 3) | 0];

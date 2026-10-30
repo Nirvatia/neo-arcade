@@ -1273,24 +1273,12 @@
 					]);
 					b.fill();
 				}
-				blob(x + k() * T$1, y + k() * T$1, 3, 1.4, "rgba(255,255,255,.9)", 0);
+				blob(x + k() * T$1, y + k() * T$1, 3, 1.4, "rgba(255,255,255,.18)", 0);
 				continue;
 			}
 			b.fillStyle = P.floor.tiles[k() * 3 | 0];
 			b.fillRect(x - .5, y - .5, 25, 25);
 			for (let i = 0; i < 3; i++) blob(x + k() * T$1, y + k() * T$1, .6 + k() * 1.4, .5 + k(), P.floor.specks[k() * 3 | 0], k() * 3);
-			if (t === "LE") {
-				const lf = S[r][c - 1] !== "LE";
-				const rt = S[r][c + 1] !== "LE";
-				b.fillStyle = "#7a5636";
-				b.fillRect(x, y + T$1 / 2 - 5, T$1, 10);
-				b.fillStyle = "#a07848";
-				for (let i = 0; i < 3; i++) b.fillRect(x, y + T$1 / 2 - 4 + i * 3.3, T$1, 1.2);
-				b.fillStyle = "#4f3622";
-				if (lf) b.fillRect(x, y + T$1 / 2 - 6, 4, 12);
-				if (rt) b.fillRect(x + T$1 - 4, y + T$1 / 2 - 6, 4, 12);
-				if (!lf && !rt) fl5(x + T$1 / 2, y + T$1 / 2 - 5, 2.6, "#d9333a", "#ffffff");
-			}
 			if (isTeleportToken(t)) TP.push([
 				x,
 				y,
@@ -1718,6 +1706,9 @@
 		pellets = [];
 		energizers = [];
 		portals = [];
+		/** Lair gates: runs of LE tiles, world units from x0 to x1 at height y. */
+		gates = [];
+		gateOpen = 0;
 		glints = [];
 		smoke = [];
 		lights = [];
@@ -1790,6 +1781,21 @@
 					});
 				}
 			}));
+			S.forEach((row, r) => {
+				let start = -1;
+				row.forEach((tt, c) => {
+					if (tt === "LE" && start < 0) start = c;
+					if (start >= 0 && (tt !== "LE" || c === row.length - 1)) {
+						const end = tt === "LE" ? c + 1 : c;
+						this.gates.push({
+							x0: start * T,
+							x1: end * T,
+							y: (r + .5) * T
+						});
+						start = -1;
+					}
+				});
+			});
 			const lair = ctr(Math.floor((this.R - 1) / 2), Math.floor((this.C - 1) / 2));
 			this.lights.push({
 				...lair,
@@ -1864,6 +1870,10 @@
 				offsetY: this.wy
 			};
 		}
+		/** How far the lair gate is open, 0 (shut) .. 1 (slid into its posts). */
+		setLairGate(open) {
+			this.gateOpen = Number.isFinite(open) ? Math.max(0, Math.min(1, open)) : 0;
+		}
 		/** Weather and night targets, 0..1; both ease in and out like the mock-up toggles. */
 		setMood(storm, night) {
 			this.stormT = storm;
@@ -1921,10 +1931,10 @@
 			for (const q of this.smoke) q.u = (q.u + .0025 * d) % 1;
 		}
 		/**
-		* Background, maze, food still on the board and the animated world objects.
-		* `collected(x, y)` tells which food was eaten. Leaves the context untransformed.
+		* Background, maze, the lair gate and the animated world objects; the food is drawn
+		* apart (`drawFood`), over the mood. Leaves the context untransformed.
 		*/
-		drawWorld(ctx, collected) {
+		drawWorld(ctx) {
 			if (this.rebakeAt > 0 && performance.now() >= this.rebakeAt) this.rebake();
 			const live = this.theme.live;
 			const t = this.t;
@@ -1936,19 +1946,7 @@
 			ctx.translate(this.wx, this.wy);
 			ctx.scale(this.sc, this.sc);
 			if (this.bg) ctx.drawImage(this.bg, this.bgX, this.bgY, this.bg.width / this.bgRS, this.bg.height / this.bgRS);
-			const pellet = live.pellet.texture();
-			const ps = live.pellet.size;
-			for (const p of this.pellets) if (!collected(p.c, p.r)) ctx.drawImage(pellet, p.x - ps / 2, p.y - ps / 2, ps, ps);
-			const en = live.energizer;
-			const enGlow = glowTexture(en.glow);
-			const enIm = en.texture();
-			for (const o of this.energizers) {
-				if (collected(o.c, o.r)) continue;
-				const s = 1 + .05 * Math.sin(t * 2.6 + o.ph);
-				const rot = en.motion === "spin" ? t * .4 : Math.sin(t * 2 + o.ph) * .12;
-				sprite(ctx, enGlow, o.x, o.y, en.glowSize * s, en.glowSize * s, .7, 0, true);
-				sprite(ctx, enIm, o.x, o.y, en.size * s, en.size * s, 1, rot);
-			}
+			this.drawGates(ctx);
 			const portalGlow = glowTexture(live.portal.glow);
 			for (const o of this.portals) {
 				sprite(ctx, portalGlow, o.x, o.y, 19.2, 19.2, .5 + .3 * Math.sin(t * 1.8 + o.i), 0, true);
@@ -1969,6 +1967,73 @@
 				sprite(ctx, puff, q.cx + q.u * 26 + Math.sin(t * 1.5 + q.ph) * 4, q.cy - q.u * 34, s, s, (1 - q.u) * .5 * Math.min(1, q.u * 8));
 			}
 			ctx.restore();
+		}
+		/**
+		* The food still on the board: pellets and energizers. Drawn after `drawMood`, like the
+		* actors, so neither the night nor the weather dims it. `collected(x, y)` tells which
+		* food was eaten. Leaves the context untransformed.
+		*/
+		drawFood(ctx, collected) {
+			const live = this.theme.live;
+			const t = this.t;
+			ctx.save();
+			ctx.globalAlpha = 1;
+			ctx.globalCompositeOperation = "source-over";
+			ctx.translate(this.wx, this.wy);
+			ctx.scale(this.sc, this.sc);
+			const pellet = live.pellet.texture();
+			const ps = live.pellet.size;
+			for (const p of this.pellets) if (!collected(p.c, p.r)) ctx.drawImage(pellet, p.x - ps / 2, p.y - ps / 2, ps, ps);
+			const en = live.energizer;
+			const enGlow = glowTexture(en.glow);
+			const enIm = en.texture();
+			for (const o of this.energizers) {
+				if (collected(o.c, o.r)) continue;
+				const s = 1 + .05 * Math.sin(t * 2.6 + o.ph);
+				const rot = en.motion === "spin" ? t * .4 : Math.sin(t * 2 + o.ph) * .12;
+				sprite(ctx, enGlow, o.x, o.y, en.glowSize * s, en.glowSize * s, .7, 0, true);
+				sprite(ctx, enIm, o.x, o.y, en.size * s, en.size * s, 1, rot);
+			}
+			ctx.restore();
+		}
+		/**
+		* The lair gate, as the bake used to paint it: a plank bar between two dark posts with a
+		* flower in the middle. Opening, each half slides into its post and the flower fades.
+		*/
+		drawGates(ctx) {
+			const o = this.gateOpen;
+			for (const g of this.gates) {
+				const mid = (g.x0 + g.x1) / 2;
+				const half = (mid - g.x0) * (1 - o);
+				for (const [from, dir] of [[g.x0, 1], [g.x1, -1]]) {
+					const left = dir > 0 ? from : from - half;
+					if (half > .01) {
+						ctx.fillStyle = "#7a5636";
+						ctx.fillRect(left, g.y - 5, half, 10);
+						ctx.fillStyle = "#a07848";
+						for (let i = 0; i < 3; i++) ctx.fillRect(left, g.y - 4 + i * 3.3, half, 1.2);
+					}
+					ctx.fillStyle = "#4f3622";
+					ctx.fillRect(dir > 0 ? from : from - 4, g.y - 6, 4, 12);
+				}
+				if (o < 1) {
+					ctx.save();
+					ctx.globalAlpha *= 1 - o;
+					const r = 2.6;
+					ctx.fillStyle = "#d9333a";
+					for (let k = 0; k < 5; k++) {
+						const a = k * 1.2566 + .3;
+						ctx.beginPath();
+						ctx.arc(mid + Math.cos(a) * r * .7, g.y - 5 + Math.sin(a) * r * .7, r * .6, 0, 7);
+						ctx.fill();
+					}
+					ctx.fillStyle = "#ffffff";
+					ctx.beginPath();
+					ctx.arc(mid, g.y - 5, r * .38, 0, 7);
+					ctx.fill();
+					ctx.restore();
+				}
+			}
 		}
 		/** Atmosphere under the actors: mist, rays, light, drift, wash, weather haze, night. */
 		drawMood(ctx) {
@@ -2165,11 +2230,11 @@
 				"#e8f1f9"
 			],
 			lair: {
-				base: "#6a7688",
+				base: "#2f3846",
 				tiles: [
-					"#dbe6f0",
-					"#cfdde9",
-					"#c3d3e2"
+					"#56637a",
+					"#515e73",
+					"#5b6880"
 				]
 			},
 			floor: {
@@ -2493,11 +2558,11 @@
 				"#9fd46a"
 			],
 			lair: {
-				base: "#4a5236",
+				base: "#2e3424",
 				tiles: [
-					"#cfd6b8",
-					"#c4cdaa",
-					"#d8dec2"
+					"#5a6446",
+					"#535d40",
+					"#606a4c"
 				]
 			},
 			floor: {
@@ -2726,56 +2791,43 @@
 		x.lineWidth = .7;
 		x.stroke();
 	}));
-	/** Energizer: a watermelon slice — red, green and big, nothing like a pellet. */
-	var watermelon = lazy(() => makeTexture(24, 24, (x) => {
-		x.translate(12, 13);
-		const R = 10;
-		const arc = (r) => {
+	/**
+	* Energizer: a little sun, a hot disc with eight rays, turning slowly. The watermelon slice
+	* it replaces clashed with the melon (owner's review): an energizer is power, never food or
+	* a collectible.
+	*/
+	var sun = lazy(() => makeTexture(24, 24, (x) => {
+		x.translate(12, 12);
+		x.lineJoin = "round";
+		const rays = () => {
 			x.beginPath();
-			x.moveTo(-r, -2);
-			x.arc(0, -2, r, 0, Math.PI);
-			x.closePath();
+			for (let i = 0; i < 8; i++) {
+				const a = i * Math.PI / 4;
+				const side = Math.PI / 11;
+				x.moveTo(Math.cos(a - side) * 6, Math.sin(a - side) * 6);
+				x.lineTo(Math.cos(a) * 11, Math.sin(a) * 11);
+				x.lineTo(Math.cos(a + side) * 6, Math.sin(a + side) * 6);
+				x.closePath();
+			}
 		};
-		x.fillStyle = "rgba(60,20,10,.3)";
-		x.save();
-		x.translate(.8, 1.2);
-		arc(R);
+		x.strokeStyle = "#7a3a00";
+		x.lineWidth = 1.6;
+		rays();
+		x.stroke();
+		x.fillStyle = "#ff9a1f";
+		rays();
 		x.fill();
-		x.restore();
-		x.fillStyle = "#1f7a34";
-		arc(R);
-		x.fill();
-		x.fillStyle = "#c9f0a0";
-		arc(8.4);
-		x.fill();
-		const g = x.createRadialGradient(0, -2, 1, 0, -2, 7.6);
-		g.addColorStop(0, "#ff7a86");
-		g.addColorStop(1, "#e8283e");
-		x.fillStyle = g;
-		arc(7.6);
-		x.fill();
-		x.fillStyle = "#2a1414";
-		for (const [sx, sy] of [
-			[-4.2, .6],
-			[-1.4, 2.6],
-			[1.6, 2.6],
-			[4.4, .6],
-			[0, 4.8]
-		]) {
-			x.beginPath();
-			x.ellipse(sx, sy, .75, 1.1, Math.atan2(sy + 2, sx) - Math.PI / 2, 0, 7);
-			x.fill();
-		}
-		x.strokeStyle = "rgba(255,255,255,.7)";
-		x.lineWidth = .8;
 		x.beginPath();
-		x.moveTo(-7.4, -1.4);
-		x.lineTo(7.4, -1.4);
+		x.arc(0, 0, 6.2, 0, 7);
 		x.stroke();
-		x.strokeStyle = "#0f4a20";
-		x.lineWidth = .9;
-		arc(R);
-		x.stroke();
+		const g = x.createRadialGradient(-1.6, -1.8, .4, 0, 0, 6.2);
+		g.addColorStop(0, "#fffbe0");
+		g.addColorStop(.5, "#ffd84a");
+		g.addColorStop(1, "#ff9a1f");
+		x.fillStyle = g;
+		x.beginPath();
+		x.arc(0, 0, 6.2, 0, 7);
+		x.fill();
 	}));
 	var fog$1 = lazy(() => tinted(radial([[0, "rgba(255,244,210,.9)"], [1, "rgba(255,244,210,0)"]]), 16773576));
 	/** Heat shimmer band, white: tinted below. */
@@ -2840,23 +2892,23 @@
 				"#c8b68c"
 			],
 			lair: {
-				base: "#a07f4e",
+				base: "#4e3a22",
 				tiles: [
-					"#f6e8c4",
-					"#efdcae",
-					"#e8d3a0"
+					"#7a603c",
+					"#735a37",
+					"#806642"
 				]
 			},
 			floor: {
 				tiles: [
-					"#c2a06a",
-					"#bc9a64",
-					"#c7a671"
+					"#8d6b40",
+					"#87663b",
+					"#937045"
 				],
 				specks: [
-					"#d2b588",
-					"#9c7a46",
-					"#d8bd90"
+					"#9e7c4e",
+					"#6e5030",
+					"#a6845a"
 				]
 			},
 			portal: {
@@ -2972,11 +3024,11 @@
 				size: 10
 			},
 			energizer: {
-				texture: watermelon,
+				texture: sun,
 				size: 24,
-				glow: 16734830,
+				glow: 16756784,
 				glowSize: 54.4 / 3,
-				motion: "sway"
+				motion: "spin"
 			},
 			portal: {
 				glow: 6288856,
@@ -2984,7 +3036,7 @@
 			},
 			glints: 16775104,
 			fog: fog$1,
-			mistAlpha: (s) => .07 + .2 * s,
+			mistAlpha: (s) => .05 + .06 * s,
 			mistSpeed: (s) => 1 + 3 * s,
 			rays: (t, i, s, n) => (.1 + .05 * Math.sin(t * .6 + i * 2)) * (1 + s) * (1 - .8 * n),
 			lit: lazy(() => radial([[0, "rgba(255,226,150,.3)"], [1, "rgba(255,205,130,0)"]])),
@@ -3001,12 +3053,12 @@
 			},
 			wash: lazy(() => washTexture("rgba(255,225,130,.22)", "rgba(255,150,60,.08)")),
 			stormTint: "#ff9d3a",
-			stormAlpha: .2,
+			stormAlpha: .14,
 			weather: {
-				count: 160,
+				count: 60,
 				make: (i, vw, vh) => {
 					const st = i % 2 === 0;
-					const s = st ? 2 + Math.random() * 3 : .14 + Math.random() * .2;
+					const s = st ? 1 + Math.random() * 1.5 : .12 + Math.random() * .14;
 					return {
 						st,
 						im: st ? tinted(band(), 16773312) : glowTexture(16765802),
@@ -3029,13 +3081,13 @@
 						p.px = Math.random() * vw;
 					}
 				},
-				alpha: (p, s) => s * (p.st ? .45 : .9)
+				alpha: (p, s) => s * (p.st ? .12 : .5)
 			},
 			nightTint: "#4a3f86",
-			nightAlpha: .6,
+			nightAlpha: .45,
 			vignette: lazy(() => radial([[.5, "rgba(70,45,10,0)"], [1, "rgba(70,45,10,.32)"]])),
 			lights: {
-				energizer: 16738938,
+				energizer: 16758858,
 				portal: 7337434
 			},
 			chimneySmoke: false
@@ -3201,9 +3253,9 @@
 				lair: {
 					base: "#2a1c12",
 					tiles: [
-						"#8c6a46",
-						"#80603e",
-						"#957250"
+						"#6e5236",
+						"#684e33",
+						"#755839"
 					]
 				},
 				floor: {
@@ -4337,8 +4389,9 @@
 		ctx.setTransform(D, 0, 0, D, 0, 0);
 		ctx.globalAlpha = 1;
 		ctx.globalCompositeOperation = "source-over";
-		world.drawWorld(ctx, () => false);
+		world.drawWorld(ctx);
 		world.drawMood(ctx);
+		world.drawFood(ctx, () => false);
 		const L = world.layout;
 		ms.draw(ctx, player, L, time, {
 			look: buffed ? "energized" : "normal",

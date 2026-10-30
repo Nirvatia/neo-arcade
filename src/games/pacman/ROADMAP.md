@@ -101,3 +101,7 @@ the owner says to go straight into the game.
   lair gate (now live in `MeadowWorld`, no longer baked) slides open, and a painted Easter
   egg waits in the lair's centre for Pac-Man. Tests: `logic/bonuses/easterEgg.test.ts`;
   prototype: `easter-egg`.
+- Summer and lair readability (owner's review after 10.2): a darker summer sand, muted
+  lair floors in every season, food drawn over the mood (`MeadowWorld.drawFood`), a faint
+  heat haze and a lighter summer night, a little sun instead of the watermelon energizer.
+  The `collectibles` prototype gained a weather toggle.

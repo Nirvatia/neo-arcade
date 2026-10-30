@@ -177,8 +177,9 @@ function frame(now: number): void {
 	ctx.globalAlpha = 1;
 	ctx.globalCompositeOperation = 'source-over';
 	world.setLairGate(egg.doorOpen);
-	world.drawWorld(ctx, (x, y) => scene.progress.isCollected(x, y));
+	world.drawWorld(ctx);
 	world.drawMood(ctx);
+	world.drawFood(ctx, (x, y) => scene.progress.isCollected(x, y));
 	const L = world.layout;
 	const S = L.tileSize;
 	eggView.draw(ctx, egg, L, time);

@@ -110,7 +110,8 @@ export const winterTheme: MeadowTheme = {
 			chimneyCap: '#f4f9fd'
 		},
 		rock: ['#b9c4d0', '#6f7d8d', '#ffffff', '#e8f1f9'],
-		lair: { base: '#6a7688', tiles: ['#dbe6f0', '#cfdde9', '#c3d3e2'] },
+		// muted (owner's review): the ghosts and the Easter egg must read on the lair floor
+		lair: { base: '#2f3846', tiles: ['#56637a', '#515e73', '#5b6880'] },
 		floor: {
 			tiles: ['#566274', '#515d6f', '#5b6779'],
 			specks: ['#6a768a', '#3a4452', '#7a869a']

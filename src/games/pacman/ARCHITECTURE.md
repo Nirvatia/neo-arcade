@@ -57,6 +57,9 @@ ui/          PacmanUi (HUD + screens + fade over the canvas), hud/ (GameHud, Arc
   carried explicitly by `LevelLoader.changeLevel` (score, lives, life threshold, arcade
   tries).
 - Shared drawing helpers go to `render/common/`, not copied into views.
+- A meadow frame: `MeadowWorld.drawWorld` (baked background, live lair gate, portals),
+  `drawMood` (weather, night), `drawFood` (dots, energizers), then the actors and
+  `drawOverlay`. Food sits over the mood so neither night nor weather dims it.
 - Collectibles (fruit, bonus life, exit) draw through `render/items/collectibleSprite`:
   callers pass the tile size and the time; the bake measures the object and how far its
   glow reaches over its ticker, so the object fills 0.78 of the tile and nothing leaves

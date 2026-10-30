@@ -269,10 +269,10 @@ export class MeadowWorld {
 	}
 
 	/**
-	 * Background, maze, food still on the board and the animated world objects.
-	 * `collected(x, y)` tells which food was eaten. Leaves the context untransformed.
+	 * Background, maze, the lair gate and the animated world objects; the food is drawn
+	 * apart (`drawFood`), over the mood. Leaves the context untransformed.
 	 */
-	drawWorld(ctx: CanvasRenderingContext2D, collected: (x: number, y: number) => boolean): void {
+	drawWorld(ctx: CanvasRenderingContext2D): void {
 		if (this.rebakeAt > 0 && performance.now() >= this.rebakeAt) {
 			this.rebake();
 		}
@@ -295,25 +295,6 @@ export class MeadowWorld {
 			);
 		}
 		this.drawGates(ctx);
-		const pellet = live.pellet.texture();
-		const ps = live.pellet.size;
-		for (const p of this.pellets) {
-			if (!collected(p.c, p.r)) {
-				ctx.drawImage(pellet, p.x - ps / 2, p.y - ps / 2, ps, ps);
-			}
-		}
-		const en = live.energizer;
-		const enGlow = glowTexture(en.glow);
-		const enIm = en.texture();
-		for (const o of this.energizers) {
-			if (collected(o.c, o.r)) {
-				continue;
-			}
-			const s = 1 + 0.05 * Math.sin(t * 2.6 + o.ph);
-			const rot = en.motion === 'spin' ? t * 0.4 : Math.sin(t * 2 + o.ph) * 0.12;
-			sprite(ctx, enGlow, o.x, o.y, en.glowSize * s, en.glowSize * s, 0.7, 0, true);
-			sprite(ctx, enIm, o.x, o.y, en.size * s, en.size * s, 1, rot);
-		}
 		const portalGlow = glowTexture(live.portal.glow);
 		for (const o of this.portals) {
 			sprite(ctx, portalGlow, o.x, o.y, 19.2, 19.2, 0.5 + 0.3 * Math.sin(t * 1.8 + o.i), 0, true);
@@ -340,6 +321,41 @@ export class MeadowWorld {
 				s,
 				(1 - q.u) * 0.5 * Math.min(1, q.u * 8)
 			);
+		}
+		ctx.restore();
+	}
+
+	/**
+	 * The food still on the board: pellets and energizers. Drawn after `drawMood`, like the
+	 * actors, so neither the night nor the weather dims it. `collected(x, y)` tells which
+	 * food was eaten. Leaves the context untransformed.
+	 */
+	drawFood(ctx: CanvasRenderingContext2D, collected: (x: number, y: number) => boolean): void {
+		const live = this.theme.live;
+		const t = this.t;
+		ctx.save();
+		ctx.globalAlpha = 1;
+		ctx.globalCompositeOperation = 'source-over';
+		ctx.translate(this.wx, this.wy);
+		ctx.scale(this.sc, this.sc);
+		const pellet = live.pellet.texture();
+		const ps = live.pellet.size;
+		for (const p of this.pellets) {
+			if (!collected(p.c, p.r)) {
+				ctx.drawImage(pellet, p.x - ps / 2, p.y - ps / 2, ps, ps);
+			}
+		}
+		const en = live.energizer;
+		const enGlow = glowTexture(en.glow);
+		const enIm = en.texture();
+		for (const o of this.energizers) {
+			if (collected(o.c, o.r)) {
+				continue;
+			}
+			const s = 1 + 0.05 * Math.sin(t * 2.6 + o.ph);
+			const rot = en.motion === 'spin' ? t * 0.4 : Math.sin(t * 2 + o.ph) * 0.12;
+			sprite(ctx, enGlow, o.x, o.y, en.glowSize * s, en.glowSize * s, 0.7, 0, true);
+			sprite(ctx, enIm, o.x, o.y, en.size * s, en.size * s, 1, rot);
 		}
 		ctx.restore();
 	}

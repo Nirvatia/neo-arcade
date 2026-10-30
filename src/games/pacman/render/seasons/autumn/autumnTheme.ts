@@ -140,7 +140,8 @@ export const autumnTheme: MeadowTheme = {
 			chimneyCap: '#5a3a28'
 		},
 		rock: ['#a89c88', '#5f5648', '#8a9a4a', '#b0a28a'],
-		lair: { base: '#2a1c12', tiles: ['#8c6a46', '#80603e', '#957250'] },
+		// muted (owner's review): the ghosts and the Easter egg must read on the lair floor
+		lair: { base: '#2a1c12', tiles: ['#6e5236', '#684e33', '#755839'] },
 		floor: {
 			tiles: ['#4a3426', '#45301f', '#503a2a'],
 			specks: ['#5e4634', '#2e2016', '#6b5240']
