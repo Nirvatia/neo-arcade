@@ -6,6 +6,7 @@ import { computeDecayField, sampleDecayField } from '../decay/decayField';
 import type { DecayField } from '../decay/decayField';
 import { SEASON_TURN_FRAGMENT, TURN_BAND } from './seasonTurnShader';
 import { seasonTurnFronts } from './seasonTurnTimeline';
+import type { DebugFront } from '../../debug/DebugOverlayView';
 
 const TILE_WORLD = 24;
 
@@ -88,6 +89,13 @@ interface Bit {
  * Without WebGL2 it cross-fades.
  */
 export class SeasonTurn {
+	private debugFrontValue: DebugFront | null = null;
+
+	/** The turning front now (dev overlay). */
+	get debugFront(): DebugFront | null {
+		return this.debugFrontValue;
+	}
+
 	private pass: GlPass<Uniform> | null | undefined;
 	private readonly scenes: Array<{ cv: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null> =
 		[null, null];
@@ -125,6 +133,7 @@ export class SeasonTurn {
 		this.prepareField(request);
 		this.fit(width, height, layout);
 		const fronts = seasonTurnFronts(request.elapsed, this.end, this.glowEnd);
+		this.debugFrontValue = this.field ? { field: this.field, front: fronts.front } : null;
 		if (this.pass === undefined) {
 			this.pass = GlPass.create('SeasonTurn', SEASON_TURN_FRAGMENT, UNIFORMS);
 			if (this.pass) {

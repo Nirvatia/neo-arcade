@@ -4,14 +4,9 @@ import type { TimeControl } from '../../engine/TimeControl';
 import type { FruitKind } from '../../logic/bonuses/fruitCatalog';
 import type { DoomPickupKind } from '../../logic/doom/DoomPickupModel';
 import type { DoomAttackKind } from '../../logic/doom/DoomAttackCore';
+import type { DebugRenderFlags } from '../../render/debug/DebugOverlayView';
 
-/** What the render overlays of the dev panel draw (read by the renderers each frame). */
-export interface DebugRenderFlags {
-	grid: boolean;
-	ghostPaths: boolean;
-	hitboxes: boolean;
-	fronts: boolean;
-}
+export type { DebugRenderFlags };
 
 /** One row of the live timer table: a name and seconds (or 0..1 for charges). */
 export interface DebugWatch {

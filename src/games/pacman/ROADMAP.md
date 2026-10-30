@@ -105,7 +105,7 @@ and covers the canvas only (Svelte buttons stay on top); replace it there.
 
 ### Debug tools (dev build only)
 
-- Debug panel: `ENTER HELL`, `BOSS -250 HP`, `GOD MODE`, `DIE`, `COMPLETE LEVEL`, …
+- Dev panels (stage 2): `` ` `` or the DEV button; `F8` steps one frame.
 - `window.__pacman = { level, director, render }` for the console and Playwright play-tests.
   Directions are upper case: `level.setDesiredDirection('LEFT')`. `director.startGame()`
   now fades for 0.8 s before READY; wait for it before `showPlaying()` / `debugEnter*()`
@@ -194,32 +194,32 @@ on the real game code for the owner to approve.
      frightened, flashing and eaten (eyes only) states. `GhostView` is one generic look now.
    - Direction indicator (see stage 3): ghosts' eyes looking where they move is the
      classic answer; settle the shared rule here so stages 3 and 4 reuse it.
-2. **Dev panel + log panel** (dev build only). **Plan approved by the owner, not started.**
-   Today: one column of buttons behind `DEBUG` (`ui/debug/PacmanDebugPanel.svelte`), ten
-   one-function bridges in `ui/debug/debugActions.ts`, no log (6 `console.warn`/`log` in
-   logic), no boss phase/attack hooks, no time control.
-   Owner's decisions: panels float over the game, draggable and collapsible, position and
-   open groups remembered (localStorage, wrapped in try/catch); hotkeys `` ` `` show/hide
-   the panels, `F8` steps one frame. No prototype (tools, not art).
-   Work, one commit each:
-   1. Groundwork: `DebugController` (one object with every command, replaces the
-      bridges); typed `debug:*` events on the existing bus (`PacmanEventMap`), emitted via
-      a helper that is compiled out of production (`import.meta.env.DEV`); time control in
-      `GameLoop`/`Director`: freeze, time scale 0.1–2×, single-frame step.
-   2. Dev panel, grouped: flow (live state, phase, timers from `director.flow`; pause,
-      slow motion, step), level (any level / season, hell, secret, complete, die, restart),
-      player (god mode, lives ±, energizer now, give weapon, profile), boss (HP, set phase
-      1–3, trigger a given attack from `DOOM_ATTACK_KINDS`, kill → boss reward), spawns
-      (fruit of a chosen kind, golden egg, echo, hell pickups), render (grid, ghost paths
-      and targets, hitboxes, fronts of the decay and season turn — flags read by the
-      renderers through `RenderFrame`).
-   3. Log panel: live stream filtered by channel (damage dealt/taken, debuffs: stun, slow,
-      pull; state changes; spawns; input), text search, pause stream, clear, copy; ring
-      buffer ~500 entries. Timers (power, berserk, BFG charge, attack cooldowns) are a
-      watch table updated every frame, not log lines. Emitters: `CombatService`, doom
-      boss / abilities / weapons, `PlayerService`, `Director`, input.
-   4. Tests: controller commands (phase, attack, kill), time scale and frame step, no
-      `debug:*` emission in production.
+2. ✅ **Dev panel + log panel** (dev build only). Done in the third chat.
+   - `core/debug/DebugController`: every dev command in one object, built only in dev
+     builds (`GameMain`); the Svelte side holds it in a store (`ui/debug/debugActions`).
+   - Time: `engine/TimeControl` (freeze, scale 0.1–2×, one-frame step); `GameLoop` asks it
+     for game time and passes the same time to `RenderPipeline.render(dt)`, so a frozen
+     game stands still on screen too. Hotkeys: `` ` `` panels, `F8` step.
+   - Windows (`ui/debug/DevWindow` + `DevGroup`): float over the game, drag by the title,
+     fold; position and open groups in localStorage (`pacman.dev.*`, failures ignored).
+     Panel (`PacmanDebugPanel`): live line + FLOW, LEVEL, PLAYER, BOSS (phase 1–3, force any
+     attack of the phase, kill), SPAWNS (any fruit, egg, echo, hell pickups), RENDER.
+   - Log (`ui/debug/DevLogWindow`, `devLog`): WATCH table of live timers
+     (`DebugController.watches()`, incl. every boss attack cooldown) and the LOG stream of
+     `debug:log` events with channel toggles, filter, hold, clear, copy (last 500 lines).
+     Logic writes through `logic/debug/debugLog` (`debugLog(events, …)`, or a `DebugSink`
+     for the doom services, wired in `LevelSession`); all of it is a no-op in production.
+   - Render overlays (`render/debug/DebugOverlayView`): grid with coordinates; next tile,
+     heading and state of ghosts, boss and Pac-Man (plus the buffered turn); contact
+     hitboxes; the decay / season-turn front over its distance field (`debugFront` on
+     `LevelDecay` and `SeasonTurn`).
+   - New logic hooks: `DoomBossService.debugSetPhase / debugForceAttack / debugKill /
+     debugCooldowns`, `takeDamage(amount, source)`, `DoomAbilityService.debugGiveWeapon`,
+     `damagePlayer(…, source)`, `FruitService.debugSpawn(kind)`, `GoldenEggService.debugSpawn`,
+     `CombatService.debugAddLives / debugPower`, `LevelLoader.debugGotoLevel`,
+     `Director.debugGotoLevel`.
+   - Tests: `core/debug/debugTools.test.ts` (time control, boss phase / forced attack /
+     kill, dev log silent in production).
 3. **Hell rework.**
    - Boss art: the lamprey reads badly on a small tile. Return to the idea of Blinky as
      the lord of hell (a demon red ghost) — readable at tile size, changes by phase.

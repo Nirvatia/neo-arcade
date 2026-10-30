@@ -129,7 +129,9 @@ export class GameMain implements GameModule {
 			profile: () => input.pressProfile()
 		});
 		if (import.meta.env.DEV) {
-			setDebugController(new DebugController(director, level, time));
+			const dev = new DebugController(director, level, time);
+			render.setDebugFlags(dev.renderFlags);
+			setDebugController(dev);
 			events.on('debug:log', (line) => pushDevLog(line, director.flow.state));
 		}
 		loop.start();

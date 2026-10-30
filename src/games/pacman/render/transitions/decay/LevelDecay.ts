@@ -6,6 +6,7 @@ import type { DecayPalette } from './DecayPass';
 import { computeDecayField, packDecayFields, sampleDecayField } from './decayField';
 import type { DecayField } from './decayField';
 import { decayFronts, DECAY_BAND } from './decayTimeline';
+import type { DebugFront } from '../../debug/DebugOverlayView';
 
 /** World units per tile inside the shader (shard cells are half a tile). */
 const TILE_WORLD = 24;
@@ -62,6 +63,13 @@ interface Dust {
  * `compose()` onto the screen. Without WebGL2 a dark veil stands in for the shader.
  */
 export class LevelDecay {
+	private debugFrontValue: DebugFront | null = null;
+
+	/** The front being drawn now (dev overlay): the shatter, or the rebuild once it runs. */
+	get debugFront(): DebugFront | null {
+		return this.debugFrontValue;
+	}
+
 	private pass: DecayPass | null | undefined;
 	private scene: HTMLCanvasElement | null = null;
 	private sceneCtx: CanvasRenderingContext2D | null = null;
@@ -121,6 +129,12 @@ export class LevelDecay {
 			return;
 		}
 		const fronts = decayFronts(request.elapsed, this.frontEnd, this.rebuildEnd);
+		this.debugFrontValue =
+			fronts.rebuild > -50 && this.respawn
+				? { field: this.respawn, front: fronts.rebuild }
+				: this.death
+					? { field: this.death, front: fronts.front }
+					: null;
 		if (this.pass === undefined) {
 			this.pass = DecayPass.create();
 			if (this.pass) {

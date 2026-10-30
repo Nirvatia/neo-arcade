@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import { debugController, debugVisible, toggleDebugVisible } from './debugActions';
-	import type { DebugController, DebugSnapshot } from '../../core/debug/DebugController';
+	import type {
+		DebugController,
+		DebugRenderFlags,
+		DebugSnapshot
+	} from '../../core/debug/DebugController';
 	import DevWindow from './DevWindow.svelte';
 	import DevGroup from './DevGroup.svelte';
 	import DevLogWindow from './DevLogWindow.svelte';
@@ -13,12 +17,24 @@
 	const WEAPONS: DoomPickupKind[] = ['bfg', 'barrel', 'berserk', 'medkit'];
 	const SCALES = [0.1, 0.25, 0.5, 1, 2];
 	const SEASONS = ['spring', 'summer', 'autumn', 'winter'] as const;
+	const RENDER_FLAGS: Array<[keyof DebugRenderFlags, string]> = [
+		['grid', 'Grid'],
+		['ghostPaths', 'Paths'],
+		['hitboxes', 'Hitboxes'],
+		['fronts', 'Fronts']
+	];
 
 	let dev = $state<DebugController | null>(null);
 	let snap = $state<DebugSnapshot | null>(null);
 	let visible = $state(false);
 	let levelInput = $state(1);
 	let mazeScale = $state(0.8);
+	let flags = $state<DebugRenderFlags>({
+		grid: false,
+		ghostPaths: false,
+		hitboxes: false,
+		fronts: false
+	});
 	let frame = 0;
 
 	const unsubDev = debugController.subscribe((value) => (dev = value));
@@ -235,6 +251,21 @@
 					<button type="button" tabindex={-1} onclick={run((d) => d.spawnEcho())}>Echo</button>
 				</div>
 			{/if}
+		</DevGroup>
+		<DevGroup id="render" title="RENDER">
+			<div class="row wrap">
+				{#each RENDER_FLAGS as [flag, label] (flag)}
+					<button
+						type="button"
+						tabindex={-1}
+						class:on={flags[flag]}
+						onclick={run((d) => {
+							d.setRenderFlag(flag, !d.renderFlags[flag]);
+							flags = { ...d.renderFlags };
+						})}>{label}</button
+					>
+				{/each}
+			</div>
 		</DevGroup>
 	</DevWindow>
 	<DevLogWindow {dev} />

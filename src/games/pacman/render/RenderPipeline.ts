@@ -15,6 +15,8 @@ import { glowTexture } from './common/textures';
 import { FLOW } from '../config/flowConfig';
 import type { NextLevel } from '../logic/level/LevelLoader';
 import type { DecayPalette } from './transitions/decay/DecayPass';
+import { DebugOverlayView } from './debug/DebugOverlayView';
+import type { DebugRenderFlags } from './debug/DebugOverlayView';
 
 /** Same as the page background, so a full fade reads as an empty stage. */
 const FADE_COLOR = '#030509';
@@ -41,6 +43,8 @@ export class RenderPipeline {
 	private readonly doomRenderer: DoomLevelRenderer;
 	private readonly decay = new LevelDecay();
 	private readonly turn = new SeasonTurn();
+	private debugFlags: DebugRenderFlags | null = null;
+	private debugView: DebugOverlayView | null = null;
 	private readonly canvas: HTMLCanvasElement;
 	private readonly ctx: CanvasRenderingContext2D;
 	private width = 0;
@@ -178,8 +182,19 @@ export class RenderPipeline {
 				this.shared.drawPlayer(screen, layout);
 			}
 		}
+		if (this.debugView && this.debugFlags) {
+			const front = death ? this.decay.debugFront : turning ? this.turn.debugFront : null;
+			this.ctx.setTransform(pr, 0, 0, pr, 0, 0);
+			this.debugView.draw(this.ctx, layout, this.level, this.debugFlags, front);
+		}
 		this.shared.drawOverlay(screen, layout);
 		this.drawFade(flow.fade);
+	}
+
+	/** Dev build: the overlay flags of the dev panel (read every frame, never copied). */
+	setDebugFlags(flags: DebugRenderFlags): void {
+		this.debugFlags = flags;
+		this.debugView = new DebugOverlayView();
 	}
 
 	destroy(): void {
