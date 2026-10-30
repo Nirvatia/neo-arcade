@@ -54,6 +54,12 @@ const SHADOW = glowSprite([20, 10, 0]);
 
 const cache = new Map<string, Baked>();
 
+/** A position in a loop of `n` frames, always in [0, n). */
+function cycle(t: number, n: number): number {
+	const f = ((t % n) + n) % n;
+	return Number.isFinite(f) ? f : 0;
+}
+
 export abstract class CharacterSprite {
 	protected x = 0;
 	protected y = 0;
@@ -184,6 +190,8 @@ export abstract class CharacterSprite {
 	}
 
 	update(dt: number, s: SpriteState): void {
+		// a frame's timestamp can come before the previous one: never step back in time
+		if (!Number.isFinite(dt) || dt < 0) dt = 0;
 		this.time += dt;
 		const dx = s.x - this.x;
 		const dy = s.y - this.y;
@@ -334,7 +342,7 @@ export abstract class CharacterSprite {
 		sx.globalAlpha = 1;
 		sx.clearRect(0, 0, side, side);
 		const n = this.surfaceFrames;
-		const f = (this.time * this.surfaceRate) % n;
+		const f = cycle(this.time * this.surfaceRate, n);
 		const k0 = Math.floor(f);
 		const k1 = (k0 + 1) % n;
 		const blend = f - k0;
@@ -393,7 +401,7 @@ export abstract class CharacterSprite {
 		ctx.rotate(this.angle);
 		ctx.scale(scale, scale * this.flip);
 		if (baked.corona && p > 0.01) {
-			const cf = (this.time * 12) % baked.corona.length;
+			const cf = cycle(this.time * 12, baked.corona.length);
 			ctx.globalAlpha = p;
 			ctx.drawImage(baked.corona[Math.floor(cf)], -css / 2, -css / 2, css, css);
 			ctx.globalAlpha = p * (cf - Math.floor(cf));

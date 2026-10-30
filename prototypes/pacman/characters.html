@@ -3857,6 +3857,11 @@
 		0
 	]);
 	var cache = /* @__PURE__ */ new Map();
+	/** A position in a loop of `n` frames, always in [0, n). */
+	function cycle(t, n) {
+		const f = (t % n + n) % n;
+		return Number.isFinite(f) ? f : 0;
+	}
 	var CharacterSprite = class {
 		x = 0;
 		y = 0;
@@ -3933,6 +3938,7 @@
 			this.flash = 0;
 		}
 		update(dt, s) {
+			if (!Number.isFinite(dt) || dt < 0) dt = 0;
 			this.time += dt;
 			const dx = s.x - this.x;
 			const dy = s.y - this.y;
@@ -4060,7 +4066,7 @@
 			sx.globalAlpha = 1;
 			sx.clearRect(0, 0, side, side);
 			const n = this.surfaceFrames;
-			const f = this.time * this.surfaceRate % n;
+			const f = cycle(this.time * this.surfaceRate, n);
 			const k0 = Math.floor(f);
 			const k1 = (k0 + 1) % n;
 			const blend = f - k0;
@@ -4114,7 +4120,7 @@
 			ctx.rotate(this.angle);
 			ctx.scale(scale, scale * this.flip);
 			if (baked.corona && p > .01) {
-				const cf = this.time * 12 % baked.corona.length;
+				const cf = cycle(this.time * 12, baked.corona.length);
 				ctx.globalAlpha = p;
 				ctx.drawImage(baked.corona[Math.floor(cf)], -css / 2, -css / 2, css, css);
 				ctx.globalAlpha = p * (cf - Math.floor(cf));
@@ -5405,7 +5411,7 @@
 	else {
 		let last = performance.now();
 		const loop = (now) => {
-			frame(Math.min(.1, (now - last) / 1e3));
+			frame(Math.min(.1, Math.max(0, (now - last) / 1e3)));
 			last = now;
 			requestAnimationFrame(loop);
 		};

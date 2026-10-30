@@ -230,7 +230,7 @@ if (new URLSearchParams(location.search).has('capture')) {
 } else {
 	let last = performance.now();
 	const loop = (now: number) => {
-		frame(Math.min(0.1, (now - last) / 1000));
+		frame(Math.min(0.1, Math.max(0, (now - last) / 1000)));
 		last = now;
 		requestAnimationFrame(loop);
 	};
