@@ -146,6 +146,5 @@ New art and effects start as a page built from the game's own sources:
 file). The approved prototype already is the game code. Existing: `hell`, `arcade`,
 `hud`, `collectibles` (with each item's reach from its tile centre and a tile grid),
 `ms-pacman`, `level-clear`, `easter-egg` (the lair code's reward played by the real
-services), `characters` (Pac-Man "Solar Flare" and Ms. Pac-Man "Stardust Heart" as baked sprites
-from `render/actors/sprite`: large and in the summer maze, with the energizer, a ghost, a
-teleport and death; `?capture` steps frames by hand for stills); `winter-decay.html` is an older standalone page.
+services), `hero` (the hero stage for Pac-Man, 10.3: him alone, large, with a
+tile-sized inset; `render/actors/hero`); `winter-decay.html` is an older standalone page.

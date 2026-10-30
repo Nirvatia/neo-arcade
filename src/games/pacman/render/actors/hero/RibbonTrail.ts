@@ -1,8 +1,12 @@
 // A trail as one tapered ribbon along the path the actor really took. Points are kept by
 // distance, not by time, so the trail has the same length at any frame rate; it is filled
-// as a single polygon per layer, so nothing doubles up at the joints.
-import type { RGB } from './bakeKit';
-import { rgba } from './bakeKit';
+// as a single polygon per layer, so nothing doubles up at the joints. Layers can stream off
+// the path's centre and wave, so a few thin layers read as strands of one flowing trail.
+
+export type RGB = readonly [number, number, number];
+
+const rgba = (c: RGB, a: number): string =>
+	`rgba(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])},${a})`;
 
 interface TrailPoint {
 	x: number;
@@ -13,6 +17,12 @@ interface TrailPoint {
 export interface RibbonLayer {
 	readonly width: number;
 	readonly stops: ReadonlyArray<readonly [number, RGB, number]>;
+	/** Side offset from the path, body radii (+ is left of the heading). */
+	readonly offset?: number;
+	/** A wave travelling down the strand: amplitude in body radii, growing to the tail. */
+	readonly wave?: number;
+	/** The wave's phase offset, radians. */
+	readonly phase?: number;
 }
 
 export class RibbonTrail {
@@ -99,7 +109,13 @@ export class RibbonTrail {
 	}
 
 	/** Fills each layer as one ribbon, `r` the body radius, `alpha` overall. */
-	draw(ctx: CanvasRenderingContext2D, r: number, layers: readonly RibbonLayer[], alpha = 1): void {
+	draw(
+		ctx: CanvasRenderingContext2D,
+		r: number,
+		layers: readonly RibbonLayer[],
+		alpha = 1,
+		time = 0
+	): void {
 		const pts = this.points;
 		const n = pts.length;
 		if (n < 2 || alpha <= 0) return;
@@ -121,8 +137,14 @@ export class RibbonTrail {
 				const k = acc / total;
 				// full width near the body, tapering smoothly to a point
 				const w = layer.width * r * Math.pow(1 - k, 0.75);
-				left.push({ x: pts[i].x - dy * w, y: pts[i].y + dx * w });
-				right.push({ x: pts[i].x + dy * w, y: pts[i].y - dx * w });
+				const side =
+					((layer.offset ?? 0) * (1 - k * 0.5) +
+						(layer.wave ?? 0) * k * Math.sin(acc / r - time * 7 + (layer.phase ?? 0))) *
+					r;
+				const cx = pts[i].x - dy * side;
+				const cy = pts[i].y + dx * side;
+				left.push({ x: cx - dy * w, y: cy + dx * w });
+				right.push({ x: cx + dy * w, y: cy - dx * w });
 			}
 			const tail = pts[n - 1];
 			const g = ctx.createLinearGradient(pts[0].x, pts[0].y, tail.x, tail.y);
@@ -135,21 +157,13 @@ export class RibbonTrail {
 				const q = left[i];
 				ctx.quadraticCurveTo(p.x, p.y, (p.x + q.x) / 2, (p.y + q.y) / 2);
 			}
-			ctx.lineTo(tail.x, tail.y);
+			ctx.lineTo((left[n - 1].x + right[n - 1].x) / 2, (left[n - 1].y + right[n - 1].y) / 2);
 			for (let i = n - 1; i > 0; i--) {
 				const p = right[i];
 				const q = right[i - 1];
 				ctx.quadraticCurveTo(p.x, p.y, (p.x + q.x) / 2, (p.y + q.y) / 2);
 			}
 			ctx.lineTo(right[0].x, right[0].y);
-			// a round cap under the body
-			ctx.arc(
-				pts[0].x,
-				pts[0].y,
-				layer.width * r,
-				Math.atan2(right[0].y - pts[0].y, right[0].x - pts[0].x),
-				Math.atan2(left[0].y - pts[0].y, left[0].x - pts[0].x)
-			);
 			ctx.closePath();
 			ctx.fill();
 		}

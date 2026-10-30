@@ -1,0 +1,1261 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>Pac-Man · Hero</title>
+    <!-- Prototype: the hero stage for Pac-Man (stage 10.3, from scratch): him alone, large on
+         a dark stage, with a tile-sized inset on the summer sand. Built from the sources:
+         `node prototypes/pacman/build.mjs hero`; open as a file. -->
+    <style>
+      html,body{height:100%;margin:0;overflow:hidden;background:#07060a}
+      #view{position:fixed;inset:0;display:block}
+      #ctl{position:fixed;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:5;display:flex;flex-wrap:wrap;justify-content:center;gap:8px;width:calc(100vw - 32px);max-width:860px}
+      .bt{border:0;cursor:pointer;padding:9px 14px;border-radius:999px;font:700 14px "Trebuchet MS","Segoe UI",system-ui,sans-serif;color:#2a2410;background:linear-gradient(#fffaf0,#f2e2b8);box-shadow:0 3px 0 #c9ac62,0 8px 14px rgba(40,30,10,.22)}
+      .bt[aria-pressed="true"]{transform:translateY(2px);color:#fff;background:linear-gradient(#e0a838,#a8721a);box-shadow:0 1px 0 #5a3a08,0 0 14px rgba(255,200,80,.6)}
+    </style>
+  </head>
+  <body>
+    <canvas id="view"></canvas>
+    <div id="ctl">
+      <button class="bt" id="run" aria-pressed="true">Бег</button>
+      <button class="bt" id="bite">Укус</button>
+      <button class="bt" id="power">⚡ Энерджайзер</button>
+      <button class="bt" id="slow" aria-pressed="false">×0.25</button>
+    </div>
+    <script>
+(function() {
+	//#region src/games/pacman/render/actors/hero/RibbonTrail.ts
+	var rgba = (c, a) => `rgba(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])},${a})`;
+	var RibbonTrail = class {
+		points = [];
+		reset() {
+			this.points = [];
+		}
+		/** The newest point first; a jump longer than `jump` (a teleport) restarts the trail. */
+		push(x, y, step, maxLength, jump) {
+			const head = this.points[0];
+			if (head && Math.hypot(head.x - x, head.y - y) > jump) this.points = [];
+			const fixed = this.points[1];
+			if (this.points.length === 0) this.points.push({
+				x,
+				y
+			});
+			else if (!fixed || Math.hypot(fixed.x - x, fixed.y - y) >= step) this.points.unshift({
+				x,
+				y
+			});
+			else {
+				this.points[0].x = x;
+				this.points[0].y = y;
+			}
+			let len = 0;
+			for (let i = 1; i < this.points.length; i++) {
+				len += Math.hypot(this.points[i].x - this.points[i - 1].x, this.points[i].y - this.points[i - 1].y);
+				if (len > maxLength) {
+					this.points.length = i + 1;
+					break;
+				}
+			}
+		}
+		/** Shrinks the trail towards the head (standing still, it draws in). */
+		shrink(amount) {
+			while (this.points.length > 1 && amount > 0) {
+				const n = this.points.length;
+				const a = this.points[n - 2];
+				const b = this.points[n - 1];
+				const len = Math.hypot(b.x - a.x, b.y - a.y);
+				if (len <= amount) {
+					this.points.pop();
+					amount -= len;
+				} else {
+					const k = amount / len;
+					b.x += (a.x - b.x) * k;
+					b.y += (a.y - b.y) * k;
+					amount = 0;
+				}
+			}
+		}
+		get length() {
+			let len = 0;
+			for (let i = 1; i < this.points.length; i++) len += Math.hypot(this.points[i].x - this.points[i - 1].x, this.points[i].y - this.points[i - 1].y);
+			return len;
+		}
+		/** The point `d` px back along the trail, or null past its end. */
+		at(d) {
+			let rest = d;
+			for (let i = 1; i < this.points.length; i++) {
+				const a = this.points[i - 1];
+				const b = this.points[i];
+				const len = Math.hypot(b.x - a.x, b.y - a.y);
+				if (rest <= len && len > 0) {
+					const k = rest / len;
+					return {
+						x: a.x + (b.x - a.x) * k,
+						y: a.y + (b.y - a.y) * k
+					};
+				}
+				rest -= len;
+			}
+			return null;
+		}
+		/** Fills each layer as one ribbon, `r` the body radius, `alpha` overall. */
+		draw(ctx, r, layers, alpha = 1, time = 0) {
+			const pts = this.points;
+			const n = pts.length;
+			if (n < 2 || alpha <= 0) return;
+			const total = this.length;
+			if (total < r * .3) return;
+			for (const layer of layers) {
+				const left = [];
+				const right = [];
+				let acc = 0;
+				for (let i = 0; i < n; i++) {
+					if (i > 0) acc += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+					const a = pts[Math.max(0, i - 1)];
+					const b = pts[Math.min(n - 1, i + 1)];
+					let dx = b.x - a.x;
+					let dy = b.y - a.y;
+					const len = Math.hypot(dx, dy) || 1;
+					dx /= len;
+					dy /= len;
+					const k = acc / total;
+					const w = layer.width * r * Math.pow(1 - k, .75);
+					const side = ((layer.offset ?? 0) * (1 - k * .5) + (layer.wave ?? 0) * k * Math.sin(acc / r - time * 7 + (layer.phase ?? 0))) * r;
+					const cx = pts[i].x - dy * side;
+					const cy = pts[i].y + dx * side;
+					left.push({
+						x: cx - dy * w,
+						y: cy + dx * w
+					});
+					right.push({
+						x: cx + dy * w,
+						y: cy - dx * w
+					});
+				}
+				const tail = pts[n - 1];
+				const g = ctx.createLinearGradient(pts[0].x, pts[0].y, tail.x, tail.y);
+				for (const [o, c, a] of layer.stops) g.addColorStop(o, rgba(c, a * alpha));
+				ctx.fillStyle = g;
+				ctx.beginPath();
+				ctx.moveTo(left[0].x, left[0].y);
+				for (let i = 1; i < n; i++) {
+					const p = left[i - 1];
+					const q = left[i];
+					ctx.quadraticCurveTo(p.x, p.y, (p.x + q.x) / 2, (p.y + q.y) / 2);
+				}
+				ctx.lineTo((left[n - 1].x + right[n - 1].x) / 2, (left[n - 1].y + right[n - 1].y) / 2);
+				for (let i = n - 1; i > 0; i--) {
+					const p = right[i];
+					const q = right[i - 1];
+					ctx.quadraticCurveTo(p.x, p.y, (p.x + q.x) / 2, (p.y + q.y) / 2);
+				}
+				ctx.lineTo(right[0].x, right[0].y);
+				ctx.closePath();
+				ctx.fill();
+			}
+		}
+	};
+	//#endregion
+	//#region src/games/pacman/render/actors/hero/PacmanHero.ts
+	var CALM = {
+		light: [
+			255,
+			230,
+			128
+		],
+		mid: [
+			255,
+			192,
+			48
+		],
+		shadow: [
+			228,
+			104,
+			30
+		],
+		deep: [
+			132,
+			34,
+			14
+		],
+		bounce: [
+			255,
+			120,
+			70
+		],
+		ink: [
+			40,
+			12,
+			4
+		],
+		highlight: [
+			255,
+			252,
+			232
+		],
+		rim: [
+			255,
+			238,
+			176
+		]
+	};
+	var AWOKEN = {
+		light: [
+			255,
+			251,
+			230
+		],
+		mid: [
+			255,
+			218,
+			96
+		],
+		shadow: [
+			238,
+			80,
+			24
+		],
+		deep: [
+			150,
+			18,
+			8
+		],
+		bounce: [
+			255,
+			90,
+			40
+		],
+		ink: [
+			58,
+			6,
+			4
+		],
+		highlight: [
+			255,
+			255,
+			255
+		],
+		rim: [
+			255,
+			210,
+			130
+		]
+	};
+	var mix = (a, b, k) => [
+		a[0] + (b[0] - a[0]) * k,
+		a[1] + (b[1] - a[1]) * k,
+		a[2] + (b[2] - a[2]) * k
+	];
+	var css = (c, a = 1) => `rgba(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])},${a})`;
+	var clamp01 = (v) => Math.max(0, Math.min(1, v));
+	var easeOut = (t) => 1 - Math.pow(1 - clamp01(t), 3);
+	var easeIn = (t) => Math.pow(clamp01(t), 3);
+	/** The key light, fixed in the world: from the upper left. */
+	var LIGHT = (() => {
+		const n = Math.hypot(-.55, -.83);
+		return {
+			x: -.55 / n,
+			y: -.83 / n
+		};
+	})();
+	/** A damped spring towards a target: overshoot and settle. */
+	var Spring = class {
+		value;
+		velocity = 0;
+		constructor(value) {
+			this.value = value;
+		}
+		step(target, dt, stiffness = 260, damping = 16) {
+			const a = (target - this.value) * stiffness - this.velocity * damping;
+			this.velocity += a * dt;
+			this.value += this.velocity * dt;
+		}
+	};
+	/** Molten veins when he is awoken: from the mouth's hinge back over the body, body radii. */
+	var CRACKS = [
+		[
+			[-.12, -.06],
+			[-.34, -.2],
+			[-.5, -.44],
+			[-.58, -.66]
+		],
+		[
+			[-.12, .06],
+			[-.36, .22],
+			[-.52, .46],
+			[-.56, .7]
+		],
+		[
+			[-.14, 0],
+			[-.46, .02],
+			[-.74, -.06],
+			[-.9, -.02]
+		],
+		[[-.5, -.44], [-.72, -.4]],
+		[[-.52, .46], [-.76, .42]]
+	];
+	/** Brush texture: a few hundred short soft strokes, light and dark, made once. */
+	var brush = null;
+	function brushTexture() {
+		if (brush) return brush;
+		const c = document.createElement("canvas");
+		c.width = c.height = 256;
+		const x = c.getContext("2d");
+		let seed = 7;
+		const rnd = () => {
+			seed = seed * 16807 % 2147483647;
+			return seed / 2147483647;
+		};
+		x.lineCap = "round";
+		for (let i = 0; i < 260; i++) {
+			const px = rnd() * 256;
+			const py = rnd() * 256;
+			const a = -.6 + (rnd() - .5) * .5;
+			const len = 18 + rnd() * 36;
+			x.strokeStyle = rnd() < .5 ? `rgba(255,255,255,${.25 + rnd() * .3})` : `rgba(0,0,0,${.2 + rnd() * .25})`;
+			x.lineWidth = 3 + rnd() * 7;
+			x.beginPath();
+			x.moveTo(px, py);
+			x.quadraticCurveTo(px + Math.cos(a) * len * .5 + 4, py + Math.sin(a) * len * .5 - 4, px + Math.cos(a) * len, py + Math.sin(a) * len);
+			x.stroke();
+		}
+		brush = c;
+		return c;
+	}
+	var glowCache = /* @__PURE__ */ new Map();
+	function glow(c) {
+		const key = c.join(",");
+		let g = glowCache.get(key);
+		if (!g) {
+			g = document.createElement("canvas");
+			g.width = g.height = 64;
+			const x = g.getContext("2d");
+			const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+			gr.addColorStop(0, css(c, 1));
+			gr.addColorStop(.3, css(c, .5));
+			gr.addColorStop(1, css(c, 0));
+			x.fillStyle = gr;
+			x.fillRect(0, 0, 64, 64);
+			glowCache.set(key, g);
+		}
+		return g;
+	}
+	var CHOMP_RATE = 4.2;
+	var CHARGE = .18;
+	var PacmanHero = class {
+		r = 20;
+		x = 0;
+		y = 0;
+		angle = 0;
+		flip = 1;
+		lastH = 1;
+		moving = false;
+		time = 0;
+		/** The awoken look, 0..1. */
+		power = 0;
+		powerOn = false;
+		ending = false;
+		/** Seconds since the energizer was taken (the wind-up and burst), or -1. */
+		transform = -1;
+		chomp = 0;
+		bite = -1;
+		snap = -1;
+		nextSnap = 2.4;
+		snaps = 0;
+		along = new Spring(1);
+		across = new Spring(1);
+		flash = 0;
+		mouthFlash = 0;
+		trail = new RibbonTrail();
+		embers = [];
+		bursts = [];
+		travelled = 0;
+		seed = 11;
+		setRadius(r) {
+			this.r = r;
+		}
+		reset() {
+			this.trail.reset();
+			this.embers = [];
+			this.bursts = [];
+			this.power = 0;
+			this.powerOn = false;
+			this.transform = -1;
+		}
+		random() {
+			this.seed = this.seed * 16807 % 2147483647;
+			return this.seed / 2147483647;
+		}
+		/** He eats something small: a quick wind-up, a snapping bite, a squash. */
+		eat() {
+			this.bite = 0;
+		}
+		update(dt, s) {
+			if (!Number.isFinite(dt) || dt < 0) dt = 0;
+			this.time += dt;
+			const step = Math.hypot(s.x - this.x, s.y - this.y);
+			this.x = s.x;
+			this.y = s.y;
+			this.angle = s.angle;
+			this.moving = s.moving;
+			this.ending = s.ending;
+			if (Math.abs(Math.cos(s.angle)) > .5) this.lastH = Math.cos(s.angle) > 0 ? 1 : -1;
+			const vertical = Math.abs(Math.sin(s.angle)) > .5;
+			this.flip = (vertical ? this.lastH : Math.cos(s.angle) > 0 ? 1 : -1) < 0 ? -1 : 1;
+			if (s.power && !this.powerOn) this.transform = 0;
+			this.powerOn = s.power;
+			let alongTarget = this.moving ? 1.06 : 1;
+			let acrossTarget = this.moving ? .95 : 1 + .018 * Math.sin(this.time * 2.3);
+			if (this.transform >= 0) {
+				const before = this.transform;
+				this.transform += dt;
+				if (this.transform < CHARGE) {
+					alongTarget = .86;
+					acrossTarget = 1.1;
+				} else if (before < CHARGE) {
+					this.flash = 1;
+					this.along.velocity += 9;
+					this.across.velocity -= 6;
+					this.bursts.push({
+						t: 0,
+						x: this.x,
+						y: this.y,
+						angle: this.angle
+					});
+					for (let i = 0; i < 18; i++) this.spawnEmber(true, i / 18 * Math.PI * 2, 7 + this.random() * 6);
+				}
+				if (this.transform > 1.2) this.transform = -1;
+			}
+			const awake = this.powerOn && (this.transform < 0 || this.transform >= CHARGE);
+			const rate = awake ? 1 / .3 : 1 / .7;
+			this.power += Math.sign((awake ? 1 : 0) - this.power) * Math.min(Math.abs((awake ? 1 : 0) - this.power), dt * rate);
+			if (this.moving) {
+				const before = this.chomp % 1;
+				this.chomp += dt * CHOMP_RATE * (1 + .25 * this.power);
+				const after = this.chomp % 1;
+				if (before < .75 && after >= .75) {
+					this.along.velocity -= 1.6;
+					this.across.velocity += 1.4;
+				}
+			} else if (this.snap < 0 && this.bite < 0 && this.time > this.nextSnap) {
+				this.snap = 0;
+				this.snaps += 1;
+				this.nextSnap = this.time + 2.2 + this.snaps % 3 * .9;
+			}
+			if (this.snap >= 0) {
+				this.snap += dt;
+				if (this.snap > .34) this.snap = -1;
+			}
+			if (this.bite >= 0) {
+				const before = this.bite;
+				this.bite += dt;
+				if (before < .12 && this.bite >= .12) {
+					this.along.velocity -= 5;
+					this.across.velocity += 4.5;
+					this.mouthFlash = 1;
+				}
+				if (this.bite > .26) this.bite = -1;
+			}
+			this.along.step(alongTarget, dt);
+			this.across.step(acrossTarget, dt);
+			this.flash = Math.max(0, this.flash - dt / .16);
+			this.mouthFlash = Math.max(0, this.mouthFlash - dt / .2);
+			const r = this.r;
+			this.trail.push(s.x, s.y, r * .22, r * (4.2 + 1.4 * this.power), r * 3);
+			if (!this.moving) this.trail.shrink(r * 7 * dt);
+			if (step < r * 3) {
+				this.travelled += step;
+				const every = r * (this.power > .5 ? .45 : 1.1);
+				while (this.travelled > every) {
+					this.travelled -= every;
+					const a = this.angle + Math.PI + (this.random() - .5) * 1.2;
+					this.spawnEmber(this.power > .5, a, 1.5 + this.random() * 2.5, true);
+				}
+			}
+			for (const e of this.embers) {
+				e.life -= dt;
+				e.x += e.vx * dt;
+				e.y += e.vy * dt;
+				const drag = Math.pow(.9, dt * 60);
+				e.vx *= drag;
+				e.vy = e.vy * drag - r * .8 * dt;
+			}
+			this.embers = this.embers.filter((e) => e.life > 0);
+			for (const b of this.bursts) b.t += dt;
+			this.bursts = this.bursts.filter((b) => b.t < .5);
+		}
+		spawnEmber(hot, angle, speed, fromBack = false) {
+			const r = this.r;
+			const ox = fromBack ? -Math.cos(this.angle) * r * .8 : Math.cos(angle) * r * .7;
+			const oy = fromBack ? -Math.sin(this.angle) * r * .8 : Math.sin(angle) * r * .7;
+			const life = .4 + this.random() * .45;
+			this.embers.push({
+				x: this.x + ox + (this.random() - .5) * r * .5,
+				y: this.y + oy + (this.random() - .5) * r * .5,
+				vx: Math.cos(angle) * speed * r,
+				vy: Math.sin(angle) * speed * r,
+				life,
+				max: life,
+				size: r * (.06 + this.random() * .06),
+				hot
+			});
+		}
+		/** How open the jaws are, 0..1.15. */
+		openness() {
+			if (this.bite >= 0) {
+				const t = this.bite;
+				if (t < .08) return .3 + .85 * easeOut(t / .08);
+				if (t < .12) return 1.15 * (1 - easeIn((t - .08) / .04));
+				return .25 * easeOut((t - .12) / .14);
+			}
+			if (this.moving) {
+				const f = this.chomp % 1;
+				if (f < .3) return .05 + .95 * easeOut(f / .3);
+				if (f < .4) return 1;
+				if (f < .75) return .05 + .95 * (1 - easeIn((f - .4) / .35));
+				return .05;
+			}
+			const rest = .2 + .035 * Math.sin(this.time * 2.3);
+			if (this.snap >= 0) {
+				const t = this.snap;
+				if (t < .09) return rest + (.75 - rest) * easeOut(t / .09);
+				if (t < .15) return .75 * (1 - easeIn((t - .09) / .06));
+				return rest * easeOut((t - .15) / .19);
+			}
+			return rest;
+		}
+		draw(ctx) {
+			const r = this.r;
+			const p = this.power;
+			const pal = mixPal(CALM, AWOKEN, p);
+			const pulse = this.ending && p > .5 ? .62 + .38 * (.5 + .5 * Math.cos(this.time * 5)) : 1;
+			this.drawTrail(ctx, p);
+			this.drawEmbers(ctx);
+			const open = this.openness();
+			const m = .04 + Math.min(1.15, open) * .58;
+			const grin = this.moving ? .08 : .2;
+			const mu = m * (1 - grin);
+			const md = m * (1 + grin);
+			const S = 1 + .07 * p;
+			const ca = Math.cos(this.angle);
+			const sa = Math.sin(this.angle);
+			const lx = LIGHT.x * ca + LIGHT.y * sa;
+			const ly = (-LIGHT.x * sa + LIGHT.y * ca) * this.flip;
+			ctx.save();
+			ctx.translate(this.x, this.y);
+			ctx.rotate(this.angle);
+			ctx.scale(this.along.value * S, this.across.value * S * this.flip);
+			const R = r;
+			if (p > .01) this.drawFlames(ctx, R, p * pulse);
+			const charge = this.transform >= 0 && this.transform < CHARGE ? this.transform / CHARGE : 0;
+			const aura = Math.max(p * .55 * pulse, charge * .8);
+			if (aura > .01) {
+				ctx.globalCompositeOperation = "lighter";
+				ctx.globalAlpha = aura;
+				ctx.drawImage(glow([
+					255,
+					170,
+					60
+				]), -R * 2.1, -R * 2.1, R * 4.2, R * 4.2);
+				ctx.globalAlpha = 1;
+				ctx.globalCompositeOperation = "source-over";
+			}
+			const A = {
+				x: -.1 * R,
+				y: 0
+			};
+			const U = {
+				x: Math.cos(mu) * R,
+				y: -Math.sin(mu) * R
+			};
+			const Dn = {
+				x: Math.cos(md) * R,
+				y: Math.sin(md) * R
+			};
+			const mouthRegion = () => {
+				ctx.beginPath();
+				ctx.moveTo(A.x, A.y);
+				ctx.lineTo(U.x, U.y);
+				ctx.arc(0, 0, R, -mu, md, false);
+				ctx.closePath();
+			};
+			const coreA = clamp01(open * 1.4) * (.85 + .15 * p) + charge * .6;
+			ctx.save();
+			mouthRegion();
+			ctx.clip();
+			const core = ctx.createRadialGradient(R * .1, 0, 0, R * .1, 0, R * .95);
+			core.addColorStop(0, css([
+				255,
+				252,
+				236
+			], coreA));
+			core.addColorStop(.3, css(mix([
+				255,
+				200,
+				80
+			], [
+				255,
+				230,
+				150
+			], p), coreA * .9));
+			core.addColorStop(.75, css(mix([
+				230,
+				90,
+				20
+			], [
+				255,
+				120,
+				30
+			], p), coreA * .5));
+			core.addColorStop(1, css([
+				120,
+				20,
+				5
+			], coreA * .2));
+			ctx.fillStyle = core;
+			ctx.fillRect(-R, -R * 1.2, R * 2.4, R * 2.4);
+			ctx.restore();
+			const body = () => {
+				ctx.beginPath();
+				ctx.moveTo(U.x, U.y);
+				ctx.arc(0, 0, R, -mu, md, true);
+				const bend = R * .09 * clamp01(m * 2.5);
+				ctx.quadraticCurveTo((Dn.x + A.x) / 2, (Dn.y + A.y) / 2 - bend, A.x, A.y);
+				ctx.quadraticCurveTo((U.x + A.x) / 2, (U.y + A.y) / 2 + bend, U.x, U.y);
+				ctx.closePath();
+			};
+			ctx.save();
+			ctx.translate(-lx * R * .045, -ly * R * .045);
+			ctx.scale(1.075, 1.075);
+			body();
+			ctx.fillStyle = css(pal.ink);
+			ctx.fill();
+			ctx.restore();
+			ctx.save();
+			body();
+			ctx.clip();
+			const base = ctx.createLinearGradient(lx * R, ly * R, -lx * R, -ly * R);
+			base.addColorStop(0, css(pal.light));
+			base.addColorStop(.45, css(pal.mid));
+			base.addColorStop(1, css(mix(pal.mid, pal.shadow, .6)));
+			ctx.fillStyle = base;
+			ctx.fillRect(-R * 1.2, -R * 1.2, R * 2.4, R * 2.4);
+			ctx.beginPath();
+			ctx.rect(-R * 1.3, -R * 1.3, R * 2.6, R * 2.6);
+			ctx.arc(lx * R * .3, ly * R * .3, R * 1, 0, Math.PI * 2);
+			ctx.fillStyle = css(pal.shadow, .88);
+			ctx.fill("evenodd");
+			const deep = ctx.createRadialGradient(-lx * R * .95, -ly * R * .95, 0, -lx * R * .95, -ly * R * .95, R * .95);
+			deep.addColorStop(0, css(pal.deep, .6));
+			deep.addColorStop(1, css(pal.deep, 0));
+			ctx.fillStyle = deep;
+			ctx.fillRect(-R * 1.2, -R * 1.2, R * 2.4, R * 2.4);
+			ctx.beginPath();
+			ctx.arc(0, 0, R * 1.05, 0, Math.PI * 2);
+			ctx.arc(-lx * R * .13, -ly * R * .13, R * .97, 0, Math.PI * 2);
+			ctx.fillStyle = css(pal.bounce, .45);
+			ctx.fill("evenodd");
+			ctx.globalAlpha = .16;
+			ctx.globalCompositeOperation = "soft-light";
+			ctx.drawImage(brushTexture(), -R, -R, R * 2, R * 2);
+			ctx.globalCompositeOperation = "source-over";
+			ctx.globalAlpha = 1;
+			ctx.globalCompositeOperation = "lighter";
+			ctx.beginPath();
+			ctx.arc(0, 0, R * 1.05, 0, Math.PI * 2);
+			ctx.arc(R * .09, 0, R * 1, 0, Math.PI * 2);
+			ctx.fillStyle = css(pal.rim, .5 + .3 * p);
+			ctx.fill("evenodd");
+			ctx.globalCompositeOperation = "source-over";
+			const hx = lx * R * .52;
+			const hy = ly * R * .52;
+			ctx.fillStyle = css(pal.highlight, .95);
+			ctx.beginPath();
+			ctx.ellipse(hx, hy, R * .25, R * .12, Math.atan2(ly, lx) + Math.PI / 2, 0, Math.PI * 2);
+			ctx.fill();
+			ctx.beginPath();
+			ctx.arc(hx + lx * R * .2 - ly * R * .18, hy + ly * R * .2 + lx * R * .18, R * .05, 0, Math.PI * 2);
+			ctx.fill();
+			if (p > .01) this.drawCracks(ctx, R, p * pulse);
+			if (this.flash > 0) {
+				ctx.fillStyle = `rgba(255,255,250,${this.flash})`;
+				ctx.fillRect(-R * 1.2, -R * 1.2, R * 2.4, R * 2.4);
+			}
+			ctx.restore();
+			ctx.lineCap = "round";
+			ctx.lineJoin = "round";
+			const lips = () => {
+				ctx.beginPath();
+				const bend = R * .09 * clamp01(m * 2.5);
+				ctx.moveTo(Dn.x * .97, Dn.y * .97);
+				ctx.quadraticCurveTo((Dn.x + A.x) / 2, (Dn.y + A.y) / 2 - bend, A.x, A.y);
+				ctx.quadraticCurveTo((U.x + A.x) / 2, (U.y + A.y) / 2 + bend, U.x * .97, U.y * .97);
+			};
+			ctx.strokeStyle = css(pal.ink);
+			ctx.lineWidth = R * .075;
+			lips();
+			ctx.stroke();
+			ctx.restore();
+			const spill = clamp01(open) * (.45 + .4 * p) + this.mouthFlash * .6;
+			if (spill > .01) {
+				const fx = this.x + Math.cos(this.angle) * R * .75;
+				const fy = this.y + Math.sin(this.angle) * R * .75;
+				const gs = R * (1.1 + .5 * clamp01(open) + .3 * p);
+				ctx.globalCompositeOperation = "lighter";
+				ctx.globalAlpha = Math.min(1, spill);
+				ctx.drawImage(glow([
+					255,
+					196,
+					90
+				]), fx - gs, fy - gs, gs * 2, gs * 2);
+				ctx.globalAlpha = 1;
+				ctx.globalCompositeOperation = "source-over";
+			}
+			this.drawBursts(ctx);
+		}
+		drawTrail(ctx, p) {
+			const calm = [
+				{
+					width: .95,
+					stops: [[
+						0,
+						[
+							255,
+							150,
+							40
+						],
+						.22
+					], [
+						1,
+						[
+							255,
+							90,
+							20
+						],
+						0
+					]]
+				},
+				{
+					width: .36,
+					offset: .34,
+					wave: .28,
+					phase: 0,
+					stops: [
+						[
+							0,
+							[
+								255,
+								236,
+								160
+							],
+							.85
+						],
+						[
+							.6,
+							[
+								255,
+								170,
+								60
+							],
+							.45
+						],
+						[
+							1,
+							[
+								255,
+								120,
+								30
+							],
+							0
+						]
+					]
+				},
+				{
+					width: .3,
+					offset: -.32,
+					wave: .3,
+					phase: 2.1,
+					stops: [
+						[
+							0,
+							[
+								255,
+								226,
+								140
+							],
+							.8
+						],
+						[
+							.6,
+							[
+								255,
+								160,
+								50
+							],
+							.4
+						],
+						[
+							1,
+							[
+								255,
+								110,
+								30
+							],
+							0
+						]
+					]
+				},
+				{
+					width: .22,
+					offset: 0,
+					wave: .22,
+					phase: 4.2,
+					stops: [
+						[
+							0,
+							[
+								255,
+								250,
+								220
+							],
+							.95
+						],
+						[
+							.5,
+							[
+								255,
+								210,
+								120
+							],
+							.55
+						],
+						[
+							1,
+							[
+								255,
+								160,
+								60
+							],
+							0
+						]
+					]
+				}
+			];
+			const awoken = [
+				{
+					width: 1.25,
+					stops: [[
+						0,
+						[
+							255,
+							120,
+							30
+						],
+						.3
+					], [
+						1,
+						[
+							220,
+							40,
+							0
+						],
+						0
+					]]
+				},
+				{
+					width: .5,
+					offset: .4,
+					wave: .4,
+					phase: 0,
+					stops: [
+						[
+							0,
+							[
+								255,
+								250,
+								220
+							],
+							.95
+						],
+						[
+							.5,
+							[
+								255,
+								150,
+								40
+							],
+							.6
+						],
+						[
+							1,
+							[
+								220,
+								40,
+								0
+							],
+							0
+						]
+					]
+				},
+				{
+					width: .44,
+					offset: -.38,
+					wave: .42,
+					phase: 2.1,
+					stops: [
+						[
+							0,
+							[
+								255,
+								244,
+								200
+							],
+							.9
+						],
+						[
+							.5,
+							[
+								255,
+								130,
+								30
+							],
+							.55
+						],
+						[
+							1,
+							[
+								210,
+								30,
+								0
+							],
+							0
+						]
+					]
+				},
+				{
+					width: .3,
+					offset: 0,
+					wave: .3,
+					phase: 4.2,
+					stops: [
+						[
+							0,
+							[
+								255,
+								255,
+								245
+							],
+							1
+						],
+						[
+							.5,
+							[
+								255,
+								220,
+								130
+							],
+							.7
+						],
+						[
+							1,
+							[
+								255,
+								120,
+								30
+							],
+							0
+						]
+					]
+				}
+			];
+			this.trail.draw(ctx, this.r, calm, 1 - p, this.time);
+			this.trail.draw(ctx, this.r, awoken, p, this.time);
+		}
+		drawEmbers(ctx) {
+			for (const e of this.embers) {
+				const u = e.life / e.max;
+				const a = Math.min(1, (1 - u) * 5) * u;
+				const s = e.size * (.5 + .5 * u);
+				ctx.globalCompositeOperation = "lighter";
+				ctx.globalAlpha = a * .8;
+				const g = glow(e.hot ? [
+					255,
+					190,
+					80
+				] : [
+					255,
+					170,
+					60
+				]);
+				ctx.drawImage(g, e.x - s * 3, e.y - s * 3, s * 6, s * 6);
+				ctx.globalCompositeOperation = "source-over";
+				ctx.globalAlpha = a;
+				ctx.fillStyle = e.hot ? "rgba(255,250,225,1)" : "rgba(255,230,160,1)";
+				ctx.beginPath();
+				ctx.arc(e.x, e.y, s * .6, 0, Math.PI * 2);
+				ctx.fill();
+			}
+			ctx.globalAlpha = 1;
+		}
+		/** Painted flame tongues streaming back from his head, swaying (no noise: no flicker). */
+		drawFlames(ctx, R, k) {
+			const t = this.time;
+			for (const pass of [0, 1]) {
+				ctx.globalCompositeOperation = pass === 0 ? "lighter" : "source-over";
+				for (let i = 0; i < 7; i++) {
+					const a = Math.PI + (i - 3) * .36;
+					const rx = Math.cos(a) * R * .8;
+					const ry = Math.sin(a) * R * .8;
+					let dx = Math.cos(a) - .9;
+					let dy = Math.sin(a) * .8;
+					const dl = Math.hypot(dx, dy);
+					dx /= dl;
+					dy /= dl;
+					const px = -dy;
+					const py = dx;
+					const len = R * (.75 + .3 * Math.sin(t * 5.2 + i * 1.9) + .15 * Math.sin(t * 8.3 + i)) * k * (pass === 0 ? 1.25 : 1);
+					const w = R * (pass === 0 ? .3 : .2) * (1 - Math.abs(i - 3) * .08);
+					const sway = R * .18 * Math.sin(t * 4.4 + i * 1.3);
+					const tx = rx + dx * len + px * sway;
+					const ty = ry + dy * len + py * sway;
+					const g = ctx.createLinearGradient(rx, ry, tx, ty);
+					if (pass === 0) {
+						g.addColorStop(0, `rgba(255,140,30,${.6 * k})`);
+						g.addColorStop(1, "rgba(220,40,0,0)");
+					} else {
+						g.addColorStop(0, `rgba(255,248,210,${k})`);
+						g.addColorStop(.45, `rgba(255,170,50,${.9 * k})`);
+						g.addColorStop(1, "rgba(230,60,10,0)");
+					}
+					ctx.fillStyle = g;
+					ctx.beginPath();
+					ctx.moveTo(rx + px * w, ry + py * w);
+					ctx.quadraticCurveTo(rx + dx * len * .45 + px * w * .9 + px * sway * .4, ry + dy * len * .45 + py * w * .9 + py * sway * .4, tx, ty);
+					ctx.quadraticCurveTo(rx + dx * len * .45 - px * w * .7 + px * sway * .4, ry + dy * len * .45 - py * w * .7 + py * sway * .4, rx - px * w, ry - py * w);
+					ctx.closePath();
+					ctx.fill();
+				}
+			}
+			ctx.globalCompositeOperation = "source-over";
+		}
+		drawCracks(ctx, R, k) {
+			ctx.lineCap = "round";
+			ctx.lineJoin = "round";
+			const line = () => {
+				ctx.beginPath();
+				for (const c of CRACKS) {
+					ctx.moveTo(c[0][0] * R, c[0][1] * R);
+					for (let i = 1; i < c.length; i++) ctx.lineTo(c[i][0] * R, c[i][1] * R);
+				}
+			};
+			ctx.globalCompositeOperation = "lighter";
+			ctx.strokeStyle = `rgba(255,120,30,${.45 * k})`;
+			ctx.lineWidth = R * .09;
+			line();
+			ctx.stroke();
+			ctx.globalCompositeOperation = "source-over";
+			ctx.strokeStyle = `rgba(255,250,215,${k})`;
+			ctx.lineWidth = R * .025;
+			line();
+			ctx.stroke();
+		}
+		/** The burst of the awakening: a painted ring and impact rays. */
+		drawBursts(ctx) {
+			const R = this.r;
+			for (const b of this.bursts) {
+				const k = b.t / .5;
+				const ease = easeOut(k);
+				const a = 1 - k;
+				ctx.save();
+				ctx.translate(b.x, b.y);
+				ctx.globalCompositeOperation = "lighter";
+				ctx.strokeStyle = `rgba(255,200,110,${.35 * a})`;
+				ctx.lineWidth = R * .32 * a;
+				ctx.beginPath();
+				ctx.arc(0, 0, R * (1 + 2.6 * ease), 0, Math.PI * 2);
+				ctx.stroke();
+				ctx.globalCompositeOperation = "source-over";
+				ctx.strokeStyle = `rgba(255,252,235,${.95 * a})`;
+				ctx.lineWidth = Math.max(1, R * .1 * a);
+				ctx.stroke();
+				const ra = clamp01(1 - b.t / .25);
+				if (ra > 0) {
+					ctx.fillStyle = `rgba(255,248,220,${ra})`;
+					for (let i = 0; i < 10; i++) {
+						const an = b.angle + i / 10 * Math.PI * 2 + .3;
+						const r0 = R * (1.15 + ease * .6);
+						const r1 = R * (1.9 + ease * 1.6) * (i % 2 ? .8 : 1);
+						const w = R * .07;
+						const cx = Math.cos(an);
+						const cy = Math.sin(an);
+						ctx.beginPath();
+						ctx.moveTo(cx * r0 - cy * w, cy * r0 + cx * w);
+						ctx.lineTo(cx * r1, cy * r1);
+						ctx.lineTo(cx * r0 + cy * w, cy * r0 - cx * w);
+						ctx.closePath();
+						ctx.fill();
+					}
+				}
+				ctx.restore();
+			}
+		}
+	};
+	function mixPal(a, b, k) {
+		return {
+			light: mix(a.light, b.light, k),
+			mid: mix(a.mid, b.mid, k),
+			shadow: mix(a.shadow, b.shadow, k),
+			deep: mix(a.deep, b.deep, k),
+			bounce: mix(a.bounce, b.bounce, k),
+			ink: mix(a.ink, b.ink, k),
+			highlight: mix(a.highlight, b.highlight, k),
+			rim: mix(a.rim, b.rim, k)
+		};
+	}
+	//#endregion
+	//#region prototypes/pacman/hero/main.ts
+	var $ = (id) => document.getElementById(id);
+	var view = $("view");
+	var ctx = view.getContext("2d");
+	var D = Math.min(window.devicePixelRatio || 1, 2);
+	var POWER_TIME = 6;
+	var POWER_ENDING = 1.6;
+	/** The inset's tile, css px (the game's tile on a large screen). */
+	var TILE = 30;
+	var hero = new PacmanHero();
+	var small = new PacmanHero();
+	var vw = 0;
+	var vh = 0;
+	var running = true;
+	var slow = false;
+	var powerTimer = 0;
+	var phase = 0;
+	var biteClock = 0;
+	function layout() {
+		vw = window.innerWidth;
+		vh = window.innerHeight;
+		view.width = Math.round(vw * D);
+		view.height = Math.round(vh * D);
+		view.style.width = `${vw}px`;
+		view.style.height = `${vh}px`;
+		hero.setRadius(Math.min(vw, vh) * .13);
+		small.setRadius(TILE * .44);
+		hero.reset();
+		small.reset();
+	}
+	$("run").addEventListener("click", () => {
+		running = !running;
+		$("run").setAttribute("aria-pressed", String(running));
+		$("run").textContent = running ? "Бег" : "Покой";
+	});
+	$("bite").addEventListener("click", () => {
+		hero.eat();
+		small.eat();
+	});
+	$("power").addEventListener("click", () => {
+		powerTimer = POWER_TIME;
+	});
+	$("slow").addEventListener("click", () => {
+		slow = !slow;
+		$("slow").setAttribute("aria-pressed", String(slow));
+	});
+	function frame(realDt) {
+		const dt = realDt * (slow ? .25 : 1);
+		powerTimer = Math.max(0, powerTimer - dt);
+		const power = powerTimer > 0;
+		const ending = power && powerTimer < POWER_ENDING;
+		if (running) phase += dt * .9;
+		const cx = vw / 2;
+		const cy = vh * .46;
+		const ax = Math.min(vw * .3, vh * .55);
+		const ay = vh * .2;
+		const x = cx + Math.sin(phase) * ax;
+		const y = cy + Math.sin(phase * 2) * ay * .5;
+		const angle = running ? Math.atan2(Math.cos(phase * 2) * ay, Math.cos(phase) * ax) : 0;
+		hero.update(dt, {
+			x: running ? x : cx,
+			y: running ? y : cy,
+			angle,
+			moving: running,
+			power,
+			ending
+		});
+		const ix = vw - 18 - 120;
+		const iy = vh - 96 - TILE * 1.5;
+		if (running) {
+			biteClock += dt * 5.2;
+			if (biteClock > 1) {
+				biteClock -= 1;
+				small.eat();
+			}
+		}
+		const sx = ix + (running ? phase * 2.2 % 1 * TILE * 2 - TILE : 0);
+		small.update(dt, {
+			x: sx,
+			y: iy,
+			angle: 0,
+			moving: running,
+			power,
+			ending
+		});
+		ctx.setTransform(D, 0, 0, D, 0, 0);
+		ctx.globalAlpha = 1;
+		ctx.globalCompositeOperation = "source-over";
+		const bg = ctx.createRadialGradient(cx, vh * .5, 0, cx, vh * .5, Math.max(vw, vh) * .7);
+		bg.addColorStop(0, "#1a1420");
+		bg.addColorStop(1, "#050408");
+		ctx.fillStyle = bg;
+		ctx.fillRect(0, 0, vw, vh);
+		hero.draw(ctx);
+		const w = 240;
+		const h = 90;
+		const bx = ix - w / 2;
+		const by = iy - h / 2;
+		ctx.save();
+		ctx.beginPath();
+		ctx.roundRect(bx, by, w, h, 10);
+		ctx.clip();
+		ctx.fillStyle = "#8d6b40";
+		ctx.fillRect(bx, by, w, h);
+		ctx.fillStyle = "#5fae3e";
+		ctx.fillRect(bx, by, w, TILE);
+		ctx.fillRect(bx, by + 60, w, TILE);
+		ctx.fillStyle = "#ffd56a";
+		for (let i = 0; i < 8; i++) {
+			ctx.beginPath();
+			ctx.arc(bx + TILE * (i + .5), iy, TILE * .1, 0, Math.PI * 2);
+			ctx.fill();
+		}
+		small.draw(ctx);
+		ctx.restore();
+		ctx.strokeStyle = "rgba(255,255,255,.8)";
+		ctx.lineWidth = 2;
+		ctx.beginPath();
+		ctx.roundRect(bx, by, w, h, 10);
+		ctx.stroke();
+		ctx.fillStyle = "rgba(220,220,235,.7)";
+		ctx.font = "11px \"Courier New\", monospace";
+		ctx.textAlign = "center";
+		ctx.fillText("В РАЗМЕРЕ ТАЙЛА", ix, by - 8);
+	}
+	window.addEventListener("resize", layout);
+	layout();
+	if (new URLSearchParams(location.search).has("capture")) window.__advance = (seconds) => {
+		for (let i = 0; i < Math.round(seconds * 60); i++) frame(1 / 60);
+	};
+	else {
+		let last = performance.now();
+		const loop = (now) => {
+			frame(Math.min(.1, Math.max(0, (now - last) / 1e3)));
+			last = now;
+			requestAnimationFrame(loop);
+		};
+		requestAnimationFrame(loop);
+	}
+	//#endregion
+})();
+
+    </script>
+  </body>
+</html>

@@ -3,13 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-    <title>Pac-Man · Characters</title>
-    <!-- Prototype: Pac-Man ("Solar Flare") and Ms. Pac-Man ("Stardust Heart") as baked
-         sprites (render/actors/sprite): large on the left, in the summer maze at game scale on
-         the right, with the energizer, a ghost, a teleport and death on buttons. Built from
-         the sources: `node prototypes/pacman/build.mjs characters`; open as a file. -->
+    <title>Pac-Man · Hero</title>
+    <!-- Prototype: the hero stage for Pac-Man (stage 10.3, from scratch): him alone, large on
+         a dark stage, with a tile-sized inset on the summer sand. Built from the sources:
+         `node prototypes/pacman/build.mjs hero`; open as a file. -->
     <style>
-      html,body{height:100%;margin:0;overflow:hidden;background:#1a1a14}
+      html,body{height:100%;margin:0;overflow:hidden;background:#07060a}
       #view{position:fixed;inset:0;display:block}
       #ctl{position:fixed;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:5;display:flex;flex-wrap:wrap;justify-content:center;gap:8px;width:calc(100vw - 32px);max-width:860px}
       .bt{border:0;cursor:pointer;padding:9px 14px;border-radius:999px;font:700 14px "Trebuchet MS","Segoe UI",system-ui,sans-serif;color:#2a2410;background:linear-gradient(#fffaf0,#f2e2b8);box-shadow:0 3px 0 #c9ac62,0 8px 14px rgba(40,30,10,.22)}
@@ -19,11 +18,10 @@
   <body>
     <canvas id="view"></canvas>
     <div id="ctl">
+      <button class="bt" id="run" aria-pressed="true">Бег</button>
+      <button class="bt" id="bite">Укус</button>
       <button class="bt" id="power">⚡ Энерджайзер</button>
-      <button class="bt" id="ghost">Съесть призрака</button>
-      <button class="bt" id="tele">Телепорт</button>
-      <button class="bt" id="die">☠ Смерть</button>
-      <button class="bt" id="stop" aria-pressed="false">■ Стоп</button>
+      <button class="bt" id="slow" aria-pressed="false">×0.25</button>
     </div>
     <script>
 /*SCRIPT*/
