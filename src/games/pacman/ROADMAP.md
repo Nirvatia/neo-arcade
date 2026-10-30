@@ -96,4 +96,5 @@ the owner says to go straight into the game.
   every fruit, the heart and the exit fill 0.78 of a tile and stay inside it (the heart's
   orbit is drawn closer around it). The HUD fruit icon is one tile. The bell and the key are
   redrawn (the mock-ups read as a flame and a lollipop at tile size): a classic gold bell,
-  a steel-cyan key on the diagonal, both with a dark outline.
+  a steel-cyan key on the diagonal, both with a dark outline. Then the strawberry (read as
+  a heart) and the pear (read as a lemon) the same way.
