@@ -234,14 +234,38 @@ on the real game code for the owner to approve.
    - Triple-pentagram attack: it almost always misses, and its art spills out of the tile
      — aim it (lead the player's path) and keep the art inside the tile.
 4. **Pac-Man art rework** + bug: Pac-Man blinks before the game starts.
-5. **Full HUD and overlays.** **Next (moved before stages 3 and 4 by the owner).**
-   Owner's decision: **one** well-designed, beautiful HUD and one set of overlay screens for
-   the whole game, not one per season. Boss levels (the hell, the later boss worlds, and
-   the secret level too) add an extra boss block on top of the same HUD: the boss health
-   bar, the weapon and other boss-level info. The hell HUD (`ui/hud/HellHud.svelte`) is
-   the quality reference and gets folded into this one HUD. Svelte screens for menu,
-   ready, pause, death, game over replace the canvas `OverlayView` and its top bar; the
-   screen fade must cover them too.
+5. **Full HUD and overlays.** **Next (moved before stages 3 and 4 by the owner). Plan
+   approved in the third chat; work starts with the prototype.**
+   Today: the hell HUD (`ui/hud/HellHud.svelte`, metal plate with hazard stripes, Russian
+   labels) on the hell only; on other levels only the canvas top bar and canvas titles
+   (`render/overlay/OverlayView` + `overlaySnapshot`); buttons in `ui/overlay/PacmanOverlay`
+   (English); HUD data by `ui:hudChanged` events (timers rounded); the screen fade is on
+   the canvas, under the Svelte buttons.
+   Owner's decisions:
+   - One HUD for the whole game; style = the hell HUD without the hell stripes: dark
+     glass and metal, the accent colour taken from the world (spring, summer, autumn,
+     winter, hell). The boss block keeps the "dangerous" look (stripes).
+   - Boss levels add a boss block on top: name and phase, HP bar with phase marks, the
+     player's HP in the fight, weapon slot with icon, berserk timer, BFG charge; after the
+     boss dies a hint "take the heart or the exit".
+   - The secret level is the original Pac-Man: it gets the **original arcade HUD**
+     (1UP / HIGH SCORE on top, lives and the level fruits at the bottom, arcade lettering).
+   - Two languages, English by default, Russian switchable (remembered).
+   Work:
+   1. Prototype `prototypes/pacman/hud` over a real season and the hell, every screen on a
+      button; `build.mjs` gets the Svelte plugin so the prototype mounts the game's own
+      components. Owner approves before wiring.
+   2. Data: one `HudSnapshot` built every frame from the director and the level (like the
+      dev panel), so timers and bars move smoothly; replaces `ui:hudChanged` + adapter.
+   3. Main HUD: score + high score (`shared/utils/scoreStore`), level + world name, lives as
+      Pac-Man / Ms. Pac-Man icons, dot progress with weather (50 %) and night (75 %) marks,
+      power / overdrive / echo timer, the level fruits row (owner's fruit art).
+   4. Boss block (above). Arcade HUD for the secret level.
+   5. Screens in Svelte: menu (start, Pac-Man / Ms. Pac-Man, high score, controls,
+      language), ready (level, world, countdown), pause (resume, restart, menu), death
+      (lives left), game over (score, new record, again, mode, menu). Remove `OverlayView`,
+      its top bar, `HellHud`, `PacmanOverlay`.
+   6. The fade moves to a DOM layer over the HUD and screens, under the dev panels.
 6. **Secret level rework.** The original Pac-Man: original arcade art, animation at a
    stepped 30 fps (the wedge snaps open and shut, no smooth tween), and very light CRT
    effects (scanlines, slight curvature, glow) as a `GlPass`. This replaces the last
