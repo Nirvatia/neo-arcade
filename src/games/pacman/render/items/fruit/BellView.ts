@@ -1,20 +1,16 @@
-// Cosmic Bell, redrawn for the tile (stage 10.1): the mock-up's narrow cone read as a flame
-// at tile size. A classic bell silhouette instead: a domed crown with a loop, a flaring
-// skirt, a heavy rim and the clapper hanging under it, gold with a dark outline so it reads
-// on every season.
+// Bell, redrawn for the tile (stage 10.1, the painting kit in `render/common/itemPaint`):
+// the mock-up's narrow cone read as a flame at tile size. A classic bell silhouette
+// instead: a domed crown with a loop, a flaring skirt, a heavy rim and the clapper hanging
+// under it, gold with a dark outline so it reads on every season.
 import type { CollectibleArt } from '../collectibleSprite';
 import { FRUIT_BLOOMS } from '../collectibleSprite';
+import { beginItem, outline, sparkle } from '../../common/itemPaint';
 
 /** Outline: dark amber, wide enough to survive the downscale to a tile. */
 const OUTLINE = 'rgba(70,38,6,0.95)';
 
 function paint(ctx: CanvasRenderingContext2D, size: number): void {
-	ctx.save();
-	ctx.translate(size / 2, size / 2);
-	// the design is 256 units across
-	ctx.scale(size / 256, size / 256);
-	ctx.lineJoin = 'round';
-	ctx.lineCap = 'round';
+	beginItem(ctx, size);
 
 	const body = () => {
 		ctx.beginPath();
@@ -40,12 +36,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	};
 
 	// 1. outline: every part stroked wide in dark, the fills cover the inner lines
-	ctx.strokeStyle = OUTLINE;
-	ctx.lineWidth = 14;
-	for (const part of [loop, clapper, body, rim]) {
-		part();
-		ctx.stroke();
-	}
+	outline(ctx, [loop, clapper, body, rim], OUTLINE);
 
 	// 2. loop
 	ctx.strokeStyle = 'rgba(255,214,90,1)';
@@ -132,26 +123,8 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.fill();
 
 	// 8. sparkles on the metal
-	for (const [x, y, r] of [
-		[30, -30, 3],
-		[56, 34, 2.5]
-	] as const) {
-		ctx.fillStyle = 'rgba(255,255,255,0.95)';
-		ctx.shadowBlur = 6;
-		ctx.shadowColor = 'rgba(255,240,180,1)';
-		ctx.beginPath();
-		ctx.moveTo(x, y - r * 3);
-		ctx.lineTo(x + r * 0.7, y - r * 0.7);
-		ctx.lineTo(x + r * 3, y);
-		ctx.lineTo(x + r * 0.7, y + r * 0.7);
-		ctx.lineTo(x, y + r * 3);
-		ctx.lineTo(x - r * 0.7, y + r * 0.7);
-		ctx.lineTo(x - r * 3, y);
-		ctx.lineTo(x - r * 0.7, y - r * 0.7);
-		ctx.closePath();
-		ctx.fill();
-	}
-	ctx.shadowBlur = 0;
+	sparkle(ctx, 30, -30, 3, 'rgba(255,240,180,1)');
+	sparkle(ctx, 56, 34, 2.5, 'rgba(255,240,180,1)');
 
 	ctx.restore();
 }

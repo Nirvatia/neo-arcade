@@ -1,20 +1,16 @@
-// Cosmic Pear, redrawn for the tile (stage 10.1): the mock-up's rounded pear read as a
-// lemon at tile size. A pear silhouette instead: a small top, a clear waist and a wide
-// bottom, yellow-green with a warm blush, a brown stem and a leaf, with a dark outline so
-// it reads on every season.
+// Pear, redrawn for the tile (stage 10.1, the painting kit in `render/common/itemPaint`):
+// the mock-up's rounded pear read as a lemon at tile size. A pear silhouette instead: a
+// small top, a clear waist and a wide bottom, yellow-green with a warm blush, a brown stem
+// and a leaf, with a dark outline so it reads on every season.
 import type { CollectibleArt } from '../collectibleSprite';
 import { FRUIT_BLOOMS } from '../collectibleSprite';
+import { beginItem } from '../../common/itemPaint';
 
 /** Outline: dark olive, wide enough to survive the downscale to a tile. */
 const OUTLINE = 'rgba(40,50,8,0.95)';
 
 function paint(ctx: CanvasRenderingContext2D, size: number): void {
-	ctx.save();
-	ctx.translate(size / 2, size / 2);
-	// the design is 256 units across
-	ctx.scale(size / 256, size / 256);
-	ctx.lineJoin = 'round';
-	ctx.lineCap = 'round';
+	beginItem(ctx, size);
 
 	const pear = () => {
 		ctx.beginPath();

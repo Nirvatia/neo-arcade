@@ -1,177 +1,92 @@
-// Cosmic Apple: the owner's COLLECTIBLE_APPLE.html, texture code 1:1 without its
-// ambient glow (the fruit keeps inside its tile, stage 10.1).
+// Apple, redrawn for the tile (stage 10.1, the painting kit in `render/common/itemPaint`):
+// a red apple with the dip at the top, a brown stem and a leaf, a yellow blush on the lit
+// side, outlined in dark wine.
 import type { CollectibleArt } from '../collectibleSprite';
 import { FRUIT_BLOOMS } from '../collectibleSprite';
+import { beginItem, gloss, outline, sparkle } from '../../common/itemPaint';
+
+const OUTLINE = 'rgba(70,6,20,0.95)';
+const LEAF_OUTLINE = 'rgba(16,50,20,0.95)';
 
 function paint(ctx: CanvasRenderingContext2D, size: number): void {
-	const cx = size / 2;
-	const cy = size / 2;
+	beginItem(ctx, size);
 
-	ctx.save();
-	ctx.translate(cx, cy + 8);
-	const s = 1.15;
-
-	// 1. stem
-	const stemGrad = ctx.createLinearGradient(0, -56 * s, 28 * s, -105 * s);
-	stemGrad.addColorStop(0, 'rgba(100,255,200,0.9)');
-	stemGrad.addColorStop(0.5, 'rgba(80,220,180,0.8)');
-	stemGrad.addColorStop(1, 'rgba(60,180,150,0.6)');
-	ctx.strokeStyle = stemGrad;
-	ctx.lineWidth = 4;
-	ctx.shadowBlur = 12;
-	ctx.shadowColor = 'rgba(100,255,200,1)';
-	ctx.lineCap = 'round';
-	ctx.beginPath();
-	ctx.moveTo(0, -56 * s);
-	ctx.bezierCurveTo(6 * s, -85 * s, 18 * s, -95 * s, 28 * s, -105 * s);
-	ctx.stroke();
-
-	ctx.strokeStyle = 'rgba(200,255,230,0.7)';
-	ctx.lineWidth = 1.5;
-	ctx.shadowBlur = 8;
-	ctx.beginPath();
-	ctx.moveTo(0, -56 * s);
-	ctx.bezierCurveTo(6 * s, -85 * s, 18 * s, -95 * s, 28 * s, -105 * s);
-	ctx.stroke();
-
-	// 2. leaf
-	const leafGrad = ctx.createLinearGradient(8 * s, -72 * s, 45 * s, -75 * s);
-	leafGrad.addColorStop(0, 'rgba(80,220,160,0.95)');
-	leafGrad.addColorStop(0.5, 'rgba(100,240,180,0.9)');
-	leafGrad.addColorStop(1, 'rgba(120,255,200,0.7)');
-	ctx.fillStyle = leafGrad;
-	ctx.shadowBlur = 10;
-	ctx.shadowColor = 'rgba(100,255,200,0.9)';
-	ctx.beginPath();
-	ctx.moveTo(8 * s, -72 * s);
-	ctx.quadraticCurveTo(35 * s, -98 * s, 45 * s, -75 * s);
-	ctx.quadraticCurveTo(24 * s, -62 * s, 8 * s, -72 * s);
-	ctx.fill();
-
-	ctx.strokeStyle = 'rgba(200,255,230,0.8)';
-	ctx.lineWidth = 1;
-	ctx.shadowBlur = 6;
-	ctx.beginPath();
-	ctx.moveTo(10 * s, -72 * s);
-	ctx.quadraticCurveTo(28 * s, -82 * s, 40 * s, -76 * s);
-	ctx.stroke();
-
-	// 3. body
-	const shadow = ctx.createRadialGradient(0, 88 * s * 0.3, 0, 0, 88 * s * 0.3, 95 * s);
-	shadow.addColorStop(0, 'rgba(100,20,20,0.4)');
-	shadow.addColorStop(1, 'rgba(0,0,0,0)');
-	ctx.fillStyle = shadow;
-	ctx.shadowBlur = 0;
-	ctx.beginPath();
-	ctx.arc(0, 88 * s * 0.3, 95 * s, 0, Math.PI * 2);
-	ctx.fill();
-
-	const appleShape = () => {
+	const apple = () => {
 		ctx.beginPath();
-		ctx.moveTo(0, -58 * s);
-		ctx.bezierCurveTo(-15 * s, -58 * s, -45 * s, -72 * s, -72 * s, -50 * s);
-		ctx.bezierCurveTo(-95 * s, -30 * s, -92 * s, 15 * s, -85 * s, 40 * s);
-		ctx.bezierCurveTo(-78 * s, 65 * s, -45 * s, 95 * s, -22 * s, 95 * s);
-		ctx.bezierCurveTo(-10 * s, 95 * s, -10 * s, 88 * s, 0 * s, 88 * s);
-		ctx.bezierCurveTo(10 * s, 88 * s, 10 * s, 95 * s, 22 * s, 95 * s);
-		ctx.bezierCurveTo(45 * s, 95 * s, 78 * s, 65 * s, 85 * s, 40 * s);
-		ctx.bezierCurveTo(92 * s, 15 * s, 95 * s, -30 * s, 72 * s, -50 * s);
-		ctx.bezierCurveTo(45 * s, -72 * s, 15 * s, -58 * s, 0 * s, -58 * s);
+		ctx.moveTo(0, -40);
+		ctx.bezierCurveTo(24, -64, 74, -60, 74, -6);
+		ctx.bezierCurveTo(74, 46, 42, 82, 20, 80);
+		ctx.bezierCurveTo(10, 79, 6, 74, 0, 74);
+		ctx.bezierCurveTo(-6, 74, -10, 79, -20, 80);
+		ctx.bezierCurveTo(-42, 82, -74, 46, -74, -6);
+		ctx.bezierCurveTo(-74, -60, -24, -64, 0, -40);
+		ctx.closePath();
+	};
+	const stem = () => {
+		ctx.beginPath();
+		ctx.moveTo(0, -38);
+		ctx.quadraticCurveTo(0, -62, 10, -78);
+	};
+	const leaf = () => {
+		ctx.beginPath();
+		ctx.moveTo(6, -62);
+		ctx.quadraticCurveTo(26, -92, 60, -78);
+		ctx.quadraticCurveTo(38, -50, 6, -62);
 		ctx.closePath();
 	};
 
-	const bodyGrad = ctx.createRadialGradient(-20 * s, -20 * s, 5 * s, 0, 10 * s, 105 * s);
-	bodyGrad.addColorStop(0, 'rgba(255,200,200,1)');
-	bodyGrad.addColorStop(0.2, 'rgba(255,100,100,0.98)');
-	bodyGrad.addColorStop(0.5, 'rgba(230,50,50,0.95)');
-	bodyGrad.addColorStop(0.75, 'rgba(180,30,30,0.9)');
-	bodyGrad.addColorStop(1, 'rgba(100,10,10,0.8)');
-	ctx.fillStyle = bodyGrad;
-	ctx.shadowBlur = 15;
-	ctx.shadowColor = 'rgba(255,80,80,1)';
-	appleShape();
+	// 1. outline
+	outline(ctx, [stem], OUTLINE, 20);
+	outline(ctx, [leaf], LEAF_OUTLINE);
+	outline(ctx, [apple], OUTLINE);
+
+	// 2. stem and leaf
+	ctx.strokeStyle = 'rgba(140,90,40,1)';
+	ctx.lineWidth = 8;
+	stem();
+	ctx.stroke();
+	const green = ctx.createLinearGradient(6, -90, 60, -56);
+	green.addColorStop(0, 'rgba(160,240,110,1)');
+	green.addColorStop(1, 'rgba(40,150,60,1)');
+	ctx.fillStyle = green;
+	leaf();
 	ctx.fill();
 
-	const innerGlow = ctx.createRadialGradient(0, 0, 50 * s, 0, 0, 105 * s);
-	innerGlow.addColorStop(0, 'rgba(255,100,100,0)');
-	innerGlow.addColorStop(0.7, 'rgba(255,60,60,0.2)');
-	innerGlow.addColorStop(1, 'rgba(255,40,40,0.4)');
-	ctx.fillStyle = innerGlow;
+	// 3. body: light from the upper left
+	const body = ctx.createRadialGradient(-30, -20, 6, 0, 10, 90);
+	body.addColorStop(0, 'rgba(255,150,130,1)');
+	body.addColorStop(0.35, 'rgba(240,40,40,1)');
+	body.addColorStop(0.75, 'rgba(190,16,24,1)');
+	body.addColorStop(1, 'rgba(120,6,16,1)');
+	ctx.fillStyle = body;
+	ctx.shadowBlur = 10;
+	ctx.shadowColor = 'rgba(255,70,70,0.9)';
+	apple();
+	ctx.fill();
 	ctx.shadowBlur = 0;
-	appleShape();
-	ctx.fill();
 
-	const blush = ctx.createRadialGradient(30 * s, 20 * s, 0, 30 * s, 20 * s, 40 * s);
-	blush.addColorStop(0, 'rgba(255,200,100,0.3)');
-	blush.addColorStop(0.5, 'rgba(255,180,80,0.15)');
-	blush.addColorStop(1, 'rgba(0,0,0,0)');
+	// a yellow blush on the lit side
+	ctx.save();
+	apple();
+	ctx.clip();
+	const blush = ctx.createRadialGradient(-44, 10, 0, -44, 10, 40);
+	blush.addColorStop(0, 'rgba(255,210,80,0.45)');
+	blush.addColorStop(1, 'rgba(255,210,80,0)');
 	ctx.fillStyle = blush;
-	appleShape();
-	ctx.fill();
+	ctx.fillRect(-90, -40, 90, 100);
+	ctx.restore();
 
-	const bottomDark = ctx.createLinearGradient(0, 0, 0, 88 * s);
-	bottomDark.addColorStop(0, 'rgba(0,0,0,0)');
-	bottomDark.addColorStop(0.6, 'rgba(60,10,10,0.15)');
-	bottomDark.addColorStop(1, 'rgba(40,5,5,0.35)');
-	ctx.fillStyle = bottomDark;
-	appleShape();
-	ctx.fill();
-
-	// 4. highlights
-	const highlight1 = ctx.createRadialGradient(-30 * s, -30 * s, 0, -30 * s, -30 * s, 25 * s);
-	highlight1.addColorStop(0, 'rgba(255,255,255,0.95)');
-	highlight1.addColorStop(0.3, 'rgba(255,230,230,0.6)');
-	highlight1.addColorStop(0.7, 'rgba(255,180,180,0.2)');
-	highlight1.addColorStop(1, 'rgba(0,0,0,0)');
-	ctx.fillStyle = highlight1;
-	ctx.shadowBlur = 0;
+	// the dip around the stem
+	ctx.strokeStyle = 'rgba(110,10,20,0.6)';
+	ctx.lineWidth = 4;
 	ctx.beginPath();
-	ctx.arc(-30 * s, -30 * s, 25 * s, 0, Math.PI * 2);
-	ctx.fill();
-
-	const highlight2 = ctx.createRadialGradient(40 * s, 30 * s, 0, 40 * s, 30 * s, 15 * s);
-	highlight2.addColorStop(0, 'rgba(255,200,200,0.5)');
-	highlight2.addColorStop(0.5, 'rgba(255,150,150,0.2)');
-	highlight2.addColorStop(1, 'rgba(0,0,0,0)');
-	ctx.fillStyle = highlight2;
-	ctx.beginPath();
-	ctx.arc(40 * s, 30 * s, 15 * s, 0, Math.PI * 2);
-	ctx.fill();
-
-	ctx.strokeStyle = 'rgba(255,140,140,0.6)';
-	ctx.lineWidth = 2;
-	ctx.shadowBlur = 6;
-	ctx.shadowColor = 'rgba(255,100,100,0.8)';
-	appleShape();
+	ctx.moveTo(-16, -44);
+	ctx.quadraticCurveTo(0, -34, 16, -44);
 	ctx.stroke();
 
-	// 5. energy sparkles
-	const sparkles = [
-		{ x: size * 0.28, y: -size * 0.05, r: 2 },
-		{ x: -size * 0.27, y: -size * 0.08, r: 1.5 },
-		{ x: size * 0.25, y: size * 0.15, r: 1.8 },
-		{ x: -size * 0.26, y: size * 0.12, r: 1.5 },
-		{ x: size * 0.05, y: size * 0.28, r: 1.8 },
-		{ x: -size * 0.08, y: -size * 0.27, r: 1.5 }
-	];
-	for (const sp of sparkles) {
-		const sparkleGlow = ctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, sp.r * 3);
-		sparkleGlow.addColorStop(0, 'rgba(255,180,180,0.8)');
-		sparkleGlow.addColorStop(0.5, 'rgba(255,120,120,0.3)');
-		sparkleGlow.addColorStop(1, 'rgba(0,0,0,0)');
-		ctx.fillStyle = sparkleGlow;
-		ctx.shadowBlur = 0;
-		ctx.beginPath();
-		ctx.arc(sp.x, sp.y, sp.r * 3, 0, Math.PI * 2);
-		ctx.fill();
-
-		ctx.fillStyle = 'rgba(255,255,255,0.95)';
-		ctx.shadowBlur = 6;
-		ctx.shadowColor = 'rgba(255,180,180,1)';
-		ctx.beginPath();
-		ctx.arc(sp.x, sp.y, sp.r, 0, Math.PI * 2);
-		ctx.fill();
-	}
+	// 4. highlights
+	gloss(ctx, -36, -24, 14, 24, 0.4);
+	sparkle(ctx, 44, 30, 2.5, 'rgba(255,200,200,1)');
 
 	ctx.restore();
 }

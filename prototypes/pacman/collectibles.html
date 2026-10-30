@@ -3644,220 +3644,120 @@
 		size: 276,
 		blur: 12
 	}];
+	/** Starts a design on a size × size texture: origin at the centre, 256 units across. */
+	function beginItem(ctx, size) {
+		ctx.save();
+		ctx.translate(size / 2, size / 2);
+		ctx.scale(size / 256, size / 256);
+		ctx.lineJoin = "round";
+		ctx.lineCap = "round";
+	}
+	/** Strokes every part wide in `color`: the silhouette's outline once the parts are filled. */
+	function outline(ctx, parts, color, width = 14) {
+		ctx.strokeStyle = color;
+		ctx.lineWidth = width;
+		for (const part of parts) {
+			part();
+			ctx.stroke();
+		}
+	}
+	/** A soft white highlight: an ellipse fading out from its centre. */
+	function gloss(ctx, x, y, rx, ry, rotation = 0, alpha = .9) {
+		const r = Math.max(rx, ry);
+		const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+		g.addColorStop(0, `rgba(255,255,255,${alpha})`);
+		g.addColorStop(1, "rgba(255,255,255,0)");
+		ctx.fillStyle = g;
+		ctx.beginPath();
+		ctx.ellipse(x, y, rx, ry, rotation, 0, Math.PI * 2);
+		ctx.fill();
+	}
+	/** A four-pointed white glint, `r` the core size (the points reach 3r). */
+	function sparkle(ctx, x, y, r, glow) {
+		ctx.save();
+		ctx.fillStyle = "rgba(255,255,255,0.95)";
+		ctx.shadowBlur = 6;
+		ctx.shadowColor = glow;
+		ctx.beginPath();
+		ctx.moveTo(x, y - r * 3);
+		ctx.lineTo(x + r * .7, y - r * .7);
+		ctx.lineTo(x + r * 3, y);
+		ctx.lineTo(x + r * .7, y + r * .7);
+		ctx.lineTo(x, y + r * 3);
+		ctx.lineTo(x - r * .7, y + r * .7);
+		ctx.lineTo(x - r * 3, y);
+		ctx.lineTo(x - r * .7, y - r * .7);
+		ctx.closePath();
+		ctx.fill();
+		ctx.restore();
+	}
 	//#endregion
 	//#region src/games/pacman/render/items/fruit/CherryView.ts
+	var OUTLINE$11 = "rgba(70,6,24,0.95)";
+	var STEM_OUTLINE = "rgba(16,50,20,0.95)";
+	/** The two cherries: centre and radius, design units (the right one in front). */
+	var LEFT = {
+		x: -36,
+		y: 36,
+		r: 34
+	};
+	var RIGHT = {
+		x: 30,
+		y: 46,
+		r: 38
+	};
+	var JOINT = {
+		x: 12,
+		y: -74
+	};
 	function paint$11(ctx, size) {
-		const cx = size / 2;
-		const cy = size / 2;
-		ctx.save();
-		ctx.translate(cx, cy);
-		const stemGrad1 = ctx.createLinearGradient(0, -size * .3, size * .1, size * .05);
-		stemGrad1.addColorStop(0, "rgba(100,255,200,0.9)");
-		stemGrad1.addColorStop(.5, "rgba(80,220,180,0.8)");
-		stemGrad1.addColorStop(1, "rgba(60,180,150,0.6)");
-		ctx.strokeStyle = stemGrad1;
-		ctx.lineWidth = 3.5;
-		ctx.shadowBlur = 12;
-		ctx.shadowColor = "rgba(100,255,200,1)";
-		ctx.lineCap = "round";
-		ctx.beginPath();
-		ctx.moveTo(0, -size * .3);
-		ctx.quadraticCurveTo(size * .08, -size * .15, size * .1, size * .05);
+		beginItem(ctx, size);
+		const ball = (c) => () => {
+			ctx.beginPath();
+			ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+		};
+		const stems = () => {
+			ctx.beginPath();
+			ctx.moveTo(LEFT.x + 4, LEFT.y - LEFT.r + 4);
+			ctx.quadraticCurveTo(-20, -40, JOINT.x, JOINT.y);
+			ctx.moveTo(RIGHT.x - 2, RIGHT.y - RIGHT.r + 4);
+			ctx.quadraticCurveTo(26, -20, JOINT.x, JOINT.y);
+		};
+		const leaf = () => {
+			ctx.beginPath();
+			ctx.moveTo(JOINT.x, JOINT.y);
+			ctx.quadraticCurveTo(34, -96, 64, -76);
+			ctx.quadraticCurveTo(40, -56, JOINT.x, JOINT.y);
+			ctx.closePath();
+		};
+		outline(ctx, [stems], STEM_OUTLINE, 18);
+		outline(ctx, [leaf], STEM_OUTLINE);
+		outline(ctx, [ball(LEFT), ball(RIGHT)], OUTLINE$11);
+		ctx.strokeStyle = "rgba(110,190,70,1)";
+		ctx.lineWidth = 7;
+		stems();
 		ctx.stroke();
-		ctx.strokeStyle = "rgba(200,255,230,0.7)";
-		ctx.lineWidth = 1.5;
-		ctx.shadowBlur = 8;
-		ctx.beginPath();
-		ctx.moveTo(0, -size * .3);
-		ctx.quadraticCurveTo(size * .08, -size * .15, size * .1, size * .05);
-		ctx.stroke();
-		const stemGrad2 = ctx.createLinearGradient(0, -size * .3, -size * .12, size * .1);
-		stemGrad2.addColorStop(0, "rgba(100,255,200,0.9)");
-		stemGrad2.addColorStop(.5, "rgba(80,220,180,0.8)");
-		stemGrad2.addColorStop(1, "rgba(60,180,150,0.6)");
-		ctx.strokeStyle = stemGrad2;
-		ctx.lineWidth = 3.5;
-		ctx.shadowBlur = 12;
-		ctx.shadowColor = "rgba(100,255,200,1)";
-		ctx.beginPath();
-		ctx.moveTo(0, -size * .3);
-		ctx.quadraticCurveTo(-size * .1, -size * .1, -size * .12, size * .1);
-		ctx.stroke();
-		ctx.strokeStyle = "rgba(200,255,230,0.7)";
-		ctx.lineWidth = 1.5;
-		ctx.shadowBlur = 8;
-		ctx.beginPath();
-		ctx.moveTo(0, -size * .3);
-		ctx.quadraticCurveTo(-size * .1, -size * .1, -size * .12, size * .1);
-		ctx.stroke();
-		const leafGrad = ctx.createLinearGradient(0, -size * .3, size * .12, -size * .2);
-		leafGrad.addColorStop(0, "rgba(120,255,200,0.9)");
-		leafGrad.addColorStop(.5, "rgba(80,220,160,0.8)");
-		leafGrad.addColorStop(1, "rgba(60,180,140,0.6)");
-		ctx.fillStyle = leafGrad;
-		ctx.shadowBlur = 10;
-		ctx.shadowColor = "rgba(100,255,200,0.9)";
-		ctx.beginPath();
-		ctx.moveTo(0, -size * .3);
-		ctx.quadraticCurveTo(size * .1, -size * .35, size * .12, -size * .25);
-		ctx.quadraticCurveTo(size * .08, -size * .2, 0, -size * .3);
+		const green = ctx.createLinearGradient(JOINT.x, -96, 64, -60);
+		green.addColorStop(0, "rgba(160,240,110,1)");
+		green.addColorStop(1, "rgba(40,150,60,1)");
+		ctx.fillStyle = green;
+		leaf();
 		ctx.fill();
-		ctx.strokeStyle = "rgba(200,255,230,0.8)";
-		ctx.lineWidth = 1;
-		ctx.shadowBlur = 6;
-		ctx.beginPath();
-		ctx.moveTo(0, -size * .3);
-		ctx.lineTo(size * .08, -size * .28);
-		ctx.stroke();
-		const rx = size * .1;
-		const ry = size * .08;
-		const rr = size * .13;
-		const rightShadow = ctx.createRadialGradient(rx, ry + rr * .3, 0, rx, ry + rr * .3, rr * 1.2);
-		rightShadow.addColorStop(0, "rgba(100,20,50,0.4)");
-		rightShadow.addColorStop(1, "rgba(0,0,0,0)");
-		ctx.fillStyle = rightShadow;
-		ctx.shadowBlur = 0;
-		ctx.beginPath();
-		ctx.arc(rx, ry + rr * .3, rr * 1.2, 0, Math.PI * 2);
-		ctx.fill();
-		const rightBodyGrad = ctx.createRadialGradient(rx - rr * .3, ry - rr * .3, 0, rx, ry, rr);
-		rightBodyGrad.addColorStop(0, "rgba(255,180,200,1)");
-		rightBodyGrad.addColorStop(.3, "rgba(255,120,160,0.95)");
-		rightBodyGrad.addColorStop(.6, "rgba(220,60,100,0.9)");
-		rightBodyGrad.addColorStop(.85, "rgba(160,30,70,0.85)");
-		rightBodyGrad.addColorStop(1, "rgba(100,20,50,0.7)");
-		ctx.fillStyle = rightBodyGrad;
-		ctx.shadowBlur = 15;
-		ctx.shadowColor = "rgba(255,100,150,1)";
-		ctx.beginPath();
-		ctx.arc(rx, ry, rr, 0, Math.PI * 2);
-		ctx.fill();
-		const rightInnerGlow = ctx.createRadialGradient(rx, ry, rr * .5, rx, ry, rr);
-		rightInnerGlow.addColorStop(0, "rgba(255,150,180,0)");
-		rightInnerGlow.addColorStop(.7, "rgba(255,120,160,0.3)");
-		rightInnerGlow.addColorStop(1, "rgba(255,100,150,0.5)");
-		ctx.fillStyle = rightInnerGlow;
-		ctx.shadowBlur = 0;
-		ctx.beginPath();
-		ctx.arc(rx, ry, rr, 0, Math.PI * 2);
-		ctx.fill();
-		const rightHighlight1 = ctx.createRadialGradient(rx - rr * .35, ry - rr * .35, 0, rx - rr * .35, ry - rr * .35, rr * .3);
-		rightHighlight1.addColorStop(0, "rgba(255,255,255,0.95)");
-		rightHighlight1.addColorStop(.3, "rgba(255,240,250,0.6)");
-		rightHighlight1.addColorStop(.7, "rgba(255,200,220,0.2)");
-		rightHighlight1.addColorStop(1, "rgba(0,0,0,0)");
-		ctx.fillStyle = rightHighlight1;
-		ctx.shadowBlur = 0;
-		ctx.beginPath();
-		ctx.arc(rx - rr * .35, ry - rr * .35, rr * .3, 0, Math.PI * 2);
-		ctx.fill();
-		const rightHighlight2 = ctx.createRadialGradient(rx + rr * .3, ry + rr * .2, 0, rx + rr * .3, ry + rr * .2, rr * .15);
-		rightHighlight2.addColorStop(0, "rgba(255,200,220,0.5)");
-		rightHighlight2.addColorStop(.5, "rgba(255,150,180,0.2)");
-		rightHighlight2.addColorStop(1, "rgba(0,0,0,0)");
-		ctx.fillStyle = rightHighlight2;
-		ctx.beginPath();
-		ctx.arc(rx + rr * .3, ry + rr * .2, rr * .15, 0, Math.PI * 2);
-		ctx.fill();
-		ctx.strokeStyle = "rgba(255,180,200,0.6)";
-		ctx.lineWidth = 1.5;
-		ctx.shadowBlur = 6;
-		ctx.shadowColor = "rgba(255,150,180,0.8)";
-		ctx.beginPath();
-		ctx.arc(rx, ry, rr, 0, Math.PI * 2);
-		ctx.stroke();
-		const lx = -size * .12;
-		const ly = size * .12;
-		const lr = size * .11;
-		const leftShadow = ctx.createRadialGradient(lx, ly + lr * .3, 0, lx, ly + lr * .3, lr * 1.2);
-		leftShadow.addColorStop(0, "rgba(80,15,40,0.4)");
-		leftShadow.addColorStop(1, "rgba(0,0,0,0)");
-		ctx.fillStyle = leftShadow;
-		ctx.shadowBlur = 0;
-		ctx.beginPath();
-		ctx.arc(lx, ly + lr * .3, lr * 1.2, 0, Math.PI * 2);
-		ctx.fill();
-		const leftBodyGrad = ctx.createRadialGradient(lx - lr * .3, ly - lr * .3, 0, lx, ly, lr);
-		leftBodyGrad.addColorStop(0, "rgba(240,160,180,0.95)");
-		leftBodyGrad.addColorStop(.3, "rgba(230,100,140,0.9)");
-		leftBodyGrad.addColorStop(.6, "rgba(200,50,90,0.85)");
-		leftBodyGrad.addColorStop(.85, "rgba(140,25,60,0.8)");
-		leftBodyGrad.addColorStop(1, "rgba(90,15,40,0.65)");
-		ctx.fillStyle = leftBodyGrad;
-		ctx.shadowBlur = 12;
-		ctx.shadowColor = "rgba(230,80,130,0.9)";
-		ctx.beginPath();
-		ctx.arc(lx, ly, lr, 0, Math.PI * 2);
-		ctx.fill();
-		const leftInnerGlow = ctx.createRadialGradient(lx, ly, lr * .5, lx, ly, lr);
-		leftInnerGlow.addColorStop(0, "rgba(240,130,160,0)");
-		leftInnerGlow.addColorStop(.7, "rgba(230,100,140,0.25)");
-		leftInnerGlow.addColorStop(1, "rgba(230,80,130,0.4)");
-		ctx.fillStyle = leftInnerGlow;
-		ctx.shadowBlur = 0;
-		ctx.beginPath();
-		ctx.arc(lx, ly, lr, 0, Math.PI * 2);
-		ctx.fill();
-		const leftHighlight1 = ctx.createRadialGradient(lx - lr * .3, ly - lr * .3, 0, lx - lr * .3, ly - lr * .3, lr * .25);
-		leftHighlight1.addColorStop(0, "rgba(255,255,255,0.85)");
-		leftHighlight1.addColorStop(.3, "rgba(255,230,240,0.5)");
-		leftHighlight1.addColorStop(.7, "rgba(255,180,200,0.15)");
-		leftHighlight1.addColorStop(1, "rgba(0,0,0,0)");
-		ctx.fillStyle = leftHighlight1;
-		ctx.beginPath();
-		ctx.arc(lx - lr * .3, ly - lr * .3, lr * .25, 0, Math.PI * 2);
-		ctx.fill();
-		ctx.strokeStyle = "rgba(240,160,180,0.5)";
-		ctx.lineWidth = 1.2;
-		ctx.shadowBlur = 5;
-		ctx.shadowColor = "rgba(230,130,160,0.7)";
-		ctx.beginPath();
-		ctx.arc(lx, ly, lr, 0, Math.PI * 2);
-		ctx.stroke();
-		const sparkles = [
-			{
-				x: size * .2,
-				y: -size * .1,
-				r: 2
-			},
-			{
-				x: -size * .22,
-				y: -size * .05,
-				r: 1.5
-			},
-			{
-				x: size * .15,
-				y: size * .2,
-				r: 1.8
-			},
-			{
-				x: -size * .18,
-				y: size * .22,
-				r: 1.5
-			},
-			{
-				x: 0,
-				y: size * .25,
-				r: 2
-			}
-		];
-		for (const sp of sparkles) {
-			const sparkleGlow = ctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, sp.r * 3);
-			sparkleGlow.addColorStop(0, "rgba(255,200,220,0.8)");
-			sparkleGlow.addColorStop(.5, "rgba(255,150,180,0.3)");
-			sparkleGlow.addColorStop(1, "rgba(0,0,0,0)");
-			ctx.fillStyle = sparkleGlow;
+		for (const [c, dark] of [[LEFT, .85], [RIGHT, 1]]) {
+			if (c === RIGHT) outline(ctx, [ball(RIGHT)], OUTLINE$11);
+			const g = ctx.createRadialGradient(c.x - c.r * .4, c.y - c.r * .4, 2, c.x, c.y, c.r);
+			g.addColorStop(0, `rgba(255,${Math.round(140 * dark)},${Math.round(150 * dark)},1)`);
+			g.addColorStop(.45, `rgba(${Math.round(240 * dark)},30,60,1)`);
+			g.addColorStop(1, `rgba(${Math.round(140 * dark)},6,30,1)`);
+			ctx.fillStyle = g;
+			ctx.shadowBlur = 10;
+			ctx.shadowColor = "rgba(255,60,100,0.9)";
+			ball(c)();
+			ctx.fill();
 			ctx.shadowBlur = 0;
-			ctx.beginPath();
-			ctx.arc(sp.x, sp.y, sp.r * 3, 0, Math.PI * 2);
-			ctx.fill();
-			ctx.fillStyle = "rgba(255,255,255,0.95)";
-			ctx.shadowBlur = 6;
-			ctx.shadowColor = "rgba(255,200,220,1)";
-			ctx.beginPath();
-			ctx.arc(sp.x, sp.y, sp.r, 0, Math.PI * 2);
-			ctx.fill();
+			gloss(ctx, c.x - c.r * .4, c.y - c.r * .38, c.r * .3, c.r * .2, -.6);
 		}
+		sparkle(ctx, RIGHT.x + 16, RIGHT.y - 18, 2.5, "rgba(255,200,220,1)");
 		ctx.restore();
 	}
 	var CHERRY_ART = {
@@ -3869,8 +3769,8 @@
 	//#endregion
 	//#region src/games/pacman/render/items/fruit/StrawberryView.ts
 	/** Outline: dark wine, wide enough to survive the downscale to a tile. */
-	var OUTLINE$3 = "rgba(70,6,20,0.95)";
-	var LEAF_OUTLINE = "rgba(10,50,20,0.95)";
+	var OUTLINE$10 = "rgba(70,6,20,0.95)";
+	var LEAF_OUTLINE$2 = "rgba(10,50,20,0.95)";
 	/** Calyx leaves: angle from straight down (radians) and length, design units. */
 	var LEAVES = [
 		[-1.75, 44],
@@ -3882,11 +3782,7 @@
 	];
 	var CROWN_Y = -46;
 	function paint$10(ctx, size) {
-		ctx.save();
-		ctx.translate(size / 2, size / 2);
-		ctx.scale(size / 256, size / 256);
-		ctx.lineJoin = "round";
-		ctx.lineCap = "round";
+		beginItem(ctx, size);
 		const berry = () => {
 			ctx.beginPath();
 			ctx.moveTo(0, -46);
@@ -3913,10 +3809,10 @@
 			ctx.quadraticCurveTo(2, -70, 10, -84);
 		};
 		ctx.lineWidth = 14;
-		ctx.strokeStyle = OUTLINE$3;
+		ctx.strokeStyle = OUTLINE$10;
 		berry();
 		ctx.stroke();
-		ctx.strokeStyle = LEAF_OUTLINE;
+		ctx.strokeStyle = LEAF_OUTLINE$2;
 		for (const [a, l] of LEAVES) {
 			leaf(a, l);
 			ctx.stroke();
@@ -4011,195 +3907,80 @@
 	};
 	//#endregion
 	//#region src/games/pacman/render/items/fruit/OrangeView.ts
+	var OUTLINE$9 = "rgba(80,30,0,0.95)";
+	var LEAF_OUTLINE$1 = "rgba(16,50,20,0.95)";
+	var R = 70;
+	var CY$1 = 10;
+	/** Skin pores, fixed so the texture is the same every bake. */
+	var PORES = [
+		[-40, -10],
+		[-20, -36],
+		[10, -30],
+		[38, -14],
+		[-48, 24],
+		[-22, 12],
+		[6, 2],
+		[34, 22],
+		[52, 4],
+		[-30, 48],
+		[0, 38],
+		[26, 54],
+		[-6, 66],
+		[44, 46]
+	];
 	function paint$9(ctx, size) {
-		const cx = size / 2;
-		const cy = size / 2;
-		ctx.save();
-		ctx.translate(cx, cy);
-		const orangeR = size * .22;
-		const shadow = ctx.createRadialGradient(0, orangeR * .3, 0, 0, orangeR * .3, orangeR * 1.2);
-		shadow.addColorStop(0, "rgba(120,60,20,0.4)");
-		shadow.addColorStop(1, "rgba(0,0,0,0)");
-		ctx.fillStyle = shadow;
-		ctx.shadowBlur = 0;
-		ctx.beginPath();
-		ctx.arc(0, orangeR * .3, orangeR * 1.2, 0, Math.PI * 2);
-		ctx.fill();
-		const bodyGrad = ctx.createRadialGradient(-orangeR * .3, -orangeR * .3, 0, 0, 0, orangeR);
-		bodyGrad.addColorStop(0, "rgba(255,240,180,1)");
-		bodyGrad.addColorStop(.2, "rgba(255,200,120,0.98)");
-		bodyGrad.addColorStop(.5, "rgba(255,160,60,0.95)");
-		bodyGrad.addColorStop(.75, "rgba(220,120,40,0.9)");
-		bodyGrad.addColorStop(1, "rgba(160,80,20,0.8)");
-		ctx.fillStyle = bodyGrad;
-		ctx.shadowBlur = 15;
-		ctx.shadowColor = "rgba(255,160,60,1)";
-		ctx.beginPath();
-		ctx.arc(0, 0, orangeR, 0, Math.PI * 2);
-		ctx.fill();
-		const innerGlow = ctx.createRadialGradient(0, 0, orangeR * .6, 0, 0, orangeR);
-		innerGlow.addColorStop(0, "rgba(255,180,80,0)");
-		innerGlow.addColorStop(.7, "rgba(255,140,60,0.2)");
-		innerGlow.addColorStop(1, "rgba(255,120,40,0.4)");
-		ctx.fillStyle = innerGlow;
-		ctx.shadowBlur = 0;
-		ctx.beginPath();
-		ctx.arc(0, 0, orangeR, 0, Math.PI * 2);
-		ctx.fill();
-		const bottomDark = ctx.createLinearGradient(0, 0, 0, orangeR);
-		bottomDark.addColorStop(0, "rgba(0,0,0,0)");
-		bottomDark.addColorStop(.6, "rgba(80,40,10,0.15)");
-		bottomDark.addColorStop(1, "rgba(60,30,5,0.35)");
-		ctx.fillStyle = bottomDark;
-		ctx.beginPath();
-		ctx.arc(0, 0, orangeR, 0, Math.PI * 2);
-		ctx.fill();
-		const segmentCount = 8;
-		for (let i = 0; i < segmentCount; i++) {
-			const angle = i / segmentCount * Math.PI * 2;
-			const x1 = Math.cos(angle) * orangeR * .15;
-			const y1 = Math.sin(angle) * orangeR * .15;
-			const x2 = Math.cos(angle) * orangeR * .85;
-			const y2 = Math.sin(angle) * orangeR * .85;
-			const lineGrad = ctx.createLinearGradient(x1, y1, x2, y2);
-			lineGrad.addColorStop(0, "rgba(255,240,200,0.4)");
-			lineGrad.addColorStop(.5, "rgba(255,200,120,0.25)");
-			lineGrad.addColorStop(1, "rgba(255,160,80,0.1)");
-			ctx.strokeStyle = lineGrad;
-			ctx.lineWidth = 1.5;
-			ctx.shadowBlur = 4;
-			ctx.shadowColor = "rgba(255,200,120,0.6)";
+		beginItem(ctx, size);
+		const fruit = () => {
 			ctx.beginPath();
-			ctx.moveTo(x1, y1);
-			ctx.lineTo(x2, y2);
-			ctx.stroke();
-		}
-		for (let i = 0; i < 40; i++) {
-			const angle = Math.random() * Math.PI * 2;
-			const dist = orangeR * .3 + Math.random() * orangeR * .6;
-			const x = Math.cos(angle) * dist;
-			const y = Math.sin(angle) * dist;
-			const dotR = .5 + Math.random() * 1;
-			ctx.fillStyle = `rgba(255,220,150,${.2 + Math.random() * .3})`;
-			ctx.shadowBlur = 2;
-			ctx.shadowColor = "rgba(255,200,120,0.5)";
+			ctx.arc(0, CY$1, R, 0, Math.PI * 2);
+		};
+		const leaf = () => {
 			ctx.beginPath();
-			ctx.arc(x, y, dotR, 0, Math.PI * 2);
-			ctx.fill();
-		}
-		const highlight1 = ctx.createRadialGradient(-orangeR * .35, -orangeR * .35, 0, -orangeR * .35, -orangeR * .35, orangeR * .25);
-		highlight1.addColorStop(0, "rgba(255,255,255,0.95)");
-		highlight1.addColorStop(.3, "rgba(255,250,230,0.6)");
-		highlight1.addColorStop(.7, "rgba(255,220,180,0.2)");
-		highlight1.addColorStop(1, "rgba(0,0,0,0)");
-		ctx.fillStyle = highlight1;
-		ctx.shadowBlur = 0;
-		ctx.beginPath();
-		ctx.arc(-orangeR * .35, -orangeR * .35, orangeR * .25, 0, Math.PI * 2);
+			ctx.moveTo(2, -58);
+			ctx.quadraticCurveTo(24, -92, 58, -80);
+			ctx.quadraticCurveTo(36, -52, 2, -58);
+			ctx.closePath();
+		};
+		outline(ctx, [leaf], LEAF_OUTLINE$1);
+		outline(ctx, [fruit], OUTLINE$9);
+		const green = ctx.createLinearGradient(2, -90, 58, -56);
+		green.addColorStop(0, "rgba(160,240,110,1)");
+		green.addColorStop(1, "rgba(40,150,60,1)");
+		ctx.fillStyle = green;
+		leaf();
 		ctx.fill();
-		const highlight2 = ctx.createRadialGradient(orangeR * .25, orangeR * .15, 0, orangeR * .25, orangeR * .15, orangeR * .1);
-		highlight2.addColorStop(0, "rgba(255,230,200,0.5)");
-		highlight2.addColorStop(.5, "rgba(255,200,150,0.2)");
-		highlight2.addColorStop(1, "rgba(0,0,0,0)");
-		ctx.fillStyle = highlight2;
+		ctx.strokeStyle = "rgba(30,110,40,0.8)";
+		ctx.lineWidth = 2.5;
 		ctx.beginPath();
-		ctx.arc(orangeR * .25, orangeR * .15, orangeR * .1, 0, Math.PI * 2);
-		ctx.fill();
-		ctx.strokeStyle = "rgba(255,200,120,0.5)";
-		ctx.lineWidth = 1.5;
-		ctx.shadowBlur = 6;
-		ctx.shadowColor = "rgba(255,180,100,0.7)";
-		ctx.beginPath();
-		ctx.arc(0, 0, orangeR, 0, Math.PI * 2);
+		ctx.moveTo(6, -60);
+		ctx.quadraticCurveTo(30, -70, 50, -76);
 		ctx.stroke();
-		const stemGrad = ctx.createLinearGradient(0, -orangeR, 0, -orangeR * 1.3);
-		stemGrad.addColorStop(0, "rgba(100,255,200,0.9)");
-		stemGrad.addColorStop(.5, "rgba(80,220,180,0.8)");
-		stemGrad.addColorStop(1, "rgba(60,180,150,0.6)");
-		ctx.strokeStyle = stemGrad;
-		ctx.lineWidth = 3;
+		const body = ctx.createRadialGradient(-26, -18, 6, 0, CY$1, R);
+		body.addColorStop(0, "rgba(255,230,140,1)");
+		body.addColorStop(.35, "rgba(255,170,40,1)");
+		body.addColorStop(.75, "rgba(240,120,10,1)");
+		body.addColorStop(1, "rgba(170,70,0,1)");
+		ctx.fillStyle = body;
 		ctx.shadowBlur = 10;
-		ctx.shadowColor = "rgba(100,255,200,1)";
-		ctx.lineCap = "round";
-		ctx.beginPath();
-		ctx.moveTo(0, -orangeR);
-		ctx.lineTo(0, -orangeR * 1.25);
-		ctx.stroke();
-		ctx.strokeStyle = "rgba(200,255,230,0.7)";
-		ctx.lineWidth = 1.2;
-		ctx.shadowBlur = 6;
-		ctx.beginPath();
-		ctx.moveTo(0, -orangeR);
-		ctx.lineTo(0, -orangeR * 1.25);
-		ctx.stroke();
-		const leafGrad = ctx.createLinearGradient(0, -orangeR * 1.1, orangeR * .15, -orangeR * 1.2);
-		leafGrad.addColorStop(0, "rgba(80,220,160,0.95)");
-		leafGrad.addColorStop(.5, "rgba(100,240,180,0.9)");
-		leafGrad.addColorStop(1, "rgba(120,255,200,0.7)");
-		ctx.fillStyle = leafGrad;
-		ctx.shadowBlur = 8;
-		ctx.shadowColor = "rgba(100,255,200,0.9)";
-		ctx.beginPath();
-		ctx.moveTo(0, -orangeR * 1.1);
-		ctx.quadraticCurveTo(orangeR * .12, -orangeR * 1.25, orangeR * .15, -orangeR * 1.15);
-		ctx.quadraticCurveTo(orangeR * .1, -orangeR * 1.05, 0, -orangeR * 1.1);
+		ctx.shadowColor = "rgba(255,170,60,0.9)";
+		fruit();
 		ctx.fill();
-		ctx.strokeStyle = "rgba(200,255,230,0.8)";
-		ctx.lineWidth = .8;
-		ctx.shadowBlur = 4;
-		ctx.beginPath();
-		ctx.moveTo(0, -orangeR * 1.1);
-		ctx.lineTo(orangeR * .1, -orangeR * 1.18);
-		ctx.stroke();
-		const sparkles = [
-			{
-				x: size * .28,
-				y: -size * .05,
-				r: 2
-			},
-			{
-				x: -size * .27,
-				y: -size * .08,
-				r: 1.5
-			},
-			{
-				x: size * .25,
-				y: size * .15,
-				r: 1.8
-			},
-			{
-				x: -size * .26,
-				y: size * .12,
-				r: 1.5
-			},
-			{
-				x: size * .05,
-				y: size * .28,
-				r: 1.8
-			},
-			{
-				x: -size * .08,
-				y: -size * .27,
-				r: 1.5
-			}
-		];
-		for (const sp of sparkles) {
-			const sparkleGlow = ctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, sp.r * 3);
-			sparkleGlow.addColorStop(0, "rgba(255,220,150,0.8)");
-			sparkleGlow.addColorStop(.5, "rgba(255,180,100,0.3)");
-			sparkleGlow.addColorStop(1, "rgba(0,0,0,0)");
-			ctx.fillStyle = sparkleGlow;
-			ctx.shadowBlur = 0;
+		ctx.shadowBlur = 0;
+		ctx.fillStyle = "rgba(170,70,0,0.4)";
+		for (const [x, y] of PORES) {
 			ctx.beginPath();
-			ctx.arc(sp.x, sp.y, sp.r * 3, 0, Math.PI * 2);
-			ctx.fill();
-			ctx.fillStyle = "rgba(255,255,255,0.95)";
-			ctx.shadowBlur = 6;
-			ctx.shadowColor = "rgba(255,220,150,1)";
-			ctx.beginPath();
-			ctx.arc(sp.x, sp.y, sp.r, 0, Math.PI * 2);
+			ctx.arc(x, y + CY$1 - 10, 2.5, 0, Math.PI * 2);
 			ctx.fill();
 		}
+		ctx.fillStyle = "rgba(90,120,30,1)";
+		ctx.strokeStyle = OUTLINE$9;
+		ctx.lineWidth = 4;
+		ctx.beginPath();
+		ctx.ellipse(0, -54, 9, 6, 0, 0, Math.PI * 2);
+		ctx.fill();
+		ctx.stroke();
+		gloss(ctx, -30, -20, 22, 14, -.6);
+		sparkle(ctx, 38, 40, 2.5, "rgba(255,220,150,1)");
 		ctx.restore();
 	}
 	var ORANGE_ART = {
@@ -4210,15 +3991,23 @@
 	};
 	//#endregion
 	//#region src/games/pacman/render/items/fruit/PretzelView.ts
+	var OUTLINE$8 = "rgba(40,14,2,0.95)";
+	/** Salt crystals on the knot, in the knot's 400-unit design. */
+	var SALT = [
+		[112, 112],
+		[155, 96],
+		[245, 96],
+		[288, 112],
+		[152, 248],
+		[248, 248],
+		[200, 265],
+		[318, 170],
+		[82, 170]
+	];
 	function paint$8(ctx, size) {
-		const cx = size / 2;
-		const cy = size / 2;
-		ctx.save();
-		ctx.translate(cx, cy);
-		ctx.scale(size / 400, size / 400);
-		ctx.translate(-200, -200);
-		ctx.lineCap = "round";
-		ctx.lineJoin = "round";
+		beginItem(ctx, size);
+		ctx.scale(.62, .62);
+		ctx.translate(-200, -186);
 		const knot = () => {
 			ctx.beginPath();
 			ctx.moveTo(130, 300);
@@ -4232,329 +4021,114 @@
 			ctx.lineTo(270, 300);
 			ctx.stroke();
 		};
-		ctx.shadowBlur = 22;
-		ctx.shadowColor = "rgba(245, 85, 20, 0.6)";
-		ctx.strokeStyle = "#190801";
-		ctx.lineWidth = 64;
+		ctx.strokeStyle = OUTLINE$8;
+		ctx.lineWidth = 66;
+		knot();
+		ctx.strokeStyle = "rgba(150,70,14,1)";
+		ctx.lineWidth = 46;
+		ctx.shadowBlur = 10;
+		ctx.shadowColor = "rgba(255,160,60,0.8)";
 		knot();
 		ctx.shadowBlur = 0;
-		ctx.strokeStyle = "#4a1600";
-		ctx.lineWidth = 54;
+		const crust = ctx.createLinearGradient(80, 80, 320, 320);
+		crust.addColorStop(0, "rgba(250,190,90,1)");
+		crust.addColorStop(.5, "rgba(226,140,50,1)");
+		crust.addColorStop(1, "rgba(190,100,30,1)");
+		ctx.strokeStyle = crust;
+		ctx.lineWidth = 32;
 		knot();
-		const bodyGrad = ctx.createRadialGradient(200, 200, 10, 200, 200, 160);
-		bodyGrad.addColorStop(0, "#e67e22");
-		bodyGrad.addColorStop(.6, "#d35400");
-		bodyGrad.addColorStop(1, "#782800");
-		ctx.strokeStyle = bodyGrad;
-		ctx.lineWidth = 38;
+		ctx.strokeStyle = "rgba(255,236,190,0.85)";
+		ctx.lineWidth = 8;
 		knot();
-		ctx.strokeStyle = "#ff9f43";
-		ctx.lineWidth = 18;
-		knot();
-		ctx.strokeStyle = "#fff6ee";
-		ctx.lineWidth = 5;
-		knot();
-		for (const salt of [
-			{
-				x: 82,
-				y: 155
-			},
-			{
-				x: 112,
-				y: 112
-			},
-			{
-				x: 155,
-				y: 96
-			},
-			{
-				x: 245,
-				y: 96
-			},
-			{
-				x: 288,
-				y: 112
-			},
-			{
-				x: 318,
-				y: 155
-			},
-			{
-				x: 172,
-				y: 195
-			},
-			{
-				x: 152,
-				y: 248
-			},
-			{
-				x: 138,
-				y: 282
-			},
-			{
-				x: 228,
-				y: 195
-			},
-			{
-				x: 248,
-				y: 248
-			},
-			{
-				x: 262,
-				y: 282
-			},
-			{
-				x: 200,
-				y: 265
-			}
-		]) {
+		for (const [x, y] of SALT) {
 			ctx.save();
-			ctx.translate(salt.x, salt.y);
+			ctx.translate(x, y);
 			ctx.rotate(Math.PI / 4);
-			ctx.fillStyle = "rgba(25, 8, 1, 0.4)";
-			ctx.fillRect(-7, -5, 16, 16);
-			ctx.fillStyle = "rgba(60, 255, 245, 0.85)";
-			ctx.fillRect(-8, -8, 16, 16);
-			ctx.fillStyle = "#ffffff";
-			ctx.fillRect(-4, -4, 8, 8);
+			ctx.fillStyle = "rgba(60,24,4,0.5)";
+			ctx.fillRect(-6, -4, 13, 13);
+			ctx.fillStyle = "rgba(255,255,255,0.95)";
+			ctx.fillRect(-7, -7, 13, 13);
 			ctx.restore();
 		}
-		for (const sp of [
-			{
-				x: 200,
-				y: 40,
-				r: 4
-			},
-			{
-				x: 55,
-				y: 140,
-				r: 3
-			},
-			{
-				x: 345,
-				y: 140,
-				r: 3
-			},
-			{
-				x: 95,
-				y: 285,
-				r: 3
-			},
-			{
-				x: 305,
-				y: 285,
-				r: 5
-			}
-		]) {
-			const glow = ctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, sp.r * 4);
-			glow.addColorStop(0, "rgba(255, 150, 50, 0.8)");
-			glow.addColorStop(1, "rgba(0,0,0,0)");
-			ctx.fillStyle = glow;
-			ctx.beginPath();
-			ctx.arc(sp.x, sp.y, sp.r * 4, 0, Math.PI * 2);
-			ctx.fill();
-			ctx.fillStyle = "#ffffff";
-			ctx.beginPath();
-			ctx.arc(sp.x, sp.y, sp.r, 0, Math.PI * 2);
-			ctx.fill();
-		}
+		sparkle(ctx, 300, 120, 4, "rgba(255,220,160,1)");
 		ctx.restore();
 	}
-	function pretzelMotion(time) {
-		return {
-			scale: 1 + Math.sin(time * 1.8) * .025,
-			rotation: Math.sin(time * .6) * .03,
-			alpha: 1,
-			bloomAlpha: [.45 + Math.sin(time * 2.5) * .05, .25 + Math.sin(time * 1.2) * .03]
-		};
-	}
 	var PRETZEL_ART = {
-		size: 512,
+		size: 256,
 		paint: paint$8,
-		sprite: 380,
-		blooms: [{
-			size: 400,
-			blur: 5
-		}, {
-			size: 437,
-			blur: 11
-		}],
-		motion: pretzelMotion
+		sprite: 240,
+		blooms: FRUIT_BLOOMS
 	};
 	//#endregion
 	//#region src/games/pacman/render/items/fruit/AppleView.ts
+	var OUTLINE$7 = "rgba(70,6,20,0.95)";
+	var LEAF_OUTLINE = "rgba(16,50,20,0.95)";
 	function paint$7(ctx, size) {
-		const cx = size / 2;
-		const cy = size / 2;
-		ctx.save();
-		ctx.translate(cx, cy + 8);
-		const s = 1.15;
-		const stemGrad = ctx.createLinearGradient(0, -56 * s, 28 * s, -105 * s);
-		stemGrad.addColorStop(0, "rgba(100,255,200,0.9)");
-		stemGrad.addColorStop(.5, "rgba(80,220,180,0.8)");
-		stemGrad.addColorStop(1, "rgba(60,180,150,0.6)");
-		ctx.strokeStyle = stemGrad;
-		ctx.lineWidth = 4;
-		ctx.shadowBlur = 12;
-		ctx.shadowColor = "rgba(100,255,200,1)";
-		ctx.lineCap = "round";
-		ctx.beginPath();
-		ctx.moveTo(0, -56 * s);
-		ctx.bezierCurveTo(6 * s, -85 * s, 18 * s, -95 * s, 28 * s, -105 * s);
-		ctx.stroke();
-		ctx.strokeStyle = "rgba(200,255,230,0.7)";
-		ctx.lineWidth = 1.5;
-		ctx.shadowBlur = 8;
-		ctx.beginPath();
-		ctx.moveTo(0, -56 * s);
-		ctx.bezierCurveTo(6 * s, -85 * s, 18 * s, -95 * s, 28 * s, -105 * s);
-		ctx.stroke();
-		const leafGrad = ctx.createLinearGradient(8 * s, -72 * s, 45 * s, -75 * s);
-		leafGrad.addColorStop(0, "rgba(80,220,160,0.95)");
-		leafGrad.addColorStop(.5, "rgba(100,240,180,0.9)");
-		leafGrad.addColorStop(1, "rgba(120,255,200,0.7)");
-		ctx.fillStyle = leafGrad;
-		ctx.shadowBlur = 10;
-		ctx.shadowColor = "rgba(100,255,200,0.9)";
-		ctx.beginPath();
-		ctx.moveTo(8 * s, -72 * s);
-		ctx.quadraticCurveTo(35 * s, -98 * s, 45 * s, -75 * s);
-		ctx.quadraticCurveTo(24 * s, -62 * s, 8 * s, -72 * s);
-		ctx.fill();
-		ctx.strokeStyle = "rgba(200,255,230,0.8)";
-		ctx.lineWidth = 1;
-		ctx.shadowBlur = 6;
-		ctx.beginPath();
-		ctx.moveTo(10 * s, -72 * s);
-		ctx.quadraticCurveTo(28 * s, -82 * s, 40 * s, -76 * s);
-		ctx.stroke();
-		const shadow = ctx.createRadialGradient(0, 88 * s * .3, 0, 0, 88 * s * .3, 95 * s);
-		shadow.addColorStop(0, "rgba(100,20,20,0.4)");
-		shadow.addColorStop(1, "rgba(0,0,0,0)");
-		ctx.fillStyle = shadow;
-		ctx.shadowBlur = 0;
-		ctx.beginPath();
-		ctx.arc(0, 88 * s * .3, 95 * s, 0, Math.PI * 2);
-		ctx.fill();
-		const appleShape = () => {
+		beginItem(ctx, size);
+		const apple = () => {
 			ctx.beginPath();
-			ctx.moveTo(0, -58 * s);
-			ctx.bezierCurveTo(-15 * s, -58 * s, -45 * s, -72 * s, -72 * s, -50 * s);
-			ctx.bezierCurveTo(-95 * s, -30 * s, -92 * s, 15 * s, -85 * s, 40 * s);
-			ctx.bezierCurveTo(-78 * s, 65 * s, -45 * s, 95 * s, -22 * s, 95 * s);
-			ctx.bezierCurveTo(-10 * s, 95 * s, -10 * s, 88 * s, 0, 88 * s);
-			ctx.bezierCurveTo(10 * s, 88 * s, 10 * s, 95 * s, 22 * s, 95 * s);
-			ctx.bezierCurveTo(45 * s, 95 * s, 78 * s, 65 * s, 85 * s, 40 * s);
-			ctx.bezierCurveTo(92 * s, 15 * s, 95 * s, -30 * s, 72 * s, -50 * s);
-			ctx.bezierCurveTo(45 * s, -72 * s, 15 * s, -58 * s, 0, -58 * s);
+			ctx.moveTo(0, -40);
+			ctx.bezierCurveTo(24, -64, 74, -60, 74, -6);
+			ctx.bezierCurveTo(74, 46, 42, 82, 20, 80);
+			ctx.bezierCurveTo(10, 79, 6, 74, 0, 74);
+			ctx.bezierCurveTo(-6, 74, -10, 79, -20, 80);
+			ctx.bezierCurveTo(-42, 82, -74, 46, -74, -6);
+			ctx.bezierCurveTo(-74, -60, -24, -64, 0, -40);
 			ctx.closePath();
 		};
-		const bodyGrad = ctx.createRadialGradient(-20 * s, -20 * s, 5 * s, 0, 10 * s, 105 * s);
-		bodyGrad.addColorStop(0, "rgba(255,200,200,1)");
-		bodyGrad.addColorStop(.2, "rgba(255,100,100,0.98)");
-		bodyGrad.addColorStop(.5, "rgba(230,50,50,0.95)");
-		bodyGrad.addColorStop(.75, "rgba(180,30,30,0.9)");
-		bodyGrad.addColorStop(1, "rgba(100,10,10,0.8)");
-		ctx.fillStyle = bodyGrad;
-		ctx.shadowBlur = 15;
-		ctx.shadowColor = "rgba(255,80,80,1)";
-		appleShape();
-		ctx.fill();
-		const innerGlow = ctx.createRadialGradient(0, 0, 50 * s, 0, 0, 105 * s);
-		innerGlow.addColorStop(0, "rgba(255,100,100,0)");
-		innerGlow.addColorStop(.7, "rgba(255,60,60,0.2)");
-		innerGlow.addColorStop(1, "rgba(255,40,40,0.4)");
-		ctx.fillStyle = innerGlow;
-		ctx.shadowBlur = 0;
-		appleShape();
-		ctx.fill();
-		const blush = ctx.createRadialGradient(30 * s, 20 * s, 0, 30 * s, 20 * s, 40 * s);
-		blush.addColorStop(0, "rgba(255,200,100,0.3)");
-		blush.addColorStop(.5, "rgba(255,180,80,0.15)");
-		blush.addColorStop(1, "rgba(0,0,0,0)");
-		ctx.fillStyle = blush;
-		appleShape();
-		ctx.fill();
-		const bottomDark = ctx.createLinearGradient(0, 0, 0, 88 * s);
-		bottomDark.addColorStop(0, "rgba(0,0,0,0)");
-		bottomDark.addColorStop(.6, "rgba(60,10,10,0.15)");
-		bottomDark.addColorStop(1, "rgba(40,5,5,0.35)");
-		ctx.fillStyle = bottomDark;
-		appleShape();
-		ctx.fill();
-		const highlight1 = ctx.createRadialGradient(-30 * s, -30 * s, 0, -30 * s, -30 * s, 25 * s);
-		highlight1.addColorStop(0, "rgba(255,255,255,0.95)");
-		highlight1.addColorStop(.3, "rgba(255,230,230,0.6)");
-		highlight1.addColorStop(.7, "rgba(255,180,180,0.2)");
-		highlight1.addColorStop(1, "rgba(0,0,0,0)");
-		ctx.fillStyle = highlight1;
-		ctx.shadowBlur = 0;
-		ctx.beginPath();
-		ctx.arc(-30 * s, -30 * s, 25 * s, 0, Math.PI * 2);
-		ctx.fill();
-		const highlight2 = ctx.createRadialGradient(40 * s, 30 * s, 0, 40 * s, 30 * s, 15 * s);
-		highlight2.addColorStop(0, "rgba(255,200,200,0.5)");
-		highlight2.addColorStop(.5, "rgba(255,150,150,0.2)");
-		highlight2.addColorStop(1, "rgba(0,0,0,0)");
-		ctx.fillStyle = highlight2;
-		ctx.beginPath();
-		ctx.arc(40 * s, 30 * s, 15 * s, 0, Math.PI * 2);
-		ctx.fill();
-		ctx.strokeStyle = "rgba(255,140,140,0.6)";
-		ctx.lineWidth = 2;
-		ctx.shadowBlur = 6;
-		ctx.shadowColor = "rgba(255,100,100,0.8)";
-		appleShape();
+		const stem = () => {
+			ctx.beginPath();
+			ctx.moveTo(0, -38);
+			ctx.quadraticCurveTo(0, -62, 10, -78);
+		};
+		const leaf = () => {
+			ctx.beginPath();
+			ctx.moveTo(6, -62);
+			ctx.quadraticCurveTo(26, -92, 60, -78);
+			ctx.quadraticCurveTo(38, -50, 6, -62);
+			ctx.closePath();
+		};
+		outline(ctx, [stem], OUTLINE$7, 20);
+		outline(ctx, [leaf], LEAF_OUTLINE);
+		outline(ctx, [apple], OUTLINE$7);
+		ctx.strokeStyle = "rgba(140,90,40,1)";
+		ctx.lineWidth = 8;
+		stem();
 		ctx.stroke();
-		const sparkles = [
-			{
-				x: size * .28,
-				y: -size * .05,
-				r: 2
-			},
-			{
-				x: -size * .27,
-				y: -size * .08,
-				r: 1.5
-			},
-			{
-				x: size * .25,
-				y: size * .15,
-				r: 1.8
-			},
-			{
-				x: -size * .26,
-				y: size * .12,
-				r: 1.5
-			},
-			{
-				x: size * .05,
-				y: size * .28,
-				r: 1.8
-			},
-			{
-				x: -size * .08,
-				y: -size * .27,
-				r: 1.5
-			}
-		];
-		for (const sp of sparkles) {
-			const sparkleGlow = ctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, sp.r * 3);
-			sparkleGlow.addColorStop(0, "rgba(255,180,180,0.8)");
-			sparkleGlow.addColorStop(.5, "rgba(255,120,120,0.3)");
-			sparkleGlow.addColorStop(1, "rgba(0,0,0,0)");
-			ctx.fillStyle = sparkleGlow;
-			ctx.shadowBlur = 0;
-			ctx.beginPath();
-			ctx.arc(sp.x, sp.y, sp.r * 3, 0, Math.PI * 2);
-			ctx.fill();
-			ctx.fillStyle = "rgba(255,255,255,0.95)";
-			ctx.shadowBlur = 6;
-			ctx.shadowColor = "rgba(255,180,180,1)";
-			ctx.beginPath();
-			ctx.arc(sp.x, sp.y, sp.r, 0, Math.PI * 2);
-			ctx.fill();
-		}
+		const green = ctx.createLinearGradient(6, -90, 60, -56);
+		green.addColorStop(0, "rgba(160,240,110,1)");
+		green.addColorStop(1, "rgba(40,150,60,1)");
+		ctx.fillStyle = green;
+		leaf();
+		ctx.fill();
+		const body = ctx.createRadialGradient(-30, -20, 6, 0, 10, 90);
+		body.addColorStop(0, "rgba(255,150,130,1)");
+		body.addColorStop(.35, "rgba(240,40,40,1)");
+		body.addColorStop(.75, "rgba(190,16,24,1)");
+		body.addColorStop(1, "rgba(120,6,16,1)");
+		ctx.fillStyle = body;
+		ctx.shadowBlur = 10;
+		ctx.shadowColor = "rgba(255,70,70,0.9)";
+		apple();
+		ctx.fill();
+		ctx.shadowBlur = 0;
+		ctx.save();
+		apple();
+		ctx.clip();
+		const blush = ctx.createRadialGradient(-44, 10, 0, -44, 10, 40);
+		blush.addColorStop(0, "rgba(255,210,80,0.45)");
+		blush.addColorStop(1, "rgba(255,210,80,0)");
+		ctx.fillStyle = blush;
+		ctx.fillRect(-90, -40, 90, 100);
+		ctx.restore();
+		ctx.strokeStyle = "rgba(110,10,20,0.6)";
+		ctx.lineWidth = 4;
+		ctx.beginPath();
+		ctx.moveTo(-16, -44);
+		ctx.quadraticCurveTo(0, -34, 16, -44);
+		ctx.stroke();
+		gloss(ctx, -36, -24, 14, 24, .4);
+		sparkle(ctx, 44, 30, 2.5, "rgba(255,200,200,1)");
 		ctx.restore();
 	}
 	var APPLE_ART = {
@@ -4566,13 +4140,9 @@
 	//#endregion
 	//#region src/games/pacman/render/items/fruit/PearView.ts
 	/** Outline: dark olive, wide enough to survive the downscale to a tile. */
-	var OUTLINE$2 = "rgba(40,50,8,0.95)";
+	var OUTLINE$6 = "rgba(40,50,8,0.95)";
 	function paint$6(ctx, size) {
-		ctx.save();
-		ctx.translate(size / 2, size / 2);
-		ctx.scale(size / 256, size / 256);
-		ctx.lineJoin = "round";
-		ctx.lineCap = "round";
+		beginItem(ctx, size);
 		const pear = () => {
 			ctx.beginPath();
 			ctx.moveTo(0, -62);
@@ -4596,7 +4166,7 @@
 			ctx.quadraticCurveTo(30, -60, 4, -72);
 			ctx.closePath();
 		};
-		ctx.strokeStyle = OUTLINE$2;
+		ctx.strokeStyle = OUTLINE$6;
 		ctx.lineWidth = 14;
 		pear();
 		ctx.stroke();
@@ -4675,184 +4245,69 @@
 	};
 	//#endregion
 	//#region src/games/pacman/render/items/fruit/MelonView.ts
+	var OUTLINE$5 = "rgba(8,40,12,0.95)";
+	var RX = 76;
+	var RY = 62;
+	var CY = 10;
 	function paint$5(ctx, size) {
-		const cx = size / 2;
-		const cy = size / 2;
-		ctx.save();
-		ctx.translate(cx, cy);
-		const melonW = size * .26;
-		const melonH = size * .2;
-		const shadow = ctx.createRadialGradient(0, melonH * .4, 0, 0, melonH * .4, melonW * 1.2);
-		shadow.addColorStop(0, "rgba(20,80,40,0.4)");
-		shadow.addColorStop(1, "rgba(0,0,0,0)");
-		ctx.fillStyle = shadow;
-		ctx.shadowBlur = 0;
-		ctx.beginPath();
-		ctx.ellipse(0, melonH * .4, melonW * 1.2, melonH * .5, 0, 0, Math.PI * 2);
-		ctx.fill();
-		const bodyGrad = ctx.createRadialGradient(-melonW * .3, -melonH * .3, 0, 0, 0, melonW * 1.1);
-		bodyGrad.addColorStop(0, "rgba(200,255,220,1)");
-		bodyGrad.addColorStop(.2, "rgba(140,240,170,0.98)");
-		bodyGrad.addColorStop(.5, "rgba(80,210,120,0.95)");
-		bodyGrad.addColorStop(.75, "rgba(50,170,80,0.9)");
-		bodyGrad.addColorStop(1, "rgba(20,100,50,0.8)");
-		ctx.fillStyle = bodyGrad;
-		ctx.shadowBlur = 15;
-		ctx.shadowColor = "rgba(100,255,150,1)";
-		ctx.beginPath();
-		ctx.ellipse(0, 0, melonW, melonH, 0, 0, Math.PI * 2);
-		ctx.fill();
-		const innerGlow = ctx.createRadialGradient(0, 0, melonW * .6, 0, 0, melonW);
-		innerGlow.addColorStop(0, "rgba(100,255,150,0)");
-		innerGlow.addColorStop(.7, "rgba(60,220,100,0.2)");
-		innerGlow.addColorStop(1, "rgba(40,180,80,0.4)");
-		ctx.fillStyle = innerGlow;
-		ctx.shadowBlur = 0;
-		ctx.beginPath();
-		ctx.ellipse(0, 0, melonW, melonH, 0, 0, Math.PI * 2);
-		ctx.fill();
-		const stripeCount = 6;
-		for (let i = 0; i < stripeCount; i++) {
-			const x = (i - 5 / 2) / 5 * melonW * 1.6;
-			if (Math.abs(x) > melonW * .85) continue;
-			const yTop = -melonH * Math.sqrt(1 - x / melonW * (x / melonW)) * .85;
-			const yBottom = melonH * Math.sqrt(1 - x / melonW * (x / melonW)) * .85;
-			const stripeGrad = ctx.createLinearGradient(x, yTop, x, yBottom);
-			stripeGrad.addColorStop(0, "rgba(20,80,40,0)");
-			stripeGrad.addColorStop(.2, "rgba(30,100,50,0.6)");
-			stripeGrad.addColorStop(.5, "rgba(20,80,40,0.75)");
-			stripeGrad.addColorStop(.8, "rgba(30,100,50,0.6)");
-			stripeGrad.addColorStop(1, "rgba(20,80,40,0)");
-			ctx.strokeStyle = stripeGrad;
-			ctx.lineWidth = 3.5;
-			ctx.shadowBlur = 4;
-			ctx.shadowColor = "rgba(40,120,60,0.6)";
-			ctx.lineCap = "round";
+		beginItem(ctx, size);
+		const melon = () => {
 			ctx.beginPath();
-			const curveAmount = .08;
-			ctx.moveTo(x, yTop);
-			ctx.quadraticCurveTo(x + x * curveAmount, 0, x, yBottom);
+			ctx.ellipse(0, CY, RX, RY, 0, 0, Math.PI * 2);
+		};
+		const stem = () => {
+			ctx.beginPath();
+			ctx.moveTo(0, -48);
+			ctx.quadraticCurveTo(2, -66, 14, -72);
+			ctx.quadraticCurveTo(26, -76, 22, -86);
+		};
+		outline(ctx, [stem], OUTLINE$5, 18);
+		outline(ctx, [melon], OUTLINE$5);
+		ctx.strokeStyle = "rgba(120,170,60,1)";
+		ctx.lineWidth = 6;
+		stem();
+		ctx.stroke();
+		const body = ctx.createRadialGradient(-30, -16, 6, 0, CY, RX);
+		body.addColorStop(0, "rgba(210,255,170,1)");
+		body.addColorStop(.4, "rgba(120,210,90,1)");
+		body.addColorStop(1, "rgba(40,130,50,1)");
+		ctx.fillStyle = body;
+		ctx.shadowBlur = 10;
+		ctx.shadowColor = "rgba(120,255,140,0.9)";
+		melon();
+		ctx.fill();
+		ctx.shadowBlur = 0;
+		ctx.save();
+		melon();
+		ctx.clip();
+		ctx.strokeStyle = "rgba(20,90,30,0.95)";
+		ctx.lineWidth = 11;
+		for (const k of [
+			-.8,
+			-.4,
+			0,
+			.4,
+			.8
+		]) {
+			ctx.beginPath();
+			for (let i = 0; i <= 12; i++) {
+				const t = -1 + i / 6;
+				const y = CY + t * RY;
+				const bulge = Math.sqrt(Math.max(0, 1 - t * t));
+				const x = k * RX * bulge + (i % 2 === 0 ? -4 : 4);
+				if (i === 0) ctx.moveTo(x, y);
+				else ctx.lineTo(x, y);
+			}
 			ctx.stroke();
 		}
-		const bottomDark = ctx.createLinearGradient(0, 0, 0, melonH);
-		bottomDark.addColorStop(0, "rgba(0,0,0,0)");
-		bottomDark.addColorStop(.6, "rgba(10,40,20,0.15)");
-		bottomDark.addColorStop(1, "rgba(5,25,10,0.35)");
-		ctx.fillStyle = bottomDark;
-		ctx.beginPath();
-		ctx.ellipse(0, 0, melonW, melonH, 0, 0, Math.PI * 2);
-		ctx.fill();
-		const highlight1 = ctx.createRadialGradient(-melonW * .35, -melonH * .4, 0, -melonW * .35, -melonH * .4, melonW * .25);
-		highlight1.addColorStop(0, "rgba(255,255,255,0.95)");
-		highlight1.addColorStop(.3, "rgba(230,255,240,0.6)");
-		highlight1.addColorStop(.7, "rgba(180,255,200,0.2)");
-		highlight1.addColorStop(1, "rgba(0,0,0,0)");
-		ctx.fillStyle = highlight1;
-		ctx.shadowBlur = 0;
-		ctx.beginPath();
-		ctx.ellipse(-melonW * .35, -melonH * .4, melonW * .25, melonH * .15, 0, 0, Math.PI * 2);
-		ctx.fill();
-		const highlight2 = ctx.createRadialGradient(melonW * .3, melonH * .15, 0, melonW * .3, melonH * .15, melonW * .1);
-		highlight2.addColorStop(0, "rgba(200,255,220,0.5)");
-		highlight2.addColorStop(.5, "rgba(150,255,180,0.2)");
-		highlight2.addColorStop(1, "rgba(0,0,0,0)");
-		ctx.fillStyle = highlight2;
-		ctx.beginPath();
-		ctx.arc(melonW * .3, melonH * .15, melonW * .1, 0, Math.PI * 2);
-		ctx.fill();
-		ctx.strokeStyle = "rgba(140,255,180,0.6)";
-		ctx.lineWidth = 1.5;
-		ctx.shadowBlur = 6;
-		ctx.shadowColor = "rgba(100,255,150,0.8)";
-		ctx.beginPath();
-		ctx.ellipse(0, 0, melonW, melonH, 0, 0, Math.PI * 2);
-		ctx.stroke();
-		const stemGrad = ctx.createLinearGradient(0, -melonH, 0, -melonH * 1.3);
-		stemGrad.addColorStop(0, "rgba(100,255,200,0.9)");
-		stemGrad.addColorStop(.5, "rgba(80,220,180,0.8)");
-		stemGrad.addColorStop(1, "rgba(60,180,150,0.6)");
-		ctx.strokeStyle = stemGrad;
-		ctx.lineWidth = 3;
-		ctx.shadowBlur = 10;
-		ctx.shadowColor = "rgba(100,255,200,1)";
-		ctx.lineCap = "round";
-		ctx.beginPath();
-		ctx.moveTo(0, -melonH);
-		ctx.quadraticCurveTo(size * .02, -melonH * 1.15, size * .01, -melonH * 1.3);
-		ctx.stroke();
-		ctx.strokeStyle = "rgba(200,255,230,0.7)";
-		ctx.lineWidth = 1.2;
-		ctx.shadowBlur = 6;
-		ctx.beginPath();
-		ctx.moveTo(0, -melonH);
-		ctx.quadraticCurveTo(size * .02, -melonH * 1.15, size * .01, -melonH * 1.3);
-		ctx.stroke();
-		const leafGrad = ctx.createLinearGradient(0, -melonH * 1.15, size * .08, -melonH * 1.25);
-		leafGrad.addColorStop(0, "rgba(80,220,160,0.95)");
-		leafGrad.addColorStop(.5, "rgba(100,240,180,0.9)");
-		leafGrad.addColorStop(1, "rgba(120,255,200,0.7)");
-		ctx.fillStyle = leafGrad;
-		ctx.shadowBlur = 6;
-		ctx.shadowColor = "rgba(100,255,200,0.8)";
-		ctx.beginPath();
-		ctx.ellipse(size * .05, -melonH * 1.2, size * .04, size * .015, Math.PI / 6, 0, Math.PI * 2);
-		ctx.fill();
-		ctx.strokeStyle = "rgba(200,255,230,0.8)";
-		ctx.lineWidth = .8;
-		ctx.shadowBlur = 3;
-		ctx.beginPath();
-		ctx.moveTo(size * .02, -melonH * 1.18);
-		ctx.lineTo(size * .07, -melonH * 1.22);
-		ctx.stroke();
-		const sparkles = [
-			{
-				x: size * .3,
-				y: -size * .05,
-				r: 2
-			},
-			{
-				x: -size * .29,
-				y: -size * .08,
-				r: 1.5
-			},
-			{
-				x: size * .27,
-				y: size * .12,
-				r: 1.8
-			},
-			{
-				x: -size * .28,
-				y: size * .1,
-				r: 1.5
-			},
-			{
-				x: size * .08,
-				y: size * .26,
-				r: 1.8
-			},
-			{
-				x: -size * .1,
-				y: -size * .26,
-				r: 1.5
-			}
-		];
-		for (const sp of sparkles) {
-			const sparkleGlow = ctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, sp.r * 3);
-			sparkleGlow.addColorStop(0, "rgba(180,255,200,0.8)");
-			sparkleGlow.addColorStop(.5, "rgba(120,255,160,0.3)");
-			sparkleGlow.addColorStop(1, "rgba(0,0,0,0)");
-			ctx.fillStyle = sparkleGlow;
-			ctx.shadowBlur = 0;
-			ctx.beginPath();
-			ctx.arc(sp.x, sp.y, sp.r * 3, 0, Math.PI * 2);
-			ctx.fill();
-			ctx.fillStyle = "rgba(255,255,255,0.95)";
-			ctx.shadowBlur = 6;
-			ctx.shadowColor = "rgba(180,255,200,1)";
-			ctx.beginPath();
-			ctx.arc(sp.x, sp.y, sp.r, 0, Math.PI * 2);
-			ctx.fill();
-		}
+		const shade = ctx.createLinearGradient(0, -52, 0, 72);
+		shade.addColorStop(.5, "rgba(0,0,0,0)");
+		shade.addColorStop(1, "rgba(0,40,10,0.35)");
+		ctx.fillStyle = shade;
+		ctx.fillRect(-76, -52, 152, 124);
+		ctx.restore();
+		gloss(ctx, -34, -18, 22, 12, -.5);
+		sparkle(ctx, 44, 34, 2.5, "rgba(200,255,200,1)");
 		ctx.restore();
 	}
 	var MELON_ART = {
@@ -4863,117 +4318,93 @@
 	};
 	//#endregion
 	//#region src/games/pacman/render/items/fruit/GalaxianView.ts
+	var OUTLINE$4 = "rgba(10,14,60,0.95)";
 	function paint$4(ctx, size) {
-		const cx = size / 2;
-		const cy = size / 2;
-		ctx.save();
-		ctx.translate(cx, cy);
-		const shipW = size * .3;
-		const shipH = size * .35;
-		const leftWing = () => {
+		beginItem(ctx, size);
+		const wings = () => {
 			ctx.beginPath();
-			ctx.moveTo(-shipW * .15, -shipH * .1);
-			ctx.lineTo(-shipW * .9, shipH * .3);
-			ctx.lineTo(-shipW * .15, shipH * .15);
+			ctx.moveTo(-14, -18);
+			ctx.lineTo(-84, 26);
+			ctx.lineTo(-80, 50);
+			ctx.lineTo(-16, 30);
+			ctx.closePath();
+			ctx.moveTo(14, -18);
+			ctx.lineTo(84, 26);
+			ctx.lineTo(80, 50);
+			ctx.lineTo(16, 30);
 			ctx.closePath();
 		};
-		const rightWing = () => {
+		const tail = () => {
 			ctx.beginPath();
-			ctx.moveTo(shipW * .15, -shipH * .1);
-			ctx.lineTo(shipW * .9, shipH * .3);
-			ctx.lineTo(shipW * .15, shipH * .15);
+			ctx.moveTo(-12, 40);
+			ctx.lineTo(-34, 70);
+			ctx.lineTo(-8, 62);
+			ctx.closePath();
+			ctx.moveTo(12, 40);
+			ctx.lineTo(34, 70);
+			ctx.lineTo(8, 62);
 			ctx.closePath();
 		};
-		const wingGrad = ctx.createLinearGradient(0, -shipH * .2, 0, shipH * .3);
-		wingGrad.addColorStop(0, "rgba(160,120,240,1)");
-		wingGrad.addColorStop(.5, "rgba(120,80,210,0.95)");
-		wingGrad.addColorStop(1, "rgba(60,40,150,0.9)");
-		ctx.fillStyle = wingGrad;
-		ctx.shadowBlur = 12;
-		ctx.shadowColor = "rgba(140,100,255,0.9)";
-		leftWing();
-		ctx.fill();
-		rightWing();
-		ctx.fill();
-		ctx.strokeStyle = "rgba(200,180,255,0.8)";
-		ctx.lineWidth = 2;
+		const hull = () => {
+			ctx.beginPath();
+			ctx.moveTo(0, -78);
+			ctx.bezierCurveTo(16, -60, 22, -20, 20, 30);
+			ctx.quadraticCurveTo(18, 66, 0, 70);
+			ctx.quadraticCurveTo(-18, 66, -20, 30);
+			ctx.bezierCurveTo(-22, -20, -16, -60, 0, -78);
+			ctx.closePath();
+		};
+		const cockpit = () => {
+			ctx.beginPath();
+			ctx.ellipse(0, -30, 9, 18, 0, 0, Math.PI * 2);
+		};
+		outline(ctx, [
+			wings,
+			tail,
+			hull
+		], OUTLINE$4);
+		const red = ctx.createLinearGradient(0, -20, 0, 50);
+		red.addColorStop(0, "rgba(255,110,120,1)");
+		red.addColorStop(1, "rgba(180,20,50,1)");
+		ctx.fillStyle = red;
 		ctx.shadowBlur = 8;
-		ctx.shadowColor = "rgba(180,150,255,1)";
-		leftWing();
-		ctx.stroke();
-		rightWing();
-		ctx.stroke();
-		const body = () => {
-			ctx.beginPath();
-			ctx.moveTo(0, -shipH * .5);
-			ctx.lineTo(shipW * .2, -shipH * .1);
-			ctx.lineTo(shipW * .15, shipH * .35);
-			ctx.lineTo(-shipW * .15, shipH * .35);
-			ctx.lineTo(-shipW * .2, -shipH * .1);
-			ctx.closePath();
-		};
-		const bodyGrad = ctx.createRadialGradient(0, -shipH * .2, 0, 0, 0, shipH * .5);
-		bodyGrad.addColorStop(0, "rgba(220,200,255,1)");
-		bodyGrad.addColorStop(.4, "rgba(180,150,240,0.98)");
-		bodyGrad.addColorStop(.8, "rgba(120,90,210,0.95)");
-		bodyGrad.addColorStop(1, "rgba(80,50,160,0.9)");
-		ctx.fillStyle = bodyGrad;
-		ctx.shadowBlur = 15;
-		ctx.shadowColor = "rgba(180,150,255,1)";
-		body();
+		ctx.shadowColor = "rgba(255,80,120,0.9)";
+		wings();
 		ctx.fill();
-		ctx.strokeStyle = "rgba(220,210,255,0.9)";
-		ctx.lineWidth = 2;
-		ctx.shadowBlur = 10;
-		ctx.shadowColor = "rgba(200,180,255,1)";
-		body();
-		ctx.stroke();
-		const cockpitGrad = ctx.createRadialGradient(-shipH * .03, -shipH * .18, 0, 0, -shipH * .15, shipH * .08);
-		cockpitGrad.addColorStop(0, "rgba(255,220,230,1)");
-		cockpitGrad.addColorStop(.4, "rgba(255,140,170,0.98)");
-		cockpitGrad.addColorStop(.8, "rgba(230,60,110,0.95)");
-		cockpitGrad.addColorStop(1, "rgba(180,30,80,0.9)");
-		ctx.fillStyle = cockpitGrad;
-		ctx.shadowBlur = 10;
-		ctx.shadowColor = "rgba(255,100,150,1)";
-		ctx.beginPath();
-		ctx.arc(0, -shipH * .15, shipH * .08, 0, Math.PI * 2);
+		tail();
 		ctx.fill();
-		ctx.fillStyle = "rgba(255,255,255,0.9)";
 		ctx.shadowBlur = 0;
+		ctx.strokeStyle = "rgba(80,170,255,1)";
+		ctx.lineWidth = 6;
 		ctx.beginPath();
-		ctx.arc(-shipH * .03, -shipH * .18, shipH * .025, 0, Math.PI * 2);
+		ctx.moveTo(-20, -10);
+		ctx.lineTo(-78, 28);
+		ctx.moveTo(20, -10);
+		ctx.lineTo(78, 28);
+		ctx.stroke();
+		const yellow = ctx.createLinearGradient(-20, 0, 20, 0);
+		yellow.addColorStop(0, "rgba(255,250,180,1)");
+		yellow.addColorStop(.5, "rgba(255,214,60,1)");
+		yellow.addColorStop(1, "rgba(200,140,10,1)");
+		ctx.fillStyle = yellow;
+		ctx.shadowBlur = 8;
+		ctx.shadowColor = "rgba(255,220,100,0.9)";
+		hull();
 		ctx.fill();
-		for (const side of [-1, 1]) {
-			const tx = side * shipW * .85;
-			const ty = shipH * .25;
-			const tipGrad = ctx.createRadialGradient(tx, ty, 0, tx, ty, shipH * .05);
-			tipGrad.addColorStop(0, "rgba(255,200,210,1)");
-			tipGrad.addColorStop(.5, "rgba(255,100,140,0.95)");
-			tipGrad.addColorStop(1, "rgba(200,50,100,0.8)");
-			ctx.fillStyle = tipGrad;
-			ctx.shadowBlur = 6;
-			ctx.shadowColor = "rgba(255,100,150,1)";
-			ctx.beginPath();
-			ctx.arc(tx, ty, shipH * .05, 0, Math.PI * 2);
-			ctx.fill();
-		}
-		const engGrad = ctx.createRadialGradient(0, shipH * .35, 0, 0, shipH * .35, shipH * .08);
-		engGrad.addColorStop(0, "rgba(255,240,180,0.95)");
-		engGrad.addColorStop(.4, "rgba(255,180,80,0.7)");
-		engGrad.addColorStop(.8, "rgba(255,120,40,0.3)");
-		engGrad.addColorStop(1, "rgba(0,0,0,0)");
-		ctx.fillStyle = engGrad;
 		ctx.shadowBlur = 0;
-		ctx.beginPath();
-		ctx.arc(0, shipH * .35, shipH * .08, 0, Math.PI * 2);
+		const glass = ctx.createLinearGradient(0, -48, 0, -12);
+		glass.addColorStop(0, "rgba(180,230,255,1)");
+		glass.addColorStop(1, "rgba(30,90,220,1)");
+		ctx.fillStyle = glass;
+		cockpit();
 		ctx.fill();
-		ctx.fillStyle = "rgba(255,255,240,0.95)";
-		ctx.shadowBlur = 6;
-		ctx.shadowColor = "rgba(255,200,120,1)";
-		ctx.beginPath();
-		ctx.arc(0, shipH * .35, shipH * .025, 0, Math.PI * 2);
-		ctx.fill();
+		ctx.strokeStyle = OUTLINE$4;
+		ctx.lineWidth = 4;
+		cockpit();
+		ctx.stroke();
+		gloss(ctx, -3, -38, 3, 7, 0, .95);
+		gloss(ctx, -8, 10, 4, 18, 0, .7);
+		sparkle(ctx, 62, 40, 2.5, "rgba(200,220,255,1)");
 		ctx.restore();
 	}
 	var GALAXIAN_ART = {
@@ -4985,13 +4416,9 @@
 	//#endregion
 	//#region src/games/pacman/render/items/fruit/BellView.ts
 	/** Outline: dark amber, wide enough to survive the downscale to a tile. */
-	var OUTLINE$1 = "rgba(70,38,6,0.95)";
+	var OUTLINE$3 = "rgba(70,38,6,0.95)";
 	function paint$3(ctx, size) {
-		ctx.save();
-		ctx.translate(size / 2, size / 2);
-		ctx.scale(size / 256, size / 256);
-		ctx.lineJoin = "round";
-		ctx.lineCap = "round";
+		beginItem(ctx, size);
 		const body = () => {
 			ctx.beginPath();
 			ctx.moveTo(0, -70);
@@ -5014,17 +4441,12 @@
 			ctx.beginPath();
 			ctx.arc(0, 68, 14, 0, Math.PI * 2);
 		};
-		ctx.strokeStyle = OUTLINE$1;
-		ctx.lineWidth = 14;
-		for (const part of [
+		outline(ctx, [
 			loop,
 			clapper,
 			body,
 			rim
-		]) {
-			part();
-			ctx.stroke();
-		}
+		], OUTLINE$3);
 		ctx.strokeStyle = "rgba(255,214,90,1)";
 		ctx.lineWidth = 8;
 		loop();
@@ -5095,31 +4517,8 @@
 		ctx.beginPath();
 		ctx.ellipse(-10, -58, 9, 5, -.3, 0, Math.PI * 2);
 		ctx.fill();
-		for (const [x, y, r] of [[
-			30,
-			-30,
-			3
-		], [
-			56,
-			34,
-			2.5
-		]]) {
-			ctx.fillStyle = "rgba(255,255,255,0.95)";
-			ctx.shadowBlur = 6;
-			ctx.shadowColor = "rgba(255,240,180,1)";
-			ctx.beginPath();
-			ctx.moveTo(x, y - r * 3);
-			ctx.lineTo(x + r * .7, y - r * .7);
-			ctx.lineTo(x + r * 3, y);
-			ctx.lineTo(x + r * .7, y + r * .7);
-			ctx.lineTo(x, y + r * 3);
-			ctx.lineTo(x - r * .7, y + r * .7);
-			ctx.lineTo(x - r * 3, y);
-			ctx.lineTo(x - r * .7, y - r * .7);
-			ctx.closePath();
-			ctx.fill();
-		}
-		ctx.shadowBlur = 0;
+		sparkle(ctx, 30, -30, 3, "rgba(255,240,180,1)");
+		sparkle(ctx, 56, 34, 2.5, "rgba(255,240,180,1)");
 		ctx.restore();
 	}
 	var BELL_ART = {
@@ -5131,17 +4530,13 @@
 	//#endregion
 	//#region src/games/pacman/render/items/fruit/KeyView.ts
 	/** Outline: deep blue, wide enough to survive the downscale to a tile. */
-	var OUTLINE = "rgba(10,30,70,0.95)";
+	var OUTLINE$2 = "rgba(10,30,70,0.95)";
 	var BOW_Y = -56;
 	var BOW_R = 42;
 	var HOLE_R = 19;
 	function paint$2(ctx, size) {
-		ctx.save();
-		ctx.translate(size / 2, size / 2);
-		ctx.scale(size / 256, size / 256);
+		beginItem(ctx, size);
 		ctx.rotate(-Math.PI / 4);
-		ctx.lineJoin = "round";
-		ctx.lineCap = "round";
 		const bow = () => {
 			ctx.beginPath();
 			ctx.arc(0, BOW_Y, BOW_R, 0, Math.PI * 2);
@@ -5169,12 +4564,7 @@
 			shaft,
 			teeth
 		];
-		ctx.strokeStyle = OUTLINE;
-		ctx.lineWidth = 14;
-		for (const part of parts) {
-			part();
-			ctx.stroke();
-		}
+		outline(ctx, parts, OUTLINE$2);
 		const metal = ctx.createLinearGradient(-42, 0, 42, 0);
 		metal.addColorStop(0, "rgba(210,246,255,1)");
 		metal.addColorStop(.35, "rgba(120,212,250,1)");
@@ -5200,7 +4590,7 @@
 		hole();
 		ctx.fill();
 		ctx.globalCompositeOperation = "source-over";
-		ctx.strokeStyle = OUTLINE;
+		ctx.strokeStyle = OUTLINE$2;
 		ctx.lineWidth = 6;
 		hole();
 		ctx.stroke();
@@ -5220,26 +4610,7 @@
 		ctx.moveTo(-6, -2);
 		ctx.lineTo(-6, 40);
 		ctx.stroke();
-		const [x, y, r] = [
-			22,
-			-74,
-			3
-		];
-		ctx.fillStyle = "rgba(255,255,255,0.95)";
-		ctx.shadowBlur = 6;
-		ctx.shadowColor = "rgba(200,240,255,1)";
-		ctx.beginPath();
-		ctx.moveTo(x, y - r * 3);
-		ctx.lineTo(x + r * .7, y - r * .7);
-		ctx.lineTo(x + r * 3, y);
-		ctx.lineTo(x + r * .7, y + r * .7);
-		ctx.lineTo(x, y + r * 3);
-		ctx.lineTo(x - r * .7, y + r * .7);
-		ctx.lineTo(x - r * 3, y);
-		ctx.lineTo(x - r * .7, y - r * .7);
-		ctx.closePath();
-		ctx.fill();
-		ctx.shadowBlur = 0;
+		sparkle(ctx, 22, -74, 3, "rgba(200,240,255,1)");
 		ctx.restore();
 	}
 	var KEY_ART = {
@@ -5269,90 +4640,46 @@
 	}
 	//#endregion
 	//#region src/games/pacman/render/items/BonusLifeView.ts
+	var OUTLINE$1 = "rgba(4,50,44,0.95)";
 	function paint$1(ctx, size) {
-		const cx = size / 2;
-		const cy = size / 2;
-		const scale = size * .012;
-		ctx.save();
-		ctx.translate(cx, cy + scale * 8);
-		ctx.scale(scale, scale);
-		const heartPath = () => {
+		beginItem(ctx, size);
+		const heart = () => {
 			ctx.beginPath();
-			ctx.moveTo(0, -10);
-			ctx.bezierCurveTo(-10, -22, -22, -12, -22, 0);
-			ctx.bezierCurveTo(-22, 12, -12, 22, 0, 28);
-			ctx.bezierCurveTo(12, 22, 22, 12, 22, 0);
-			ctx.bezierCurveTo(22, -12, 10, -22, 0, -10);
+			ctx.moveTo(0, 74);
+			ctx.bezierCurveTo(-56, 36, -84, -2, -76, -34);
+			ctx.bezierCurveTo(-68, -70, -20, -78, 0, -44);
+			ctx.bezierCurveTo(20, -78, 68, -70, 76, -34);
+			ctx.bezierCurveTo(84, -2, 56, 36, 0, 74);
+			ctx.closePath();
 		};
-		ctx.strokeStyle = "rgba(150,255,200,0.95)";
-		ctx.lineWidth = 3;
-		ctx.shadowBlur = 12;
-		ctx.shadowColor = "rgba(100,255,180,1)";
-		heartPath();
-		ctx.stroke();
-		ctx.strokeStyle = "rgba(180,255,220,0.7)";
-		ctx.lineWidth = 2;
-		ctx.shadowBlur = 6;
-		ctx.shadowColor = "rgba(120,255,200,0.8)";
-		ctx.beginPath();
-		ctx.moveTo(0, -8);
-		ctx.bezierCurveTo(-8, -18, -18, -10, -18, 0);
-		ctx.bezierCurveTo(-18, 10, -10, 18, 0, 24);
-		ctx.bezierCurveTo(10, 18, 18, 10, 18, 0);
-		ctx.bezierCurveTo(18, -10, 8, -18, 0, -8);
-		ctx.stroke();
-		ctx.strokeStyle = "rgba(220,255,240,0.5)";
-		ctx.lineWidth = 1.5;
-		ctx.shadowBlur = 4;
-		ctx.shadowColor = "rgba(150,255,220,0.6)";
-		ctx.beginPath();
-		ctx.moveTo(0, -6);
-		ctx.bezierCurveTo(-7, -15, -15, -8, -15, 0);
-		ctx.bezierCurveTo(-15, 8, -8, 15, 0, 20);
-		ctx.bezierCurveTo(8, 15, 15, 8, 15, 0);
-		ctx.bezierCurveTo(15, -8, 7, -15, 0, -6);
-		ctx.stroke();
-		ctx.shadowBlur = 0;
-		const fillGrad = ctx.createRadialGradient(0, 5, 0, 0, 5, 20);
-		fillGrad.addColorStop(0, "rgba(200,255,230,0.4)");
-		fillGrad.addColorStop(.5, "rgba(120,255,180,0.2)");
-		fillGrad.addColorStop(1, "rgba(60,200,140,0.05)");
-		ctx.fillStyle = fillGrad;
-		heartPath();
-		ctx.fill();
-		for (const layer of [{
-			r: 12,
-			stops: [
-				[0, "rgba(255,255,255,0.95)"],
-				[.2, "rgba(220,255,240,0.7)"],
-				[.5, "rgba(150,255,200,0.3)"],
-				[1, "rgba(0,0,0,0)"]
-			]
-		}, {
-			r: 8,
-			stops: [
-				[0, "rgba(255,255,255,1)"],
-				[.4, "rgba(240,255,250,0.8)"],
-				[1, "rgba(0,0,0,0)"]
-			]
-		}]) {
-			const g = ctx.createRadialGradient(0, 2, 0, 0, 2, layer.r);
-			for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
-			ctx.fillStyle = g;
-			ctx.fillRect(-layer.r, -layer.r + 2, layer.r * 2, layer.r * 2);
-		}
-		ctx.strokeStyle = "rgba(200,255,230,0.4)";
-		ctx.lineWidth = .8;
-		ctx.shadowBlur = 3;
-		ctx.shadowColor = "rgba(150,255,200,0.6)";
-		for (let i = 0; i < 4; i++) {
-			const angle = i / 4 * Math.PI * 2;
-			const length = 15;
+		const plus = () => {
 			ctx.beginPath();
-			ctx.moveTo(Math.cos(angle) * 3, 2 + Math.sin(angle) * 3);
-			ctx.lineTo(Math.cos(angle) * length, 2 + Math.sin(angle) * length);
-			ctx.stroke();
-		}
+			ctx.moveTo(0, -22);
+			ctx.lineTo(0, 34);
+			ctx.moveTo(-28, 6);
+			ctx.lineTo(28, 6);
+		};
+		outline(ctx, [heart], OUTLINE$1);
+		const body = ctx.createRadialGradient(-30, -30, 6, 0, 0, 90);
+		body.addColorStop(0, "rgba(220,255,240,1)");
+		body.addColorStop(.35, "rgba(110,240,180,1)");
+		body.addColorStop(.75, "rgba(30,180,130,1)");
+		body.addColorStop(1, "rgba(10,110,90,1)");
+		ctx.fillStyle = body;
+		ctx.shadowBlur = 10;
+		ctx.shadowColor = "rgba(120,255,200,0.9)";
+		heart();
+		ctx.fill();
+		ctx.shadowBlur = 0;
+		ctx.strokeStyle = OUTLINE$1;
+		ctx.lineWidth = 32;
+		plus();
+		ctx.stroke();
+		ctx.strokeStyle = "rgba(255,255,255,1)";
+		ctx.lineWidth = 18;
+		plus();
+		ctx.stroke();
+		gloss(ctx, -44, -38, 16, 10, -.6);
 		ctx.restore();
 	}
 	/** The mock-up's ticker: the heartbeat, a slight sway, the flicker. */
@@ -5368,10 +4695,10 @@
 	/** Mock-up display px → texture px (heart 100 px from a 128 px texture). */
 	var DISPLAY = 128 / 100;
 	var ORBIT_WOBBLE = 2;
-	/** The orbit's centre: the heart's, which sits below the texture centre, texture px. */
-	var ORBIT_Y = 22;
+	/** The orbit's centre: the heart's, texture px. */
+	var ORBIT_Y = 0;
 	/** The orbit's far edge plus half the largest particle, texture px. */
-	var ORBIT_X_REACH = 44 * DISPLAY;
+	var ORBIT_X_REACH = 46 * DISPLAY;
 	/** Fixed per-particle randomness, so the orbit is a function of time. */
 	var ORBIT = Array.from({ length: 16 }, (_, i) => {
 		const r = (n) => {
@@ -5380,7 +4707,7 @@
 		};
 		return {
 			angle: i / 16 * Math.PI * 2,
-			radius: 32 + r(1) * 8,
+			radius: 34 + r(1) * 8,
 			speed: .6 + r(2) * .4,
 			size: .6 + r(3) * .4
 		};
@@ -5399,10 +4726,10 @@
 		}],
 		motion: heartMotion,
 		extraBounds: {
-			x0: -56.32,
-			y0: -18.192,
+			x0: -58.88,
+			y0: -41.984,
 			x1: ORBIT_X_REACH,
-			y1: 62.192
+			y1: 41.984
 		}
 	};
 	function drawBonusLife(ctx, x, y, tile, time) {
@@ -5425,54 +4752,62 @@
 	}
 	//#endregion
 	//#region src/games/pacman/render/items/ExitView.ts
+	var OUTLINE = "rgba(8,20,60,0.95)";
+	/** The opening's half width and half height, design units. */
+	var W = 44;
+	var H = 72;
 	function paint(ctx, size) {
-		const cx = size / 2;
-		const cy = size / 2;
-		ctx.save();
-		ctx.translate(cx, cy);
-		const w = size * .2;
-		const h = size * .3;
-		const door = () => {
+		beginItem(ctx, size);
+		const door = (grow) => () => {
 			ctx.beginPath();
-			ctx.moveTo(-w, h);
-			ctx.lineTo(-w, -h + w);
-			ctx.arc(0, -h + w, w, Math.PI, 0);
-			ctx.lineTo(w, h);
+			ctx.moveTo(-44 - grow, H);
+			ctx.lineTo(-44 - grow, -28);
+			ctx.arc(0, -28, W + grow, Math.PI, 0);
+			ctx.lineTo(W + grow, H);
 			ctx.closePath();
 		};
-		const inside = ctx.createLinearGradient(0, -h, 0, h);
-		inside.addColorStop(0, "rgba(255,255,255,0.95)");
-		inside.addColorStop(.5, "rgba(170,235,255,0.85)");
-		inside.addColorStop(1, "rgba(60,140,210,0.7)");
-		ctx.fillStyle = inside;
-		ctx.shadowBlur = 18;
-		ctx.shadowColor = "rgba(140,220,255,1)";
-		door();
+		const frame = door(14);
+		const opening = door(0);
+		const step = () => {
+			ctx.beginPath();
+			ctx.roundRect(-68, 68, 136, 16, 5);
+		};
+		const arrow = () => {
+			ctx.beginPath();
+			ctx.moveTo(0, 54);
+			ctx.lineTo(0, -46);
+			ctx.moveTo(-26, -22);
+			ctx.lineTo(0, -48);
+			ctx.lineTo(26, -22);
+		};
+		outline(ctx, [frame, step], OUTLINE);
+		const stone = ctx.createLinearGradient(-58, 0, 58, 0);
+		stone.addColorStop(0, "rgba(170,200,240,1)");
+		stone.addColorStop(1, "rgba(70,100,170,1)");
+		ctx.fillStyle = stone;
+		frame();
 		ctx.fill();
-		ctx.strokeStyle = "rgba(220,245,255,0.9)";
-		ctx.lineWidth = 6;
-		ctx.shadowBlur = 10;
+		step();
+		ctx.fill();
+		const light = ctx.createLinearGradient(0, -72, 0, H);
+		light.addColorStop(0, "rgba(255,255,255,1)");
+		light.addColorStop(.5, "rgba(180,240,255,1)");
+		light.addColorStop(1, "rgba(90,190,250,1)");
+		ctx.fillStyle = light;
+		ctx.shadowBlur = 12;
 		ctx.shadowColor = "rgba(160,230,255,1)";
-		door();
-		ctx.stroke();
-		ctx.strokeStyle = "rgba(255,255,255,0.9)";
-		ctx.lineWidth = 4;
-		ctx.lineCap = "round";
-		ctx.beginPath();
-		ctx.moveTo(-w * 1.35, h);
-		ctx.lineTo(w * 1.35, h);
-		ctx.stroke();
-		ctx.strokeStyle = "rgba(30,90,150,0.9)";
-		ctx.lineWidth = 7;
-		ctx.lineJoin = "round";
+		opening();
+		ctx.fill();
 		ctx.shadowBlur = 0;
-		ctx.beginPath();
-		ctx.moveTo(0, h * .6);
-		ctx.lineTo(0, -h * .35);
-		ctx.moveTo(-w * .5, -h * .05);
-		ctx.lineTo(0, -h * .4);
-		ctx.lineTo(w * .5, -h * .05);
+		ctx.strokeStyle = OUTLINE;
+		ctx.lineWidth = 5;
+		opening();
 		ctx.stroke();
+		ctx.strokeStyle = "rgba(20,70,150,1)";
+		ctx.lineWidth = 16;
+		arrow();
+		ctx.stroke();
+		sparkle(ctx, 48, -68, 3, "rgba(200,240,255,1)");
 		ctx.restore();
 	}
 	/** A steady doorway: it breathes and its light pulses, it does not sway. */

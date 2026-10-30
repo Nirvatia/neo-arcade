@@ -1,9 +1,9 @@
 // The owner's collectible mock-ups (COLLECTIBLE_*.html, PIXI) all work the same way: a
 // Canvas2D texture painted once, shown as a sprite with two blurred copies added on top
-// (bloom), the whole thing breathing and swaying. Here the texture is painted by the
-// mock-up's own code, the bloom copies are blurred once at bake time, and every frame only
-// draws three images. Sizes in the art are texture pixels. The textures carry no backdrop
-// glow of their own (the mock-ups' ambient gradients are left out) and the bloom hugs the
+// (bloom), the whole thing breathing and swaying. Here each item paints its own texture
+// (redrawn for the tile in stage 10.1, see `render/common/itemPaint`), the bloom copies are
+// blurred once at bake time, and every frame only draws three images. Sizes in the art are
+// texture pixels. The textures carry no backdrop glow of their own and the bloom hugs the
 // object; the bake measures the object and how far the glow reaches, so the object fills
 // `COLLECTIBLE_EXTENT` of a tile and, glow and animation included, never leaves the tile
 // (stage 10.1).

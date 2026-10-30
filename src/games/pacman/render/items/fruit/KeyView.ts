@@ -1,9 +1,11 @@
-// Cosmic Key, redrawn for the tile (stage 10.1): the mock-up's crystal key read as a
-// lollipop at tile size. A plain key instead, laid on the diagonal to fill the tile: a round
-// bow with a clear hole, a collar, a thick shaft and two teeth, cold steel-cyan (apart from
-// the gold bell) with a dark outline so it reads on every season.
+// Key, redrawn for the tile (stage 10.1, the painting kit in `render/common/itemPaint`):
+// the mock-up's crystal key read as a lollipop at tile size. A plain key instead, laid on
+// the diagonal to fill the tile: a round bow with a clear hole, a collar, a thick shaft and
+// two teeth, cold steel-cyan (apart from the gold bell) with a dark outline so it reads on
+// every season.
 import type { CollectibleArt } from '../collectibleSprite';
 import { FRUIT_BLOOMS } from '../collectibleSprite';
+import { beginItem, outline, sparkle } from '../../common/itemPaint';
 
 /** Outline: deep blue, wide enough to survive the downscale to a tile. */
 const OUTLINE = 'rgba(10,30,70,0.95)';
@@ -13,13 +15,9 @@ const BOW_R = 42;
 const HOLE_R = 19;
 
 function paint(ctx: CanvasRenderingContext2D, size: number): void {
-	ctx.save();
-	ctx.translate(size / 2, size / 2);
-	// the design is 256 units across, drawn upright and laid on the diagonal (bow top left)
-	ctx.scale(size / 256, size / 256);
+	beginItem(ctx, size);
+	// drawn upright and laid on the diagonal (bow top left)
 	ctx.rotate(-Math.PI / 4);
-	ctx.lineJoin = 'round';
-	ctx.lineCap = 'round';
 
 	const bow = () => {
 		ctx.beginPath();
@@ -45,12 +43,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	const parts = [bow, collar, shaft, teeth];
 
 	// 1. outline: every part stroked wide in dark, the fills cover the inner lines
-	ctx.strokeStyle = OUTLINE;
-	ctx.lineWidth = 14;
-	for (const part of parts) {
-		part();
-		ctx.stroke();
-	}
+	outline(ctx, parts, OUTLINE);
 
 	// 2. metal: lit across the key, from its left edge
 	const metal = ctx.createLinearGradient(-42, 0, 42, 0);
@@ -108,22 +101,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.stroke();
 
 	// 6. a sparkle on the bow
-	const [x, y, r] = [22, BOW_Y - 18, 3];
-	ctx.fillStyle = 'rgba(255,255,255,0.95)';
-	ctx.shadowBlur = 6;
-	ctx.shadowColor = 'rgba(200,240,255,1)';
-	ctx.beginPath();
-	ctx.moveTo(x, y - r * 3);
-	ctx.lineTo(x + r * 0.7, y - r * 0.7);
-	ctx.lineTo(x + r * 3, y);
-	ctx.lineTo(x + r * 0.7, y + r * 0.7);
-	ctx.lineTo(x, y + r * 3);
-	ctx.lineTo(x - r * 0.7, y + r * 0.7);
-	ctx.lineTo(x - r * 3, y);
-	ctx.lineTo(x - r * 0.7, y - r * 0.7);
-	ctx.closePath();
-	ctx.fill();
-	ctx.shadowBlur = 0;
+	sparkle(ctx, 22, BOW_Y - 18, 3, 'rgba(200,240,255,1)');
 
 	ctx.restore();
 }

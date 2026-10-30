@@ -1,9 +1,11 @@
-// Cosmic Strawberry, redrawn for the tile (stage 10.1): the mock-up's rounded pink berry
-// read as a heart or an apple at tile size. A strawberry silhouette instead: a broad
-// shoulder narrowing to a point, deep red with rows of golden seeds, a big green calyx
-// crown and a stem, with a dark outline so it reads on every season.
+// Strawberry, redrawn for the tile (stage 10.1, the painting kit in
+// `render/common/itemPaint`): the mock-up's rounded pink berry read as a heart or an apple
+// at tile size. A strawberry silhouette instead: a broad shoulder narrowing to a point,
+// deep red with rows of golden seeds, a big green calyx crown and a stem, with a dark
+// outline so it reads on every season.
 import type { CollectibleArt } from '../collectibleSprite';
 import { FRUIT_BLOOMS } from '../collectibleSprite';
+import { beginItem } from '../../common/itemPaint';
 
 /** Outline: dark wine, wide enough to survive the downscale to a tile. */
 const OUTLINE = 'rgba(70,6,20,0.95)';
@@ -21,12 +23,7 @@ const LEAVES: ReadonlyArray<readonly [number, number]> = [
 const CROWN_Y = -46;
 
 function paint(ctx: CanvasRenderingContext2D, size: number): void {
-	ctx.save();
-	ctx.translate(size / 2, size / 2);
-	// the design is 256 units across
-	ctx.scale(size / 256, size / 256);
-	ctx.lineJoin = 'round';
-	ctx.lineCap = 'round';
+	beginItem(ctx, size);
 
 	const berry = () => {
 		ctx.beginPath();

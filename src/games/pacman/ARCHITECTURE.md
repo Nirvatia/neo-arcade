@@ -60,7 +60,9 @@ ui/          PacmanUi (HUD + screens + fade over the canvas), hud/ (GameHud, Arc
 - Collectibles (fruit, bonus life, exit) draw through `render/items/collectibleSprite`:
   callers pass the tile size and the time; the bake measures the object and how far its
   glow reaches over its ticker, so the object fills 0.78 of the tile and nothing leaves
-  the tile. Textures carry no backdrop glow; `extraBounds` declares what `extra` draws.
+  the tile. Textures carry no backdrop glow; `extraBounds` declares what `extra` draws. Their
+  textures are painted with `render/common/itemPaint` (256-unit design, outline, gloss,
+  sparkle).
 - A level renderer returns the board layout. In the death state it leaves Pac-Man out:
   `RenderPipeline` renders the level offscreen, runs the decay pass, then draws Pac-Man
   on top. The arcade draws its own death and level clear (no decay, no season turn).

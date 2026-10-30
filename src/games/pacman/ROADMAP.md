@@ -97,4 +97,6 @@ the owner says to go straight into the game.
   orbit is drawn closer around it). The HUD fruit icon is one tile. The bell and the key are
   redrawn (the mock-ups read as a flame and a lollipop at tile size): a classic gold bell,
   a steel-cyan key on the diagonal, both with a dark outline. Then the strawberry (read as
-  a heart) and the pear (read as a lemon) the same way.
+  a heart) and the pear (read as a lemon), and at the owner's request every other item
+  (cherry, orange, pretzel, apple, melon, Galaxian, the heart with a plus, the exit): one
+  outlined style, painted with `render/common/itemPaint`.

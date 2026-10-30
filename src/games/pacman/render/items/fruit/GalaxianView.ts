@@ -1,143 +1,105 @@
-// Cosmic Galaxian: the owner's COLLECTIBLE_GALAXIAN.html, texture code 1:1 without its
-// ambient glow (the fruit keeps inside its tile, stage 10.1).
+// Galaxian flagship, redrawn for the tile (stage 10.1, the painting kit in
+// `render/common/itemPaint`): a ship seen from above, nose up, a yellow hull, red swept
+// wings and a blue cockpit, outlined in deep navy.
 import type { CollectibleArt } from '../collectibleSprite';
 import { FRUIT_BLOOMS } from '../collectibleSprite';
+import { beginItem, gloss, outline, sparkle } from '../../common/itemPaint';
+
+const OUTLINE = 'rgba(10,14,60,0.95)';
 
 function paint(ctx: CanvasRenderingContext2D, size: number): void {
-	const cx = size / 2;
-	const cy = size / 2;
+	beginItem(ctx, size);
 
-	ctx.save();
-	ctx.translate(cx, cy);
-	const shipW = size * 0.3;
-	const shipH = size * 0.35;
-
-	// 1. wings
-	const leftWing = () => {
+	const wings = () => {
 		ctx.beginPath();
-		ctx.moveTo(-shipW * 0.15, -shipH * 0.1);
-		ctx.lineTo(-shipW * 0.9, shipH * 0.3);
-		ctx.lineTo(-shipW * 0.15, shipH * 0.15);
+		ctx.moveTo(-14, -18);
+		ctx.lineTo(-84, 26);
+		ctx.lineTo(-80, 50);
+		ctx.lineTo(-16, 30);
+		ctx.closePath();
+		ctx.moveTo(14, -18);
+		ctx.lineTo(84, 26);
+		ctx.lineTo(80, 50);
+		ctx.lineTo(16, 30);
 		ctx.closePath();
 	};
-	const rightWing = () => {
+	const tail = () => {
 		ctx.beginPath();
-		ctx.moveTo(shipW * 0.15, -shipH * 0.1);
-		ctx.lineTo(shipW * 0.9, shipH * 0.3);
-		ctx.lineTo(shipW * 0.15, shipH * 0.15);
+		ctx.moveTo(-12, 40);
+		ctx.lineTo(-34, 70);
+		ctx.lineTo(-8, 62);
+		ctx.closePath();
+		ctx.moveTo(12, 40);
+		ctx.lineTo(34, 70);
+		ctx.lineTo(8, 62);
 		ctx.closePath();
 	};
+	const hull = () => {
+		ctx.beginPath();
+		ctx.moveTo(0, -78);
+		ctx.bezierCurveTo(16, -60, 22, -20, 20, 30);
+		ctx.quadraticCurveTo(18, 66, 0, 70);
+		ctx.quadraticCurveTo(-18, 66, -20, 30);
+		ctx.bezierCurveTo(-22, -20, -16, -60, 0, -78);
+		ctx.closePath();
+	};
+	const cockpit = () => {
+		ctx.beginPath();
+		ctx.ellipse(0, -30, 9, 18, 0, 0, Math.PI * 2);
+	};
 
-	const wingGrad = ctx.createLinearGradient(0, -shipH * 0.2, 0, shipH * 0.3);
-	wingGrad.addColorStop(0, 'rgba(160,120,240,1)');
-	wingGrad.addColorStop(0.5, 'rgba(120,80,210,0.95)');
-	wingGrad.addColorStop(1, 'rgba(60,40,150,0.9)');
-	ctx.fillStyle = wingGrad;
-	ctx.shadowBlur = 12;
-	ctx.shadowColor = 'rgba(140,100,255,0.9)';
-	leftWing();
-	ctx.fill();
-	rightWing();
-	ctx.fill();
+	// 1. outline
+	outline(ctx, [wings, tail, hull], OUTLINE);
 
-	ctx.strokeStyle = 'rgba(200,180,255,0.8)';
-	ctx.lineWidth = 2;
+	// 2. wings and tail: red with a blue leading stripe
+	const red = ctx.createLinearGradient(0, -20, 0, 50);
+	red.addColorStop(0, 'rgba(255,110,120,1)');
+	red.addColorStop(1, 'rgba(180,20,50,1)');
+	ctx.fillStyle = red;
 	ctx.shadowBlur = 8;
-	ctx.shadowColor = 'rgba(180,150,255,1)';
-	leftWing();
-	ctx.stroke();
-	rightWing();
-	ctx.stroke();
-
-	// 2. body
-	const body = () => {
-		ctx.beginPath();
-		ctx.moveTo(0, -shipH * 0.5);
-		ctx.lineTo(shipW * 0.2, -shipH * 0.1);
-		ctx.lineTo(shipW * 0.15, shipH * 0.35);
-		ctx.lineTo(-shipW * 0.15, shipH * 0.35);
-		ctx.lineTo(-shipW * 0.2, -shipH * 0.1);
-		ctx.closePath();
-	};
-
-	const bodyGrad = ctx.createRadialGradient(0, -shipH * 0.2, 0, 0, 0, shipH * 0.5);
-	bodyGrad.addColorStop(0, 'rgba(220,200,255,1)');
-	bodyGrad.addColorStop(0.4, 'rgba(180,150,240,0.98)');
-	bodyGrad.addColorStop(0.8, 'rgba(120,90,210,0.95)');
-	bodyGrad.addColorStop(1, 'rgba(80,50,160,0.9)');
-	ctx.fillStyle = bodyGrad;
-	ctx.shadowBlur = 15;
-	ctx.shadowColor = 'rgba(180,150,255,1)';
-	body();
+	ctx.shadowColor = 'rgba(255,80,120,0.9)';
+	wings();
 	ctx.fill();
-
-	ctx.strokeStyle = 'rgba(220,210,255,0.9)';
-	ctx.lineWidth = 2;
-	ctx.shadowBlur = 10;
-	ctx.shadowColor = 'rgba(200,180,255,1)';
-	body();
-	ctx.stroke();
-
-	// 3. cockpit
-	const cockpitGrad = ctx.createRadialGradient(
-		-shipH * 0.03,
-		-shipH * 0.18,
-		0,
-		0,
-		-shipH * 0.15,
-		shipH * 0.08
-	);
-	cockpitGrad.addColorStop(0, 'rgba(255,220,230,1)');
-	cockpitGrad.addColorStop(0.4, 'rgba(255,140,170,0.98)');
-	cockpitGrad.addColorStop(0.8, 'rgba(230,60,110,0.95)');
-	cockpitGrad.addColorStop(1, 'rgba(180,30,80,0.9)');
-	ctx.fillStyle = cockpitGrad;
-	ctx.shadowBlur = 10;
-	ctx.shadowColor = 'rgba(255,100,150,1)';
-	ctx.beginPath();
-	ctx.arc(0, -shipH * 0.15, shipH * 0.08, 0, Math.PI * 2);
+	tail();
 	ctx.fill();
-
-	ctx.fillStyle = 'rgba(255,255,255,0.9)';
 	ctx.shadowBlur = 0;
+	ctx.strokeStyle = 'rgba(80,170,255,1)';
+	ctx.lineWidth = 6;
 	ctx.beginPath();
-	ctx.arc(-shipH * 0.03, -shipH * 0.18, shipH * 0.025, 0, Math.PI * 2);
+	ctx.moveTo(-20, -10);
+	ctx.lineTo(-78, 28);
+	ctx.moveTo(20, -10);
+	ctx.lineTo(78, 28);
+	ctx.stroke();
+
+	// 3. hull
+	const yellow = ctx.createLinearGradient(-20, 0, 20, 0);
+	yellow.addColorStop(0, 'rgba(255,250,180,1)');
+	yellow.addColorStop(0.5, 'rgba(255,214,60,1)');
+	yellow.addColorStop(1, 'rgba(200,140,10,1)');
+	ctx.fillStyle = yellow;
+	ctx.shadowBlur = 8;
+	ctx.shadowColor = 'rgba(255,220,100,0.9)';
+	hull();
 	ctx.fill();
-
-	// 4. wing tips
-	for (const side of [-1, 1]) {
-		const tx = side * shipW * 0.85;
-		const ty = shipH * 0.25;
-		const tipGrad = ctx.createRadialGradient(tx, ty, 0, tx, ty, shipH * 0.05);
-		tipGrad.addColorStop(0, 'rgba(255,200,210,1)');
-		tipGrad.addColorStop(0.5, 'rgba(255,100,140,0.95)');
-		tipGrad.addColorStop(1, 'rgba(200,50,100,0.8)');
-		ctx.fillStyle = tipGrad;
-		ctx.shadowBlur = 6;
-		ctx.shadowColor = 'rgba(255,100,150,1)';
-		ctx.beginPath();
-		ctx.arc(tx, ty, shipH * 0.05, 0, Math.PI * 2);
-		ctx.fill();
-	}
-
-	// 5. engine
-	const engGrad = ctx.createRadialGradient(0, shipH * 0.35, 0, 0, shipH * 0.35, shipH * 0.08);
-	engGrad.addColorStop(0, 'rgba(255,240,180,0.95)');
-	engGrad.addColorStop(0.4, 'rgba(255,180,80,0.7)');
-	engGrad.addColorStop(0.8, 'rgba(255,120,40,0.3)');
-	engGrad.addColorStop(1, 'rgba(0,0,0,0)');
-	ctx.fillStyle = engGrad;
 	ctx.shadowBlur = 0;
-	ctx.beginPath();
-	ctx.arc(0, shipH * 0.35, shipH * 0.08, 0, Math.PI * 2);
-	ctx.fill();
 
-	ctx.fillStyle = 'rgba(255,255,240,0.95)';
-	ctx.shadowBlur = 6;
-	ctx.shadowColor = 'rgba(255,200,120,1)';
-	ctx.beginPath();
-	ctx.arc(0, shipH * 0.35, shipH * 0.025, 0, Math.PI * 2);
+	// 4. cockpit
+	const glass = ctx.createLinearGradient(0, -48, 0, -12);
+	glass.addColorStop(0, 'rgba(180,230,255,1)');
+	glass.addColorStop(1, 'rgba(30,90,220,1)');
+	ctx.fillStyle = glass;
+	cockpit();
 	ctx.fill();
+	ctx.strokeStyle = OUTLINE;
+	ctx.lineWidth = 4;
+	cockpit();
+	ctx.stroke();
+
+	// 5. highlights
+	gloss(ctx, -3, -38, 3, 7, 0, 0.95);
+	gloss(ctx, -8, 10, 4, 18, 0, 0.7);
+	sparkle(ctx, 62, 40, 2.5, 'rgba(200,220,255,1)');
 
 	ctx.restore();
 }

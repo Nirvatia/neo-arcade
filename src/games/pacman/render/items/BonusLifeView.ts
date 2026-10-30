@@ -1,112 +1,62 @@
-// Bonus life, the cosmic heart: the owner's COLLECTIBLE_BONUS_LIFE.html, texture code 1:1
-// without its nebula glow, with its heartbeat, flicker and the 16 particles on an elliptic
-// orbit (drawn closer around the heart than in the mock-up, so all of it fits the tile). Not placed in the
-// game yet: no pickup grants a life today (lives come from the score thresholds).
+// Bonus life, redrawn for the tile (stage 10.1, the painting kit in
+// `render/common/itemPaint`): a mint heart with a white plus, outlined in deep teal, with
+// the mock-up's heartbeat, flicker and the 16 particles on an elliptic orbit around it
+// (closer than in the mock-up, so all of it fits the tile). Not placed in the game yet: no
+// pickup grants a life today (lives come from the score thresholds).
 import type { CollectibleArt, CollectibleMotion } from './collectibleSprite';
 import { drawCollectible } from './collectibleSprite';
+import { beginItem, gloss, outline } from '../common/itemPaint';
+
+const OUTLINE = 'rgba(4,50,44,0.95)';
 
 function paint(ctx: CanvasRenderingContext2D, size: number): void {
-	const cx = size / 2;
-	const cy = size / 2;
+	beginItem(ctx, size);
 
-	const scale = size * 0.012;
-	ctx.save();
-	ctx.translate(cx, cy + scale * 8);
-	ctx.scale(scale, scale);
-
-	const heartPath = () => {
+	const heart = () => {
 		ctx.beginPath();
-		ctx.moveTo(0, -10);
-		ctx.bezierCurveTo(-10, -22, -22, -12, -22, 0);
-		ctx.bezierCurveTo(-22, 12, -12, 22, 0, 28);
-		ctx.bezierCurveTo(12, 22, 22, 12, 22, 0);
-		ctx.bezierCurveTo(22, -12, 10, -22, 0, -10);
+		ctx.moveTo(0, 74);
+		ctx.bezierCurveTo(-56, 36, -84, -2, -76, -34);
+		ctx.bezierCurveTo(-68, -70, -20, -78, 0, -44);
+		ctx.bezierCurveTo(20, -78, 68, -70, 76, -34);
+		ctx.bezierCurveTo(84, -2, 56, 36, 0, 74);
+		ctx.closePath();
+	};
+	const plus = () => {
+		ctx.beginPath();
+		ctx.moveTo(0, -22);
+		ctx.lineTo(0, 34);
+		ctx.moveTo(-28, 6);
+		ctx.lineTo(28, 6);
 	};
 
-	// outer contour
-	ctx.strokeStyle = 'rgba(150,255,200,0.95)';
-	ctx.lineWidth = 3;
-	ctx.shadowBlur = 12;
-	ctx.shadowColor = 'rgba(100,255,180,1)';
-	heartPath();
-	ctx.stroke();
+	// 1. outline
+	outline(ctx, [heart], OUTLINE);
 
-	// middle contour
-	ctx.strokeStyle = 'rgba(180,255,220,0.7)';
-	ctx.lineWidth = 2;
-	ctx.shadowBlur = 6;
-	ctx.shadowColor = 'rgba(120,255,200,0.8)';
-	ctx.beginPath();
-	ctx.moveTo(0, -8);
-	ctx.bezierCurveTo(-8, -18, -18, -10, -18, 0);
-	ctx.bezierCurveTo(-18, 10, -10, 18, 0, 24);
-	ctx.bezierCurveTo(10, 18, 18, 10, 18, 0);
-	ctx.bezierCurveTo(18, -10, 8, -18, 0, -8);
-	ctx.stroke();
-
-	// inner contour
-	ctx.strokeStyle = 'rgba(220,255,240,0.5)';
-	ctx.lineWidth = 1.5;
-	ctx.shadowBlur = 4;
-	ctx.shadowColor = 'rgba(150,255,220,0.6)';
-	ctx.beginPath();
-	ctx.moveTo(0, -6);
-	ctx.bezierCurveTo(-7, -15, -15, -8, -15, 0);
-	ctx.bezierCurveTo(-15, 8, -8, 15, 0, 20);
-	ctx.bezierCurveTo(8, 15, 15, 8, 15, 0);
-	ctx.bezierCurveTo(15, -8, 7, -15, 0, -6);
-	ctx.stroke();
-
-	// translucent fill
-	ctx.shadowBlur = 0;
-	const fillGrad = ctx.createRadialGradient(0, 5, 0, 0, 5, 20);
-	fillGrad.addColorStop(0, 'rgba(200,255,230,0.4)');
-	fillGrad.addColorStop(0.5, 'rgba(120,255,180,0.2)');
-	fillGrad.addColorStop(1, 'rgba(60,200,140,0.05)');
-	ctx.fillStyle = fillGrad;
-	heartPath();
+	// 2. body: light from the upper left
+	const body = ctx.createRadialGradient(-30, -30, 6, 0, 0, 90);
+	body.addColorStop(0, 'rgba(220,255,240,1)');
+	body.addColorStop(0.35, 'rgba(110,240,180,1)');
+	body.addColorStop(0.75, 'rgba(30,180,130,1)');
+	body.addColorStop(1, 'rgba(10,110,90,1)');
+	ctx.fillStyle = body;
+	ctx.shadowBlur = 10;
+	ctx.shadowColor = 'rgba(120,255,200,0.9)';
+	heart();
 	ctx.fill();
+	ctx.shadowBlur = 0;
 
-	// core
-	const coreLayers: Array<{ r: number; stops: Array<[number, string]> }> = [
-		{
-			r: 12,
-			stops: [
-				[0, 'rgba(255,255,255,0.95)'],
-				[0.2, 'rgba(220,255,240,0.7)'],
-				[0.5, 'rgba(150,255,200,0.3)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		},
-		{
-			r: 8,
-			stops: [
-				[0, 'rgba(255,255,255,1)'],
-				[0.4, 'rgba(240,255,250,0.8)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		}
-	];
-	for (const layer of coreLayers) {
-		const g = ctx.createRadialGradient(0, 2, 0, 0, 2, layer.r);
-		for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
-		ctx.fillStyle = g;
-		ctx.fillRect(-layer.r, -layer.r + 2, layer.r * 2, layer.r * 2);
-	}
+	// 3. the plus: one more life
+	ctx.strokeStyle = OUTLINE;
+	ctx.lineWidth = 32;
+	plus();
+	ctx.stroke();
+	ctx.strokeStyle = 'rgba(255,255,255,1)';
+	ctx.lineWidth = 18;
+	plus();
+	ctx.stroke();
 
-	// rays from the core
-	ctx.strokeStyle = 'rgba(200,255,230,0.4)';
-	ctx.lineWidth = 0.8;
-	ctx.shadowBlur = 3;
-	ctx.shadowColor = 'rgba(150,255,200,0.6)';
-	for (let i = 0; i < 4; i++) {
-		const angle = (i / 4) * Math.PI * 2;
-		const length = 15;
-		ctx.beginPath();
-		ctx.moveTo(Math.cos(angle) * 3, 2 + Math.sin(angle) * 3);
-		ctx.lineTo(Math.cos(angle) * length, 2 + Math.sin(angle) * length);
-		ctx.stroke();
-	}
+	// 4. highlights
+	gloss(ctx, -44, -38, 16, 10, -0.6);
 
 	ctx.restore();
 }
@@ -126,10 +76,10 @@ function heartMotion(time: number): CollectibleMotion {
 const DISPLAY = 128 / 100;
 
 /** The orbit's largest radius and wobble, mock-up display px (the mock-up's: 65 and 3). */
-const ORBIT_RADIUS = 40;
+const ORBIT_RADIUS = 42;
 const ORBIT_WOBBLE = 2;
-/** The orbit's centre: the heart's, which sits below the texture centre, texture px. */
-const ORBIT_Y = 22;
+/** The orbit's centre: the heart's, texture px. */
+const ORBIT_Y = 0;
 /** The orbit's far edge plus half the largest particle, texture px. */
 const ORBIT_X_REACH = (ORBIT_RADIUS + ORBIT_WOBBLE + 2) * DISPLAY;
 const ORBIT_Y_REACH = (ORBIT_RADIUS + ORBIT_WOBBLE) * 0.7 * DISPLAY + 2 * DISPLAY;

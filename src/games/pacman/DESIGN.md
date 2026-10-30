@@ -175,6 +175,8 @@ scared loop. The arcade synthesises its own (`audio/ArcadeSynth.ts`).
 - Fruit: one file per fruit (`render/items/fruit/*View.ts`), each with its own art.
 - Fruit, the heart and the exit stay inside their tile, glow included: the object is 0.78
   of a tile, the bloom hugs it, no halo spills onto the walls.
+- One style for all of them: a clear silhouette with a wide dark outline, gradient fill,
+  a gloss and a glint (`render/common/itemPaint`); the mock-ups' looks are not kept.
 - A boss level ends by the player's choice: the heart (+1 life) or the exit.
 
 ### Art status
