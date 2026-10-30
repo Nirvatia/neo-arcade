@@ -1,8 +1,12 @@
 # Pac-Man — roadmap
 
 Working agreement: one stage per chat. A new chat starts with
-"read `src/games/pacman/ROADMAP.md`, stage N". Claude analyses the code, proposes a plan,
-waits for approval, works, then updates this file (done / found) and pushes to `feat/pacman`.
+"read `src/games/pacman/ROADMAP.md`, stage N" — N is a stage of the **Plan** below (plan v2).
+Claude analyses the code, proposes a plan, waits for approval, works, then updates this
+file (done / found) and pushes to `feat/pacman`. New art and new effects start as a
+prototype the owner approves first: an HTML page built from the game's own sources
+(see `prototypes/pacman/level-clear/` — `main.ts` + `build.mjs`), so the approved
+prototype already is the game code.
 
 ## Architecture (after stage 3)
 
@@ -113,8 +117,9 @@ and covers the canvas only (Svelte buttons stay on top); replace it there.
 
 - Headless Chromium without a GPU runs the hell night at ~20 FPS (the reference prototype
   ~26); JS cost is ~2 ms/frame, the rest is software rasterisation. Check on real hardware.
-- Art polish postponed: Pac-Man, lamprey and minions are approved directions, not final.
-- Regular levels have no Svelte HUD (only the canvas top bar); stage 5 adds one.
+- Art not final: Pac-Man (plan stage 4), Ms. Pac-Man, fruit and ghosts (stage 1), the
+  hell boss, berserk orb and pentagram attack (stage 3).
+- Regular levels have no Svelte HUD (only the canvas top bar); plan stage 5 adds one.
 - `DecayPass` still has its own WebGL boilerplate; move it onto `render/common/GlPass`
   (the season turn already uses it) when the decay is next touched.
 - Large files left as they are, to be cut when their stage rewrites them:
@@ -133,9 +138,63 @@ and covers the canvas only (Svelte buttons stay on top); replace it there.
 - Fruit views stay one file per fruit (`render/items/fruit/*View.ts`), even while they are
   stubs: each fruit gets its own art later.
 
-## Stages
+## Plan (v2, set by the owner after plan v1)
 
-Order matters: each stage builds on the ones before it.
+Order matters; new boss worlds come last. Each art or effect stage starts with a prototype
+on the real game code for the owner to approve.
+
+1. **Migrate the remaining art.**
+   - Ms. Pac-Man in the style of the new Pac-Man (`render/actors/PlayerView.ts` draws both
+     profiles today).
+   - Fruit: real art for each of the 10 fruits (`render/items/fruit/*View.ts` are stubs on
+     one shared primitive). Follow the food rule from the seasons: readable at tile size,
+     no inner clutter.
+   - Ghosts: art for each season (spring, summer, autumn, winter), with the normal,
+     frightened, flashing and eaten (eyes only) states. `GhostView` is one generic look now.
+   - Direction indicator (see stage 3): ghosts' eyes looking where they move is the
+     classic answer; settle the shared rule here so stages 3 and 4 reuse it.
+   - Note: the Ms. Pac-Man design follows Pac-Man's; consider doing stage 4's Pac-Man art
+     first or together with this stage.
+2. **Dev panel + log panel** (dev build only).
+   - Panel with proper buttons, grouped: flow (state, phase, timers; pause, slow motion,
+     single-frame step), level (jump to any level / season / hell / secret, complete,
+     die), player (god mode, lives, power, weapon), boss (HP, set phase, trigger a given
+     attack), spawns (fruit, golden egg, echo, pickups), render (grid, paths, hitboxes,
+     fronts of the decay and season turn).
+   - Log panel: a live, filterable stream of numbers — damage dealt and taken, debuffs
+     (stun, slow, pull), timers (power, berserk, BFG charge, attack cooldowns), state
+     changes. Logic emits typed `debug:*` events on the bus (no-ops outside dev); the
+     panel only listens. Comes before stages 3 and 7 so both can be tuned with it.
+3. **Hell rework.**
+   - Boss art: the lamprey reads badly on a small tile. Return to the idea of Blinky as
+     the lord of hell (a demon red ghost) — readable at tile size, changes by phase.
+   - Direction indicator for every entity (boss, minions, Pac-Man, ghosts): the player
+     must see where each one is heading.
+   - Phase 3: the purple circles that fill the area around Pac-Man cannot be dodged and
+     always cost a life — make them telegraphed and escapable (extend the fairness
+     checks in `DoomFairness.ts` and cover it with a test).
+   - Berserk orb: new art that reads as a weapon.
+   - Triple-pentagram attack: it almost always misses, and its art spills out of the tile
+     — aim it (lead the player's path) and keep the art inside the tile.
+4. **Pac-Man art rework** + bug: Pac-Man blinks before the game starts.
+5. **Full HUD and overlays.** A regular HUD for every season (the hell HUD is the quality
+   reference) and Svelte screens for menu, ready, pause, death, game over, replacing the
+   canvas `OverlayView` and its top bar; the screen fade should cover them too.
+6. **Secret level rework.** The original Pac-Man: original arcade art, animation at a
+   stepped 30 fps (the wedge snaps open and shut, no smooth tween), and very light CRT
+   effects (scanlines, slight curvature, glow) as a `GlPass`. This replaces the last
+   tile-by-tile bundle (`seasons/secret/`, `SeasonLevelRenderer`, `contracts/`).
+7. **FX pass**, e.g. hitting a ghost while energized; also eaten-ghost score pop-ups,
+   pickups, near misses, screen feedback — consistent across seasons.
+8. **New boss worlds, every 5th level.** Level 5 stays the hell; levels 10, 15, … get new
+   worlds, each like the hell (`*Bake` + `*World` + a level renderer with `preview()`), its
+   own boss and mechanics, a decay palette and a season-turn style
+   (`RenderPipeline.turnStyle`).
+9. **Global refactor to solid game-dev code**, or local refactors if the code by then is
+   already sound. Candidates known today: the large files listed under Known issues,
+   `DecayPass` onto `GlPass`, states still using nullable `LevelLoader` getters.
+
+## Done (plan v1)
 
 1. ✅ **Folder reorganisation, global refactor, dead code, bug fixes.** Done in the second
    chat:
@@ -198,7 +257,7 @@ Order matters: each stage builds on the ones before it.
      `WorldPreview` and a palette in `RenderPipeline.turnStyle`.
    - Note: the season after a hell level is autumn (level 6), not summer — the season
      index follows the level number, unchanged from before.
-5. **New regular HUD.** The hell HUD is the reference for quality.
+5. → **New regular HUD**: moved to plan v2, stage 5.
 6. ✅ **Integrate the 4 seasons.** Largest stage; one season per chat, from the owner's
    mock-ups, following the hell pattern (`*Bake` static world + `*World` live layer).
    - ✅ All four seasons (second chat). The owner's CLAUDE_GRID_{SPRING,SUMMER,AUTUMN,
@@ -217,7 +276,5 @@ Order matters: each stage builds on the ones before it.
    - Decay palettes per season: ice (winter), moss and pink (spring), indigo and amber
      (summer), umber and amber (autumn), ember (hell).
    - The old tile-by-tile spring/summer/autumn/winter bundles are deleted.
-7. **More boss worlds.** The owner wants further boss levels like the hell, in other
-   worlds. Each follows the hell pattern (`*Bake` + `*World` + a level renderer with
-   `preview()`), its own decay palette, and is entered by the season turn in its own
-   palette. (The former cutscene stage is dropped: the season turn replaces it.)
+7. → **More boss worlds**: moved to plan v2, stage 8. (The former cutscene stage is
+   dropped: the season turn replaces it.)
