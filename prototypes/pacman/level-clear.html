@@ -2083,6 +2083,19 @@
 			turn: 3,
 			settle: 1
 		},
+		/**
+		* The arcade (secret level): Pac-Man folds away (`fold`), a beat of empty board
+		* (`pause`); a cleared round blinks the maze (`flash`), and after round 2 the
+		* intermission plays.
+		*/
+		arcade: {
+			death: {
+				fold: 1.8,
+				pause: .6
+			},
+			flash: 2,
+			intermission: 7.5
+		},
 		/** Screen fade between menu and game and between levels: each half, out then in. */
 		screenFade: .4,
 		/** Game over ignores confirm/menu this long, so a held key does not restart at once. */
@@ -3924,6 +3937,11 @@ void main() {
 	* Without WebGL2 it cross-fades.
 	*/
 	var SeasonTurn = class {
+		debugFrontValue = null;
+		/** The turning front now (dev overlay). */
+		get debugFront() {
+			return this.debugFrontValue;
+		}
 		pass;
 		scenes = [null, null];
 		field = null;
@@ -3947,6 +3965,10 @@ void main() {
 			this.prepareField(request);
 			this.fit(width, height, layout);
 			const fronts = seasonTurnFronts(request.elapsed, this.end, this.glowEnd);
+			this.debugFrontValue = this.field ? {
+				field: this.field,
+				front: fronts.front
+			} : null;
 			if (this.pass === void 0) {
 				this.pass = GlPass.create("SeasonTurn", SEASON_TURN_FRAGMENT, UNIFORMS);
 				if (this.pass) {

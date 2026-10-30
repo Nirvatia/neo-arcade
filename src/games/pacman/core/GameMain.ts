@@ -36,7 +36,10 @@ export class GameMain implements GameModule {
 		}
 		const events = new EventBus<PacmanEventMap>();
 		const level = new LevelLoader(events);
-		const audio = new PacmanAudioPlayer(events);
+		const audio = new PacmanAudioPlayer(events, () => ({
+			active: level.secretMode,
+			urgency: level.progress?.collectionRatio ?? 0
+		}));
 		const director = new Director(events, level);
 		const render = new RenderPipeline(container, director, level, events);
 		let highScore = parseInt(getSavedScore('pacman'), 10) || 0;

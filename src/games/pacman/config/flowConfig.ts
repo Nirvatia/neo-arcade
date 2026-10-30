@@ -26,6 +26,16 @@ export const FLOW = {
 		turn: 3,
 		settle: 1
 	},
+	/**
+	 * The arcade (secret level): Pac-Man folds away (`fold`), a beat of empty board
+	 * (`pause`); a cleared round blinks the maze (`flash`), and after round 2 the
+	 * intermission plays.
+	 */
+	arcade: {
+		death: { fold: 1.8, pause: 0.6 },
+		flash: 2,
+		intermission: 7.5
+	},
 	/** Screen fade between menu and game and between levels: each half, out then in. */
 	screenFade: 0.4,
 	/** Game over ignores confirm/menu this long, so a held key does not restart at once. */

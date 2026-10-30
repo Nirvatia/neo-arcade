@@ -16,7 +16,6 @@ const IMPULSE_SPEED = 1.5;
 const RECOIL_SPEED = 9;
 const DASH_SPEED = 10;
 const DASH_INVULNERABILITY = 0.5;
-const TRAIN_TRAIL_LENGTH = 96;
 /** A turn pressed this far (in tiles) past a junction still takes it. */
 const LATE_TURN = 0.15;
 
@@ -26,9 +25,6 @@ export class PlayerService {
 	private readonly events: EventBus<PacmanEventMap>;
 	private readonly player: PlayerModel;
 	private speedModifierValue = 1;
-	private trainActiveValue = false;
-	private trailValue: PlayerTile[] = [];
-	private lastTrailTileValue: PlayerTile | null = null;
 	private recoilRemainingValue = 0;
 	private recoilDirectionValue: PlayerDirection | null = null;
 	private dashRemainingValue = 0;
@@ -86,10 +82,6 @@ export class PlayerService {
 		return this.dashRemainingValue > 0;
 	}
 
-	get trail(): readonly PlayerTile[] {
-		return this.trailValue;
-	}
-
 	get isMovementLocked(): boolean {
 		return this.movementLockedValue;
 	}
@@ -127,13 +119,6 @@ export class PlayerService {
 		if (this.player.progress <= LATE_TURN && this.canMoveFrom(this.player.tile, direction)) {
 			// pressed a moment after passing the turn: step back onto the junction and take it
 			this.player.cancelMove();
-		}
-	}
-
-	setTrainMode(value: boolean): void {
-		this.trainActiveValue = value;
-		if (!value) {
-			this.clearTrail();
 		}
 	}
 
@@ -184,24 +169,7 @@ export class PlayerService {
 		this.player.reset(this.grid.playerSpawn);
 		this.endRecoil();
 		this.endDash();
-		this.clearTrail();
 		this.movementLockedValue = false;
-	}
-
-	getTrainTarget(offset: number): PlayerTile {
-		const tile = this.player.tile;
-		if (!this.trainActiveValue) {
-			return tile;
-		}
-		if (!Number.isFinite(offset) || offset <= 0) {
-			return tile;
-		}
-		if (this.trailValue.length === 0) {
-			return tile;
-		}
-		const index = Math.min(this.trailValue.length - 1, Math.max(0, Math.floor(offset) - 1));
-		const target = this.trailValue[index];
-		return target ? target : tile;
 	}
 
 	update(dt: number): void {
@@ -219,12 +187,10 @@ export class PlayerService {
 
 		if (this.isDashing) {
 			this.updateDash(dt);
-			this.recordTrail();
 			return;
 		}
 		if (this.isRecoiling) {
 			this.updateRecoil(dt);
-			this.recordTrail();
 			return;
 		}
 		let remaining = Math.min(0.25, Math.max(0, dt));
@@ -268,7 +234,6 @@ export class PlayerService {
 		if (guard >= 512) {
 			console.error('PlayerService.update', 'movement guard exhausted');
 		}
-		this.recordTrail();
 	}
 
 	private updateRecoil(dt: number): void {
@@ -437,29 +402,5 @@ export class PlayerService {
 		this.events.emit('audio:cue', { cue: 'teleport' });
 		this.progress.collectAt(destination.x, destination.y);
 		return true;
-	}
-
-	private recordTrail(): void {
-		if (!this.trainActiveValue) {
-			return;
-		}
-		const tile = this.player.tile;
-		if (
-			this.lastTrailTileValue &&
-			this.lastTrailTileValue.x === tile.x &&
-			this.lastTrailTileValue.y === tile.y
-		) {
-			return;
-		}
-		this.lastTrailTileValue = { x: tile.x, y: tile.y };
-		this.trailValue.unshift({ x: tile.x, y: tile.y });
-		if (this.trailValue.length > TRAIN_TRAIL_LENGTH) {
-			this.trailValue.pop();
-		}
-	}
-
-	private clearTrail(): void {
-		this.trailValue = [];
-		this.lastTrailTileValue = null;
 	}
 }

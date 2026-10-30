@@ -10514,7 +10514,8 @@ createHTML: (html) => {
 		world_secret: "Secret",
 		boss_hell: "LORD OF HELL",
 		oneUp: "1UP",
-		highScore: "HIGH SCORE"
+		highScore: "HIGH SCORE",
+		round: "ROUND"
 	};
 	var RU = {
 		score: "ОЧКИ",
@@ -10559,7 +10560,8 @@ createHTML: (html) => {
 		world_secret: "Секрет",
 		boss_hell: "ПОВЕЛИТЕЛЬ АДА",
 		oneUp: "1UP",
-		highScore: "HIGH SCORE"
+		highScore: "HIGH SCORE",
+		round: "РАУНД"
 	};
 	function initial() {
 		try {
@@ -13280,7 +13282,7 @@ createHTML: (html) => {
 	}
 	//#endregion
 	//#region src/games/pacman/ui/hud/ArcadeHud.svelte
-	var root$2 = /* @__PURE__ */ from_html(`<div class="arcade svelte-10x9qwe"><div class="top svelte-10x9qwe"><div class="col svelte-10x9qwe"><span class="label blink svelte-10x9qwe"> </span> <span class="num svelte-10x9qwe"> </span></div> <div class="col svelte-10x9qwe"><span class="label svelte-10x9qwe"> </span> <span class="num svelte-10x9qwe"> </span></div> <div class="col svelte-10x9qwe"></div></div> <div class="bottom svelte-10x9qwe"><div class="row svelte-10x9qwe"></div> <div class="row svelte-10x9qwe"></div></div></div>`);
+	var root$2 = /* @__PURE__ */ from_html(`<div class="arcade svelte-10x9qwe"><div class="top svelte-10x9qwe"><div class="col svelte-10x9qwe"><span class="label blink svelte-10x9qwe"> </span> <span class="num svelte-10x9qwe"> </span></div> <div class="col svelte-10x9qwe"><span class="label svelte-10x9qwe"> </span> <span class="num svelte-10x9qwe"> </span></div> <div class="col svelte-10x9qwe"><span class="label svelte-10x9qwe"> </span> <span class="num svelte-10x9qwe"> </span></div></div> <div class="bottom svelte-10x9qwe"><div class="row svelte-10x9qwe"></div> <div class="row svelte-10x9qwe"></div></div></div>`);
 	var $$css$2 = {
 		hash: "svelte-10x9qwe",
 		code: ".arcade.svelte-10x9qwe {position:fixed;inset:0;pointer-events:none;z-index:20;color:#fff;font-family:'Press Start 2P', 'Courier New', monospace;font-weight:700;text-transform:uppercase;image-rendering:pixelated;}.top.svelte-10x9qwe {position:absolute;top:8px;left:50%;transform:translateX(-50%);width:min(560px, calc(100vw - 24px));display:grid;grid-template-columns:1fr 1fr 1fr;}.col.svelte-10x9qwe {display:grid;justify-items:center;gap:4px;}.label.svelte-10x9qwe {font-size:15px;letter-spacing:2px;}.num.svelte-10x9qwe {font-size:15px;letter-spacing:2px;justify-self:end;padding-right:20%;}.blink.svelte-10x9qwe {\n		animation: svelte-10x9qwe-blink 0.53s steps(1) infinite;}.bottom.svelte-10x9qwe {position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:min(560px, calc(100vw - 24px));display:flex;justify-content:space-between;}.row.svelte-10x9qwe {display:flex;gap:4px;align-items:center;}\n	@keyframes svelte-10x9qwe-blink {\n		50% {\n			opacity: 0;\n		}\n	}"
@@ -13304,11 +13306,15 @@ createHTML: (html) => {
 		var text_2 = only_child(span_2, true);
 		var text_3 = only_child(sibling(span_2, 2), true);
 		reset(div_3);
-		next(2);
+		var div_4 = sibling(div_3, 2);
+		var span_4 = child(div_4);
+		var text_4 = only_child(span_4, true);
+		var text_5 = only_child(sibling(span_4, 2), true);
+		reset(div_4);
 		reset(div_1);
-		var div_4 = sibling(div_1, 2);
-		var div_5 = child(div_4);
-		each(div_5, 20, () => get(reserve), (i) => i, ($$anchor, i) => {
+		var div_5 = sibling(div_1, 2);
+		var div_6 = child(div_5);
+		each(div_6, 20, () => get(reserve), (i) => i, ($$anchor, i) => {
 			{
 				let $0 = /* @__PURE__ */ user_derived(() => $$props.snap.profile === "ms-pacman");
 				LifeIcon($$anchor, {
@@ -13319,9 +13325,9 @@ createHTML: (html) => {
 				});
 			}
 		});
-		reset(div_5);
-		var div_6 = sibling(div_5, 2);
-		each(div_6, 21, () => $$props.snap.fruits, index, ($$anchor, kind) => {
+		reset(div_6);
+		var div_7 = sibling(div_6, 2);
+		each(div_7, 21, () => $$props.snap.fruits, index, ($$anchor, kind) => {
 			FruitIcon($$anchor, {
 				get kind() {
 					return get(kind);
@@ -13329,19 +13335,22 @@ createHTML: (html) => {
 				size: 22
 			});
 		});
-		reset(div_6);
-		reset(div_4);
+		reset(div_7);
+		reset(div_5);
 		reset(div);
-		template_effect(($0, $1, $2, $3) => {
+		template_effect(($0, $1, $2, $3, $4) => {
 			set_text(text, $0);
 			set_text(text_1, $1);
 			set_text(text_2, $2);
 			set_text(text_3, $3);
+			set_text(text_4, $4);
+			set_text(text_5, $$props.snap.level);
 		}, [
 			() => $t()("oneUp"),
 			() => score($$props.snap.score),
 			() => $t()("highScore"),
-			() => score($$props.snap.highScore)
+			() => score($$props.snap.highScore),
+			() => $t()("round")
 		]);
 		append($$anchor, div);
 		pop();
@@ -13721,6 +13730,7 @@ createHTML: (html) => {
 			state: get(screen) === "paused" ? "playing" : get(screen),
 			underPause: "playing",
 			paused: get(screen) === "paused",
+			fade: 0,
 			phase: get(screen) === "ready" ? "intro" : "run",
 			remaining: get(screen) === "ready" ? 5 - get(time) % 5 : 0,
 			duration: get(screen) === "ready" ? 5 : 0,

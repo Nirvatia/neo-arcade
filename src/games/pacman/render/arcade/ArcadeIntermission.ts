@@ -2,9 +2,10 @@ import type { GhostKind } from '../../logic/actors/GhostModel';
 import type { ArcadeDir } from './arcadeSprites';
 import { ARCADE_COLORS, GHOST_COLORS, ghostBody, ghostEyes, pacFrame } from './arcadeSprites';
 import { ARCADE_FPS } from './ArcadeView';
+import { FLOW } from '../../config/flowConfig';
 
-/** Seconds of the intermission after round 2. */
-export const INTERMISSION_DURATION = 7.5;
+/** Seconds of the intermission after round 2 (the flow's `intermission` phase). */
+export const INTERMISSION_DURATION = FLOW.arcade.intermission;
 
 /** Everything sits this far down the board canvas, so the scene fills the screen. */
 const OY = 40;

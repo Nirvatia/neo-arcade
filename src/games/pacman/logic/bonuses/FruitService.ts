@@ -31,6 +31,8 @@ export class FruitService {
 	private timerValue = 0;
 	private fruitDurationValue = DEFAULT_FRUIT_DURATION;
 	private spawnedCountValue = 0;
+	/** The arcade round's fruit; null: by level (or random for Ms. Pac-Man). */
+	private kindOverride: FruitKind | null = null;
 
 	constructor(
 		profile: GameProfile,
@@ -103,6 +105,11 @@ export class FruitService {
 		this.fruitDurationValue = value;
 	}
 
+	/** Every fruit of this level is `kind` (the arcade's fruit of the round). */
+	setKind(kind: FruitKind | null): void {
+		this.kindOverride = kind;
+	}
+
 	reset(): void {
 		this.activeKindValue = null;
 		this.spawnTileValue = null;
@@ -157,6 +164,7 @@ export class FruitService {
 	private spawn(forced?: FruitKind): void {
 		const kind =
 			forced ??
+			this.kindOverride ??
 			(this.profileValue === 'ms-pacman' ? randomFruitKind() : fruitForLevel(this.levelValue));
 		const tile = this.chooseSpawnTile();
 		if (!tile) {

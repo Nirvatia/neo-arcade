@@ -32,7 +32,7 @@ render/
   SharedLayers     Pac-Man, bonuses, overlay (every level)
   seasons/meadow/  MeadowBake (static world) + MeadowWorld (live layer) + MeadowLevelRenderer,
                    driven by a MeadowTheme per season (seasons/<season>/<season>Theme.ts)
-  seasons/         SeasonLevelRenderer + tile bundle for the secret level only
+  arcade/          the secret level: pixel art at native size, CRT pass, intermission
   doom/            DoomLevelRenderer, baked world, lamprey boss, combat and weapon FX
   transitions/decay/       level decay on death: field (Dijkstra), timeline, WebGL2 pass
   transitions/seasonTurn/  level clear: corridor lights + tile cards to the next world
@@ -304,14 +304,14 @@ on the real game code for the owner to approve.
       (lives left), game over (score, new record, again, mode, menu). Remove `OverlayView`,
       its top bar, `HellHud`, `PacmanOverlay`.
    6. The fade moves to a DOM layer over the HUD and screens, under the dev panels.
-6. **Secret level rework: "Arcade".** In progress (fourth chat). Not a copy of the
+6. ✅ **Secret level rework: "Arcade".** Done in the fourth chat. Not a copy of the
    original Pac-Man (its sprites, ghost rules, fruit table, cutscenes and sounds are not
    reproduced): our own 80s-style arcade round inside the secret level.
    Owner's decisions: three rounds, faster each time, the intermission after round 2;
    its own three tries (dying never costs the main game's lives; losing them all returns
    to the main game without a penalty); the intermission is scene (a): Blinky chalks an
    ambush plan, Pac-Man eats the chalk.
-   - Prototype, **awaiting the owner's verdict**: `prototypes/pacman/arcade`
+   - Prototype approved by the owner: `prototypes/pacman/arcade`
      (`node prototypes/pacman/build.mjs arcade`). Code in `render/arcade/`: `arcadeSprites`
      (our pixel art at 10 px a tile: Pac-Man, ghosts, scared / flashing / eyes, pear,
      pretzel, melon, 3×5 digits), `ArcadeMaze` (neon double walls baked from the grid),
@@ -320,12 +320,27 @@ on the real game code for the owner to approve.
      vignette; hard pixels without WebGL2), `ArcadeIntermission` (7.5 s); sound in
      `audio/ArcadeSynth` (WebAudio chiptune: hum / scared / eyes loops, chomp, power, ghost,
      fruit, extra try, death, round start, clear, intermission tune).
-   - Next, after approval: rounds and tries in the logic, ghost personalities (hunter:
-     straight at Pac-Man; ambusher: the junction Pac-Man reaches next; herder: the junction
-     behind him; keeper: guards the part of the maze with the most dots, chases only up
-     close), energizers on, one fruit per round (pear, pretzel, melon), flow phases for the
-     maze flash and the intermission, the arcade renderer and synth in the game, the HUD
-     tries; then delete `seasons/secret/`, `SeasonLevelRenderer`, `contracts/`.
+   - In the game: `config/arcadeConfig` (per round: speeds, energizer time, scatter /
+     chase waves, fruit pear / pretzel / melon; 3 tries; round bonus 2000, final 10000).
+     `LevelLoader` keeps the round and carries the tries between rounds; `advanceLevel`
+     goes to the next round and after the last one home; `leaveArcade` when the tries are
+     gone (no game over, lives and score kept); RESTART replays the round (the pause
+     screen's RESTART used to send the secret level to a season level 99). `CombatService`
+     in the arcade: plain Pac-Man rules for both profiles, energizers on, deaths spend
+     `tries`. `GhostService.setArcade`: the round's waves, then the characters of
+     `logic/actors/arcadeTargets` (hunter, ambusher, herder, keeper). Flow: `DeathState`
+     runs `fold` → `pause`, `LevelClearState` runs `flash` (+ `intermission` after round 2,
+     cue `intermission`); the next round starts in place, leaving fades. Render:
+     `render/arcade/ArcadeLevelRenderer` (score pop-ups for ghosts and fruit; no decay,
+     no season turn in the arcade). Sound: `PacmanAudioPlayer` sends the arcade's cues to
+     `ArcadeSynth` (round jingle on READY, hum rising with the dots). HUD: tries, round,
+     the rounds' fruits. No golden egg or echo in the arcade.
+   - Removed: the ghost / player train, the tile-by-tile bundle (`seasons/secret/`,
+     `SeasonLevelRenderer`, `seasonRenderBundleFactory`, `contracts/`), the season
+     palettes; `render/maze/GridView` is only the `GridLayout` type now.
+   - Tests: `logic/level/arcade.test.ts` (tries never cost lives, the last try goes home,
+     three rounds with the intermission, tries carried, energizers and the round's fruit,
+     restart, the ghost characters).
 7. **FX pass**, e.g. hitting a ghost while energized; also eaten-ghost score pop-ups,
    pickups, near misses, screen feedback — consistent across seasons.
 8. **New boss worlds, every 5th level.** Level 5 stays the hell; levels 10, 15, … get new

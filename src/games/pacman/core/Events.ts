@@ -23,7 +23,9 @@ export type PacmanAudioCue =
 	| 'exit-open'
 	| 'exit-enter'
 	| 'teleport'
-	| 'bonus-life';
+	| 'bonus-life'
+	/** The arcade's intermission starts. */
+	| 'intermission';
 
 export interface PacmanStateChangedPayload {
 	state: PacmanStateName;

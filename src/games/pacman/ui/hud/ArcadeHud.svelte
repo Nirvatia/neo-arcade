@@ -1,5 +1,5 @@
-<!-- The secret level is the original Pac-Man, so it gets the original arcade HUD: 1UP and
-	HIGH SCORE on top, lives and the level fruits at the bottom, blocky white lettering. -->
+<!-- The secret level is our arcade, so it gets an arcade HUD: 1UP, HIGH SCORE and the round
+	on top, the tries in reserve and the rounds' fruits at the bottom, blocky white lettering. -->
 <script lang="ts">
 	import type { HudSnapshot } from './hudSnapshot';
 	import { t } from '../i18n';
@@ -8,7 +8,7 @@
 
 	let { snap }: { snap: HudSnapshot } = $props();
 	const score = (n: number) => (n > 0 ? String(Math.floor(n)) : '00');
-	// the arcade shows the lives in reserve, not the one on the board
+	// the tries in reserve, not the one on the board (the arcade's own, not the game's lives)
 	const reserve = $derived(
 		Array.from({ length: Math.min(5, Math.max(0, snap.lives - 1)) }, (_, i) => i)
 	);
@@ -24,7 +24,10 @@
 			<span class="label">{$t('highScore')}</span>
 			<span class="num">{score(snap.highScore)}</span>
 		</div>
-		<div class="col"></div>
+		<div class="col">
+			<span class="label">{$t('round')}</span>
+			<span class="num">{snap.level}</span>
+		</div>
 	</div>
 	<div class="bottom">
 		<div class="row">

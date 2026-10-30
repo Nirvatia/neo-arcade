@@ -1619,7 +1619,6 @@
 	var RECOIL_SPEED = 9;
 	var DASH_SPEED = 10;
 	var DASH_INVULNERABILITY = .5;
-	var TRAIN_TRAIL_LENGTH = 96;
 	/** A turn pressed this far (in tiles) past a junction still takes it. */
 	var LATE_TURN = .15;
 	var PlayerService = class {
@@ -1628,9 +1627,6 @@
 		events;
 		player;
 		speedModifierValue = 1;
-		trainActiveValue = false;
-		trailValue = [];
-		lastTrailTileValue = null;
 		recoilRemainingValue = 0;
 		recoilDirectionValue = null;
 		dashRemainingValue = 0;
@@ -1678,9 +1674,6 @@
 		get isDashing() {
 			return this.dashRemainingValue > 0;
 		}
-		get trail() {
-			return this.trailValue;
-		}
 		get isMovementLocked() {
 			return this.movementLockedValue;
 		}
@@ -1703,10 +1696,6 @@
 				return;
 			}
 			if (this.player.progress <= LATE_TURN && this.canMoveFrom(this.player.tile, direction)) this.player.cancelMove();
-		}
-		setTrainMode(value) {
-			this.trainActiveValue = value;
-			if (!value) this.clearTrail();
 		}
 		setMovementLocked(value) {
 			this.movementLockedValue = value;
@@ -1743,17 +1732,7 @@
 			this.player.reset(this.grid.playerSpawn);
 			this.endRecoil();
 			this.endDash();
-			this.clearTrail();
 			this.movementLockedValue = false;
-		}
-		getTrainTarget(offset) {
-			const tile = this.player.tile;
-			if (!this.trainActiveValue) return tile;
-			if (!Number.isFinite(offset) || offset <= 0) return tile;
-			if (this.trailValue.length === 0) return tile;
-			const index = Math.min(this.trailValue.length - 1, Math.max(0, Math.floor(offset) - 1));
-			const target = this.trailValue[index];
-			return target ? target : tile;
 		}
 		update(dt) {
 			if (!Number.isFinite(dt) || dt < 0) {
@@ -1768,12 +1747,10 @@
 			}
 			if (this.isDashing) {
 				this.updateDash(dt);
-				this.recordTrail();
 				return;
 			}
 			if (this.isRecoiling) {
 				this.updateRecoil(dt);
-				this.recordTrail();
 				return;
 			}
 			let remaining = Math.min(.25, Math.max(0, dt));
@@ -1807,7 +1784,6 @@
 				}
 			}
 			if (guard >= 512) console.error("PlayerService.update", "movement guard exhausted");
-			this.recordTrail();
 		}
 		updateRecoil(dt) {
 			let remaining = Math.min(.25, Math.max(0, dt));
@@ -1945,24 +1921,6 @@
 			this.events.emit("audio:cue", { cue: "teleport" });
 			this.progress.collectAt(destination.x, destination.y);
 			return true;
-		}
-		recordTrail() {
-			if (!this.trainActiveValue) return;
-			const tile = this.player.tile;
-			if (this.lastTrailTileValue && this.lastTrailTileValue.x === tile.x && this.lastTrailTileValue.y === tile.y) return;
-			this.lastTrailTileValue = {
-				x: tile.x,
-				y: tile.y
-			};
-			this.trailValue.unshift({
-				x: tile.x,
-				y: tile.y
-			});
-			if (this.trailValue.length > TRAIN_TRAIL_LENGTH) this.trailValue.pop();
-		}
-		clearTrail() {
-			this.trailValue = [];
-			this.lastTrailTileValue = null;
 		}
 	};
 	//#endregion

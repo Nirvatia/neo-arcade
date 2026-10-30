@@ -4,6 +4,8 @@ import type { LevelProgress } from '../level/LevelProgress';
 import { GhostModel } from './GhostModel';
 import type { GhostDirection, GhostKind, GhostState, GhostTile } from './GhostModel';
 import { isLairTile, resolveExitTarget } from '../maze/LairExit';
+import type { ArcadeRoundTuning } from '../../config/arcadeConfig';
+import { arcadeChaseTarget } from './arcadeTargets';
 
 const VECTORS: Record<GhostDirection, { x: number; y: number }> = {
 	UP: { x: 0, y: -1 },
@@ -29,8 +31,6 @@ const GHOST_SPEED = 5.4;
 const SCATTER_TIME = 7;
 const CHASE_TIME = 20;
 const EPSILON = 1e-6;
-const TRAIN_TRAIL_LENGTH = 64;
-const TRAIN_SPEED_MODIFIER = 1.05;
 const EMPTY_GHOST_LIST: readonly GhostModel[] = [];
 
 type GhostMode = 'scatter' | 'chase';
@@ -46,10 +46,10 @@ export class GhostService {
 	private powerActiveValue = false;
 	private msOverdriveValue = false;
 	private speedModifierValue = 1;
-	private trainRequestedValue = false;
-	private trainActiveValue = false;
 	private visibleValue = true;
-	private trainTrailValue: GhostTile[][] = [];
+	/** The arcade round's waves and characters; null outside the secret level. */
+	private arcade: ArcadeRoundTuning | null = null;
+	private waveIndex = 0;
 
 	constructor(grid: GridService, player: PlayerService, progress: LevelProgress) {
 		if (!grid) {
@@ -78,7 +78,6 @@ export class GhostService {
 			new GhostModel('INKY', spawns.INKY, GHOST_SPEED, EXIT_DELAYS.INKY),
 			new GhostModel('CLYDE', spawns.CLYDE, GHOST_SPEED, EXIT_DELAYS.CLYDE)
 		];
-		this.trainTrailValue = this.ghosts.map((ghost) => [{ x: ghost.tile.x, y: ghost.tile.y }]);
 		const resolved = resolveExitTarget(grid, spawns.BLINKY);
 		if (resolved) {
 			this.exitTargetValue = resolved;
@@ -110,15 +109,13 @@ export class GhostService {
 		this.powerActiveValue = value;
 	}
 
-	setTrainMode(value: boolean): void {
-		this.trainRequestedValue = value;
-		if (!value) {
-			this.trainActiveValue = false;
-			return;
-		}
-		if (this.allGhostsOutOfLair()) {
-			this.activateTrain();
-		}
+	/**
+	 * The secret level's arcade round: its scatter / chase waves (then chase for good) and
+	 * the arcade characters in chase (`arcadeTargets`). Null returns to the main rules.
+	 */
+	setArcade(tuning: ArcadeRoundTuning | null): void {
+		this.arcade = tuning;
+		this.resetWaves();
 	}
 
 	setMsOverdrive(value: boolean): void {
@@ -183,18 +180,15 @@ export class GhostService {
 			}
 			ghost.reset(spawn, EXIT_DELAYS[ghost.kind]);
 		}
-		this.mode = 'scatter';
-		this.modeTimer = SCATTER_TIME;
+		this.resetWaves();
 		this.powerActiveValue = false;
 		this.msOverdriveValue = false;
-		if (this.trainRequestedValue) {
-			this.trainActiveValue = false;
-			if (this.allGhostsOutOfLair()) {
-				this.activateTrain();
-			}
-		} else {
-			this.trainActiveValue = false;
-		}
+	}
+
+	private resetWaves(): void {
+		this.mode = 'scatter';
+		this.waveIndex = 0;
+		this.modeTimer = this.arcade ? (this.arcade.waves[0] ?? Infinity) : SCATTER_TIME;
 	}
 
 	update(dt: number): void {
@@ -206,189 +200,10 @@ export class GhostService {
 			return;
 		}
 		const safeDt = Math.min(0.25, Math.max(0, dt));
-		if (this.trainActiveValue) {
-			this.updateTrain(safeDt);
-			return;
-		}
 		this.updateMode(safeDt);
 		for (const ghost of this.ghosts) {
 			this.updateGhost(ghost, safeDt);
 		}
-		if (this.trainRequestedValue && this.allGhostsOutOfLair()) {
-			this.activateTrain();
-		}
-	}
-
-	private activateTrain(): void {
-		this.trainActiveValue = true;
-		this.resetTrainTrails();
-	}
-
-	private allGhostsOutOfLair(): boolean {
-		for (const ghost of this.ghosts) {
-			if (ghost.state === 'lair' || ghost.state === 'exiting') {
-				return false;
-			}
-		}
-		return true;
-	}
-
-	private updateTrain(dt: number): void {
-		for (let index = 0; index < this.ghosts.length; index += 1) {
-			const ghost = this.ghosts[index];
-			if (!ghost) {
-				continue;
-			}
-			if (ghost.state !== 'active') {
-				ghost.setState('active');
-				ghost.setForceReverse(false);
-			}
-			const target =
-				index === 0 ? this.player.getTrainTarget(2) : this.trainTargetForGhost(index - 1, 2);
-			this.moveTrainGhost(ghost, target, dt);
-			this.recordTrainTrail(index, ghost);
-		}
-	}
-
-	private moveTrainGhost(ghost: GhostModel, targetTile: GhostTile, dt: number): void {
-		let remaining = dt;
-		let guard = 0;
-		while (remaining > EPSILON && guard < 512) {
-			guard += 1;
-			if (!ghost.target) {
-				if (ghost.tile.x === targetTile.x && ghost.tile.y === targetTile.y) {
-					break;
-				}
-				const direction = this.chooseTrainDirection(ghost, targetTile);
-				if (!direction) {
-					break;
-				}
-				const target = this.targetFor(ghost.tile, direction);
-				if (!this.grid.isGhostWalkable(target.x, target.y, true)) {
-					break;
-				}
-				ghost.beginMove(direction, target);
-			}
-			const needed = Math.max(0, 1 - ghost.progress);
-			if (needed <= EPSILON) {
-				ghost.completeMove();
-				this.handleTrainArrival(ghost);
-				continue;
-			}
-			const speed = this.trainSpeed(ghost);
-			const step = speed * remaining;
-			if (step < needed) {
-				ghost.addProgress(step);
-				remaining = 0;
-			} else {
-				remaining -= needed / speed;
-				ghost.completeMove();
-				this.handleTrainArrival(ghost);
-			}
-		}
-		if (guard >= 512) {
-			console.error('GhostService.moveTrainGhost', 'movement guard exhausted', {
-				kind: ghost.kind
-			});
-		}
-	}
-
-	private trainSpeed(ghost: GhostModel): number {
-		return ghost.speed * this.speedModifierValue * TRAIN_SPEED_MODIFIER;
-	}
-
-	private handleTrainArrival(ghost: GhostModel): void {
-		const tile = ghost.tile;
-		if (!this.grid.isTeleport(tile.x, tile.y)) {
-			return;
-		}
-		const destination = this.grid.teleportDestination(tile.x, tile.y);
-		if (!destination) {
-			console.error('GhostService.handleTrainArrival', 'missing teleport destination', {
-				kind: ghost.kind,
-				tile
-			});
-			return;
-		}
-		ghost.teleportTo(destination);
-	}
-
-	private chooseTrainDirection(ghost: GhostModel, targetTile: GhostTile): GhostDirection | null {
-		const candidates: GhostDirection[] = [];
-		for (const direction of DIRECTIONS) {
-			const target = this.targetFor(ghost.tile, direction);
-			if (this.grid.isGhostWalkable(target.x, target.y, true)) {
-				candidates.push(direction);
-			}
-		}
-		if (candidates.length === 0) {
-			return null;
-		}
-		if (candidates.length === 1) {
-			return candidates[0];
-		}
-		const facing = ghost.facing;
-		const opposite = facing ? this.oppositeDirection(facing) : null;
-		let choices = candidates;
-		if (opposite) {
-			const filtered = candidates.filter((direction) => direction !== opposite);
-			if (filtered.length > 0) {
-				choices = filtered;
-			}
-		}
-		let best: GhostDirection | null = null;
-		let bestScore = Number.POSITIVE_INFINITY;
-		for (const direction of choices) {
-			const candidate = this.targetFor(ghost.tile, direction);
-			const score = this.distanceSq(candidate, targetTile);
-			if (score < bestScore) {
-				bestScore = score;
-				best = direction;
-			}
-		}
-		return best ?? choices[0];
-	}
-
-	private trainTargetForGhost(index: number, offset: number): GhostTile {
-		const trail = this.trainTrailValue[index];
-		if (!trail || trail.length === 0) {
-			const ghost = this.ghosts[index];
-			if (ghost) {
-				return { x: ghost.tile.x, y: ghost.tile.y };
-			}
-			return this.exitTargetValue;
-		}
-		const safeOffset = Number.isFinite(offset) && offset > 0 ? Math.floor(offset) : 1;
-		const trailIndex = Math.min(trail.length - 1, Math.max(0, safeOffset - 1));
-		const target = trail[trailIndex];
-		if (target) {
-			return target;
-		}
-		const ghost = this.ghosts[index];
-		if (ghost) {
-			return { x: ghost.tile.x, y: ghost.tile.y };
-		}
-		return this.exitTargetValue;
-	}
-
-	private recordTrainTrail(index: number, ghost: GhostModel): void {
-		const trail = this.trainTrailValue[index];
-		if (!trail) {
-			return;
-		}
-		const tile = ghost.tile;
-		const last = trail[0];
-		if (last && last.x === tile.x && last.y === tile.y) {
-			return;
-		}
-		trail.unshift({ x: tile.x, y: tile.y });
-		if (trail.length > TRAIN_TRAIL_LENGTH) {
-			trail.pop();
-		}
-	}
-
-	private resetTrainTrails(): void {
-		this.trainTrailValue = this.ghosts.map((ghost) => [{ x: ghost.tile.x, y: ghost.tile.y }]);
 	}
 
 	private updateMode(dt: number): void {
@@ -396,7 +211,12 @@ export class GhostService {
 		if (this.modeTimer > EPSILON) {
 			return;
 		}
-		if (this.mode === 'scatter') {
+		if (this.arcade) {
+			// the round's waves, then chase for good
+			this.waveIndex += 1;
+			this.mode = this.waveIndex % 2 === 0 ? 'scatter' : 'chase';
+			this.modeTimer = this.arcade.waves[this.waveIndex] ?? Infinity;
+		} else if (this.mode === 'scatter') {
 			this.mode = 'chase';
 			this.modeTimer = CHASE_TIME;
 		} else {
@@ -583,6 +403,18 @@ export class GhostService {
 	private chaseTarget(ghost: GhostModel): GhostTile {
 		const playerTile = this.player.tile;
 		const playerFacing = this.player.facing;
+		if (this.arcade) {
+			return arcadeChaseTarget(ghost.kind, {
+				grid: this.grid,
+				ghost: ghost.tile,
+				player: playerTile,
+				facing: playerFacing,
+				hasFood: (x, y) => {
+					const token = this.grid.tileAt(x, y);
+					return (token === 'DT' || token === 'EU') && !this.progress.isCollected(x, y);
+				}
+			});
+		}
 		if (ghost.kind === 'BLINKY') {
 			return playerTile;
 		}

@@ -10,12 +10,13 @@ export interface DeathSnapshot {
 	readonly y: number;
 }
 
-export type DeathPhase = 'shatter' | 'void' | 'rebuild';
+/** The main game's decay phases, or the arcade's own (`fold`, `pause`). */
+export type DeathPhase = 'shatter' | 'void' | 'rebuild' | 'fold' | 'pause';
 
 export class DeathState implements GameState {
 	readonly name: PacmanStateName = 'death';
 	readonly pausable = true;
-	private readonly clock = new StateClock<DeathPhase>([
+	private clock = new StateClock<DeathPhase>([
 		{ name: 'shatter', duration: FLOW.death.shatter },
 		{ name: 'void', duration: FLOW.death.void },
 		{ name: 'rebuild', duration: FLOW.death.rebuild }
@@ -31,6 +32,12 @@ export class DeathState implements GameState {
 
 	enter(ctx: GameStateContext): void {
 		ctx.level.ensure();
+		if (ctx.level.secretMode) {
+			this.clock = new StateClock<DeathPhase>([
+				{ name: 'fold', duration: FLOW.arcade.death.fold },
+				{ name: 'pause', duration: FLOW.arcade.death.pause }
+			]);
+		}
 		const player = ctx.level.player;
 		if (player) {
 			const position = player.position;
@@ -68,6 +75,16 @@ export class DeathState implements GameState {
 		}
 		this.resolved = true;
 		const combat = ctx.level.ensure().combat;
+		if (ctx.level.secretMode) {
+			// the arcade's own tries: the last one returns to the main game, no penalty
+			if (combat.arcadeLost) {
+				ctx.director.changeLevel(() => ctx.level.leaveArcade());
+				return;
+			}
+			ctx.level.prepareAfterDeath();
+			ctx.director.showReady('short');
+			return;
+		}
 		if (combat.hellDefeat) {
 			// falling into the abyss ends the hell level, not the run
 			ctx.director.changeLevel(() => ctx.level.advanceLevel());

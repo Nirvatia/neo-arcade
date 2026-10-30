@@ -4,6 +4,7 @@ import type { LevelLoader } from '../../logic/level/LevelLoader';
 import type { FruitKind } from '../../logic/bonuses/fruitCatalog';
 import { fruitForLevel } from '../../logic/bonuses/fruitCatalog';
 import { BOSS_HP, PHASE_THRESHOLDS, PLAYER_MAX_HP } from '../../logic/doom/DoomBalance';
+import { arcadeRound } from '../../config/arcadeConfig';
 
 export type HudWorld = 'spring' | 'summer' | 'autumn' | 'winter' | 'hell' | 'secret';
 
@@ -45,9 +46,11 @@ export interface HudSnapshot {
 	readonly duration: number;
 	readonly profile: PacmanProfile;
 	readonly world: HudWorld;
+	/** The level number; on the secret level the arcade round. */
 	readonly level: number;
 	readonly score: number;
 	readonly highScore: number;
+	/** Lives; on the secret level the arcade's tries. */
 	readonly lives: number;
 	/** 0..1 of the dots eaten (weather at 0.5, night at 0.75). */
 	readonly dots: number;
@@ -102,10 +105,17 @@ export function buildHudSnapshot(
 					rewardOffered: Boolean(level.bossReward?.offered)
 				}
 			: null;
-	const n = Math.max(1, level.level);
+	const secret = level.secretMode;
 	const fruits: FruitKind[] = [];
-	for (let i = Math.max(1, n - FRUIT_ROW + 1); i <= n; i++) {
-		fruits.push(fruitForLevel(i));
+	if (secret) {
+		for (let r = 1; r <= level.arcadeRound; r++) {
+			fruits.push(arcadeRound(r).fruit);
+		}
+	} else {
+		const n = Math.max(1, level.level);
+		for (let i = Math.max(1, n - FRUIT_ROW + 1); i <= n; i++) {
+			fruits.push(fruitForLevel(i));
+		}
 	}
 	const score = level.score;
 	return {
@@ -118,10 +128,10 @@ export function buildHudSnapshot(
 		duration: flow.duration,
 		profile: level.profile,
 		world,
-		level: level.level,
+		level: secret ? level.arcadeRound : level.level,
 		score,
 		highScore: Math.max(highScore, score),
-		lives: combat?.lives ?? 0,
+		lives: (secret ? combat?.tries : combat?.lives) ?? 0,
 		dots: level.progress?.collectionRatio ?? 0,
 		timer,
 		fruits,

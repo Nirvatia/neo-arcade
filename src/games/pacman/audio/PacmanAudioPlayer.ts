@@ -1,5 +1,9 @@
 import type { EventBus } from '../engine/EventBus';
 import type { PacmanAudioCue, PacmanEventMap, PacmanStateName } from '../core/Events';
+import { ArcadeSynth } from './ArcadeSynth';
+
+/** Is the arcade (secret level) running, and how far its dots are eaten (0..1). */
+export type ArcadeProbe = () => { readonly active: boolean; readonly urgency: number };
 
 const AUDIO_BASE = '/assets/pacman/sfx/';
 
@@ -29,13 +33,22 @@ export class PacmanAudioPlayer {
 	private deathToggle = false;
 	private readonly unsubscribeState: () => void;
 	private readonly unsubscribeCue: () => void;
+	/** The arcade has its own chiptune sound; the sample sounds stay out of it. */
+	private readonly synth = new ArcadeSynth();
+	private readonly arcade: ArcadeProbe;
+	private arcadeUrgency = 0;
+	private arcadePower = false;
 
-	constructor(events: EventBus<PacmanEventMap>) {
+	constructor(
+		events: EventBus<PacmanEventMap>,
+		arcade: ArcadeProbe = () => ({ active: false, urgency: 0 })
+	) {
 		if (!events) {
 			console.error('PacmanAudioPlayer.constructor', 'missing event bus');
 			throw new Error('PacmanAudioPlayer.constructor: missing event bus');
 		}
 		this.events = events;
+		this.arcade = arcade;
 		this.available = typeof window !== 'undefined' && typeof Audio !== 'undefined';
 		this.unsubscribeState = events.on('ui:stateChanged', (payload) => {
 			this.handleState(payload.state);
@@ -50,6 +63,7 @@ export class PacmanAudioPlayer {
 		this.unsubscribeState();
 		this.unsubscribeCue();
 		this.stopBackground();
+		this.synth.destroy();
 		for (const audio of this.sounds.values()) {
 			audio.pause();
 		}
@@ -66,6 +80,18 @@ export class PacmanAudioPlayer {
 	}
 
 	private handleState(next: PacmanStateName): void {
+		if (this.arcade().active) {
+			this.stopBackground();
+			this.stop('start.wav');
+			this.state = next;
+			if (next === 'ready') {
+				this.arcadePower = false;
+				this.synth.play('start');
+			}
+			this.updateArcadeLoop();
+			return;
+		}
+		this.synth.setLoop(null);
 		if (next !== 'ready') {
 			this.stop('start.wav');
 		}
@@ -77,6 +103,13 @@ export class PacmanAudioPlayer {
 	}
 
 	private handleCue(cue: PacmanAudioCue): void {
+		if (this.arcade().active) {
+			this.handleArcadeCue(cue);
+			return;
+		}
+		if (cue === 'intermission') {
+			return;
+		}
 		if (cue === 'intro') {
 			// the new-game jingle; leaving READY stops it (see handleState)
 			this.play('start.wav', 0.8);
@@ -153,6 +186,62 @@ export class PacmanAudioPlayer {
 			return;
 		}
 		console.error('PacmanAudioPlayer.handleCue', 'unknown audio cue', cue);
+	}
+
+	/** The arcade's cues on the synth; READY plays the round jingle (see handleState). */
+	private handleArcadeCue(cue: PacmanAudioCue): void {
+		switch (cue) {
+			case 'dot': {
+				this.synth.play('chomp');
+				// the hum rises in steps as the dots run out
+				const urgency = Math.floor(this.arcade().urgency * 4) / 4;
+				if (urgency !== this.arcadeUrgency) {
+					this.arcadeUrgency = urgency;
+					this.synth.setUrgency(urgency);
+				}
+				return;
+			}
+			case 'power-start':
+				this.synth.play('power');
+				this.arcadePower = true;
+				this.updateArcadeLoop();
+				return;
+			case 'power-end':
+				this.arcadePower = false;
+				this.updateArcadeLoop();
+				return;
+			case 'ghost-eaten':
+				this.synth.play('ghost');
+				return;
+			case 'fruit-collect':
+				this.synth.play('fruit');
+				return;
+			case 'bonus-life':
+				this.synth.play('extra');
+				return;
+			case 'death':
+				this.arcadePower = false;
+				this.synth.setLoop(null);
+				this.synth.play('death');
+				return;
+			case 'win':
+				this.synth.setLoop(null);
+				this.synth.play('clear');
+				return;
+			case 'intermission':
+				this.synth.play('intermission');
+				return;
+			default:
+				return;
+		}
+	}
+
+	private updateArcadeLoop(): void {
+		if (this.state !== 'playing') {
+			this.synth.setLoop(null);
+			return;
+		}
+		this.synth.setLoop(this.arcadePower ? 'scared' : 'hum');
 	}
 
 	private updateBackground(): void {

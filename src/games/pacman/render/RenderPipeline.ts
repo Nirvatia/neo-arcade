@@ -3,7 +3,7 @@ import type { EventBus } from '../engine/EventBus';
 import type { PacmanEventMap } from '../core/Events';
 import type { LevelLoader } from '../logic/level/LevelLoader';
 import { SharedLayers } from './SharedLayers';
-import { SeasonLevelRenderer } from './seasons/SeasonLevelRenderer';
+import { ArcadeLevelRenderer } from './arcade/ArcadeLevelRenderer';
 import { DoomLevelRenderer } from './doom/DoomLevelRenderer';
 import { MeadowLevelRenderer } from './seasons/meadow/MeadowLevelRenderer';
 import { meadowThemeFor } from './seasons/meadow/meadowThemes';
@@ -37,7 +37,7 @@ export class RenderPipeline {
 	private readonly level: LevelLoader;
 	private readonly unsubscribeCues: () => void;
 	private readonly shared: SharedLayers;
-	private readonly seasonRenderer: LevelRenderer;
+	private readonly arcadeRenderer = new ArcadeLevelRenderer();
 	private readonly meadowRenderer: MeadowLevelRenderer;
 	private readonly doomRenderer: DoomLevelRenderer;
 	private readonly decay = new LevelDecay();
@@ -73,7 +73,6 @@ export class RenderPipeline {
 		this.unsubscribeCues = events
 			? events.on('audio:cue', (payload) => shared.trigger(payload.cue))
 			: () => {};
-		this.seasonRenderer = new SeasonLevelRenderer(shared);
 		this.meadowRenderer = new MeadowLevelRenderer(shared, meadowThemeFor);
 		this.doomRenderer = new DoomLevelRenderer(shared);
 		this.canvas = document.createElement('canvas');
@@ -107,8 +106,10 @@ export class RenderPipeline {
 
 		const pr = this.pixelRatio;
 		const flow = this.director.flow;
-		const death = flow.state === 'death' ? this.director.death : null;
-		const clear = flow.state === 'level-clear' ? this.director.levelClear : null;
+		// the arcade draws its own death and level clear: no decay, no season turn
+		const arcade = this.level.secretMode;
+		const death = flow.state === 'death' && !arcade ? this.director.death : null;
+		const clear = flow.state === 'level-clear' && !arcade ? this.director.levelClear : null;
 		const next = clear ? this.level.peekNextLevel() : null;
 		const nextView = next ? this.previewFor(next) : null;
 		const turning = clear && next && nextView;
@@ -237,11 +238,10 @@ export class RenderPipeline {
 		if (this.level.hellMode) {
 			return this.doomRenderer;
 		}
-		const season = this.level.season;
-		if (season && !this.level.secretMode && this.meadowRenderer.handles(season.name)) {
-			return this.meadowRenderer;
+		if (this.level.secretMode) {
+			return this.arcadeRenderer;
 		}
-		return this.seasonRenderer;
+		return this.meadowRenderer;
 	}
 
 	/** Screen fade between menu and game and between levels; covers everything. */

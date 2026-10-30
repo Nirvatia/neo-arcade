@@ -47,7 +47,8 @@ const EN = {
 	world_secret: 'Secret',
 	boss_hell: 'LORD OF HELL',
 	oneUp: '1UP',
-	highScore: 'HIGH SCORE'
+	highScore: 'HIGH SCORE',
+	round: 'ROUND'
 } as const;
 
 export type I18nKey = keyof typeof EN;
@@ -95,7 +96,8 @@ const RU: Record<I18nKey, string> = {
 	world_secret: 'Секрет',
 	boss_hell: 'ПОВЕЛИТЕЛЬ АДА',
 	oneUp: '1UP',
-	highScore: 'HIGH SCORE'
+	highScore: 'HIGH SCORE',
+	round: 'РАУНД'
 };
 
 function initial(): Lang {

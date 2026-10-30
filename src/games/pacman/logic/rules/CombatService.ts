@@ -10,9 +10,9 @@ import type { LairCodeService } from './LairCodeService';
 import { SCORE_TABLE } from '../../config/scoreConfig';
 import { ACTOR_CONTACT_DISTANCE_SQ } from '../../config/actorConfig';
 import { debugLog } from '../debug/debugLog';
+import { ARCADE } from '../../config/arcadeConfig';
 
 const DEFAULT_POWER_DURATION = 6;
-const SECRET_CLEAR_BONUS = 10000;
 
 export class CombatService {
 	private readonly player: PlayerService;
@@ -37,6 +37,10 @@ export class CombatService {
 	private nextLifeThresholdValue = SCORE_TABLE.firstLifeThreshold;
 	private lastDeathReasonValue = 'none';
 	private secretModeValue = false;
+	/** The arcade's own tries (secret level); the main game's lives are left alone. */
+	private triesValue: number = ARCADE.tries;
+	private finalRoundValue = false;
+	private arcadeLostValue = false;
 
 	constructor(
 		player: PlayerService,
@@ -131,6 +135,16 @@ export class CombatService {
 		return this.hellDefeatValue;
 	}
 
+	/** Arcade tries left (secret level). */
+	get tries(): number {
+		return this.triesValue;
+	}
+
+	/** Every arcade try is used up: back to the main game, no penalty. */
+	get arcadeLost(): boolean {
+		return this.arcadeLostValue;
+	}
+
 	setPowerDuration(value: number): void {
 		if (!Number.isFinite(value) || value <= 0) {
 			console.error('CombatService.setPowerDuration', 'invalid duration', value);
@@ -160,8 +174,21 @@ export class CombatService {
 		this.nextLifeThresholdValue = Math.floor(value);
 	}
 
-	setSecretMode(value: boolean): void {
+	/**
+	 * The secret level's arcade: classic rules whatever the profile (energizers scare the
+	 * ghosts), deaths use the arcade's tries, a cleared round pays `ARCADE.roundBonus`
+	 * and the last one `ARCADE.finalBonus` on top.
+	 */
+	setSecretMode(value: boolean, tries: number = ARCADE.tries, finalRound = false): void {
 		this.secretModeValue = value;
+		this.triesValue = Math.max(0, Math.floor(tries));
+		this.finalRoundValue = finalRound;
+		this.arcadeLostValue = false;
+	}
+
+	/** The rules in force: the arcade is always plain Pac-Man. */
+	private get rulesProfile(): GameProfile {
+		return this.secretModeValue ? 'pacman' : this.profileValue;
 	}
 
 	setHellMode(value: boolean): void {
@@ -210,16 +237,11 @@ export class CombatService {
 			return;
 		}
 
-		if (this.secretModeValue) {
-			this.progress.consumePendingEnergizer();
-			return;
-		}
-
 		if (this.progress.consumePendingEnergizer()) {
 			this.activatePower();
 		}
 
-		if (this.profileValue === 'ms-pacman') {
+		if (this.rulesProfile === 'ms-pacman') {
 			this.hypnosis.update(dt, this.ghosts);
 		} else if (this.powerTimerValue > 0) {
 			this.powerTimerValue = Math.max(0, this.powerTimerValue - dt);
@@ -300,7 +322,7 @@ export class CombatService {
 
 		this.deathActiveValue = false;
 
-		if (this.livesValue > 0) {
+		if (this.secretModeValue ? this.triesValue > 0 : this.livesValue > 0) {
 			this.player.reset();
 			this.ghosts.reset();
 		}
@@ -330,7 +352,7 @@ export class CombatService {
 
 	/** Dev: the energizer effect (or the Ms. Pac-Man overdrive) now. */
 	debugPower(): void {
-		if (this.hellModeValue || this.secretModeValue) {
+		if (this.hellModeValue) {
 			return;
 		}
 		this.activatePower();
@@ -354,7 +376,7 @@ export class CombatService {
 	}
 
 	private activatePower(): void {
-		if (this.profileValue === 'ms-pacman') {
+		if (this.rulesProfile === 'ms-pacman') {
 			this.hypnosis.startOverdrive(this.ghosts);
 			this.events.emit('audio:cue', { cue: 'power-start' });
 			debugLog(this.events, 'state', 'power starts', this.powerDurationValue);
@@ -370,7 +392,7 @@ export class CombatService {
 	}
 
 	private checkCollisions(): void {
-		if (this.profileValue === 'ms-pacman') {
+		if (this.rulesProfile === 'ms-pacman') {
 			this.checkMsCollisions();
 			return;
 		}
@@ -509,7 +531,7 @@ export class CombatService {
 		this.clearMsMode();
 
 		if (this.secretModeValue) {
-			this.scoreModel.add(SECRET_CLEAR_BONUS);
+			this.scoreModel.add(ARCADE.roundBonus + (this.finalRoundValue ? ARCADE.finalBonus : 0));
 		} else {
 			this.scoreModel.add(SCORE_TABLE.levelClear);
 
@@ -528,16 +550,24 @@ export class CombatService {
 	}
 
 	private handleDeath(reason: string): void {
-		if (this.secretModeValue) {
-			return;
-		}
-
 		if (this.deathActiveValue || this.gameOverValue || this.completedValue) {
 			return;
 		}
 
 		const safeReason = typeof reason === 'string' && reason.length > 0 ? reason : 'unknown';
 		this.lastDeathReasonValue = safeReason;
+
+		if (this.secretModeValue) {
+			// the arcade spends its own tries; the last one sends the player back
+			this.deathsValue += 1;
+			this.triesValue = Math.max(0, this.triesValue - 1);
+			debugLog(this.events, 'damage', `arcade try lost (${safeReason})`, this.triesValue);
+			this.clearPower();
+			this.deathActiveValue = true;
+			this.events.emit('audio:cue', { cue: 'death' });
+			this.arcadeLostValue = this.triesValue <= 0;
+			return;
+		}
 
 		console.warn('CombatService.handleDeath', 'player death', {
 			reason: safeReason,
@@ -571,7 +601,7 @@ export class CombatService {
 	}
 
 	private clearMsMode(): void {
-		if (this.profileValue !== 'ms-pacman') {
+		if (this.rulesProfile !== 'ms-pacman') {
 			return;
 		}
 

@@ -23,6 +23,7 @@ import type {
 } from '../../core/Events';
 import { BOSS_HP, PLAYER_MAX_HP } from '../doom/DoomBalance';
 import { seasonForLevel, secretSeason, hellSeason } from './SeasonCatalog';
+import { ARCADE } from '../../config/arcadeConfig';
 import type { SeasonData } from './SeasonCatalog';
 import { buildLevelSession, resetForNextLevel, resetLevelSession } from './LevelSession';
 import type { LevelSession } from './LevelSession';
@@ -51,6 +52,9 @@ export class LevelLoader {
 	private hellModeValue = false;
 	private fireRequestedValue = false;
 	private secretReturnLevelValue = 1;
+	/** The arcade on the secret level: the round (1..3) and the tries carried between rounds. */
+	private arcadeRoundValue = 1;
+	private arcadeTriesValue: number = ARCADE.tries;
 	private mazeScaleValue = MAZE_SCALE_DEFAULT;
 	private godModeValue = false;
 	private sessionValue: LevelSession | null = null;
@@ -81,6 +85,21 @@ export class LevelLoader {
 
 	get godMode(): boolean {
 		return this.godModeValue;
+	}
+
+	/** The arcade round on the secret level (1..3). */
+	get arcadeRound(): number {
+		return this.arcadeRoundValue;
+	}
+
+	/** The round's intermission plays after it is cleared. */
+	get arcadeIntermission(): boolean {
+		return this.secretModeValue && this.arcadeRoundValue === ARCADE.intermissionAfter;
+	}
+
+	/** Clearing this round ends the arcade. */
+	get arcadeFinalRound(): boolean {
+		return this.secretModeValue && this.arcadeRoundValue >= ARCADE.rounds.length;
 	}
 
 	get hellMode(): boolean {
@@ -203,6 +222,7 @@ export class LevelLoader {
 		this.pendingStartLevelValue = 1;
 		this.secretModeValue = false;
 		this.secretReturnLevelValue = 1;
+		this.arcadeRoundValue = 1;
 		this.buildLevel();
 		this.resetGameplay();
 		this.emitHud();
@@ -237,18 +257,38 @@ export class LevelLoader {
 			this.secretModeValue = true;
 			this.secretReturnLevelValue = this.levelNumber + 1;
 			this.levelNumber = SECRET_LEVEL_NUMBER;
+			this.arcadeRoundValue = 1;
+			this.arcadeTriesValue = ARCADE.tries;
 		});
 	}
 
+	/** The next level; in the arcade the next round, and after the last one back home. */
 	advanceLevel(): void {
 		this.changeLevel(() => {
-			if (this.secretModeValue) {
-				this.secretModeValue = false;
-				this.levelNumber = this.secretReturnLevel();
+			if (this.secretModeValue && this.arcadeRoundValue < ARCADE.rounds.length) {
+				this.arcadeRoundValue += 1;
+			} else if (this.secretModeValue) {
+				this.leaveSecret();
 			} else {
 				this.levelNumber += 1;
 			}
 		});
+	}
+
+	/** Every arcade try is lost: back to the main game's next level, nothing taken away. */
+	leaveArcade(): void {
+		this.changeLevel(() => this.leaveSecret());
+	}
+
+	/** The pause screen's RESTART: this level (or arcade round) again. */
+	restartLevel(): void {
+		this.changeLevel(() => undefined);
+	}
+
+	private leaveSecret(): void {
+		this.secretModeValue = false;
+		this.levelNumber = this.secretReturnLevel();
+		this.arcadeRoundValue = 1;
 	}
 
 	debugSpawnBonus(): void {
@@ -353,6 +393,8 @@ export class LevelLoader {
 		const keptScore = previous.score.score;
 		const keptLives = previous.combat.lives;
 		const keptLifeThreshold = previous.combat.nextLifeThreshold;
+		// the arcade's tries carry from round to round
+		this.arcadeTriesValue = previous.secret ? previous.combat.tries : this.arcadeTriesValue;
 		route();
 		const session = this.buildLevel();
 		session.score.add(keptScore);
@@ -391,7 +433,9 @@ export class LevelLoader {
 			season,
 			hell,
 			secret: this.secretModeValue,
-			godMode: this.godModeValue
+			godMode: this.godModeValue,
+			arcadeRound: this.arcadeRoundValue,
+			arcadeTries: this.arcadeTriesValue
 		});
 		this.sessionValue = session;
 		return session;

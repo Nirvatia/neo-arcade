@@ -20,6 +20,7 @@ import type { PacmanEventMap } from '../../core/Events';
 import { seasonModifiers } from './SeasonCatalog';
 import type { SeasonData } from './SeasonCatalog';
 import { busSink } from '../debug/debugLog';
+import { ARCADE, arcadeRound } from '../../config/arcadeConfig';
 
 /** Boss and weapons of the hell level. */
 export interface DoomSession {
@@ -61,6 +62,9 @@ export interface LevelSessionRequest {
 	readonly hell: boolean;
 	readonly secret: boolean;
 	readonly godMode: boolean;
+	/** Secret level only: the arcade round (1..3) and the tries left. */
+	readonly arcadeRound?: number;
+	readonly arcadeTries?: number;
 }
 
 export function buildLevelSession(request: LevelSessionRequest): LevelSession {
@@ -98,14 +102,23 @@ export function buildLevelSession(request: LevelSessionRequest): LevelSession {
 	}
 	combat.setProfile(profile);
 	combat.setHellMode(hell);
-	player.setTrainMode(secret);
-	ghosts.setTrainMode(secret);
-	combat.setSecretMode(secret);
 	const mods = seasonModifiers(season.name);
-	combat.setPowerDuration(mods.powerDuration);
 	fruit.setFruitDuration(mods.fruitDuration);
-	ghosts.setSpeedModifier(mods.ghostSpeedModifier);
-	player.setSpeedModifier(mods.playerSpeedModifier);
+	if (secret) {
+		// the arcade: the round's own speeds, energizer time, waves and fruit
+		const round = request.arcadeRound ?? 1;
+		const tuning = arcadeRound(round);
+		combat.setSecretMode(true, request.arcadeTries ?? ARCADE.tries, round >= ARCADE.rounds.length);
+		combat.setPowerDuration(tuning.power);
+		ghosts.setArcade(tuning);
+		ghosts.setSpeedModifier(tuning.ghostSpeed);
+		player.setSpeedModifier(tuning.playerSpeed);
+		fruit.setKind(tuning.fruit);
+	} else {
+		combat.setPowerDuration(mods.powerDuration);
+		ghosts.setSpeedModifier(mods.ghostSpeedModifier);
+		player.setSpeedModifier(mods.playerSpeedModifier);
+	}
 	return {
 		season,
 		hell,
