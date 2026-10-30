@@ -202,6 +202,11 @@ export class FruitService {
 			return;
 		}
 		this.scoreModel.add(SCORE_TABLE.fruit[kind]);
+		const tile = this.spawnTileValue;
+		if (tile) {
+			const points = SCORE_TABLE.fruit[kind];
+			this.events.emit('fx:event', { kind: 'fruit', x: tile.x + 0.5, y: tile.y + 0.5, points });
+		}
 		this.activeKindValue = null;
 		this.spawnTileValue = null;
 		this.timerValue = 0;

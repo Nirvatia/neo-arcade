@@ -165,6 +165,7 @@ export class LevelProgress {
 			this.scoreModel.add(SCORE_TABLE.energizer);
 			this.pendingEnergizerValue = true;
 			this.events.emit('audio:cue', { cue: 'energizer' });
+			this.events.emit('fx:event', { kind: 'energizer', x: x + 0.5, y: y + 0.5 });
 		}
 	}
 

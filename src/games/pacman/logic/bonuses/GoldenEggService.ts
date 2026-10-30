@@ -143,6 +143,11 @@ export class GoldenEggService {
 		const converted = this.progress.convertRemainingDots();
 		this.scoreModel.add(converted * SCORE_TABLE.dot);
 		this.scoreModel.add(SCORE_TABLE.goldenEgg);
+		const tile = this.spawnTileValue;
+		if (tile) {
+			const points = converted * SCORE_TABLE.dot + SCORE_TABLE.goldenEgg;
+			this.events.emit('fx:event', { kind: 'egg', x: tile.x + 0.5, y: tile.y + 0.5, points });
+		}
 		this.phaseValue = 'spent';
 		this.secretRequestedValue = true;
 		this.events.emit('audio:cue', { cue: 'egg-collect' });

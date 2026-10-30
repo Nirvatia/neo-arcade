@@ -1,3 +1,5 @@
+import type { GhostKind } from '../logic/actors/GhostModel';
+
 export type PacmanStateName =
 	'menu' | 'ready' | 'playing' | 'paused' | 'death' | 'level-clear' | 'game-over';
 
@@ -70,9 +72,23 @@ export interface PacmanDebugLogPayload {
 	value?: number;
 }
 
+/**
+ * Gameplay moments the renderer turns into effects (pop-ups, bursts, rings, shake).
+ * Positions are tile-centre coordinates; `points` is what the moment scored.
+ */
+export type PacmanFx =
+	| { kind: 'ghost-eaten'; x: number; y: number; points: number; ghost: GhostKind }
+	| { kind: 'energizer'; x: number; y: number }
+	| { kind: 'fruit'; x: number; y: number; points: number }
+	| { kind: 'egg'; x: number; y: number; points: number }
+	| { kind: 'extra-life'; x: number; y: number }
+	/** A ghost brushed past Pac-Man and he got away: from the ghost (gx, gy) to him. */
+	| { kind: 'near-miss'; x: number; y: number; gx: number; gy: number; ghost: GhostKind };
+
 export type PacmanEventMap = {
 	'ui:stateChanged': PacmanStateChangedPayload;
 	'ui:hudChanged': PacmanHudPayload;
 	'audio:cue': PacmanAudioCuePayload;
 	'debug:log': PacmanDebugLogPayload;
+	'fx:event': PacmanFx;
 };

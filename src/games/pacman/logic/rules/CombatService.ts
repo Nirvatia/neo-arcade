@@ -13,6 +13,13 @@ import { debugLog } from '../debug/debugLog';
 import { ARCADE } from '../../config/arcadeConfig';
 
 const DEFAULT_POWER_DURATION = 6;
+/** Gameplay freezes this long when a ghost is eaten, so the bite lands. */
+const HIT_STOP = 0.12;
+/** A ghost this close (tiles²) without touching, then this far again, is a near miss. */
+const NEAR_MISS_SQ = 0.95 * 0.95;
+const NEAR_MISS_CLEAR_SQ = 1.6 * 1.6;
+/** One near miss per ghost per this many seconds. */
+const NEAR_MISS_COOLDOWN = 3;
 
 export class CombatService {
 	private readonly player: PlayerService;
@@ -41,6 +48,10 @@ export class CombatService {
 	private triesValue: number = ARCADE.tries;
 	private finalRoundValue = false;
 	private arcadeLostValue = false;
+	private hitStopValue = 0;
+	/** Ghosts brushing past Pac-Man right now, and each ghost's near-miss cooldown. */
+	private readonly closeGhosts = new Set<GhostKind>();
+	private readonly nearMissCooldown = new Map<GhostKind, number>();
 
 	constructor(
 		player: PlayerService,
@@ -133,6 +144,13 @@ export class CombatService {
 
 	get hellDefeat(): boolean {
 		return this.hellDefeatValue;
+	}
+
+	/** Seconds of hit-stop asked for since the last call (a ghost was eaten). */
+	consumeHitStop(): number {
+		const value = this.hitStopValue;
+		this.hitStopValue = 0;
+		return value;
 	}
 
 	/** Arcade tries left (secret level). */
@@ -254,6 +272,9 @@ export class CombatService {
 		}
 
 		this.ghosts.setPowerActive(this.powerTimerValue > 0);
+		for (const [kind, left] of this.nearMissCooldown) {
+			this.nearMissCooldown.set(kind, Math.max(0, left - dt));
+		}
 		this.checkCollisions();
 	}
 
@@ -372,6 +393,8 @@ export class CombatService {
 
 	private awardExtraLife(): void {
 		this.livesValue += 1;
+		const p = this.player.position;
+		this.events.emit('fx:event', { kind: 'extra-life', x: p.x, y: p.y });
 		debugLog(this.events, 'spawn', 'extra life', this.livesValue);
 	}
 
@@ -425,8 +448,12 @@ export class CombatService {
 
 			const dx = playerPosition.x - ghostPosition.x;
 			const dy = playerPosition.y - ghostPosition.y;
+			const d2 = dx * dx + dy * dy;
 
-			if (dx * dx + dy * dy > ACTOR_CONTACT_DISTANCE_SQ) {
+			if (d2 > ACTOR_CONTACT_DISTANCE_SQ) {
+				if (ghost.state === 'active') {
+					this.trackNearMiss(ghost, d2);
+				}
 				continue;
 			}
 
@@ -438,6 +465,31 @@ export class CombatService {
 
 			break;
 		}
+	}
+
+	/** A ghost came within a whisker and Pac-Man got away: one `near-miss` effect. */
+	private trackNearMiss(ghost: GhostModel, d2: number): void {
+		if (d2 <= NEAR_MISS_SQ) {
+			this.closeGhosts.add(ghost.kind);
+			return;
+		}
+		if (d2 < NEAR_MISS_CLEAR_SQ || !this.closeGhosts.delete(ghost.kind)) {
+			return;
+		}
+		if ((this.nearMissCooldown.get(ghost.kind) ?? 0) > 0) {
+			return;
+		}
+		this.nearMissCooldown.set(ghost.kind, NEAR_MISS_COOLDOWN);
+		const p = this.player.position;
+		const g = ghost.position;
+		this.events.emit('fx:event', {
+			kind: 'near-miss',
+			x: p.x,
+			y: p.y,
+			gx: g.x,
+			gy: g.y,
+			ghost: ghost.kind
+		});
 	}
 
 	private checkMsCollisions(): void {
@@ -498,6 +550,15 @@ export class CombatService {
 		this.scoreModel.add(points);
 		debugLog(this.events, 'damage', `ghost ${ghost.kind} eaten`, points);
 		this.chainValue = Math.min(3, this.chainValue + 1);
+		const at = ghost.position;
+		this.events.emit('fx:event', {
+			kind: 'ghost-eaten',
+			x: at.x,
+			y: at.y,
+			points,
+			ghost: ghost.kind
+		});
+		this.hitStopValue = HIT_STOP;
 		this.ghosts.toEyes(ghost);
 		this.events.emit('audio:cue', { cue: 'ghost-eaten' });
 
@@ -574,6 +635,7 @@ export class CombatService {
 			lives: this.livesValue
 		});
 
+		this.closeGhosts.clear();
 		this.deathsValue += 1;
 		this.livesValue = Math.max(0, this.livesValue - 1);
 		debugLog(this.events, 'damage', `player died (${safeReason})`, this.livesValue);

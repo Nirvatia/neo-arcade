@@ -7,6 +7,8 @@ export class PlayingState implements GameState {
 	readonly name: PacmanStateName = 'playing';
 	readonly pausable = true;
 	private lastHudKey = '';
+	/** Seconds the play stays frozen after a ghost is eaten (hit-stop). */
+	private hitStop = 0;
 
 	enter(ctx: GameStateContext): void {
 		ctx.level.ensure();
@@ -21,6 +23,10 @@ export class PlayingState implements GameState {
 		const session = ctx.level.session;
 		if (!session) {
 			console.error('PlayingState.update', 'level is not initialized');
+			return;
+		}
+		if (this.hitStop > 0) {
+			this.hitStop = Math.max(0, this.hitStop - dt);
 			return;
 		}
 		const { player, fruit, egg, echo, ghosts, combat, lairCode } = session;
@@ -81,6 +87,7 @@ export class PlayingState implements GameState {
 			ghosts.update(dt);
 		}
 		combat.update(dt);
+		this.hitStop = combat.consumeHitStop();
 		if (combat.deathActive) {
 			console.warn('PlayingState.update', 'death requested', {
 				reason: combat.lastDeathReason
@@ -105,6 +112,7 @@ export class PlayingState implements GameState {
 
 	exit(): void {
 		this.lastHudKey = '';
+		this.hitStop = 0;
 	}
 
 	timing(): FlowTiming {

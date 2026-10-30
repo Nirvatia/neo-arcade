@@ -70,9 +70,21 @@ export class RenderPipeline {
 		this.level = level;
 		const shared = new SharedLayers();
 		this.shared = shared;
-		this.unsubscribeCues = events
+		const unsubscribeCues = events
 			? events.on('audio:cue', (payload) => shared.trigger(payload.cue))
 			: () => {};
+		// gameplay effects on the season levels (the hell and the arcade have their own)
+		const unsubscribeFx = events
+			? events.on('fx:event', (fx) => {
+					if (!this.level.secretMode && !this.level.hellMode) {
+						this.meadowRenderer.spawnFx(fx);
+					}
+				})
+			: () => {};
+		this.unsubscribeCues = () => {
+			unsubscribeCues();
+			unsubscribeFx();
+		};
 		this.meadowRenderer = new MeadowLevelRenderer(shared, meadowThemeFor);
 		this.doomRenderer = new DoomLevelRenderer(shared);
 		this.canvas = document.createElement('canvas');

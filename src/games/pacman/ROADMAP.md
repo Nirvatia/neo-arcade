@@ -151,7 +151,7 @@ and covers the canvas only (Svelte buttons stay on top); replace it there.
 ## Plan (v2, set by the owner after plan v1)
 
 Order matters; new boss worlds come last. **Owner's order after stage 3: 6 → 7 → 8 → 9
-→ 4** (5 and 3 are done; the secret level comes next, the Pac-Man art and its pre-game
+→ 4** (6 and 7 done) (5 and 3 are done; the secret level comes next, the Pac-Man art and its pre-game
 blink move to the very end); the numbers below stay as they are. Each art or effect stage starts with a prototype
 on the real game code for the owner to approve.
 
@@ -341,8 +341,24 @@ on the real game code for the owner to approve.
    - Tests: `logic/level/arcade.test.ts` (tries never cost lives, the last try goes home,
      three rounds with the intermission, tries carried, energizers and the round's fruit,
      restart, the ghost characters).
-7. **FX pass**, e.g. hitting a ghost while energized; also eaten-ghost score pop-ups,
-   pickups, near misses, screen feedback — consistent across seasons.
+7. ✅ **FX pass.** Done in the fourth chat, straight in the game (no prototype, the
+   owner's call).
+   - Logic reports gameplay moments as `fx:event` (`PacmanFx` in `core/Events`, tile-centre
+     positions): `ghost-eaten` (ghost, points; `CombatService.eatGhost`), `energizer`
+     (`LevelProgress`), `fruit` and `egg` (points), `extra-life`, `near-miss` (an active
+     ghost within 0.95 tile without contact, then 1.6 tiles away again; one per ghost per
+     3 s; `CombatService.trackNearMiss`).
+   - Hit-stop: eating a ghost freezes the play for 0.12 s (`CombatService.consumeHitStop`,
+     `PlayingState`), on every level kind incl. the arcade.
+   - `render/fx/LevelFx`, drawn by `MeadowLevelRenderer` for all four seasons and styled
+     by the season (accent = the theme's energizer glow, particles = its drift: petals,
+     leaves, snow, drops): rings with a dark rim (readable on bright and dark seasons),
+     white flash, ghost-coloured sparks, the season's particles from pickups, score
+     pop-ups that pop in and rise, a whoosh for a near miss, an edge pulse (energizer,
+     egg, extra life) and a camera shake that moves the world and the actors, never the
+     vignette. The hell keeps `DoomFxView`, the arcade its own pixel pop-ups.
+   - Tests: `logic/rules/fx.test.ts` (ghost eaten with points and hit-stop, energizer
+     tile, near miss and its cooldown).
 8. **New boss worlds, every 5th level.** Level 5 stays the hell; levels 10, 15, … get new
    worlds, each like the hell (`*Bake` + `*World` + a level renderer with `preview()`), its
    own boss and mechanics, a decay palette and a season-turn style

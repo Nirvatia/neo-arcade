@@ -6,6 +6,8 @@ import type { GridMatrix } from '../../../config/gridConfig';
 import type { SeasonData } from '../../../logic/level/SeasonCatalog';
 import { MeadowWorld } from './MeadowWorld';
 import type { MeadowTheme } from './MeadowTheme';
+import type { PacmanFx } from '../../../core/Events';
+import { LevelFx } from '../../fx/LevelFx';
 
 /** Share of eaten dots at which the season's weather rises, then the night falls. */
 const WEATHER_AT = 0.5;
@@ -22,10 +24,26 @@ export class MeadowLevelRenderer implements LevelRenderer, WorldPreview {
 	private readonly ghostView = new GhostView();
 	/** The current level's world and the next one (the season turn needs both at once). */
 	private worlds: Array<{ grid: GridMatrix; theme: MeadowTheme; world: MeadowWorld }> = [];
+	/** Gameplay effects, styled by the season on screen; cleared when the world changes. */
+	private readonly fx = new LevelFx();
+	private fxWorld: MeadowWorld | null = null;
+	private fxTheme: MeadowTheme | null = null;
 
 	constructor(shared: SharedLayers, themeFor: (season: string) => MeadowTheme | null) {
 		this.shared = shared;
 		this.themeFor = themeFor;
+	}
+
+	/** A gameplay moment to show (`fx:event`), in the current season's style. */
+	spawnFx(event: PacmanFx): void {
+		const theme = this.fxTheme;
+		if (!theme) {
+			return;
+		}
+		this.fx.spawn(event, {
+			accent: theme.live.energizer.glow,
+			particle: (i) => theme.live.drift.texture(i)
+		});
 	}
 
 	/** True when this renderer draws the frame's season. */
@@ -43,11 +61,26 @@ export class MeadowLevelRenderer implements LevelRenderer, WorldPreview {
 			world.update(frame.dt);
 		}
 		const layout = world.layout;
+		if (this.fxWorld !== world) {
+			this.fx.reset();
+			this.fxWorld = world;
+		}
+		this.fxTheme = this.themeFor(frame.season.name);
+		if (!frame.paused) {
+			this.fx.update(frame.dt);
+		}
 
+		// the effects' shake moves the world and the actors, never the vignette
+		const amp = this.fx.shake ** 2 * layout.tileSize * 0.3;
+		ctx.save();
+		if (amp > 0 && !frame.paused) {
+			ctx.translate((Math.random() - 0.5) * amp, (Math.random() - 0.5) * amp);
+		}
 		world.drawWorld(ctx, (x, y) => progress.isCollected(x, y));
 		world.drawMood(ctx);
 		// on level clear only the world: the season turn flips it over, actors stay out
 		if (state !== 'level-clear') {
+			this.fx.drawUnder(ctx, layout);
 			this.shared.drawCollectibles(frame, layout);
 			const ghosts = level.ghosts;
 			if (ghosts) {
@@ -68,8 +101,11 @@ export class MeadowLevelRenderer implements LevelRenderer, WorldPreview {
 				// while dying, the pipeline draws Pac-Man over the level decay
 				this.shared.drawPlayer(frame, layout);
 			}
+			this.fx.drawOver(ctx, layout);
 		}
+		ctx.restore();
 		world.drawOverlay(ctx);
+		this.fx.drawScreen(ctx, frame.width, frame.height);
 		return layout;
 	}
 
