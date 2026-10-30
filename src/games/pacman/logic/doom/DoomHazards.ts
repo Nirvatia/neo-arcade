@@ -182,3 +182,93 @@ export function distanceRings(grid: GridService, from: GridPoint, radius: number
 	}
 	return rings;
 }
+
+/** A set of tiles deadly from `start` to `end` seconds from now. */
+export interface TimedThreat {
+	readonly keys: ReadonlySet<string>;
+	readonly start: number;
+	readonly end: number;
+}
+
+/**
+ * Can the player stay alive through every threat? A search over (tile, time step) at
+ * 80% of the player's speed: each step the player moves to a neighbour, and may stay
+ * only where Pac-Man can stop, against a wall (not mid-corridor, not on a crossroads).
+ * No tile may be occupied while it is deadly.
+ */
+export function canOutlast(
+	grid: GridService,
+	from: GridPoint,
+	threats: readonly TimedThreat[],
+	playerSpeed: number
+): boolean {
+	if (threats.length === 0) {
+		return true;
+	}
+	if (!(playerSpeed > 0)) {
+		return false;
+	}
+	const step = 1 / (playerSpeed * 0.8);
+	const horizon = Math.max(...threats.map((threat) => threat.end));
+	const deadly = (key: string, t0: number, t1: number): boolean =>
+		threats.some((threat) => threat.keys.has(key) && threat.start < t1 && threat.end > t0);
+	let frontier = new Map<string, GridPoint>();
+	const startKey = doomTileKey(from);
+	if (!deadly(startKey, 0, step)) {
+		frontier.set(startKey, from);
+	}
+	for (let k = 1; frontier.size > 0 && (k - 1) * step <= horizon; k += 1) {
+		const t0 = k * step;
+		const next = new Map<string, GridPoint>();
+		for (const [key, tile] of frontier) {
+			if (canStop(grid, tile) && !deadly(key, t0, t0 + step)) {
+				next.set(key, tile);
+			}
+			for (const dir of DIRECTIONS) {
+				const n = adjacentTile(tile, dir);
+				const nKey = doomTileKey(n);
+				if (
+					next.has(nKey) ||
+					!grid.isPlayerWalkable(n.x, n.y) ||
+					grid.isTeleport(n.x, n.y) ||
+					deadly(nKey, t0, t0 + step)
+				) {
+					continue;
+				}
+				next.set(nKey, n);
+			}
+		}
+		frontier = next;
+	}
+	return frontier.size > 0;
+}
+
+/** Pac-Man halts on a tile only by running into a wall: corners, T-junctions, dead ends. */
+function canStop(grid: GridService, tile: GridPoint): boolean {
+	const open = DIRECTIONS.map((dir) => {
+		const n = adjacentTile(tile, dir);
+		return grid.isPlayerWalkable(n.x, n.y);
+	});
+	const exits = open.filter(Boolean).length;
+	// UP, LEFT, DOWN, RIGHT: a straight corridor is open on opposite sides only
+	const straight = exits === 2 && open[0] === open[2];
+	return exits < 4 && !straight;
+}
+
+/**
+ * Eruption: the disc of tiles within `inner` path steps of the player bursts first, the
+ * ring out to `outer` bursts `gap` seconds later. Run out of the disc, then keep going
+ * or step back into the burnt-out disc.
+ */
+export function eruptionWaves(
+	grid: GridService,
+	from: GridPoint,
+	inner: number,
+	outer: number
+): { disc: GridPoint[]; ring: GridPoint[] } {
+	const rings = distanceRings(grid, from, outer);
+	return {
+		disc: rings.slice(0, inner + 1).flat(),
+		ring: rings.slice(inner + 1).flat()
+	};
+}

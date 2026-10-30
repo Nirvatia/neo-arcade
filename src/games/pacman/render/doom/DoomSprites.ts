@@ -184,7 +184,70 @@ const megasphereTexture = lazy(() =>
 	})
 );
 
-/** Icon and glow tint per pickup kind; berserk is shown as the megasphere. */
+/** Berserk: a clenched red gauntlet with steel spikes on the knuckles and a steel cuff. */
+const fistTexture = lazy(() =>
+	makeTexture(26, 26, (x) => {
+		x.translate(13, 14);
+		edge(x);
+		// cuff
+		const cuff = x.createLinearGradient(-6, 0, 6, 0);
+		cuff.addColorStop(0, '#4a4c56');
+		cuff.addColorStop(0.45, '#c8ccd8');
+		cuff.addColorStop(1, '#3a3c46');
+		x.fillStyle = cuff;
+		x.beginPath();
+		x.rect(-6.5, 4, 13, 7.5);
+		x.fill();
+		x.stroke();
+		x.fillStyle = '#b01410';
+		x.fillRect(-6.5, 6.6, 13, 2);
+		// back of the hand
+		const leather = x.createLinearGradient(0, -9, 0, 6);
+		leather.addColorStop(0, '#ff5a3a');
+		leather.addColorStop(0.5, '#c8180e');
+		leather.addColorStop(1, '#6a0806');
+		x.fillStyle = leather;
+		x.beginPath();
+		x.roundRect(-9.5, -8, 19, 13.5, 3);
+		x.fill();
+		x.stroke();
+		// four curled fingers, knuckles up
+		for (let i = 0; i < 4; i += 1) {
+			const fx = -9.5 + i * 4.75;
+			x.fillStyle = leather;
+			x.beginPath();
+			x.roundRect(fx, -8, 4.75, 8, 2.2);
+			x.fill();
+			x.stroke();
+			x.fillStyle = 'rgba(255,220,200,.45)';
+			x.beginPath();
+			x.ellipse(fx + 2.4, -6.3, 1.4, 0.8, 0, 0, 7);
+			x.fill();
+			// spike
+			x.fillStyle = '#e8ecf4';
+			x.beginPath();
+			x.moveTo(fx + 1.1, -8);
+			x.lineTo(fx + 2.4, -11.8);
+			x.lineTo(fx + 3.6, -8);
+			x.closePath();
+			x.fill();
+			x.lineWidth = 0.6;
+			x.stroke();
+			x.lineWidth = 1.1;
+		}
+		// thumb across the fingers
+		const thumb = x.createLinearGradient(0, -1, 0, 4);
+		thumb.addColorStop(0, '#e0301e');
+		thumb.addColorStop(1, '#7a0a08');
+		x.fillStyle = thumb;
+		x.beginPath();
+		x.roundRect(-9.5, -1.2, 12, 5, 2.4);
+		x.fill();
+		x.stroke();
+	})
+);
+
+/** Icon and glow tint per pickup kind; berserk is the fist. */
 export function pickupSprite(kind: DoomPickupKind): { icon: HTMLCanvasElement; glow: number } {
 	if (kind === 'bfg') {
 		return { icon: bfgTexture(), glow: 0x40ff50 };
@@ -199,3 +262,9 @@ export function pickupSprite(kind: DoomPickupKind): { icon: HTMLCanvasElement; g
 }
 
 export const barrelSprite = barrelTexture;
+
+/** The berserk fist, shown by the stage-3 prototype until it replaces the megasphere. */
+export const berserkFistSprite = (): { icon: HTMLCanvasElement; glow: number } => ({
+	icon: fistTexture(),
+	glow: 0xff7a1a
+});

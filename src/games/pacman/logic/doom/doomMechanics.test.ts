@@ -9,9 +9,26 @@ import { PlayerService } from '../actors/PlayerService';
 import type { PlayerDirection } from '../actors/PlayerModel';
 import { ScoreModel } from '../level/ScoreModel';
 import { DoomAbilityService } from './DoomAbilityService';
-import { BFG_ORB_DAMAGE, BOSS_HP, INTRO_DURATION } from './DoomBalance';
+import {
+	BFG_ORB_DAMAGE,
+	BOSS_HP,
+	ERUPTION_ACTIVE,
+	ERUPTION_INNER,
+	ERUPTION_RADIUS,
+	ERUPTION_TELEGRAPH,
+	ERUPTION_WAVE_GAP,
+	INTRO_DURATION,
+	SEAL_TELEGRAPH
+} from './DoomBalance';
 import { bfsDistanceFrom } from './DoomGraph';
-import { canEscape, distanceRings, straightSegment } from './DoomHazards';
+import {
+	DoomHazardField,
+	canEscape,
+	canOutlast,
+	distanceRings,
+	eruptionWaves,
+	straightSegment
+} from './DoomHazards';
 import type { DoomAttackKind } from './DoomAttackCore';
 import { DoomBossService } from './DoomBossService';
 import { createMinion, minionPosition } from './DoomMinions';
@@ -325,18 +342,114 @@ describe('doom boss attacks', () => {
 		expect(canEscape(grid, tile, keys, 0.05, 6)).toBe(false);
 	});
 
-	it('eruption waves alternate, so one step always dodges', () => {
+	it('eruption: running straight out of the disc dodges both waves', () => {
+		const { grid, player } = makeWorld();
+		walk(player, pathTo(grid, player.tile, { x: 8, y: 5 }));
+		expect(player.tile.y).toBe(5);
+		const waves = eruptionWaves(grid, player.tile, ERUPTION_INNER, ERUPTION_RADIUS);
+		const field = new DoomHazardField();
+		field.add('eruption', waves.disc, ERUPTION_TELEGRAPH, ERUPTION_ACTIVE);
+		field.add('eruption', waves.ring, ERUPTION_TELEGRAPH + ERUPTION_WAVE_GAP, ERUPTION_ACTIVE);
+		let caught = false;
+		let inDisc = false;
+		player.setDesiredDirection('RIGHT');
+		for (let t = 0; t < 3; t += STEP) {
+			player.update(STEP);
+			const here = { x: Math.floor(player.position.x), y: Math.floor(player.position.y) };
+			caught = field.update(STEP, here, false) || caught;
+			inDisc =
+				inDisc ||
+				(t > ERUPTION_TELEGRAPH && waves.disc.some((d) => d.x === here.x && d.y === here.y));
+		}
+		expect(caught).toBe(false);
+		expect(inDisc).toBe(false);
+	});
+
+	it('eruption can be outlasted from every tile, the old even/odd waves almost never', () => {
 		const { grid } = makeWorld();
-		const rings = distanceRings(grid, { x: 12, y: 19 }, 6);
-		for (let d = 1; d < rings.length; d += 1) {
-			for (const tile of rings[d]) {
-				// every tile has a neighbour in the other wave
-				const neighbourInOther = rings[d - 1].some(
-					(p) => Math.abs(p.x - tile.x) + Math.abs(p.y - tile.y) === 1
-				);
-				expect(neighbourInOther).toBe(true);
+		const threats = (from: { x: number; y: number }) => {
+			const waves = eruptionWaves(grid, from, ERUPTION_INNER, ERUPTION_RADIUS);
+			const ringStart = ERUPTION_TELEGRAPH + ERUPTION_WAVE_GAP;
+			return [
+				{
+					keys: new Set(waves.disc.map((t) => `${t.x},${t.y}`)),
+					start: ERUPTION_TELEGRAPH,
+					end: ERUPTION_TELEGRAPH + ERUPTION_ACTIVE
+				},
+				{
+					keys: new Set(waves.ring.map((t) => `${t.x},${t.y}`)),
+					start: ringStart,
+					end: ringStart + ERUPTION_ACTIVE
+				}
+			];
+		};
+		let tiles = 0;
+		let fair = 0;
+		let oldFair = 0;
+		for (let y = 0; y < grid.height; y += 1) {
+			for (let x = 0; x < grid.width; x += 1) {
+				if (!grid.isPlayerWalkable(x, y) || grid.isTeleport(x, y)) {
+					continue;
+				}
+				tiles += 1;
+				if (canOutlast(grid, { x, y }, threats({ x, y }), 6)) {
+					fair += 1;
+				}
+				const rings = distanceRings(grid, { x, y }, ERUPTION_RADIUS);
+				const keys = (d: number) =>
+					new Set(
+						rings
+							.filter((_, i) => i % 2 === d)
+							.flat()
+							.map((t) => `${t.x},${t.y}`)
+					);
+				const old = [
+					{ keys: keys(0), start: 1.0, end: 1.3 },
+					{ keys: keys(1), start: 1.65, end: 1.95 }
+				];
+				if (canOutlast(grid, { x, y }, old, 6)) {
+					oldFair += 1;
+				}
 			}
 		}
+		expect(fair).toBe(tiles);
+		// the old waves left a way out only by stopping on a few corners (8% of tiles)
+		expect(oldFair / tiles).toBeLessThan(0.15);
+	});
+
+	it('seals are aimed at the junction the player reaches as they burn, and hit', () => {
+		vi.spyOn(Math, 'random').mockImplementation(seededRandom(3));
+		const { grid, player, boss } = makeWorld();
+		skipIntro(boss, player);
+		enterPhase(boss, player, 2);
+		walk(player, pathTo(grid, player.tile, { x: 2, y: 23 }));
+		player.setDesiredDirection('RIGHT');
+		player.update(STEP);
+		const internals = boss as unknown as {
+			pickSeals(
+				player: PlayerService,
+				tile: { x: number; y: number },
+				n: number
+			): Array<{ x: number; y: number }>;
+			pendingSeals: Array<{ x: number; y: number; warn: number; total: number }>;
+			updateArena(dt: number, player: PlayerService): void;
+		};
+		const seals = internals.pickSeals(player, player.tile, 3);
+		expect(seals.length).toBeGreaterThanOrEqual(2);
+		// the first seal lies on the row ahead, where a player running on arrives in time
+		const aim = seals[0];
+		expect(aim.y).toBe(23);
+		expect(aim.x).toBeGreaterThan(player.tile.x + 1);
+		for (const seal of seals) {
+			internals.pendingSeals.push({ ...seal, warn: SEAL_TELEGRAPH, total: SEAL_TELEGRAPH });
+		}
+		let hit = false;
+		for (let t = 0; t < SEAL_TELEGRAPH + 0.1; t += STEP) {
+			player.update(STEP);
+			internals.updateArena(STEP, player);
+			hit = boss.consumeHazardHit() || hit;
+		}
+		expect(hit).toBe(true);
 	});
 
 	it('pull slows only running away, corruption spares pickups', () => {
@@ -366,10 +479,14 @@ describe('doom boss attacks', () => {
 		skipIntro(boss, player);
 		enterPhase(boss, player, 2);
 		const internals = boss as unknown as {
-			pickSeals(tile: { x: number; y: number }, n: number): Array<{ x: number; y: number }>;
+			pickSeals(
+				player: PlayerService,
+				tile: { x: number; y: number },
+				n: number
+			): Array<{ x: number; y: number }>;
 			pendingSeals: Array<{ x: number; y: number; warn: number; total: number }>;
 		};
-		const seals = internals.pickSeals(player.tile, 3);
+		const seals = internals.pickSeals(player, player.tile, 3);
 		expect(seals.length).toBeGreaterThanOrEqual(2);
 		for (const seal of seals) {
 			internals.pendingSeals.push({ ...seal, warn: 0.1, total: 0.1 });

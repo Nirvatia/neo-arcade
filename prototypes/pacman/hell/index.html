@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>Pac-Man · Hell rework</title>
+    <!-- Prototype for plan v2 stage 3: Blinky, lord of hell, his imps, the berserk fist, the
+         aimed seals and the new eruption, on the game's own code. Built from the sources:
+         `node prototypes/pacman/build.mjs hell`; open as a file. -->
+    <style>
+      html,body{height:100%;margin:0;overflow:hidden;background:#000}
+      #view{position:fixed;inset:0;display:block}
+      #ctl{position:fixed;left:50%;bottom:max(12px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:5;display:flex;flex-direction:column;align-items:center;gap:6px;width:calc(100vw - 32px);max-width:980px}
+      .row{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+      .bt{border:0;cursor:pointer;padding:7px 12px;border-radius:999px;font:700 13px "Trebuchet MS","Segoe UI",system-ui,sans-serif;color:#2a1010;background:linear-gradient(#fff2ea,#e8c2b0);box-shadow:0 3px 0 #a86a52,0 6px 12px rgba(0,0,0,.35)}
+      .bt[aria-pressed="true"]{transform:translateY(2px);color:#fff;background:linear-gradient(#e0402a,#901a10);box-shadow:0 1px 0 #4a0806,0 0 14px rgba(255,90,60,.6)}
+      .sep{width:1px;background:rgba(255,255,255,.25);margin:0 4px}
+      #status,#hint{font:12px "Courier New",monospace;color:#f0d8d0;background:rgba(0,0,0,.6);padding:4px 10px;border-radius:6px}
+      body[data-mode="gallery"] .fight-only,body[data-mode="fight"] .gallery-only{display:none}
+    </style>
+  </head>
+  <body>
+    <canvas id="view"></canvas>
+    <div id="ctl">
+      <div class="row fight-only"><span id="status"></span></div>
+      <div class="row fight-only"><span id="hint">Стрелки / WASD — движение, F — оружие. Попробуйте печати и извержение в фазах 2 и 3.</span></div>
+      <div class="row">
+        <button class="bt" data-mode="gallery">Галерея</button>
+        <button class="bt" data-mode="fight">Бой</button>
+        <span class="sep"></span>
+        <button class="bt" data-phase="1" aria-pressed="true">Фаза 1</button>
+        <button class="bt" data-phase="2">Фаза 2</button>
+        <button class="bt" data-phase="3">Фаза 3</button>
+      </div>
+      <div class="row gallery-only">
+        <button class="bt" data-pose="chase" aria-pressed="true">Погоня</button>
+        <button class="bt" data-pose="windup">Замах</button>
+        <button class="bt" data-pose="dash">Рывок</button>
+        <button class="bt" data-pose="cast">Заклинание</button>
+        <button class="bt" data-pose="stunned">Оглушён</button>
+        <button class="bt" data-pose="hit">Попадание</button>
+      </div>
+      <div class="row fight-only">
+        <button class="bt" data-attack="seal">Печати</button>
+        <button class="bt" data-attack="eruption">Извержение</button>
+        <button class="bt" data-attack="dash">Рывок</button>
+        <button class="bt" data-attack="cross">Крест</button>
+        <button class="bt" data-attack="rift">Разлом</button>
+        <button class="bt" data-attack="brood">Выводок</button>
+        <span class="sep"></span>
+        <button class="bt" id="god" aria-pressed="false">Бессмертие</button>
+        <button class="bt" id="restart">Заново</button>
+      </div>
+    </div>
+    <script>
+/*SCRIPT*/
+    </script>
+  </body>
+</html>

@@ -2,7 +2,7 @@ import type { GridService } from '../maze/GridService';
 import type { GridPoint } from '../maze/GridModel';
 import type { PlayerService } from '../actors/PlayerService';
 import type { DoomDirection } from './DoomGraph';
-import { adjacentTile, doomTileKey, bfsDistanceFrom } from './DoomGraph';
+import { adjacentTile, doomTileKey, bfsDistanceFrom, oppositeDirection } from './DoomGraph';
 import { chooseChaseDirection } from './DoomMovement';
 import { DoomBossModel } from './DoomBossModel';
 import type { DoomAttackKind } from './DoomAttackCore';
@@ -13,7 +13,14 @@ import {
 	tileDistance
 } from './DoomAttackCore';
 import type { DoomHazard, DoomSegment } from './DoomHazards';
-import { DoomHazardField, canEscape, distanceRings, straightSegment } from './DoomHazards';
+import {
+	DoomHazardField,
+	canEscape,
+	canOutlast,
+	distanceRings,
+	eruptionWaves,
+	straightSegment
+} from './DoomHazards';
 import {
 	bossChaseSpeed,
 	bossDashSpeed,
@@ -74,6 +81,7 @@ import {
 	ERUPTION_TELEGRAPH,
 	ERUPTION_WAVE_GAP,
 	ERUPTION_ACTIVE,
+	ERUPTION_INNER,
 	ERUPTION_RADIUS,
 	ERUPTION_COOLDOWN,
 	CORRUPTION_RATE,
@@ -560,8 +568,15 @@ export class DoomBossService {
 			}
 			this.pendingSeals.splice(i, 1);
 			const here = this.currentTargetTile(player);
+			const onSeal = here.x === seal.x && here.y === seal.y;
+			this.shakeValue = Math.max(this.shakeValue, SHAKE_HAZARD * 0.6);
+			if (onSeal && !player.isInvulnerable) {
+				// a seal burns whoever stands on it; the tile stays open under the player
+				this.hazardHitValue = true;
+				this.debug('boss', `seal hit at ${seal.x},${seal.y}`);
+			}
 			if (
-				(here.x !== seal.x || here.y !== seal.y) &&
+				!onSeal &&
 				!this.grid.isVoidBlocked(seal.x, seal.y) &&
 				this.keepsPlayerGraphConnected(seal, here)
 			) {
@@ -853,8 +868,9 @@ export class DoomBossService {
 		}
 		let seals: GridPoint[] = [];
 		if (ready('seal')) {
-			seals = this.pickSeals(playerTile, SEAL_COUNT[pi]);
-			if (seals.length >= 2) {
+			seals = this.pickSeals(player, playerTile, SEAL_COUNT[pi]);
+			const sealKeys = new Set(seals.map(doomTileKey));
+			if (seals.length >= 2 && canEscape(this.grid, playerTile, sealKeys, SEAL_TELEGRAPH, speed)) {
 				available.add('seal');
 			}
 		}
@@ -868,13 +884,31 @@ export class DoomBossService {
 				available.add('split');
 			}
 		}
-		if (
-			ready('eruption') &&
-			this.grid
-				.walkableNeighbors(playerTile.x, playerTile.y)
-				.some((n) => this.grid.isPlayerWalkable(n.x, n.y))
-		) {
-			available.add('eruption');
+		let eruption: { disc: GridPoint[]; ring: GridPoint[] } | null = null;
+		if (ready('eruption')) {
+			eruption = eruptionWaves(this.grid, playerTile, ERUPTION_INNER, ERUPTION_RADIUS);
+			const discEnd = ERUPTION_TELEGRAPH + ERUPTION_ACTIVE;
+			const ringStart = ERUPTION_TELEGRAPH + ERUPTION_WAVE_GAP;
+			const fair = canOutlast(
+				this.grid,
+				playerTile,
+				[
+					{
+						keys: new Set(eruption.disc.map(doomTileKey)),
+						start: ERUPTION_TELEGRAPH,
+						end: discEnd
+					},
+					{
+						keys: new Set(eruption.ring.map(doomTileKey)),
+						start: ringStart,
+						end: ringStart + ERUPTION_ACTIVE
+					}
+				],
+				speed
+			);
+			if (fair) {
+				available.add('eruption');
+			}
 		}
 		const forced = this.forcedAttack;
 		if (forced) {
@@ -922,18 +956,13 @@ export class DoomBossService {
 			this.beginSplit(split, playerTile);
 			return true;
 		}
-		if (chosen === 'eruption') {
-			const rings = distanceRings(this.grid, playerTile, ERUPTION_RADIUS);
-			const even = rings.filter((_, d) => d % 2 === 0).flat();
-			const odd = rings.filter((_, d) => d % 2 === 1).flat();
-			this.hazards.add('eruption', even, ERUPTION_TELEGRAPH, ERUPTION_ACTIVE);
+		if (chosen === 'eruption' && eruption) {
+			this.hazards.add('eruption', eruption.disc, ERUPTION_TELEGRAPH, ERUPTION_ACTIVE);
 			this.hazards.add(
 				'eruption',
-				odd,
+				eruption.ring,
 				ERUPTION_TELEGRAPH + ERUPTION_WAVE_GAP,
-				ERUPTION_ACTIVE,
-				null,
-				ERUPTION_TELEGRAPH
+				ERUPTION_ACTIVE
 			);
 			this.model.beginTelegraph('eruption', ERUPTION_TELEGRAPH);
 			return true;
@@ -1014,39 +1043,96 @@ export class DoomBossService {
 		this.model.beginTelegraph('split', SPLIT_TELEGRAPH);
 	}
 
-	/** Intersections around the player that can be sealed, spread apart. */
-	private pickSeals(playerTile: GridPoint, count: number): GridPoint[] {
+	/**
+	 * Seals aimed at the player's way: the tile the player reaches just as the seals burn
+	 * (a junction when one is near that point), the next junction past it, then other
+	 * junctions around, spread apart.
+	 */
+	private pickSeals(player: PlayerService, playerTile: GridPoint, count: number): GridPoint[] {
 		if (count <= 0) {
 			return [];
+		}
+		const usable = (tile: GridPoint): boolean =>
+			!this.protectedTileKeys.has(doomTileKey(tile)) &&
+			!this.grid.isVoidBlocked(tile.x, tile.y) &&
+			!this.grid.isTeleport(tile.x, tile.y) &&
+			!(tile.x === this.model.tile.x && tile.y === this.model.tile.y);
+		const picked: GridPoint[] = [];
+		const take = (tile: GridPoint | undefined): void => {
+			if (
+				tile &&
+				picked.length < count &&
+				usable(tile) &&
+				picked.every((p) => tileDistance(p, tile) >= 3)
+			) {
+				picked.push(tile);
+			}
+		};
+		const path = this.predictPlayerPath(player, playerTile, SEAL_MAX_DIST + 4);
+		const aim = Math.round(SEAL_TELEGRAPH * this.playerBaseSpeed);
+		const isJunction = (tile: GridPoint): boolean => this.grid.exitsCount(tile.x, tile.y) >= 3;
+		let best = -1;
+		let bestScore = Infinity;
+		for (let d = SEAL_MIN_DIST; d < Math.min(path.length, SEAL_MAX_DIST + 1); d += 1) {
+			// a junction within a tile of the aim point wins over a plain corridor tile
+			const score = Math.abs(d - aim) - (isJunction(path[d]) ? 1.5 : 0);
+			if (usable(path[d]) && score < bestScore) {
+				best = d;
+				bestScore = score;
+			}
+		}
+		if (best >= 0) {
+			take(path[best]);
+			take(path.slice(best + 1).find(isJunction));
 		}
 		const rings = distanceRings(this.grid, playerTile, SEAL_MAX_DIST);
 		const candidates: GridPoint[] = [];
 		for (let d = SEAL_MIN_DIST; d < rings.length; d += 1) {
-			for (const tile of rings[d]) {
-				if (
-					this.grid.exitsCount(tile.x, tile.y) >= 3 &&
-					!this.protectedTileKeys.has(`${tile.x},${tile.y}`) &&
-					!this.grid.isVoidBlocked(tile.x, tile.y) &&
-					!(tile.x === this.model.tile.x && tile.y === this.model.tile.y)
-				) {
-					candidates.push(tile);
-				}
-			}
+			candidates.push(...rings[d].filter(isJunction));
 		}
 		for (let i = candidates.length - 1; i > 0; i -= 1) {
 			const j = Math.floor(Math.random() * (i + 1));
 			[candidates[i], candidates[j]] = [candidates[j], candidates[i]];
 		}
-		const picked: GridPoint[] = [];
 		for (const tile of candidates) {
-			if (picked.length >= count) {
-				break;
-			}
-			if (picked.every((p) => tileDistance(p, tile) >= 3)) {
-				picked.push(tile);
-			}
+			take(tile);
 		}
 		return picked;
+	}
+
+	/**
+	 * Where the player is going: straight on along the heading, and at a corner or a
+	 * junction the turn the player has asked for, else the first way that is not back.
+	 * Element 0 is the player's tile.
+	 */
+	private predictPlayerPath(player: PlayerService, from: GridPoint, length: number): GridPoint[] {
+		const path: GridPoint[] = [from];
+		let dir: DoomDirection | null = player.facing ?? player.desired;
+		if (!dir) {
+			return path;
+		}
+		const open = (tile: GridPoint, d: DoomDirection): boolean => {
+			const n = adjacentTile(tile, d);
+			return this.grid.isPlayerWalkable(n.x, n.y) && !this.grid.isTeleport(n.x, n.y);
+		};
+		const order: readonly DoomDirection[] = ['UP', 'LEFT', 'DOWN', 'RIGHT'];
+		let tile = from;
+		while (path.length <= length) {
+			const wanted = player.desired;
+			const back = oppositeDirection(dir);
+			if (path.length > 1 && wanted && wanted !== back && wanted !== dir && open(tile, wanted)) {
+				dir = wanted;
+			} else if (!open(tile, dir)) {
+				const turn = order.find((d) => d !== back && open(tile, d));
+				if (!turn) {
+					break;
+				}
+				dir = turn;
+			}
+			tile = adjacentTile(tile, dir);
+			path.push(tile);
+		}
+		return path;
 	}
 
 	/**

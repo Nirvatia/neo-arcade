@@ -55,7 +55,7 @@ export const RIFT_MIN_LENGTH = 4;
 export const RIFT_MAX_RANGE = 14;
 export const RIFT_COOLDOWN = 5;
 export const RIFT_WEIGHTS = [45, 15, 10] as const;
-// Seals: intersections around the player are locked for a while.
+// Seals: the junctions ahead of the player burn (a hit if standing on one), then stay locked.
 export const SEAL_TELEGRAPH = 0.8;
 export const SEAL_DURATION = [0, 5, 6] as const;
 export const SEAL_COUNT = [0, 3, 3] as const;
@@ -76,10 +76,11 @@ export const SPLIT_MIN_LENGTH = 7;
 export const SPLIT_MIN_END_DIST = 3;
 export const SPLIT_COOLDOWN = 10;
 export const SPLIT_WEIGHTS = [0, 0, 15] as const;
-// Eruption: two waves, tiles at even then odd path distance from the player.
-export const ERUPTION_TELEGRAPH = 1.0;
+// Eruption: the disc around the player bursts, then the ring around the disc.
+export const ERUPTION_TELEGRAPH = 1.2;
 export const ERUPTION_WAVE_GAP = 0.65;
 export const ERUPTION_ACTIVE = 0.3;
+export const ERUPTION_INNER = 3;
 export const ERUPTION_RADIUS = 6;
 export const ERUPTION_COOLDOWN = 9;
 export const ERUPTION_WEIGHTS = [0, 0, 15] as const;

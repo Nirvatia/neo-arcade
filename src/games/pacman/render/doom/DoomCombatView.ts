@@ -144,9 +144,27 @@ export class DoomCombatView {
 		const s = layout.tileSize;
 		for (const seal of boss.pendingSealList) {
 			const p = 1 - Math.max(0, seal.warn) / seal.total;
-			const cx = layout.offsetX + (seal.x + 0.5) * s;
-			const cy = layout.offsetY + (seal.y + 0.5) * s;
-			drawSigil(ctx, cx, cy, s * (0.9 - 0.45 * p), time, 0.35 + 0.65 * p, p);
+			const px = layout.offsetX + seal.x * s;
+			const py = layout.offsetY + seal.y * s;
+			const cx = px + s / 2;
+			const cy = py + s / 2;
+			// the tile darkens and a burning arc closes around it: standing here when it
+			// closes costs a hit; everything stays inside the tile
+			const flicker = p > 0.75 ? 0.6 + 0.4 * Math.sin(time * 50) : 1;
+			ctx.save();
+			ctx.globalAlpha = (0.25 + 0.45 * p) * flicker;
+			ctx.fillStyle = '#1a0004';
+			ctx.fillRect(px + 1, py + 1, s - 2, s - 2);
+			ctx.globalCompositeOperation = 'lighter';
+			ctx.globalAlpha = flicker;
+			ctx.strokeStyle = '#ffb070';
+			ctx.lineWidth = Math.max(1, s * 0.07);
+			ctx.lineCap = 'round';
+			ctx.beginPath();
+			ctx.arc(cx, cy, s * 0.42, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p);
+			ctx.stroke();
+			ctx.restore();
+			drawSigil(ctx, cx, cy, s * 0.34, time, (0.45 + 0.55 * p) * flicker, p);
 		}
 	}
 
@@ -163,7 +181,9 @@ export class DoomCombatView {
 				continue;
 			}
 			const p = 1 - hazard.warn / hazard.warnVisible;
-			const flicker = p > 0.75 ? 0.5 + 0.5 * Math.sin(time * 50) : 1;
+			// a later wave (the eruption's outer ring) stays dim until its turn comes
+			const soon = Math.min(1, Math.max(0.3, 1.3 - hazard.warn));
+			const flicker = (p > 0.75 && hazard.warn < 0.4 ? 0.5 + 0.5 * Math.sin(time * 50) : 1) * soon;
 			const rift = hazard.kind === 'rift';
 			for (const tile of hazard.tiles) {
 				const px = layout.offsetX + tile.x * s;
