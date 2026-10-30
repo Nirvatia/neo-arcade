@@ -1,5 +1,7 @@
 import type { GridLayout } from './maze/GridView';
 import { PlayerView } from './actors/PlayerView';
+import { MsPacmanView } from './actors/MsPacmanView';
+import type { PacmanAudioCue } from '../core/Events';
 import type { PlayerDrawOptions } from './actors/PlayerView';
 import { EchoCloneView } from './actors/EchoCloneView';
 import { FruitView } from './items/fruit/FruitView';
@@ -15,6 +17,7 @@ import type { RenderFrame } from './RenderFrame';
  */
 export class SharedLayers {
 	readonly playerView = new PlayerView();
+	private readonly msPacmanView = new MsPacmanView();
 	private readonly fruitView = new FruitView();
 	private readonly goldenEggView = new GoldenEggView();
 	private readonly echoCloneView = new EchoCloneView();
@@ -38,17 +41,21 @@ export class SharedLayers {
 		}
 	}
 
+	/** Eating, power-ups, teleports: both players react, only the one on screen shows it. */
+	trigger(cue: PacmanAudioCue): void {
+		this.playerView.trigger(cue);
+		this.msPacmanView.trigger(cue);
+	}
+
 	drawPlayer(frame: RenderFrame, layout: GridLayout): void {
 		const player = frame.level.player;
-		if (player) {
-			this.playerView.draw(
-				frame.ctx,
-				player,
-				layout,
-				frame.level.profile,
-				frame.time,
-				this.playerOptions(frame)
-			);
+		if (!player) {
+			return;
+		}
+		if (frame.level.profile === 'ms-pacman') {
+			this.msPacmanView.draw(frame.ctx, player, layout, frame.time, this.playerOptions(frame));
+		} else {
+			this.playerView.draw(frame.ctx, player, layout, frame.time, this.playerOptions(frame));
 		}
 	}
 

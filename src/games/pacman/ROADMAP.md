@@ -5,7 +5,7 @@ Working agreement: one stage per chat. A new chat starts with
 Claude analyses the code, proposes a plan, waits for approval, works, then updates this
 file (done / found) and pushes to `feat/pacman`. New art and new effects start as a
 prototype the owner approves first: an HTML page built from the game's own sources
-(see `prototypes/pacman/level-clear/` — `main.ts` + `build.mjs`), so the approved
+(`prototypes/pacman/<name>/main.ts` + `index.html`, built by `node prototypes/pacman/build.mjs <name>`), so the approved
 prototype already is the game code.
 
 ## Architecture (after stage 3)
@@ -117,7 +117,7 @@ and covers the canvas only (Svelte buttons stay on top); replace it there.
 
 - Headless Chromium without a GPU runs the hell night at ~20 FPS (the reference prototype
   ~26); JS cost is ~2 ms/frame, the rest is software rasterisation. Check on real hardware.
-- Art not final: Pac-Man (plan stage 4), Ms. Pac-Man, fruit and ghosts (stage 1), the
+- Art not final: Pac-Man (plan stage 4), fruit and ghosts (stage 1), the
   hell boss, berserk orb and pentagram attack (stage 3).
 - Regular levels have no Svelte HUD (only the canvas top bar); plan stage 5 adds one.
 - `DecayPass` still has its own WebGL boilerplate; move it onto `render/common/GlPass`
@@ -144,8 +144,13 @@ Order matters; new boss worlds come last. Each art or effect stage starts with a
 on the real game code for the owner to approve.
 
 1. **Migrate the remaining art.**
-   - Ms. Pac-Man in the style of the new Pac-Man (`render/actors/PlayerView.ts` draws both
-     profiles today).
+   - Ms. Pac-Man: **ported, awaiting the owner's verdict.** The owner's "Stardust Heart"
+     mock-up, refined and redrawn in Canvas2D: `render/actors/MsPacmanView.ts`, picked by
+     `SharedLayers.drawPlayer` for the `ms-pacman` profile. Sizes scale with the tile, the
+     bow sits on top of the head toward the back, effects stay near the tile, the mouth
+     chomps only while moving, and reactions follow game events (dot, energizer / fruit,
+     ghost eaten, teleport wormholes, overdrive, invulnerability blink, death).
+     Prototype: `prototypes/pacman/ms-pacman` (`node prototypes/pacman/build.mjs ms-pacman`).
    - Fruit: real art for each of the 10 fruits (`render/items/fruit/*View.ts` are stubs on
      one shared primitive). Follow the food rule from the seasons: readable at tile size,
      no inner clutter.
@@ -153,8 +158,6 @@ on the real game code for the owner to approve.
      frightened, flashing and eaten (eyes only) states. `GhostView` is one generic look now.
    - Direction indicator (see stage 3): ghosts' eyes looking where they move is the
      classic answer; settle the shared rule here so stages 3 and 4 reuse it.
-   - Note: the Ms. Pac-Man design follows Pac-Man's; consider doing stage 4's Pac-Man art
-     first or together with this stage.
 2. **Dev panel + log panel** (dev build only).
    - Panel with proper buttons, grouped: flow (state, phase, timers; pause, slow motion,
      single-frame step), level (jump to any level / season / hell / secret, complete,
@@ -240,7 +243,7 @@ on the real game code for the owner to approve.
      software (~0.8 s/frame), so smoothness must be checked on real hardware.
 4. ✅ **Level-complete animation.** Done in the second chat: the season turn
    (`render/transitions/seasonTurn/`, prototype `prototypes/pacman/level-clear.html`,
-   rebuilt from the sources by `node prototypes/pacman/level-clear/build.mjs`).
+   rebuilt from the sources by `node prototypes/pacman/build.mjs level-clear`).
    - Beads of light run down the corridors from the last dot, then every tile flips like
      a card from the cleared level (at night, in its weather) to the next level's world
      (morning, full of dots), with that world's particles thrown up at the front.

@@ -1,5 +1,5 @@
 import type { PlayerService } from '../../logic/actors/PlayerService';
-import type { PacmanAudioCue, PacmanProfile } from '../../core/Events';
+import type { PacmanAudioCue } from '../../core/Events';
 import type { GridLayout } from '../maze/GridView';
 import { rgba } from '../common/color';
 
@@ -188,7 +188,6 @@ export class PlayerView {
 		ctx: CanvasRenderingContext2D,
 		player: PlayerService,
 		layout: GridLayout,
-		profile: PacmanProfile,
 		time: number,
 		options: PlayerDrawOptions = { look: 'normal', charge: 0, dying: false }
 	): void {
@@ -213,9 +212,6 @@ export class PlayerView {
 		}
 		this.drawTrail(ctx, layout, L);
 		this.drawBody(ctx, cx, cy, S, L, options.charge, player.isInvulnerable);
-		if (profile === 'ms-pacman') {
-			this.drawBow(ctx, cx, cy, S * 0.42);
-		}
 		ctx.restore();
 	}
 
@@ -724,27 +720,5 @@ export class PlayerView {
 			}
 			ctx.globalCompositeOperation = 'source-over';
 		}
-	}
-
-	private drawBow(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number): void {
-		const size = Math.max(2, radius * 0.42);
-		const bowY = y - radius * 0.82;
-		ctx.fillStyle = '#ff4d6d';
-		ctx.beginPath();
-		ctx.moveTo(x, bowY);
-		ctx.lineTo(x - size, bowY - size * 0.62);
-		ctx.lineTo(x - size * 0.85, bowY + size * 0.5);
-		ctx.closePath();
-		ctx.fill();
-		ctx.beginPath();
-		ctx.moveTo(x, bowY);
-		ctx.lineTo(x + size, bowY - size * 0.62);
-		ctx.lineTo(x + size * 0.85, bowY + size * 0.5);
-		ctx.closePath();
-		ctx.fill();
-		ctx.fillStyle = '#ffd93b';
-		ctx.beginPath();
-		ctx.arc(x, bowY, Math.max(1, size * 0.22), 0, TAU);
-		ctx.fill();
 	}
 }

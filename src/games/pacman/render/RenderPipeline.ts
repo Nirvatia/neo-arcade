@@ -68,7 +68,7 @@ export class RenderPipeline {
 		const shared = new SharedLayers();
 		this.shared = shared;
 		this.unsubscribeCues = events
-			? events.on('audio:cue', (payload) => shared.playerView.trigger(payload.cue))
+			? events.on('audio:cue', (payload) => shared.trigger(payload.cue))
 			: () => {};
 		this.seasonRenderer = new SeasonLevelRenderer(shared);
 		this.meadowRenderer = new MeadowLevelRenderer(shared, meadowThemeFor);
