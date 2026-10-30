@@ -177,6 +177,13 @@ Order matters: each stage builds on the ones before it.
    - Performance: the pass runs at ≤ 1.5× pixel ratio. Headless Chromium renders it in
      software (~0.8 s/frame), so smoothness must be checked on real hardware.
 4. **Level-complete animation.** Built on stage 2's transitions.
+   - Prototype: `prototypes/pacman/level-clear.html` (built from the game's sources by
+     `node prototypes/pacman/level-clear/build.mjs`; open as a file). The season turns:
+     beads of light run down the corridors from the last dot, then every tile flips like a
+     card from the cleared level (in its weather, at night) to the next season (morning,
+     full of dots), with the new season's leaves / snow / petals thrown up at the front.
+     Code in `render/transitions/seasonTurn/` and `render/common/GlPass.ts`, not wired in
+     yet. Waiting for the owner's verdict.
 5. **New regular HUD.** The hell HUD is the reference for quality.
 6. ✅ **Integrate the 4 seasons.** Largest stage; one season per chat, from the owner's
    mock-ups, following the hell pattern (`*Bake` static world + `*World` live layer).

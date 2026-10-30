@@ -1,0 +1,4285 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>Уровень пройден · смена сезона</title>
+    <!-- Prototype for stage 4: the level-complete animation. Built from the game's own
+         sources (prototypes/pacman/level-clear/main.ts, `node build.mjs`); open as a file. -->
+    <style>
+      html,body{height:100%;margin:0;overflow:hidden;background:#1a1a14}
+      #view{position:fixed;inset:0;display:block;cursor:crosshair}
+      .ui{font:700 14px "Trebuchet MS","Segoe UI",system-ui,sans-serif}
+      #note{position:fixed;top:max(14px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:5;font:600 12px "Trebuchet MS","Segoe UI",system-ui,sans-serif;color:#3a3020;background:rgba(255,250,235,.75);padding:5px 14px;border-radius:999px;pointer-events:none;white-space:nowrap}
+      #dock{position:fixed;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:5;display:flex;flex-direction:column;align-items:center;gap:10px;width:calc(100vw - 32px);max-width:820px}
+      #tl{display:flex;align-items:center;gap:10px;padding:6px 14px;border-radius:999px;background:rgba(255,250,235,.8);box-shadow:0 4px 12px rgba(40,30,10,.2);color:#4a3a20;width:min(460px,100%);box-sizing:border-box}
+      #tl input{flex:1;accent-color:#c47a1a}
+      #tt{min-width:56px;text-align:right;font-variant-numeric:tabular-nums}
+      #ctl{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+      .bt{border:0;cursor:pointer;padding:9px 15px;border-radius:999px;color:#5a3a14;background:linear-gradient(#fffaf0,#f3e2bc);box-shadow:0 3px 0 #c9a76a,0 8px 14px rgba(40,30,10,.22)}
+      .bt[aria-pressed="true"]{transform:translateY(2px);color:#fff8e6;background:linear-gradient(#e0a040,#b8701e);box-shadow:0 1px 0 #7a4a10,0 0 14px rgba(255,190,90,.7)}
+      .bt.go{color:#fff;background:linear-gradient(#f0b040,#d07818);box-shadow:0 3px 0 #8a4a10,0 8px 14px rgba(40,30,10,.3)}
+    </style>
+  </head>
+  <body>
+    <canvas id="view"></canvas>
+    <div id="note">клик по коридору — где съедена последняя точка</div>
+    <div id="dock" class="ui">
+      <div id="tl"><input id="ts" type="range" min="0" max="1000" value="0" aria-label="время" /><span id="tt">—</span></div>
+      <div id="ctl">
+        <button class="bt go" id="bp">★ Уровень пройден</button>
+        <button class="bt" id="br">↺ Сброс</button>
+        <button class="bt" data-season="summer">Лето</button>
+        <button class="bt" data-season="autumn">Осень</button>
+        <button class="bt" data-season="winter">Зима</button>
+        <button class="bt" data-season="spring">Весна</button>
+        <button class="bt" id="bv">1×</button>
+      </div>
+    </div>
+    <script>
+(function() {
+	function isTeleportToken(token) {
+		return token.length === 2 && token.charAt(0) === "0";
+	}
+	var GRID_01 = [
+		[
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"EU",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"EU",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES"
+		],
+		[
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"LE",
+			"LE",
+			"LE",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"LT",
+			"LT",
+			"LT",
+			"LT",
+			"LT",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"0A",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"BY",
+			"IY",
+			"LT",
+			"PY",
+			"CE",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"0A",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"LT",
+			"LT",
+			"LT",
+			"LT",
+			"LT",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES"
+		],
+		[
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"FT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"PM",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"EU",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"EU",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES"
+		]
+	];
+	//#endregion
+	//#region src/games/pacman/render/common/textures.ts
+	function makeCanvas(width, height) {
+		const canvas = document.createElement("canvas");
+		canvas.width = Math.max(1, Math.floor(width));
+		canvas.height = Math.max(1, Math.floor(height));
+		return canvas;
+	}
+	function canvasContext(canvas) {
+		const ctx = canvas.getContext("2d");
+		if (!ctx) {
+			console.error("textures.canvasContext", "2d context unavailable");
+			throw new Error("textures.canvasContext: 2d context unavailable");
+		}
+		return ctx;
+	}
+	function hexChannels(value) {
+		return [
+			value >> 16 & 255,
+			value >> 8 & 255,
+			value & 255
+		];
+	}
+	function radialTexture(size, stops) {
+		const safeSize = Math.max(2, Math.floor(size));
+		const canvas = makeCanvas(safeSize, safeSize);
+		const ctx = canvasContext(canvas);
+		const gradient = ctx.createRadialGradient(safeSize / 2, safeSize / 2, 0, safeSize / 2, safeSize / 2, safeSize / 2);
+		for (const stop of stops) gradient.addColorStop(stop[0], stop[1]);
+		ctx.fillStyle = gradient;
+		ctx.fillRect(0, 0, safeSize, safeSize);
+		return canvas;
+	}
+	var glowCache = /* @__PURE__ */ new Map();
+	function glowTexture(tint) {
+		const cached = glowCache.get(tint);
+		if (cached) return cached;
+		const [r, g, b] = hexChannels(tint);
+		const texture = radialTexture(64, [
+			[0, `rgb(${r},${g},${b})`],
+			[.35, `rgba(${r},${g},${b},0.35)`],
+			[1, `rgba(${r},${g},${b},0)`]
+		]);
+		glowCache.set(tint, texture);
+		return texture;
+	}
+	function makeTexture(width, height, painter) {
+		const scale = 3;
+		const canvas = makeCanvas(width * scale, height * scale);
+		const ctx = canvasContext(canvas);
+		ctx.scale(scale, scale);
+		painter(ctx);
+		return canvas;
+	}
+	var T$1 = 24;
+	var LAIR = /* @__PURE__ */ new Set([
+		"LT",
+		"BY",
+		"IY",
+		"PY",
+		"CE",
+		"DB"
+	]);
+	/** Seeded per-tile generator (Park–Miller), identical to the mock-ups' `hs`. */
+	function tileRandom(a, b) {
+		let s = ((a + 50) * 7919 + (b + 50) * 104729) % 2147483646 + 1;
+		return () => (s = s * 16807 % 2147483647) / 2147483647;
+	}
+	/** Stream centre line (world y for a world x). */
+	function streamY(rows, x) {
+		return (rows + 4.7) * T$1 + Math.sin(x / 216) * 2.5 * T$1 + Math.sin(x / (3.7 * T$1) + 1) * .6 * T$1;
+	}
+	var decorCache = /* @__PURE__ */ new Map();
+	/**
+	* Fixed landmarks plus seeded scatter, sorted back to front. Shared with the live layer.
+	* The landmarks' keep-out radii differ per season and shift the scatter, as in the mock-ups.
+	*/
+	function meadowDecor(rows, cols, landmarkEx) {
+		const cacheKey = `${rows}x${cols}:${landmarkEx[0]},${landmarkEx[1]}`;
+		const cached = decorCache.get(cacheKey);
+		if (cached) return cached;
+		const R = rows;
+		const C = cols;
+		const TY = 12.5 * T$1;
+		let s = 91;
+		const P = [
+			{
+				k: "cabin",
+				x: -8.5,
+				y: 7,
+				w: 7,
+				h: 5,
+				ex: 4.2
+			},
+			{
+				k: "cabin",
+				x: 33.5,
+				y: 19,
+				w: 7,
+				h: 5,
+				ex: 4.2
+			},
+			{
+				k: "cabin",
+				x: 23.5,
+				y: -5,
+				w: 6,
+				h: 4.4,
+				ex: 3.8
+			},
+			{
+				k: "pond",
+				x: 1.5,
+				y: -4.5,
+				rx: 3.6,
+				ry: 2.4,
+				ex: 4.2
+			},
+			{
+				k: "landmark",
+				x: -3.6,
+				y: 3.2,
+				r: .8,
+				ex: landmarkEx[0]
+			},
+			{
+				k: "landmark",
+				x: 28.6,
+				y: 23.5,
+				r: .7,
+				ex: landmarkEx[1]
+			},
+			{
+				k: "lamp",
+				x: -2,
+				y: -2,
+				ex: 1
+			},
+			{
+				k: "lamp",
+				x: 27,
+				y: -2,
+				ex: 1
+			},
+			{
+				k: "lamp",
+				x: -2,
+				y: 28,
+				ex: 1
+			},
+			{
+				k: "lamp",
+				x: 27,
+				y: 28,
+				ex: 1
+			}
+		].map((o) => {
+			const q = {
+				...o,
+				x: o.x * T$1,
+				y: o.y * T$1
+			};
+			for (const key of [
+				"w",
+				"h",
+				"rx",
+				"ry",
+				"r",
+				"ex"
+			]) {
+				const v = o[key];
+				if (v !== void 0) q[key] = v * T$1;
+			}
+			return q;
+		});
+		P.push({
+			k: "bridge",
+			x: 12.5 * T$1,
+			y: streamY(R, 12.5 * T$1),
+			ex: 48
+		});
+		const g = () => (s = s * 16807 % 2147483647) / 2147483647;
+		const free = (x, y, m) => !(x > -m && x < C * T$1 + m && y > -m && y < R * T$1 + m) && Math.abs(y - streamY(R, x)) > 3.6 * T$1 && !(Math.abs(y - TY) < 2.4 * T$1 && (x < 0 || x > C * T$1));
+		const add = (k, n, dist, m, f) => {
+			let t = 0;
+			let cnt = 0;
+			while (cnt < n && t++ < 6e3) {
+				const x = (-34 + g() * (C + 68)) * T$1;
+				const y = (-25 + g() * (R + 50)) * T$1;
+				if (!free(x, y, m) || P.some((q) => Math.hypot(q.x - x, q.y - y) < dist + (q.ex || 0))) continue;
+				P.push({
+					k,
+					x,
+					y,
+					...f()
+				});
+				cnt++;
+			}
+		};
+		add("tree", 80, 5.5 * T$1, 96, () => ({
+			r: (1.5 + g() * .7) * T$1,
+			pk: g() < .45,
+			s: g() * 99 | 0
+		}));
+		add("rock", 28, 72, 72, () => ({ r: (.5 + g() * .4) * T$1 }));
+		add("bush", 44, 2.5 * T$1, 72, () => ({ r: (.6 + g() * .4) * T$1 }));
+		add("fl", 110, 48, 48, () => ({
+			n: 6 + (g() * 6 | 0),
+			c: g()
+		}));
+		P.sort((a, c) => a.y - c.y);
+		decorCache.set(cacheKey, P);
+		return P;
+	}
+	/**
+	* Bakes the static world inside the world-space rect (x0, y0, w, h) at RS canvas pixels
+	* per world unit: meadow, stream, decorations, path cells, lair, portals, walls and tree
+	* crowns, faded into the background colour at the edge of the world.
+	*/
+	function bakeMeadow(S, P, x0, y0, w, h, RS) {
+		const R = S.length;
+		const C = S[0].length;
+		const BG = P.bg;
+		const DEC = meadowDecor(R, C, P.landmark.ex);
+		const isW = (r, c) => !!S[r] && S[r][c] === "WL";
+		const cv = makeCanvas(Math.ceil(w * RS), Math.ceil(h * RS));
+		const b = canvasContext(cv);
+		b.scale(RS, RS);
+		b.translate(-x0, -y0);
+		const X1 = x0 + w;
+		const Y1 = y0 + h;
+		const vis = (x, y, m = 70) => x > x0 - m && x < X1 + m && y > y0 - m && y < Y1 + m;
+		let sd = 11;
+		const rnd = () => (sd = sd * 16807 % 2147483647) / 2147483647;
+		const rr = (a, c) => a + rnd() * (c - a);
+		const pick = (a) => a[rnd() * a.length | 0];
+		const shade = (alpha) => `rgba(${P.shadow},${alpha})`;
+		const lin = (a, c, d, e, f, g) => {
+			const q = b.createLinearGradient(a, c, d, e);
+			q.addColorStop(0, f);
+			q.addColorStop(1, g);
+			return q;
+		};
+		const blob = (x, y, rx, ry, col, rot) => {
+			b.fillStyle = col;
+			b.beginPath();
+			b.ellipse(x, y, rx, ry, rot ?? rnd() * 3, 0, 7);
+			b.fill();
+		};
+		const rp = (x, y, w2, h2, [a, c, d, e]) => {
+			b.beginPath();
+			b.moveTo(x + a, y);
+			b.lineTo(x + w2 - c, y);
+			b.arcTo(x + w2, y, x + w2, y + c, c);
+			b.lineTo(x + w2, y + h2 - d);
+			b.arcTo(x + w2, y + h2, x + w2 - d, y + h2, d);
+			b.lineTo(x + e, y + h2);
+			b.arcTo(x, y + h2, x, y + h2 - e, e);
+			b.lineTo(x, y + a);
+			b.arcTo(x, y, x + a, y, a);
+		};
+		const fl5 = (x, y, r, col, mid) => {
+			for (let k = 0; k < 5; k++) {
+				const a = k * 1.2566 + .3;
+				blob(x + Math.cos(a) * r * .7, y + Math.sin(a) * r * .7, r * .6, r * .6, col, 0);
+			}
+			blob(x, y, r * .38, r * .38, mid, 0);
+		};
+		const sph = (x, y, r, c0, c1) => {
+			const g = b.createRadialGradient(x - r * .35, y - r * .35, .5, x, y, r);
+			g.addColorStop(0, c0);
+			g.addColorStop(1, c1);
+			b.fillStyle = g;
+			b.beginPath();
+			b.arc(x, y, r, 0, 7);
+			b.fill();
+		};
+		const kit = {
+			b,
+			rnd,
+			rr,
+			pick,
+			blob,
+			fl5,
+			sph,
+			lin,
+			shade
+		};
+		const q = b.createRadialGradient(C * T$1 / 2, R * T$1 / 2, 0, C * T$1 / 2, R * T$1 / 2, 912);
+		q.addColorStop(0, P.groundCenter);
+		q.addColorStop(1, BG);
+		b.fillStyle = q;
+		b.fillRect(x0, y0, w, h);
+		const A = w * h;
+		for (let i = 0; i < A / 5e4; i++) {
+			const x = x0 + rnd() * w;
+			const y = y0 + rnd() * h;
+			const r = rr(70, 130);
+			const g = b.createRadialGradient(x, y, 0, x, y, r);
+			const d = i % 2;
+			g.addColorStop(0, d ? P.groundBlobs[0] : P.groundBlobs[1]);
+			g.addColorStop(1, "rgba(0,0,0,0)");
+			b.fillStyle = g;
+			b.fillRect(x - r, y - r, 2 * r, 2 * r);
+		}
+		for (let i = 0; i < A / 1100; i++) {
+			b.strokeStyle = pick(P.grass);
+			const x = x0 + rnd() * w;
+			const y = y0 + rnd() * h;
+			b.lineWidth = 1;
+			b.beginPath();
+			b.moveTo(x, y);
+			b.lineTo(x + rr(-2, 2), y - rr(3, 7));
+			b.stroke();
+		}
+		for (let i = 0; i < A / 8e3; i++) {
+			const x = x0 + rnd() * w;
+			const y = y0 + rnd() * h;
+			const L = rr(14, 40);
+			b.strokeStyle = P.curls;
+			b.lineWidth = 1.4;
+			b.beginPath();
+			b.moveTo(x, y);
+			b.quadraticCurveTo(x + L / 2, y - rr(2, 6), x + L, y);
+			b.stroke();
+		}
+		const sy = (x) => streamY(R, x);
+		if (Y1 > sy(x0) - 40 && y0 < sy(x0) + 60) {
+			const line = () => {
+				b.beginPath();
+				for (let x = x0 - 20; x <= X1 + 20; x += 12) if (x === x0 - 20) b.moveTo(x, sy(x));
+				else b.lineTo(x, sy(x));
+			};
+			b.lineCap = b.lineJoin = "round";
+			for (const [lw, c] of [
+				[40, P.stream[0]],
+				[32, P.stream[1]],
+				[27, P.stream[2]],
+				[13, P.stream[3]]
+			]) {
+				b.lineWidth = lw;
+				b.strokeStyle = c;
+				line();
+				b.stroke();
+			}
+			for (let x = x0; x < X1; x += 16) {
+				const y = sy(x) + rr(-9, 9);
+				b.strokeStyle = "rgba(255,255,255,.4)";
+				b.lineWidth = 1;
+				b.beginPath();
+				b.moveTo(x, y);
+				b.lineTo(x + rr(6, 14), y);
+				b.stroke();
+			}
+		}
+		for (const o of DEC) {
+			if (!vis(o.x, o.y, 60 + (o.w || (o.rx || 0) * 2))) continue;
+			const r = o.r ?? 0;
+			if (o.k === "fl") P.flowerPatch(kit, o);
+			else if (o.k === "bush") {
+				blob(o.x + 3, o.y + 4, r, r * .7, shade(.3), 0);
+				for (let i = 0; i < 4; i++) {
+					const px = o.x + rr(-.5, .5) * r;
+					const py = o.y + rr(-.4, .4) * r;
+					const g = b.createRadialGradient(px - 2, py - 2, 1, px, py, r * .7);
+					g.addColorStop(0, P.bush[0]);
+					g.addColorStop(1, P.bush[1]);
+					b.fillStyle = g;
+					b.beginPath();
+					b.arc(px, py, r * .7, 0, 7);
+					b.fill();
+				}
+			} else if (o.k === "pond") {
+				const rx = o.rx ?? 0;
+				const ry = o.ry ?? 0;
+				blob(o.x + 3, o.y + 4, rx * 1.05, ry * 1.05, shade(.25), 0);
+				blob(o.x, o.y, rx * 1.1, ry * 1.12, P.pond.sand, 0);
+				b.fillStyle = lin(o.x - rx, o.y - ry, o.x + rx, o.y + ry, P.pond.water[0], P.pond.water[1]);
+				b.beginPath();
+				b.ellipse(o.x, o.y, rx, ry, 0, 0, 7);
+				b.fill();
+				b.strokeStyle = P.pond.rim;
+				b.lineWidth = 1.5;
+				b.stroke();
+				b.strokeStyle = "rgba(255,255,255,.8)";
+				b.lineWidth = 1;
+				for (let i = 0; i < 5; i++) {
+					const a = rnd() * 6.28;
+					const L = rr(.3, .8);
+					b.beginPath();
+					b.moveTo(o.x + Math.cos(a) * rx * .1, o.y + Math.sin(a) * ry * .1);
+					b.lineTo(o.x + Math.cos(a + .2) * rx * L * .6, o.y + Math.sin(a + .2) * ry * L);
+					b.lineTo(o.x + Math.cos(a - .1) * rx * L, o.y + Math.sin(a - .1) * ry * L * 1.1);
+					b.stroke();
+				}
+				blob(o.x - rx * .35, o.y - ry * .4, rx * .3, ry * .1, P.pond.highlight, -.3);
+				P.pondExtras?.(kit, o);
+				for (let i = 0; i < 9; i++) {
+					const a = i * .7 + rnd() * .4;
+					blob(o.x + Math.cos(a) * rx * 1.05, o.y + Math.sin(a) * ry * 1.07, rr(3, 5), rr(2, 3.4), P.pond.stones);
+				}
+			} else if (o.k === "landmark") P.landmark.draw(kit, o);
+			else if (o.k === "lamp") {
+				blob(o.x + 2, o.y + 3, 5, 3.5, shade(.35), 0);
+				sph(o.x, o.y, 4.2, "#7b7268", "#2f2a27");
+				sph(o.x, o.y, 2.6, "#fff6cf", "#ffc561");
+				blob(o.x - 2.6, o.y - 3, 2.4, 1.2, "#ffffff", 0);
+			} else if (o.k === "bridge") {
+				const bx = o.x - 26;
+				const by = o.y - 34;
+				b.fillStyle = shade(.35);
+				b.fillRect(bx + 4, by + 5, 52, 68);
+				for (let yy = by, i = 0; yy < by + 68; yy += 5, i++) {
+					b.fillStyle = i % 2 ? "#8c6342" : "#795634";
+					b.fillRect(bx + 2, yy, 48, 4.2);
+					b.fillStyle = "rgba(255,230,190,.25)";
+					b.fillRect(bx + 2, yy, 48, .8);
+				}
+				b.fillStyle = "#4f3622";
+				b.fillRect(bx, by, 4, 68);
+				b.fillRect(bx + 48, by, 4, 68);
+				for (const [px, py] of [
+					[bx - 1, by - 1],
+					[bx + 47, by - 1],
+					[bx - 1, by + 63],
+					[bx + 47, by + 63]
+				]) {
+					b.fillStyle = "#3a281a";
+					b.fillRect(px, py, 6, 6);
+					blob(px + 3, py + 1, 2.8, 1.6, P.bridge.caps, 0);
+				}
+				blob(bx + 26, by + 20, 7, 2.6, P.bridge.middle, .2);
+			} else if (o.k === "cabin") {
+				const ow = o.w ?? 0;
+				const oh = o.h ?? 0;
+				const X = o.x - ow / 2;
+				const Y = o.y - oh / 2;
+				b.fillStyle = shade(.3);
+				rp(X + 6, Y + 8, ow, oh, [
+					4,
+					4,
+					4,
+					4
+				]);
+				b.fill();
+				b.save();
+				rp(X, Y, ow, oh, [
+					4,
+					4,
+					4,
+					4
+				]);
+				b.clip();
+				b.fillStyle = lin(X, Y, X, o.y, P.cabin.walls[0], P.cabin.walls[1]);
+				b.fillRect(X, Y, ow, oh / 2);
+				b.fillStyle = lin(X, o.y, X, Y + oh, P.cabin.walls[2], P.cabin.walls[3]);
+				b.fillRect(X, o.y, ow, oh / 2);
+				b.strokeStyle = "rgba(40,20,20,.22)";
+				b.lineWidth = 1;
+				for (let r2 = 0; r2 < oh / 6; r2++) {
+					b.beginPath();
+					b.moveTo(X, Y + r2 * 6);
+					b.lineTo(X + ow, Y + r2 * 6);
+					for (let xx = X + r2 % 2 * 5; xx < X + ow; xx += 10) {
+						b.moveTo(xx, Y + r2 * 6);
+						b.lineTo(xx, Y + r2 * 6 + 6);
+					}
+					b.stroke();
+				}
+				for (let i = 0; i < 16; i++) blob(X + rnd() * ow, Y + rnd() * oh, rr(8, 18), rr(4, 8), P.cabin.roofBlobs);
+				b.restore();
+				b.lineCap = "round";
+				b.strokeStyle = P.cabin.ridge;
+				b.lineWidth = 4;
+				b.beginPath();
+				b.moveTo(X + 3, o.y);
+				b.lineTo(X + ow - 3, o.y);
+				b.stroke();
+				b.strokeStyle = P.cabin.ridgeShadow;
+				b.lineWidth = 1;
+				b.beginPath();
+				b.moveTo(X + 3, o.y + 2.8);
+				b.lineTo(X + ow - 3, o.y + 2.8);
+				b.stroke();
+				b.strokeStyle = "rgba(45,25,25,.5)";
+				b.lineWidth = 1.5;
+				rp(X, Y, ow, oh, [
+					4,
+					4,
+					4,
+					4
+				]);
+				b.stroke();
+				const cx = o.x + ow * .25;
+				const cy = o.y - oh * .22;
+				b.fillStyle = shade(.35);
+				b.fillRect(cx - 2, cy - 1, 12, 12);
+				b.fillStyle = "#8c8179";
+				b.fillRect(cx - 6, cy - 6, 12, 12);
+				b.fillStyle = "#2b2523";
+				b.fillRect(cx - 3.5, cy - 3.5, 7, 7);
+				blob(cx - 4, cy - 5, 3, 1.5, P.cabin.chimneyCap, 0);
+			} else if (o.k === "rock") {
+				blob(o.x + 3, o.y + 5, r * 1.1, r * .7, shade(.35), 0);
+				b.fillStyle = lin(o.x - r, o.y - r, o.x + r, o.y + r, P.rock[0], P.rock[1]);
+				b.beginPath();
+				b.ellipse(o.x, o.y, r, r * .75, 0, 0, 7);
+				b.fill();
+				blob(o.x - r * .3, o.y - r * .35, r * .6, r * .28, P.rock[2], 0);
+				blob(o.x + r * .4, o.y - r * .2, r * .25, r * .15, P.rock[3], 0);
+			}
+		}
+		const TP = [];
+		for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
+			const t = S[r][c];
+			const x = c * T$1;
+			const y = r * T$1;
+			if (t === "ES" || t === "WL" || !vis(x + T$1 / 2, y + T$1 / 2, T$1)) continue;
+			const k = tileRandom(r, c);
+			if (LAIR.has(t)) {
+				b.fillStyle = P.lair.base;
+				b.fillRect(x - .5, y - .5, 25, 25);
+				for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
+					b.fillStyle = P.lair.tiles[k() * 3 | 0];
+					rp(x + i * T$1 / 2 + 1, y + j * T$1 / 2 + 1, T$1 / 2 - 2, T$1 / 2 - 2, [
+						3,
+						3,
+						3,
+						3
+					]);
+					b.fill();
+				}
+				blob(x + k() * T$1, y + k() * T$1, 3, 1.4, "rgba(255,255,255,.9)", 0);
+				continue;
+			}
+			b.fillStyle = P.floor.tiles[k() * 3 | 0];
+			b.fillRect(x - .5, y - .5, 25, 25);
+			for (let i = 0; i < 3; i++) blob(x + k() * T$1, y + k() * T$1, .6 + k() * 1.4, .5 + k(), P.floor.specks[k() * 3 | 0], k() * 3);
+			if (t === "LE") {
+				const lf = S[r][c - 1] !== "LE";
+				const rt = S[r][c + 1] !== "LE";
+				b.fillStyle = "#7a5636";
+				b.fillRect(x, y + T$1 / 2 - 5, T$1, 10);
+				b.fillStyle = "#a07848";
+				for (let i = 0; i < 3; i++) b.fillRect(x, y + T$1 / 2 - 4 + i * 3.3, T$1, 1.2);
+				b.fillStyle = "#4f3622";
+				if (lf) b.fillRect(x, y + T$1 / 2 - 6, 4, 12);
+				if (rt) b.fillRect(x + T$1 - 4, y + T$1 / 2 - 6, 4, 12);
+				if (!lf && !rt) fl5(x + T$1 / 2, y + T$1 / 2 - 5, 2.6, "#d9333a", "#ffffff");
+			}
+			if (isTeleportToken(t)) TP.push([
+				x,
+				y,
+				c
+			]);
+		}
+		for (const [x, y, c] of TP) {
+			const dir = c < C / 2 ? -1 : 1;
+			const L = 264;
+			const px = x + T$1 / 2;
+			const py = y + T$1 / 2;
+			for (let i = 0; i < 240; i++) {
+				const u = i / 240;
+				const xx = px + dir * u * L;
+				const yy = py + Math.sin(u * 6 + dir) * 5 * u + rr(-1.2, 1.2);
+				const a = u < .1 ? 1 : Math.pow(1 - (u - .1) / .9, 1.5);
+				if (vis(xx, yy, 30)) blob(xx, yy, 11 - 5 * u + rr(0, 2), 10 - 4 * u, P.portal.trail(a));
+			}
+			for (let i = 0; i < 260; i++) {
+				const u = rnd();
+				const xx = px + dir * u * L;
+				const yy = py + Math.sin(u * 6 + dir) * 5 * u + (rnd() < .5 ? 1 : -1) * (rr(9, 14) - 5 * u);
+				if (u > .1 && vis(xx, yy, 10)) {
+					b.strokeStyle = pick(P.portal.grass);
+					b.lineWidth = 1.2;
+					b.beginPath();
+					b.moveTo(xx, yy);
+					b.lineTo(xx + rr(-3, 3), yy - rr(3, 7));
+					b.stroke();
+				}
+			}
+			blob(px + 1.5, py + 2, 10, 9.5, shade(.38), 0);
+			b.fillStyle = lin(x, y, x + T$1, y + T$1, P.portal.plate[0], P.portal.plate[1]);
+			rp(x + 1.5, y + 1.5, 21, 21, [
+				6,
+				6,
+				6,
+				6
+			]);
+			b.fill();
+			b.strokeStyle = "rgba(255,255,255,.55)";
+			b.lineWidth = 1;
+			rp(x + 2.5, y + 2.5, 19, 19, [
+				5,
+				5,
+				5,
+				5
+			]);
+			b.stroke();
+			const q2 = b.createRadialGradient(px, py, 1, px, py, 8.5);
+			q2.addColorStop(0, P.portal.core[0]);
+			q2.addColorStop(.45, P.portal.core[1]);
+			q2.addColorStop(1, P.portal.core[2]);
+			b.fillStyle = q2;
+			b.beginPath();
+			b.arc(px, py, 8.5, 0, 7);
+			b.fill();
+			b.strokeStyle = P.portal.ring;
+			b.lineWidth = 1.2;
+			b.stroke();
+			for (const [dx, dy] of [
+				[5, 5],
+				[19, 5],
+				[5, 19],
+				[19, 19]
+			]) blob(x + dx, y + dy, 1.5, 1.2, P.portal.corners, 0);
+		}
+		const WL = [];
+		for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) if (isW(r, c) && vis(c * T$1 + T$1 / 2, r * T$1 + T$1 / 2, T$1)) WL.push([r, c]);
+		const wsh = (r, c, i, j, k, all) => {
+			const oL = !isW(r, c - 1);
+			const oU = !isW(r - 1, c);
+			const oR = !isW(r, c + 1);
+			const oD = !isW(r + 1, c);
+			const L = oL ? i : j;
+			const U = oU ? i : j;
+			const Rr = oR ? i : j;
+			const Dd = oD ? i : j;
+			rp(c * T$1 + L, r * T$1 + U, T$1 - L - Rr, T$1 - U - Dd, all ? [
+				k,
+				k,
+				k,
+				k
+			] : [
+				oU && oL ? k : 0,
+				oU && oR ? k : 0,
+				oD && oR ? k : 0,
+				oD && oL ? k : 0
+			]);
+		};
+		const SIDES = [
+			[0, -1],
+			[0, 1],
+			[-1, 0],
+			[1, 0]
+		];
+		const W = P.wall;
+		for (const [r, c] of WL) for (const [dr, dc] of SIDES) {
+			const n = S[r + dr] && S[r + dr][c + dc];
+			if (!n || n === "ES" || n === "WL") continue;
+			b.fillStyle = LAIR.has(n) ? P.lair.base : P.floor.tiles[0];
+			const x = c * T$1;
+			const y = r * T$1;
+			b.fillRect(dc ? dc > 0 ? x + T$1 / 2 : x : x, dr ? dr > 0 ? y + T$1 / 2 : y : y, dc ? T$1 / 2 : T$1, dr ? T$1 / 2 : T$1);
+		}
+		b.save();
+		b.shadowColor = W.shadow;
+		b.shadowBlur = 7 * RS;
+		b.shadowOffsetX = 2 * RS;
+		b.shadowOffsetY = 3 * RS;
+		b.fillStyle = W.base;
+		for (const [r, c] of WL) {
+			wsh(r, c, 0, -.4, 8, false);
+			b.fill();
+		}
+		b.restore();
+		b.fillStyle = W.base;
+		for (const [r, c] of WL) {
+			wsh(r, c, 0, -.4, 8, false);
+			b.fill();
+		}
+		for (const [r, c] of WL) {
+			const k = tileRandom(r, c);
+			const v = k();
+			const x = c * T$1;
+			const y = r * T$1;
+			const hd = v < .08;
+			b.save();
+			b.fillStyle = hd ? lin(x, y, x + T$1, y + T$1, W.moss[0], W.moss[1]) : lin(x, y, x + T$1, y + T$1, W.top[k() * 3 | 0], W.bottom[k() * 3 | 0]);
+			wsh(r, c, .6, .6, 8, false);
+			b.fill();
+			b.restore();
+			wsh(r, c, .6, .6, 8, false);
+			b.save();
+			b.clip();
+			if (hd) for (let i = 0; i < 14; i++) blob(x + k() * T$1, y + k() * T$1, 1.5 + k() * 1.5, .8 + k() * .8, W.mossSpecks[k() * 3 | 0], k() * 3);
+			else {
+				for (let i = 0; i < 8; i++) blob(x + k() * T$1, y + k() * T$1, .5 + k(), .4 + k() * .6, k() < .5 ? W.specks[0] : W.specks[1], k() * 3);
+				b.strokeStyle = W.crack;
+				b.lineWidth = 1;
+				b.beginPath();
+				b.moveTo(x + 4 + k() * 16, y);
+				b.lineTo(x + 4 + k() * 16, y + T$1 * .6);
+				b.lineTo(x + 4 + k() * 16, y + T$1);
+				b.stroke();
+				const o1 = r + c & 1;
+				b.strokeStyle = W.joints;
+				b.lineWidth = .8;
+				b.beginPath();
+				b.moveTo(x, y + T$1 / 2);
+				b.lineTo(x + T$1, y + T$1 / 2);
+				b.moveTo(x + (o1 ? T$1 * .34 : T$1 * .66), y);
+				b.lineTo(x + (o1 ? T$1 * .34 : T$1 * .66), y + T$1 / 2);
+				b.moveTo(x + (o1 ? T$1 * .68 : T$1 * .32), y + T$1 / 2);
+				b.lineTo(x + (o1 ? T$1 * .68 : T$1 * .32), y + T$1);
+				b.stroke();
+				const n = v < .3 ? 2 : 1;
+				for (let i = 0; i < n; i++) {
+					blob(x + k() * T$1 * .7 + 3, y + k() * T$1 * .55 + 3, 5 + k() * 4, 3 + k() * 2.5, W.drifts[0]);
+					blob(x + k() * T$1 * .8, y + k() * T$1 * .6, 3 + k() * 3, 1.5 + k() * 1.5, W.drifts[1]);
+				}
+			}
+			b.strokeStyle = W.light;
+			b.lineWidth = 2;
+			b.save();
+			b.translate(-1.2, -1.2);
+			wsh(r, c, .6, .6, 8, false);
+			b.stroke();
+			b.restore();
+			b.strokeStyle = W.dark;
+			b.save();
+			b.translate(1.2, 1.2);
+			wsh(r, c, .6, .6, 8, false);
+			b.stroke();
+			b.restore();
+			b.restore();
+			if (v > .96) {
+				const px = x + 6 + k() * 12;
+				const py = y + 6 + k() * 12;
+				for (let i = 0; i < 4; i++) blob(px + k() * 6 - 3, py + k() * 5 - 2.5, 1.8, 1.8, W.flowers[k() * 3 | 0], 0);
+				blob(px, py, 1, 1, "#ffd45e", 0);
+			}
+		}
+		for (const [r, c] of WL) {
+			const k = tileRandom(r + 9, c + 9);
+			for (const [dr, dc] of SIDES) {
+				const n = S[r + dr] && S[r + dr][c + dc];
+				if (n && n !== "ES" || k() < .45) continue;
+				for (let i = 0; i < 4; i++) {
+					const t = k();
+					const x = c * T$1 + (dc ? dc > 0 ? T$1 : 0 : t * T$1);
+					const y = r * T$1 + (dr ? dr > 0 ? T$1 : 0 : t * T$1);
+					b.strokeStyle = P.edgeGrass[k() * 3 | 0];
+					b.lineWidth = 1.2;
+					b.beginPath();
+					b.moveTo(x, y);
+					b.lineTo(x + dc * k() * 4 + (k() - .5) * 3, y + dr * k() * 4 - 2 - k() * 3);
+					b.stroke();
+				}
+			}
+		}
+		const TR = P.trees;
+		for (const o of DEC) {
+			const r = o.r ?? 0;
+			if (o.k !== "tree" || !vis(o.x, o.y, r * 2)) continue;
+			const k = tileRandom(o.s ?? 0, 7);
+			const pal = o.pk ? TR.accent : TR.plain;
+			blob(o.x + r * .3, o.y + r * .4, r * 1.3, r, shade(.34), 0);
+			for (let i = 0; i < 11; i++) {
+				const a = i * .62 + k() * 2;
+				const d = i ? r * (.3 + k() * .45) : 0;
+				const px = o.x + Math.cos(a) * d;
+				const py = o.y + Math.sin(a) * d;
+				const pr = r * (.36 + k() * .2);
+				const g = b.createRadialGradient(px - pr * .35, py - pr * .35, 1, px, py, pr);
+				g.addColorStop(0, pal[0]);
+				g.addColorStop(.55, pal[1]);
+				g.addColorStop(1, pal[2]);
+				b.fillStyle = g;
+				b.beginPath();
+				b.arc(px, py, pr, 0, 7);
+				b.fill();
+			}
+			for (let i = 0; i < 24; i++) {
+				const a = k() * 6.28;
+				const d = Math.sqrt(k()) * r * .85;
+				const rx = 1.2 + k() * 1.4;
+				const ry = 1 + k();
+				const dots = o.pk ? TR.accentDots : TR.plainDots;
+				const light = o.pk ? k() < .6 : k() < .5;
+				blob(o.x + Math.cos(a) * d - r * .1, o.y + Math.sin(a) * d - r * .1, rx, ry, light ? dots[0] : dots[1], 0);
+			}
+			for (let i = 0; i < 8; i++) blob(o.x + rr(.4, 1.9) * r, o.y + rr(.2, 1.7) * r, rr(3, 6), rr(1.5, 3), TR.drifts);
+		}
+		const X0 = -864;
+		const X2 = (C + 36) * T$1;
+		const Y0 = -648;
+		const Y2 = (R + 27) * T$1;
+		const F = 144;
+		b.fillStyle = BG;
+		if (x0 < X0) b.fillRect(x0, y0, X0 - x0, h);
+		if (X1 > X2) b.fillRect(X2, y0, X1 - X2, h);
+		if (y0 < Y0) b.fillRect(x0, y0, w, Y0 - y0);
+		if (Y1 > Y2) b.fillRect(x0, Y2, w, Y1 - Y2);
+		for (const [a, c, d, e, f, g, i, j] of [
+			[
+				X0,
+				0,
+				-720,
+				0,
+				X0,
+				y0,
+				F,
+				h
+			],
+			[
+				X2,
+				0,
+				X2 - F,
+				0,
+				X2 - F,
+				y0,
+				F,
+				h
+			],
+			[
+				0,
+				Y0,
+				0,
+				-504,
+				x0,
+				Y0,
+				w,
+				F
+			],
+			[
+				0,
+				Y2,
+				0,
+				Y2 - F,
+				x0,
+				Y2 - F,
+				w,
+				F
+			]
+		]) {
+			const gr = b.createLinearGradient(a, c, d, e);
+			gr.addColorStop(0, BG);
+			gr.addColorStop(1, BG + "00");
+			b.fillStyle = gr;
+			b.fillRect(f, g, i, j);
+		}
+		return cv;
+	}
+	//#endregion
+	//#region src/games/pacman/render/seasons/meadow/meadowSprites.ts
+	function lazy(make) {
+		let value = null;
+		return () => value ??= make();
+	}
+	/** Linear 64×64 colour wash laid over the whole screen. */
+	function washTexture(from, to) {
+		const c = makeCanvas(64, 64);
+		const x = canvasContext(c);
+		const q = x.createLinearGradient(0, 0, 64, 64);
+		q.addColorStop(0, from);
+		q.addColorStop(.5, "rgba(255,255,255,0)");
+		q.addColorStop(1, to);
+		x.fillStyle = q;
+		x.fillRect(0, 0, 64, 64);
+		return c;
+	}
+	/** Soft sun ray falling from the top edge. */
+	var rayTexture = lazy(() => {
+		const c = makeCanvas(70, 520);
+		const x = canvasContext(c);
+		let q = x.createLinearGradient(0, 0, 70, 0);
+		q.addColorStop(0, "rgba(255,230,170,0)");
+		q.addColorStop(.5, "rgba(255,230,170,1)");
+		q.addColorStop(1, "rgba(255,230,170,0)");
+		x.fillStyle = q;
+		x.fillRect(0, 0, 70, 520);
+		x.globalCompositeOperation = "destination-in";
+		q = x.createLinearGradient(0, 0, 0, 520);
+		q.addColorStop(0, "rgba(0,0,0,1)");
+		q.addColorStop(1, "rgba(0,0,0,0)");
+		x.fillStyle = q;
+		x.fillRect(0, 0, 70, 520);
+		return c;
+	});
+	var streakCache = /* @__PURE__ */ new Map();
+	/** 16×2 streak fading in from the left, tinted (rain, blizzard, wind). */
+	function streakTexture(tint) {
+		const cached = streakCache.get(tint);
+		if (cached) return cached;
+		const r = tint >> 16 & 255;
+		const g = tint >> 8 & 255;
+		const b = tint & 255;
+		const texture = makeTexture(16, 2, (x) => {
+			const q = x.createLinearGradient(0, 0, 16, 0);
+			q.addColorStop(0, `rgba(${r},${g},${b},0)`);
+			q.addColorStop(1, `rgba(${r},${g},${b},1)`);
+			x.fillStyle = q;
+			x.fillRect(0, 0, 16, 2);
+		});
+		streakCache.set(tint, texture);
+		return texture;
+	}
+	/** Portal swirl: three spiral arms (the same in every season). */
+	var swirlTexture = lazy(() => makeTexture(20, 20, (x) => {
+		x.translate(10, 10);
+		x.lineCap = "round";
+		for (let arm = 0; arm < 3; arm++) {
+			x.strokeStyle = "rgba(255,255,255,.9)";
+			x.lineWidth = 1.2;
+			x.beginPath();
+			for (let i = 0; i <= 20; i++) {
+				const u = i / 20;
+				const a = u * 3.6 + arm * Math.PI * 2 / 3;
+				const r = 1 + u * 6.8;
+				if (i) x.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+				else x.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+			}
+			x.stroke();
+		}
+	}));
+	/** Portal ring in the season's colour. */
+	function ringTexture(color) {
+		return makeTexture(20, 20, (x) => {
+			x.strokeStyle = color;
+			x.lineWidth = 1.2;
+			x.beginPath();
+			x.arc(10, 10, 8.8, 0, 7);
+			x.stroke();
+		});
+	}
+	/** A sprite texture multiplied by a tint, keeping its alpha (PIXI's `tint`). */
+	var tintCache = /* @__PURE__ */ new WeakMap();
+	function tinted(im, tint) {
+		let byTint = tintCache.get(im);
+		if (!byTint) {
+			byTint = /* @__PURE__ */ new Map();
+			tintCache.set(im, byTint);
+		}
+		const cached = byTint.get(tint);
+		if (cached) return cached;
+		const c = makeCanvas(im.width, im.height);
+		const x = canvasContext(c);
+		x.drawImage(im, 0, 0);
+		x.globalCompositeOperation = "multiply";
+		x.fillStyle = "#" + tint.toString(16).padStart(6, "0");
+		x.fillRect(0, 0, c.width, c.height);
+		x.globalCompositeOperation = "destination-in";
+		x.drawImage(im, 0, 0);
+		byTint.set(tint, c);
+		return c;
+	}
+	/** Radial fog / light / vignette in one call. */
+	function radial(stops) {
+		return radialTexture(256, stops);
+	}
+	//#endregion
+	//#region src/games/pacman/render/seasons/meadow/MeadowWorld.ts
+	var T = 24;
+	var REBAKE_DELAY_MS = 160;
+	/** Centred sprite; size in the current transform's units. */
+	function sprite(ctx, im, x, y, w, h, a = 1, rot = 0, add = false) {
+		if (a <= .003 || w <= 0 || h <= 0) return;
+		ctx.globalAlpha = a > 1 ? 1 : a;
+		ctx.globalCompositeOperation = add ? "lighter" : "source-over";
+		if (rot) {
+			ctx.save();
+			ctx.translate(x, y);
+			ctx.rotate(rot);
+			ctx.drawImage(im, -w / 2, -h / 2, w, h);
+			ctx.restore();
+		} else ctx.drawImage(im, x - w / 2, y - h / 2, w, h);
+	}
+	var MeadowWorld = class {
+		S;
+		theme;
+		R;
+		C;
+		ring;
+		pellets = [];
+		energizers = [];
+		portals = [];
+		glints = [];
+		smoke = [];
+		lights = [];
+		mist;
+		drift;
+		weather = [];
+		motion;
+		vw = 0;
+		vh = 0;
+		dpr = 1;
+		sc = 1;
+		wx = 0;
+		wy = 0;
+		t = 0;
+		stormV = 0;
+		stormT = 0;
+		nightV = 0;
+		nightT = 0;
+		bg = null;
+		bgX = 0;
+		bgY = 0;
+		bgRS = 1;
+		rebakeAt = 0;
+		constructor(S, theme) {
+			this.S = S;
+			this.theme = theme;
+			this.R = S.length;
+			this.C = S[0].length;
+			const live = theme.live;
+			this.ring = live.portal.ring();
+			const reduce = typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+			this.motion = reduce ? .2 : 1;
+			const ctr = (r, c) => ({
+				x: (c + .5) * T,
+				y: (r + .5) * T
+			});
+			S.forEach((row, r) => row.forEach((tt, c) => {
+				const p = ctr(r, c);
+				if (tt === "DT") this.pellets.push({
+					...p,
+					r,
+					c
+				});
+				else if (tt === "EU") {
+					this.energizers.push({
+						...p,
+						r,
+						c,
+						ph: Math.random() * 6
+					});
+					this.lights.push({
+						...p,
+						r: 1.7 * T,
+						tint: live.lights.energizer,
+						a: .8,
+						flicker: false
+					});
+				} else if (isTeleportToken(tt)) {
+					this.portals.push({
+						...p,
+						i: this.portals.length,
+						ph: r + c
+					});
+					this.lights.push({
+						...p,
+						r: 1.6 * T,
+						tint: live.lights.portal,
+						a: .7,
+						flicker: false
+					});
+				}
+			}));
+			const lair = ctr(Math.floor((this.R - 1) / 2), Math.floor((this.C - 1) / 2));
+			this.lights.push({
+				...lair,
+				r: 3.4 * T,
+				tint: 16767392,
+				a: .4,
+				flicker: false
+			});
+			for (let i = 0; i < 22; i++) {
+				const x = (-18 + i * (this.C + 36) / 22) * T + Math.random() * T * 2;
+				this.glints.push({
+					x,
+					y: streamY(this.R, x) + (Math.random() - .5) * 10,
+					ph: Math.random() * 6
+				});
+			}
+			for (const o of meadowDecor(this.R, this.C, theme.bake.landmark.ex)) if (o.k === "lamp") this.lights.push({
+				x: o.x,
+				y: o.y,
+				r: 4 * T,
+				tint: 16767120,
+				a: .85,
+				flicker: true
+			});
+			else if (o.k === "cabin") {
+				const w = o.w ?? 0;
+				const h = o.h ?? 0;
+				this.lights.push({
+					x: o.x,
+					y: o.y,
+					r: 5 * T,
+					tint: 16762746,
+					a: .5,
+					flicker: false
+				});
+				if (live.chimneySmoke) for (let i = 0; i < 5; i++) this.smoke.push({
+					cx: o.x + w * .25,
+					cy: o.y - h * .22,
+					u: i / 5,
+					ph: i
+				});
+			}
+			this.mist = [
+				0,
+				1,
+				2,
+				3
+			].map((i) => ({
+				x: 0,
+				y: 0,
+				w: 0,
+				h: 0,
+				v: .15 + i * .04
+			}));
+			this.drift = Array.from({ length: 80 }, (_, i) => ({
+				im: live.drift.texture(i),
+				a: .55 + Math.random() * .35,
+				px: Math.random(),
+				py: Math.random(),
+				v: 4e-4 + Math.random() * 4e-4,
+				ph: Math.random() * 6,
+				rand: Math.random(),
+				w: 0,
+				h: 0
+			}));
+		}
+		/** Board placement for the actors: one tile = MEADOW_TILE world units. */
+		get layout() {
+			return {
+				tileSize: T * this.sc,
+				offsetX: this.wx,
+				offsetY: this.wy
+			};
+		}
+		/** Weather and night targets, 0..1; both ease in and out like the mock-up toggles. */
+		setMood(storm, night) {
+			this.stormT = storm;
+			this.nightT = night;
+		}
+		resize(vw, vh, dpr) {
+			if (vw === this.vw && vh === this.vh && dpr === this.dpr) return;
+			const first = this.vw === 0;
+			this.vw = vw;
+			this.vh = vh;
+			this.dpr = dpr;
+			this.sc = .75 * Math.min(vw / ((this.C + 2.5) * T), vh / ((this.R + 2.5) * T));
+			this.wx = vw / 2 - this.C * T / 2 * this.sc;
+			this.wy = vh / 2 - this.R * T / 2 * this.sc;
+			const W = Math.max(vw, vh);
+			this.mist.forEach((f, i) => {
+				f.w = W * .8;
+				f.h = W * .5;
+				f.y = vh * (.15 + i * .22);
+			});
+			for (const p of this.drift) [p.w, p.h] = this.theme.live.drift.size(this.sc, p.rand);
+			if (first) {
+				const weather = this.theme.live.weather;
+				this.weather = Array.from({ length: weather.count }, (_, i) => weather.make(i, vw, vh));
+				this.rebake();
+			} else this.rebakeAt = performance.now() + REBAKE_DELAY_MS;
+		}
+		update(dt) {
+			const live = this.theme.live;
+			const ms = Math.min(Math.max(dt * 1e3, 0), 100);
+			const k = this.motion;
+			this.t += ms / 1e3 * k;
+			const d = ms * .06 * k;
+			const t = this.t;
+			const ez = Math.min(1, .04 * d);
+			this.stormV += (this.stormT - this.stormV) * ez;
+			this.nightV += (this.nightT - this.nightV) * ez;
+			for (const f of this.mist) {
+				f.x += f.v * d * live.mistSpeed(this.stormV);
+				if (f.x > this.vw + f.w / 2) f.x = -f.w / 2;
+			}
+			const dir = live.drift.direction;
+			for (const p of this.drift) {
+				p.py += dir * p.v * d * live.drift.speed;
+				p.px += Math.sin(t * .9 + p.ph) * 4e-4;
+				if (dir > 0 && p.py > 1.03) {
+					p.py = -.03;
+					p.px = Math.random();
+				} else if (dir < 0 && p.py < -.03) {
+					p.py = 1.03;
+					p.px = Math.random();
+				}
+			}
+			if (this.stormV > .02) for (const p of this.weather) live.weather.step(p, d, t, this.stormV, this.vw, this.vh);
+			for (const q of this.smoke) q.u = (q.u + .0025 * d) % 1;
+		}
+		/**
+		* Background, maze, food still on the board and the animated world objects.
+		* `collected(x, y)` tells which food was eaten. Leaves the context untransformed.
+		*/
+		drawWorld(ctx, collected) {
+			if (this.rebakeAt > 0 && performance.now() >= this.rebakeAt) this.rebake();
+			const live = this.theme.live;
+			const t = this.t;
+			ctx.save();
+			ctx.globalAlpha = 1;
+			ctx.globalCompositeOperation = "source-over";
+			ctx.fillStyle = this.theme.bake.bg;
+			ctx.fillRect(0, 0, this.vw, this.vh);
+			ctx.translate(this.wx, this.wy);
+			ctx.scale(this.sc, this.sc);
+			if (this.bg) ctx.drawImage(this.bg, this.bgX, this.bgY, this.bg.width / this.bgRS, this.bg.height / this.bgRS);
+			const pellet = live.pellet.texture();
+			const ps = live.pellet.size;
+			for (const p of this.pellets) if (!collected(p.c, p.r)) ctx.drawImage(pellet, p.x - ps / 2, p.y - ps / 2, ps, ps);
+			const en = live.energizer;
+			const enGlow = glowTexture(en.glow);
+			const enIm = en.texture();
+			for (const o of this.energizers) {
+				if (collected(o.c, o.r)) continue;
+				const s = 1 + .05 * Math.sin(t * 2.6 + o.ph);
+				const rot = en.motion === "spin" ? t * .4 : Math.sin(t * 2 + o.ph) * .12;
+				sprite(ctx, enGlow, o.x, o.y, en.glowSize * s, en.glowSize * s, .7, 0, true);
+				sprite(ctx, enIm, o.x, o.y, en.size * s, en.size * s, 1, rot);
+			}
+			const portalGlow = glowTexture(live.portal.glow);
+			for (const o of this.portals) {
+				sprite(ctx, portalGlow, o.x, o.y, 19.2, 19.2, .5 + .3 * Math.sin(t * 1.8 + o.i), 0, true);
+				sprite(ctx, swirlTexture(), o.x, o.y, 20, 20, .7 + .2 * Math.sin(t * 1.6 + o.ph), t * .9);
+				sprite(ctx, swirlTexture(), o.x, o.y, 12.4, 12.4, .75, -t * 1.5);
+				const br = .5 + .5 * Math.sin(t * 1.8 + o.ph);
+				const rs = 20 * (.94 + .08 * br);
+				sprite(ctx, this.ring, o.x, o.y, rs, rs, .45 + .5 * br);
+			}
+			const glint = glowTexture(live.glints);
+			for (const g of this.glints) {
+				const a = Math.pow(Math.max(0, Math.sin(t * 2 + g.ph)), 3) * .8;
+				sprite(ctx, glint, g.x, g.y, 6.4, 6.4, a, 0, true);
+			}
+			const puff = glowTexture(15922938);
+			for (const q of this.smoke) {
+				const s = 8 + q.u * 22;
+				sprite(ctx, puff, q.cx + q.u * 26 + Math.sin(t * 1.5 + q.ph) * 4, q.cy - q.u * 34, s, s, (1 - q.u) * .5 * Math.min(1, q.u * 8));
+			}
+			ctx.restore();
+		}
+		/** Atmosphere under the actors: mist, rays, light, drift, wash, weather haze, night. */
+		drawMood(ctx) {
+			const live = this.theme.live;
+			const vw = this.vw;
+			const vh = this.vh;
+			const t = this.t;
+			ctx.save();
+			const fog = live.fog();
+			const mistA = live.mistAlpha(this.stormV);
+			for (const f of this.mist) sprite(ctx, fog, f.x, f.y, f.w, f.h, mistA);
+			for (let i = 0; i < 2; i++) {
+				const a = live.rays(t, i, this.stormV, this.nightV);
+				if (a > .003) {
+					const w = 70 * (1.6 + i);
+					const h = vh * 1.6;
+					ctx.save();
+					ctx.translate(vw * (.1 + i * .22), -20);
+					ctx.rotate(-.5);
+					ctx.globalAlpha = Math.min(1, a);
+					ctx.globalCompositeOperation = "lighter";
+					ctx.drawImage(rayTexture(), -w / 2, 0, w, h);
+					ctx.restore();
+				}
+			}
+			const W = Math.max(vw, vh) * 1.5;
+			ctx.globalAlpha = Math.min(1, live.litAlpha(this.stormV, this.nightV));
+			ctx.globalCompositeOperation = "lighter";
+			ctx.drawImage(live.lit(), 0, 0, W, W);
+			const spin = live.drift.spin;
+			for (const p of this.drift) sprite(ctx, p.im, p.px * vw, p.py * vh, p.w, p.h, p.a, spin ? t + p.ph : 0);
+			ctx.globalAlpha = 1;
+			ctx.globalCompositeOperation = "source-over";
+			ctx.drawImage(live.wash(), 0, 0, vw, vh);
+			if (this.stormV > .002) {
+				ctx.globalAlpha = live.stormAlpha * this.stormV;
+				ctx.fillStyle = live.stormTint;
+				ctx.fillRect(0, 0, vw, vh);
+			}
+			if (this.nightV > .002) {
+				ctx.globalAlpha = live.nightAlpha * this.nightV;
+				ctx.globalCompositeOperation = "multiply";
+				ctx.fillStyle = live.nightTint;
+				ctx.fillRect(0, 0, vw, vh);
+				ctx.save();
+				ctx.translate(this.wx, this.wy);
+				ctx.scale(this.sc, this.sc);
+				for (const g of this.lights) {
+					const a = this.nightV * g.a * (g.flicker ? .88 + .12 * Math.sin(t * 7 + g.x) : 1);
+					sprite(ctx, glowTexture(g.tint), g.x, g.y, 2 * g.r, 2 * g.r, a, 0, true);
+				}
+				ctx.restore();
+			}
+			ctx.restore();
+		}
+		/** Screen-space layer over the actors: the weather particles and the vignette. */
+		drawOverlay(ctx) {
+			const live = this.theme.live;
+			ctx.save();
+			if (this.stormV > .02) for (const p of this.weather) sprite(ctx, p.im, p.px, p.py, p.w, p.h, live.weather.alpha(p, this.stormV), p.rot, p.add);
+			ctx.globalAlpha = 1;
+			ctx.globalCompositeOperation = "source-over";
+			ctx.drawImage(live.vignette(), 0, 0, this.vw, this.vh);
+			ctx.restore();
+		}
+		rebake() {
+			this.rebakeAt = 0;
+			const m = 2 * T;
+			const bx = -this.wx / this.sc - m;
+			const by = -this.wy / this.sc - m;
+			const bw = this.vw / this.sc + 2 * m;
+			const bh = this.vh / this.sc + 2 * m;
+			let RS = this.sc * this.dpr;
+			while (RS * RS * bw * bh > 13e6) RS *= .92;
+			this.bg = bakeMeadow(this.S, this.theme.bake, bx, by, bw, bh, RS);
+			this.bgX = bx;
+			this.bgY = by;
+			this.bgRS = RS;
+		}
+	};
+	//#endregion
+	//#region src/games/pacman/render/transitions/decay/decayTimeline.ts
+	/** Width of the shattering band behind the decay front, tiles. */
+	var DECAY_BAND = 2.2;
+	/** Width of the band where shards fly back in behind the rebuild front, tiles. */
+	var REBUILD_BAND = 1.8;
+	/** Walking costs: the decay runs along corridors, soaks slowly through walls. */
+	var COST_CORRIDOR = 1;
+	var COST_LAIR = 1.25;
+	var COST_OPEN = 2.4;
+	var COST_WALL = 5;
+	/** Beyond the stored field the distance keeps growing at the open-ground rate. */
+	var DECAY_OUTSIDE_RATE = COST_OPEN;
+	function tileCost(grid, r, c) {
+		const row = grid[r];
+		if (!row || c < 0 || c >= row.length) return COST_OPEN;
+		const t = row[c];
+		if (t === "WL") return COST_WALL;
+		if (t === "ES") return COST_OPEN;
+		if (t === "LT" || t === "LE" || t === "BY" || t === "PY" || t === "IY" || t === "CE" || t === "DB") return COST_LAIR;
+		return COST_CORRIDOR;
+	}
+	/** Dijkstra over 8 neighbours; diagonals may not cut wall corners. */
+	function computeDecayField(grid, originX, originY) {
+		const margin = 32;
+		const rowsIn = grid.length;
+		const colsIn = rowsIn > 0 ? grid[0].length : 0;
+		const rows = rowsIn + 64;
+		const cols = colsIn + 64;
+		const cost = new Float64Array(rows * cols);
+		for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) cost[r * cols + c] = tileCost(grid, r - margin, c - margin);
+		const dist = new Float64Array(rows * cols).fill(Infinity);
+		const heapD = [];
+		const heapI = [];
+		const push = (d, i) => {
+			heapD.push(d);
+			heapI.push(i);
+			let k = heapD.length - 1;
+			while (k > 0) {
+				const p = k - 1 >> 1;
+				if (heapD[p] <= heapD[k]) break;
+				[heapD[p], heapD[k]] = [heapD[k], heapD[p]];
+				[heapI[p], heapI[k]] = [heapI[k], heapI[p]];
+				k = p;
+			}
+		};
+		const pop = () => {
+			const top = [heapD[0], heapI[0]];
+			const lastD = heapD.pop();
+			const lastI = heapI.pop();
+			if (heapD.length > 0) {
+				heapD[0] = lastD;
+				heapI[0] = lastI;
+				let k = 0;
+				for (;;) {
+					const l = 2 * k + 1;
+					const r = l + 1;
+					let m = k;
+					if (l < heapD.length && heapD[l] < heapD[m]) m = l;
+					if (r < heapD.length && heapD[r] < heapD[m]) m = r;
+					if (m === k) break;
+					[heapD[m], heapD[k]] = [heapD[k], heapD[m]];
+					[heapI[m], heapI[k]] = [heapI[k], heapI[m]];
+					k = m;
+				}
+			}
+			return top;
+		};
+		const or = Math.min(rows - 1, Math.max(0, Math.floor(originY) + margin));
+		const oc = Math.min(cols - 1, Math.max(0, Math.floor(originX) + margin));
+		dist[or * cols + oc] = 0;
+		push(0, or * cols + oc);
+		while (heapD.length > 0) {
+			const [d, i] = pop();
+			if (d > dist[i]) continue;
+			const r = i / cols | 0;
+			const c = i % cols;
+			for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+				if (!dr && !dc) continue;
+				const r2 = r + dr;
+				const c2 = c + dc;
+				if (r2 < 0 || c2 < 0 || r2 >= rows || c2 >= cols) continue;
+				if (dr && dc && (cost[(r + dr) * cols + c] >= COST_WALL || cost[r * cols + c + dc] >= COST_WALL)) continue;
+				const j = r2 * cols + c2;
+				const nd = d + (cost[i] + cost[j]) / 2 * (dr && dc ? Math.SQRT2 : 1);
+				if (nd < dist[j]) {
+					dist[j] = nd;
+					push(nd, j);
+				}
+			}
+		}
+		let max = 0;
+		for (const v of dist) if (v > max) max = v;
+		return {
+			cols,
+			rows,
+			margin,
+			dist,
+			max
+		};
+	}
+	/**
+	* Distance at a point in tile coordinates (tile (c, r) has its centre at (c + 0.5, r + 0.5)),
+	* bilinear between tile centres and extended past the stored ring. Mirrors the shader.
+	*/
+	function sampleDecayField(field, tx, ty) {
+		const gx = tx + field.margin - .5;
+		const gy = ty + field.margin - .5;
+		const cx = Math.min(field.cols - 1, Math.max(0, gx));
+		const cy = Math.min(field.rows - 1, Math.max(0, gy));
+		const extra = Math.hypot(gx - cx, gy - cy) * DECAY_OUTSIDE_RATE;
+		const ix = Math.min(field.cols - 2, Math.floor(cx));
+		const iy = Math.min(field.rows - 2, Math.floor(cy));
+		const fx = cx - ix;
+		const fy = cy - iy;
+		const d = (r, c) => field.dist[r * field.cols + c];
+		return (d(iy, ix) * (1 - fx) + d(iy, ix + 1) * fx) * (1 - fy) + (d(iy + 1, ix) * (1 - fx) + d(iy + 1, ix + 1) * fx) * fy + extra;
+	}
+	`${DECAY_BAND.toFixed(2)}${REBUILD_BAND.toFixed(2)}${DECAY_OUTSIDE_RATE.toFixed(2)}`;
+	//#endregion
+	//#region src/games/pacman/render/transitions/decay/LevelDecay.ts
+	var ICE_PALETTE = {
+		deep: 330263,
+		mid: 1321802,
+		wisp: 4234961,
+		ice: 13429503,
+		rim: 7585791,
+		warm: 16773849
+	};
+	//#endregion
+	//#region src/games/pacman/render/seasons/winter/winterTheme.ts
+	var pellet = lazy(() => makeTexture(10, 10, (x) => {
+		const q = x.createLinearGradient(2, 1, 8, 9);
+		q.addColorStop(0, "#f4fcff");
+		q.addColorStop(1, "#62b8e6");
+		x.fillStyle = q;
+		x.beginPath();
+		x.moveTo(5, .8);
+		x.lineTo(7.8, 5);
+		x.lineTo(5, 9.2);
+		x.lineTo(2.2, 5);
+		x.closePath();
+		x.fill();
+		x.strokeStyle = "rgba(255,255,255,.8)";
+		x.lineWidth = .5;
+		x.beginPath();
+		x.moveTo(2.2, 5);
+		x.lineTo(7.8, 5);
+		x.moveTo(5, .8);
+		x.lineTo(5, 9.2);
+		x.stroke();
+	}));
+	var crystal = lazy(() => makeTexture(20, 20, (x) => {
+		x.translate(10, 10);
+		const g = x.createRadialGradient(-2, -2, .5, 0, 0, 9);
+		g.addColorStop(0, "#ffffff");
+		g.addColorStop(.5, "#9fe0ff");
+		g.addColorStop(1, "#3b8fd0");
+		x.fillStyle = g;
+		x.beginPath();
+		for (let i = 0; i < 8; i++) {
+			const a = i * Math.PI / 4 - Math.PI / 2;
+			const r = i % 2 ? 4.8 : 9;
+			if (i) x.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+			else x.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+		}
+		x.closePath();
+		x.fill();
+		x.strokeStyle = "rgba(255,255,255,.8)";
+		x.lineWidth = .6;
+		x.beginPath();
+		for (let i = 0; i < 8; i += 2) {
+			const a = i * Math.PI / 4 - Math.PI / 2;
+			x.moveTo(0, 0);
+			x.lineTo(Math.cos(a) * 9, Math.sin(a) * 9);
+		}
+		x.stroke();
+		x.fillStyle = "#fff";
+		x.beginPath();
+		x.arc(0, 0, 1.7, 0, 7);
+		x.fill();
+	}));
+	var fog$3 = lazy(() => tinted(radial([[0, "rgba(235,245,235,.9)"], [1, "rgba(235,245,235,0)"]]), 14412021));
+	var winterTheme = {
+		name: "winter",
+		bake: {
+			bg: "#c9d8e8",
+			groundCenter: "#f2f7fc",
+			groundBlobs: ["rgba(255,255,255,.4)", "rgba(90,120,170,.06)"],
+			grass: [
+				"#9aa888aa",
+				"#b8c0a488",
+				"#6f7f66aa",
+				"#ffffff66"
+			],
+			curls: "rgba(150,175,215,.28)",
+			stream: [
+				"rgba(70,95,130,.35)",
+				"#dbe9f3",
+				"#b4d6e8",
+				"rgba(150,200,225,.6)"
+			],
+			shadow: "50,70,110",
+			bush: ["#ffffff", "#a9bfd6"],
+			pond: {
+				sand: "#f4f9fd",
+				water: ["#eaf6fd", "#8fc3de"],
+				rim: "rgba(60,100,140,.35)",
+				highlight: "rgba(255,255,255,.85)",
+				stones: "#ffffff"
+			},
+			bridge: {
+				caps: "#f4f9fd",
+				middle: "rgba(255,255,255,.9)"
+			},
+			cabin: {
+				walls: [
+					"#bb6851",
+					"#a65240",
+					"#87423b",
+					"#6a342f"
+				],
+				roofBlobs: "rgba(248,252,255,.93)",
+				ridge: "#f6fafd",
+				ridgeShadow: "rgba(110,130,160,.45)",
+				chimneyCap: "#f4f9fd"
+			},
+			rock: [
+				"#b9c4d0",
+				"#6f7d8d",
+				"#ffffff",
+				"#e8f1f9"
+			],
+			lair: {
+				base: "#6a7688",
+				tiles: [
+					"#dbe6f0",
+					"#cfdde9",
+					"#c3d3e2"
+				]
+			},
+			floor: {
+				tiles: [
+					"#566274",
+					"#515d6f",
+					"#5b6779"
+				],
+				specks: [
+					"#6a768a",
+					"#3a4452",
+					"#7a869a"
+				]
+			},
+			portal: {
+				trail: (a) => `rgba(86,98,116,${a * .55})`,
+				grass: [
+					"#b9c4a6",
+					"#8a9a7a",
+					"#e8eef2"
+				],
+				plate: ["#aeb9c6", "#6c7a8c"],
+				core: [
+					"#d8f4ff",
+					"#4f9fd8",
+					"#1b2d52"
+				],
+				ring: "#9fe3ff",
+				corners: "#f4f9fd"
+			},
+			wall: {
+				base: "#5d6a62",
+				moss: ["#4f7f66", "#2f5a4a"],
+				top: [
+					"#a3afbf",
+					"#a9b0bd",
+					"#9aa8b8"
+				],
+				bottom: [
+					"#7a8799",
+					"#838c9a",
+					"#74869a"
+				],
+				mossSpecks: [
+					"#8fb8a2",
+					"#2a4f40",
+					"#e8f2f8"
+				],
+				specks: ["rgba(255,255,255,.4)", "rgba(40,55,48,.3)"],
+				crack: "rgba(50,65,58,.22)",
+				joints: "rgba(45,60,72,.17)",
+				drifts: ["#f4f9fd", "#ffffff"],
+				light: "rgba(255,255,240,.4)",
+				dark: "rgba(30,45,38,.32)",
+				flowers: [
+					"#d9333a",
+					"#ff6b6b",
+					"#ffffff"
+				],
+				shadow: "rgba(30,40,70,.45)"
+			},
+			edgeGrass: [
+				"#b9c4a6",
+				"#8a9a7a",
+				"#e8eef2"
+			],
+			trees: {
+				accent: [
+					"#ffffff",
+					"#9fbfae",
+					"#3b6a58"
+				],
+				plain: [
+					"#f4f9fd",
+					"#b4c8d8",
+					"#5a7a8e"
+				],
+				accentDots: ["rgba(255,255,255,.85)", "rgba(40,90,70,.5)"],
+				plainDots: ["rgba(255,255,255,.8)", "rgba(70,95,115,.45)"],
+				drifts: "rgba(255,255,255,.55)"
+			},
+			landmark: {
+				ex: [1.8, 1.6],
+				draw: ({ b, blob, sph, shade }, o) => {
+					const r = o.r ?? 0;
+					blob(o.x + r * .5, o.y + r * .6, r * 1.15, r * .8, shade(.32), 0);
+					b.strokeStyle = "#5a4028";
+					b.lineWidth = 1.6;
+					b.beginPath();
+					b.moveTo(o.x - r * .9, o.y - r * .1);
+					b.lineTo(o.x + r * .9, o.y + r * .1);
+					b.stroke();
+					sph(o.x, o.y + r * .2, r, "#ffffff", "#b4c9de");
+					sph(o.x - r * .1, o.y - r * .55, r * .62, "#ffffff", "#bfd2e4");
+					b.strokeStyle = "#d9333a";
+					b.lineWidth = 2.4;
+					b.beginPath();
+					b.arc(o.x - r * .1, o.y - r * .55, r * .58, .3, 2.9);
+					b.stroke();
+					blob(o.x - r * .1, o.y - r * .55, r * .34, r * .34, "#2b3340", 0);
+					blob(o.x - r * .1, o.y - r * .58, r * .2, r * .2, "#4a5566", 0);
+				}
+			},
+			flowerPatch: ({ rr, pick, fl5 }, o) => {
+				const c = o.c ?? 0;
+				const cl = c < .3 ? ["#ffffff", "#e8f2fb"] : c < .55 ? ["#c9dcef", "#e8f2fb"] : c < .8 ? ["#d9333a", "#ff6b6b"] : ["#f4d4d8", "#ffffff"];
+				for (let i = 0; i < (o.n ?? 0); i++) fl5(o.x + rr(-16, 16), o.y + rr(-12, 12), rr(2, 3), pick(cl), "#ffcf4d");
+			}
+		},
+		live: {
+			pellet: {
+				texture: pellet,
+				size: 10
+			},
+			energizer: {
+				texture: crystal,
+				size: 20,
+				glow: 8378623,
+				glowSize: 39.68 / 3,
+				motion: "spin"
+			},
+			portal: {
+				glow: 11065599,
+				ring: () => ringTexture("rgba(170,232,255,.95)")
+			},
+			glints: 16777215,
+			fog: fog$3,
+			mistAlpha: (s) => .1 + .22 * s,
+			mistSpeed: (s) => 1 + 6 * s,
+			rays: () => 0,
+			lit: lazy(() => radial([[0, "rgba(205,228,255,.4)"], [1, "rgba(255,205,130,0)"]])),
+			litAlpha: () => 1,
+			drift: {
+				texture: () => glowTexture(16777215),
+				size: (sc, rand) => {
+					const s = 64 * sc * (.035 + rand * .05);
+					return [s, s];
+				},
+				direction: 1,
+				speed: 16,
+				spin: false
+			},
+			wash: lazy(() => washTexture("rgba(255,236,200,.14)", "rgba(70,90,150,.16)")),
+			stormTint: "#e4edf6",
+			stormAlpha: .24,
+			weather: {
+				count: 220,
+				make: (i, vw, vh) => {
+					const st = i % 2 === 0;
+					const s = st ? .8 + Math.random() : .14 + Math.random() * .2;
+					return {
+						st,
+						im: st ? streakTexture(i % 4 === 0 ? 16777215 : 11124182) : glowTexture(16777215),
+						w: st ? 16 * s : 64 * s / 3,
+						h: st ? 2 * s : 64 * s / 3,
+						px: Math.random() * vw,
+						py: Math.random() * vh,
+						vx: st ? 12 + Math.random() * 8 : 3 + Math.random() * 3,
+						vy: st ? 4 + Math.random() * 3 : 2 + Math.random() * 2,
+						ph: Math.random() * 6,
+						rot: st ? .3 : 0,
+						add: false
+					};
+				},
+				step: (p, d, t, s, vw, vh) => {
+					p.px += p.vx * d * s;
+					p.py += p.vy * d * s + (p.st ? 0 : Math.sin(t * 2 + p.ph) * .3);
+					if (p.px > vw + 30) {
+						p.px = -30;
+						p.py = Math.random() * vh;
+					}
+					if (p.py > vh + 30) {
+						p.py = -30;
+						p.px = Math.random() * vw;
+					}
+				},
+				alpha: (p, s) => s * (p.st ? .7 : .9)
+			},
+			nightTint: "#5a6ea6",
+			nightAlpha: .55,
+			vignette: lazy(() => radial([[.5, "rgba(12,22,44,0)"], [1, "rgba(12,22,44,.5)"]])),
+			lights: {
+				energizer: 8378623,
+				portal: 10475775
+			},
+			chimneySmoke: true
+		},
+		decay: ICE_PALETTE
+	};
+	//#endregion
+	//#region src/games/pacman/render/seasons/spring/springTheme.ts
+	var PETALS = [
+		16761561,
+		16777215,
+		16768488,
+		16230596
+	];
+	var clover = lazy(() => makeTexture(10, 10, (x) => {
+		x.translate(5, 5);
+		x.strokeStyle = "#d8ff9a";
+		x.lineWidth = .9;
+		x.beginPath();
+		x.moveTo(0, .5);
+		x.lineTo(.6, 4.6);
+		x.stroke();
+		x.fillStyle = "#9dff5a";
+		x.strokeStyle = "rgba(235,255,200,.95)";
+		x.lineWidth = .5;
+		for (const [a, c] of [
+			[-2, .2],
+			[2, .2],
+			[0, -2.4]
+		]) {
+			x.beginPath();
+			x.arc(a, c, 2.1, 0, 7);
+			x.fill();
+			x.stroke();
+		}
+	}));
+	var tulip = lazy(() => makeTexture(26, 26, (x) => {
+		x.translate(13, 13);
+		x.lineWidth = 1.2;
+		x.strokeStyle = "#5a0f2e";
+		x.fillStyle = "#4fa83a";
+		x.beginPath();
+		x.moveTo(-1, 2);
+		x.lineTo(-1, 12);
+		x.lineTo(1, 12);
+		x.lineTo(1, 2);
+		x.closePath();
+		x.fill();
+		x.stroke();
+		x.beginPath();
+		x.moveTo(1, 11);
+		x.quadraticCurveTo(10, 8, 9, 2);
+		x.quadraticCurveTo(3, 5, 1, 11);
+		x.fill();
+		x.stroke();
+		const g = x.createLinearGradient(0, -12, 0, 4);
+		g.addColorStop(0, "#ff8fc0");
+		g.addColorStop(1, "#d0246e");
+		x.fillStyle = g;
+		x.beginPath();
+		x.moveTo(-8, -8);
+		x.lineTo(-4.5, -3);
+		x.lineTo(0, -11);
+		x.lineTo(4.5, -3);
+		x.lineTo(8, -8);
+		x.bezierCurveTo(10, 0, 5, 6, 0, 6);
+		x.bezierCurveTo(-5, 6, -10, 0, -8, -8);
+		x.closePath();
+		x.fill();
+		x.stroke();
+		x.strokeStyle = "rgba(255,230,240,.7)";
+		x.lineWidth = .9;
+		x.beginPath();
+		x.moveTo(-4.5, -3);
+		x.quadraticCurveTo(-3, 2, 0, 5);
+		x.moveTo(4.5, -3);
+		x.quadraticCurveTo(3, 2, 0, 5);
+		x.stroke();
+	}));
+	/** A single petal, white: tinted per particle. */
+	var petal = lazy(() => makeTexture(10, 6, (x) => {
+		x.fillStyle = "#fff";
+		x.beginPath();
+		x.moveTo(.5, 3);
+		x.quadraticCurveTo(3, -1, 9.5, 3);
+		x.quadraticCurveTo(3, 7, .5, 3);
+		x.fill();
+	}));
+	var fog$2 = lazy(() => tinted(radial([[0, "rgba(240,255,240,.9)"], [1, "rgba(240,255,240,0)"]]), 15267296));
+	var springTheme = {
+		name: "spring",
+		bake: {
+			bg: "#9ad66b",
+			groundCenter: "#d2ef9a",
+			groundBlobs: ["rgba(255,255,220,.4)", "rgba(40,110,40,.07)"],
+			grass: [
+				"#5fa83acc",
+				"#86c94f99",
+				"#4a9030aa",
+				"#e0f59a88"
+			],
+			curls: "rgba(255,255,200,.25)",
+			stream: [
+				"rgba(30,70,60,.3)",
+				"#e8f0d0",
+				"#5ec0e0",
+				"rgba(200,245,255,.6)"
+			],
+			shadow: "30,50,20",
+			bush: ["#a8e070", "#3f8f3a"],
+			pond: {
+				sand: "#d9cf9c",
+				water: ["#8fe0f0", "#2a9ac0"],
+				rim: "rgba(20,80,100,.45)",
+				highlight: "rgba(255,255,255,.85)",
+				stones: "#c4b890"
+			},
+			bridge: {
+				caps: "#8fd05a",
+				middle: "rgba(255,190,215,.8)"
+			},
+			cabin: {
+				walls: [
+					"#bb6851",
+					"#a65240",
+					"#87423b",
+					"#6a342f"
+				],
+				roofBlobs: "rgba(255,190,215,.3)",
+				ridge: "#6a3a2a",
+				ridgeShadow: "rgba(60,30,20,.4)",
+				chimneyCap: "#5a4a3a"
+			},
+			rock: [
+				"#b8b8a8",
+				"#6a6a5a",
+				"#7fbf4a",
+				"#9fd46a"
+			],
+			lair: {
+				base: "#4a5236",
+				tiles: [
+					"#cfd6b8",
+					"#c4cdaa",
+					"#d8dec2"
+				]
+			},
+			floor: {
+				tiles: [
+					"#5a4636",
+					"#54402f",
+					"#604b3a"
+				],
+				specks: [
+					"#6e5846",
+					"#3a2c20",
+					"#7a6452"
+				]
+			},
+			portal: {
+				trail: (a) => `rgba(60,45,30,${a * .55})`,
+				grass: [
+					"#5faa3a",
+					"#86c94f",
+					"#b8e07a"
+				],
+				plate: ["#d8d6c0", "#8f8c70"],
+				core: [
+					"#fffbd0",
+					"#ffd23f",
+					"#a8741a"
+				],
+				ring: "#fff3a0",
+				corners: "#fffbe0"
+			},
+			wall: {
+				base: "#24481f",
+				moss: ["#4a8a3e", "#2a5a2a"],
+				top: [
+					"#5a9a48",
+					"#62a24e",
+					"#528f42"
+				],
+				bottom: [
+					"#2f6a2c",
+					"#357230",
+					"#2a6028"
+				],
+				mossSpecks: [
+					"#ffc2d9",
+					"#f58fb5",
+					"#ffffff"
+				],
+				specks: ["rgba(190,230,130,.3)", "rgba(15,50,20,.32)"],
+				crack: "rgba(15,50,20,.28)",
+				joints: "rgba(15,50,20,.2)",
+				drifts: ["#8fcf6a", "#a8dc80"],
+				light: "rgba(210,240,160,.35)",
+				dark: "rgba(10,40,15,.4)",
+				flowers: [
+					"#ffffff",
+					"#ffc2d9",
+					"#f58fb5"
+				],
+				shadow: "rgba(20,50,20,.5)"
+			},
+			edgeGrass: [
+				"#5faa3a",
+				"#86c94f",
+				"#b8e07a"
+			],
+			trees: {
+				accent: [
+					"#ffe6ef",
+					"#f5a6c4",
+					"#c85a88"
+				],
+				plain: [
+					"#d8f58a",
+					"#78c050",
+					"#3a7a30"
+				],
+				accentDots: ["rgba(255,255,255,.85)", "rgba(150,50,90,.5)"],
+				plainDots: ["rgba(235,255,170,.7)", "rgba(25,80,30,.45)"],
+				drifts: "rgba(255,200,220,.5)"
+			},
+			landmark: {
+				ex: [2.4, 2.2],
+				draw: ({ b, blob }, o) => {
+					const r = o.r ?? 0;
+					const U = r * 2.2;
+					b.save();
+					b.translate(o.x, o.y);
+					b.rotate(.3);
+					b.fillStyle = "rgba(30,60,20,.3)";
+					b.fillRect(-U + 3, -U * .75 + 4, U * 2, U * 1.5);
+					for (let i = 0; i < 6; i++) for (let j = 0; j < 4; j++) {
+						b.fillStyle = (i + j) % 2 ? "#fff4e6" : "#e8574a";
+						b.fillRect(-U + i * U * 2 / 6, -U * .75 + j * U * 1.5 / 4, U * 2 / 6 + .5, U * 1.5 / 4 + .5);
+					}
+					b.restore();
+					blob(o.x + U * .2, o.y - U * .1, r * .8, r * .55, "#b8864a", 0);
+					blob(o.x + U * .2, o.y - U * .2, r * .6, r * .3, "#d9a868", 0);
+				}
+			},
+			flowerPatch: ({ rr, pick, fl5 }, o) => {
+				const c = o.c ?? 0;
+				const cl = c < .3 ? ["#ffffff", "#fff0f6"] : c < .55 ? ["#ff9ec4", "#ffc2d9"] : c < .8 ? ["#ffe14d", "#ffd23f"] : ["#b58cff", "#d9c8ff"];
+				const mid = c >= .55 && c < .8 ? "#d9731a" : "#ffcf4d";
+				for (let i = 0; i < (o.n ?? 0); i++) fl5(o.x + rr(-16, 16), o.y + rr(-12, 12), rr(2, 3), pick(cl), mid);
+			},
+			pondExtras: ({ blob, fl5 }, o) => {
+				const rx = o.rx ?? 0;
+				const ry = o.ry ?? 0;
+				for (let i = 0; i < 4; i++) {
+					const a = i * 1.7 + .5;
+					const px = o.x + Math.cos(a) * rx * .45;
+					const py = o.y + Math.sin(a) * ry * .45;
+					blob(px, py, 6, 4.5, "#4fbf4a", 0);
+					if (i % 2) fl5(px, py, 2.4, "#ff9ec4", "#ffe14d");
+				}
+			}
+		},
+		live: {
+			pellet: {
+				texture: clover,
+				size: 10
+			},
+			energizer: {
+				texture: tulip,
+				size: 26,
+				glow: 16736160,
+				glowSize: 60.8 / 3,
+				motion: "sway"
+			},
+			portal: {
+				glow: 16769120,
+				ring: () => ringTexture("rgba(255,226,110,.95)")
+			},
+			glints: 16777215,
+			fog: fog$2,
+			mistAlpha: (s) => .1 + .22 * s,
+			mistSpeed: (s) => 1 + 6 * s,
+			rays: (t, i, _s, n) => (.1 + .04 * Math.sin(t * .5 + i * 2)) * (1 - .8 * n),
+			lit: lazy(() => radial([[0, "rgba(255,250,210,.25)"], [1, "rgba(255,205,130,0)"]])),
+			litAlpha: () => 1,
+			drift: {
+				texture: (i) => tinted(petal(), PETALS[i % 4]),
+				size: (_sc, rand) => {
+					const s = .16 + rand * .12;
+					return [30 * s, 18 * s];
+				},
+				direction: 1,
+				speed: 16,
+				spin: true
+			},
+			wash: lazy(() => washTexture("rgba(255,255,220,.16)", "rgba(120,200,255,.1)")),
+			stormTint: "#eef8e8",
+			stormAlpha: .14,
+			weather: {
+				count: 240,
+				make: (i, vw, vh) => {
+					const st = i % 3 === 0;
+					const s = st ? 1.2 + Math.random() * 1.6 : .9 + Math.random() * .8;
+					return {
+						st,
+						im: st ? streakTexture(16777215) : tinted(petal(), PETALS[i % 4]),
+						w: st ? 16 * s : 10 * s,
+						h: st ? 2 * s * .5 : 6 * s,
+						px: Math.random() * vw,
+						py: Math.random() * vh,
+						vx: st ? 22 + Math.random() * 10 : 9 + Math.random() * 7,
+						vy: st ? .5 + Math.random() * 1.5 : 1 + Math.random() * 3,
+						ph: Math.random() * 6,
+						rot: st ? .06 : Math.random() * 6,
+						add: false
+					};
+				},
+				step: (p, d, t, s, vw, vh) => {
+					if (!p.st) p.rot += .12 * d;
+					p.px += p.vx * d * s;
+					p.py += p.vy * d * s + (p.st ? 0 : Math.sin(t * 3 + p.ph) * 1.2 * s);
+					if (p.px > vw + 40) {
+						p.px = -40;
+						p.py = Math.random() * vh;
+					}
+					if (p.py > vh + 30) p.py = -30;
+				},
+				alpha: (p, s) => s * (p.st ? .4 : .9)
+			},
+			nightTint: "#4a5a9a",
+			nightAlpha: .55,
+			vignette: lazy(() => radial([[.5, "rgba(20,50,20,0)"], [1, "rgba(20,50,20,.3)"]])),
+			lights: {
+				energizer: 16740270,
+				portal: 16769120
+			},
+			chimneySmoke: true
+		},
+		decay: {
+			deep: 398348,
+			mid: 1194534,
+			wisp: 5822112,
+			ice: 16766696,
+			rim: 16748480,
+			warm: 16774872
+		}
+	};
+	//#endregion
+	//#region src/games/pacman/render/seasons/summer/summerTheme.ts
+	/**
+	* Pellet: a small amber drop, ~5 world units across (a fifth of a tile). Light centre and
+	* a dark rim so it holds against the sand; no inner detail, because 200 of them are on
+	* screen at once.
+	*/
+	var drop = lazy(() => makeTexture(10, 10, (x) => {
+		x.translate(5, 5);
+		x.fillStyle = "rgba(90,45,10,.35)";
+		x.beginPath();
+		x.arc(.5, .7, 2.7, 0, 7);
+		x.fill();
+		const g = x.createRadialGradient(-.8, -.9, .2, 0, 0, 2.6);
+		g.addColorStop(0, "#fffbe2");
+		g.addColorStop(.55, "#ffd56a");
+		g.addColorStop(1, "#f29a2e");
+		x.fillStyle = g;
+		x.beginPath();
+		x.arc(0, 0, 2.6, 0, 7);
+		x.fill();
+		x.strokeStyle = "#a8501a";
+		x.lineWidth = .7;
+		x.stroke();
+	}));
+	/** Energizer: a watermelon slice — red, green and big, nothing like a pellet. */
+	var watermelon = lazy(() => makeTexture(24, 24, (x) => {
+		x.translate(12, 13);
+		const R = 10;
+		const arc = (r) => {
+			x.beginPath();
+			x.moveTo(-r, -2);
+			x.arc(0, -2, r, 0, Math.PI);
+			x.closePath();
+		};
+		x.fillStyle = "rgba(60,20,10,.3)";
+		x.save();
+		x.translate(.8, 1.2);
+		arc(R);
+		x.fill();
+		x.restore();
+		x.fillStyle = "#1f7a34";
+		arc(R);
+		x.fill();
+		x.fillStyle = "#c9f0a0";
+		arc(8.4);
+		x.fill();
+		const g = x.createRadialGradient(0, -2, 1, 0, -2, 7.6);
+		g.addColorStop(0, "#ff7a86");
+		g.addColorStop(1, "#e8283e");
+		x.fillStyle = g;
+		arc(7.6);
+		x.fill();
+		x.fillStyle = "#2a1414";
+		for (const [sx, sy] of [
+			[-4.2, .6],
+			[-1.4, 2.6],
+			[1.6, 2.6],
+			[4.4, .6],
+			[0, 4.8]
+		]) {
+			x.beginPath();
+			x.ellipse(sx, sy, .75, 1.1, Math.atan2(sy + 2, sx) - Math.PI / 2, 0, 7);
+			x.fill();
+		}
+		x.strokeStyle = "rgba(255,255,255,.7)";
+		x.lineWidth = .8;
+		x.beginPath();
+		x.moveTo(-7.4, -1.4);
+		x.lineTo(7.4, -1.4);
+		x.stroke();
+		x.strokeStyle = "#0f4a20";
+		x.lineWidth = .9;
+		arc(R);
+		x.stroke();
+	}));
+	var fog$1 = lazy(() => tinted(radial([[0, "rgba(255,244,210,.9)"], [1, "rgba(255,244,210,0)"]]), 16773576));
+	/** Heat shimmer band, white: tinted below. */
+	var band = lazy(() => makeTexture(48, 6, (x) => {
+		const q = x.createLinearGradient(0, 0, 48, 0);
+		q.addColorStop(0, "rgba(255,255,255,0)");
+		q.addColorStop(.5, "rgba(255,255,255,.6)");
+		q.addColorStop(1, "rgba(255,255,255,0)");
+		x.fillStyle = q;
+		x.beginPath();
+		x.ellipse(24, 3, 24, 2.2, 0, 0, 7);
+		x.fill();
+	}));
+	var summerTheme = {
+		name: "summer",
+		bake: {
+			bg: "#8cc152",
+			groundCenter: "#c6e67e",
+			groundBlobs: ["rgba(255,248,170,.35)", "rgba(30,90,30,.08)"],
+			grass: [
+				"#4f8f2fcc",
+				"#6fb03c99",
+				"#3a7a28aa",
+				"#d8f27a88"
+			],
+			curls: "rgba(255,244,160,.25)",
+			stream: [
+				"rgba(30,90,60,.35)",
+				"#ecdca8",
+				"#26b5c9",
+				"rgba(160,245,240,.6)"
+			],
+			shadow: "60,45,15",
+			bush: ["#8fdc4f", "#2f7a2c"],
+			pond: {
+				sand: "#f0dca0",
+				water: ["#8ff0ea", "#1a8fb0"],
+				rim: "rgba(10,90,110,.45)",
+				highlight: "rgba(255,255,255,.85)",
+				stones: "#cdb27a"
+			},
+			bridge: {
+				caps: "#8fd05a",
+				middle: "rgba(90,190,70,.7)"
+			},
+			cabin: {
+				walls: [
+					"#f08a4b",
+					"#d9693a",
+					"#c24f2c",
+					"#9b3a22"
+				],
+				roofBlobs: "rgba(255,214,150,.22)",
+				ridge: "#ffe7a8",
+				ridgeShadow: "rgba(120,50,20,.5)",
+				chimneyCap: "#d8cdbf"
+			},
+			rock: [
+				"#d8c9a8",
+				"#8a7a5c",
+				"#efe2c0",
+				"#c8b68c"
+			],
+			lair: {
+				base: "#a07f4e",
+				tiles: [
+					"#f6e8c4",
+					"#efdcae",
+					"#e8d3a0"
+				]
+			},
+			floor: {
+				tiles: [
+					"#c2a06a",
+					"#bc9a64",
+					"#c7a671"
+				],
+				specks: [
+					"#d2b588",
+					"#9c7a46",
+					"#d8bd90"
+				]
+			},
+			portal: {
+				trail: (a) => `rgba(190,150,90,${a * .5})`,
+				grass: [
+					"#7fb34a",
+					"#5f9a3a",
+					"#b8dc6a"
+				],
+				plate: ["#f0dfb0", "#b08d58"],
+				core: [
+					"#d6fff6",
+					"#1fc2b4",
+					"#0b5a66"
+				],
+				ring: "#7ff5e0",
+				corners: "#fff3cf"
+			},
+			wall: {
+				base: "#2f5a2a",
+				moss: ["#5fae3e", "#2f7a2c"],
+				top: [
+					"#86cc4e",
+					"#8fd356",
+					"#7cc247"
+				],
+				bottom: [
+					"#3f8f2e",
+					"#468f30",
+					"#3a842c"
+				],
+				mossSpecks: [
+					"#ffd23f",
+					"#ff7a59",
+					"#fff4c2"
+				],
+				specks: ["rgba(214,255,140,.4)", "rgba(15,70,20,.3)"],
+				crack: "rgba(15,70,20,.25)",
+				joints: "rgba(15,70,20,.2)",
+				drifts: ["#a6e65e", "#c4f57e"],
+				light: "rgba(230,255,170,.45)",
+				dark: "rgba(10,50,15,.4)",
+				flowers: [
+					"#ff5c8a",
+					"#ffd23f",
+					"#ffffff"
+				],
+				shadow: "rgba(25,50,15,.5)"
+			},
+			edgeGrass: [
+				"#7fb34a",
+				"#5f9a3a",
+				"#b8dc6a"
+			],
+			trees: {
+				accent: [
+					"#d4f08a",
+					"#6dba45",
+					"#2f7a2c"
+				],
+				plain: [
+					"#b6ee6e",
+					"#5fae3e",
+					"#2a6a2a"
+				],
+				accentDots: ["rgba(255,140,40,.95)", "rgba(20,70,25,.5)"],
+				plainDots: ["rgba(214,255,140,.7)", "rgba(20,70,25,.45)"],
+				drifts: "rgba(30,80,30,.25)"
+			},
+			landmark: {
+				ex: [2.4, 2.2],
+				draw: ({ b, blob, shade }, o) => {
+					const r = o.r ?? 0;
+					blob(o.x + r * .9, o.y + r * 1.1, r * 2.2, r * 1.7, shade(.3), 0);
+					const U = r * 2;
+					for (let i = 0; i < 8; i++) {
+						b.fillStyle = i % 2 ? "#ff5a4f" : "#fff4dc";
+						b.beginPath();
+						b.moveTo(o.x, o.y);
+						b.arc(o.x, o.y, U, i * Math.PI / 4, (i + 1) * Math.PI / 4);
+						b.closePath();
+						b.fill();
+					}
+					b.strokeStyle = "rgba(120,40,30,.5)";
+					b.lineWidth = 1.2;
+					b.beginPath();
+					b.arc(o.x, o.y, U, 0, 7);
+					b.stroke();
+					blob(o.x, o.y, 3, 3, "#ffd23f", 0);
+				}
+			},
+			flowerPatch: ({ rr, pick, fl5 }, o) => {
+				const c = o.c ?? 0;
+				const cl = c < .3 ? ["#ffffff", "#f6f2d0"] : c < .55 ? ["#ffd23f", "#ffe36e"] : c < .8 ? ["#e8383d", "#ff6b6b"] : ["#a77bff", "#d9c2ff"];
+				const mid = c >= .3 && c < .55 ? "#8a4b14" : "#ffcf4d";
+				for (let i = 0; i < (o.n ?? 0); i++) fl5(o.x + rr(-16, 16), o.y + rr(-12, 12), rr(2, 3), pick(cl), mid);
+			},
+			pondExtras: ({ blob, fl5 }, o) => {
+				const rx = o.rx ?? 0;
+				const ry = o.ry ?? 0;
+				for (let i = 0; i < 4; i++) {
+					const a = i * 1.7 + .5;
+					const px = o.x + Math.cos(a) * rx * .45;
+					const py = o.y + Math.sin(a) * ry * .45;
+					blob(px, py, 6, 4.5, "#3fae4a", 0);
+					if (i % 2) fl5(px, py, 2.4, "#ff9ec4", "#ffe14d");
+				}
+			}
+		},
+		live: {
+			pellet: {
+				texture: drop,
+				size: 10
+			},
+			energizer: {
+				texture: watermelon,
+				size: 24,
+				glow: 16734830,
+				glowSize: 54.4 / 3,
+				motion: "sway"
+			},
+			portal: {
+				glow: 6288856,
+				ring: () => ringTexture("rgba(120,255,225,.95)")
+			},
+			glints: 16775104,
+			fog: fog$1,
+			mistAlpha: (s) => .07 + .2 * s,
+			mistSpeed: (s) => 1 + 3 * s,
+			rays: (t, i, s, n) => (.1 + .05 * Math.sin(t * .6 + i * 2)) * (1 + s) * (1 - .8 * n),
+			lit: lazy(() => radial([[0, "rgba(255,226,150,.3)"], [1, "rgba(255,205,130,0)"]])),
+			litAlpha: (s, n) => (.8 + .7 * s) * (1 - .7 * n),
+			drift: {
+				texture: () => glowTexture(16773280),
+				size: (sc, rand) => {
+					const s = 64 * sc * (.035 + rand * .05);
+					return [s, s];
+				},
+				direction: -1,
+				speed: 10,
+				spin: false
+			},
+			wash: lazy(() => washTexture("rgba(255,225,130,.22)", "rgba(255,150,60,.08)")),
+			stormTint: "#ff9d3a",
+			stormAlpha: .2,
+			weather: {
+				count: 160,
+				make: (i, vw, vh) => {
+					const st = i % 2 === 0;
+					const s = st ? 2 + Math.random() * 3 : .14 + Math.random() * .2;
+					return {
+						st,
+						im: st ? tinted(band(), 16773312) : glowTexture(16765802),
+						w: st ? 48 * s : 64 * s / 3,
+						h: st ? 6 * s : 64 * s / 3,
+						px: Math.random() * vw,
+						py: Math.random() * vh,
+						vx: 0,
+						vy: st ? .5 + Math.random() * .7 : .8 + Math.random() * 1.2,
+						ph: Math.random() * 6,
+						rot: 0,
+						add: false
+					};
+				},
+				step: (p, d, t, s, vw, vh) => {
+					p.px += (p.st ? Math.sin(t * 1.6 + p.ph) * .5 : Math.sin(t * 2 + p.ph) * .6) * d;
+					p.py -= p.vy * d * s;
+					if (p.py < -30) {
+						p.py = vh + 30;
+						p.px = Math.random() * vw;
+					}
+				},
+				alpha: (p, s) => s * (p.st ? .45 : .9)
+			},
+			nightTint: "#4a3f86",
+			nightAlpha: .6,
+			vignette: lazy(() => radial([[.5, "rgba(70,45,10,0)"], [1, "rgba(70,45,10,.32)"]])),
+			lights: {
+				energizer: 16738938,
+				portal: 7337434
+			},
+			chimneySmoke: false
+		},
+		decay: {
+			deep: 657176,
+			mid: 1972810,
+			wisp: 4186320,
+			ice: 16771240,
+			rim: 16757575,
+			warm: 16774352
+		}
+	};
+	//#endregion
+	//#region src/games/pacman/render/seasons/autumn/autumnTheme.ts
+	var LEAVES = [
+		14700586,
+		15771690,
+		16765040,
+		12084250
+	];
+	/**
+	* Pellet: a small acorn, ~5×6 world units (a fifth of a tile): a light amber nut under a
+	* darker cap, no outline clutter, bright enough for the dark path.
+	*/
+	var acorn = lazy(() => makeTexture(10, 10, (x) => {
+		x.translate(5, 5.3);
+		const g = x.createRadialGradient(-.7, 0, .2, 0, .6, 2.6);
+		g.addColorStop(0, "#fff0bf");
+		g.addColorStop(.6, "#f2c060");
+		g.addColorStop(1, "#d08a2e");
+		x.fillStyle = g;
+		x.beginPath();
+		x.ellipse(0, .7, 2.2, 2.6, 0, 0, 7);
+		x.fill();
+		x.fillStyle = "#8a4a1e";
+		x.beginPath();
+		x.ellipse(0, -1.3, 2.6, 1.35, 0, 0, 7);
+		x.fill();
+		x.fillRect(-.35, -3.6, .7, 1.4);
+		x.fillStyle = "rgba(255,220,160,.55)";
+		x.beginPath();
+		x.ellipse(-.7, -1.7, 1, .4, 0, 0, 7);
+		x.fill();
+	}));
+	var amanita = lazy(() => makeTexture(26, 26, (x) => {
+		x.translate(13, 13);
+		x.lineWidth = 1.2;
+		x.strokeStyle = "#4a1408";
+		x.fillStyle = "#f6e8c8";
+		x.beginPath();
+		x.moveTo(-3.6, 2);
+		x.lineTo(-4.4, 10.5);
+		x.quadraticCurveTo(0, 12.6, 4.4, 10.5);
+		x.lineTo(3.6, 2);
+		x.closePath();
+		x.fill();
+		x.stroke();
+		const g = x.createLinearGradient(0, -10, 0, 4);
+		g.addColorStop(0, "#ff8a5a");
+		g.addColorStop(1, "#c0261a");
+		x.fillStyle = g;
+		x.beginPath();
+		x.moveTo(-11.5, 3.5);
+		x.bezierCurveTo(-11.5, -12, 11.5, -12, 11.5, 3.5);
+		x.quadraticCurveTo(0, 6.5, -11.5, 3.5);
+		x.closePath();
+		x.fill();
+		x.stroke();
+		x.fillStyle = "#fff7e0";
+		for (const [a, c, r] of [
+			[
+				-5,
+				-2.5,
+				2.4
+			],
+			[
+				3,
+				-5.5,
+				2.6
+			],
+			[
+				6.5,
+				-.5,
+				1.8
+			],
+			[
+				-.5,
+				0,
+				1.5
+			]
+		]) {
+			x.beginPath();
+			x.arc(a, c, r, 0, 7);
+			x.fill();
+		}
+	}));
+	/** A single leaf, white: tinted per particle. */
+	var leaf = lazy(() => makeTexture(10, 6, (x) => {
+		x.fillStyle = "#fff";
+		x.beginPath();
+		x.moveTo(.5, 3);
+		x.quadraticCurveTo(5, -1.5, 9.5, 3);
+		x.quadraticCurveTo(5, 7.5, .5, 3);
+		x.fill();
+	}));
+	var fog = lazy(() => tinted(radial([[0, "rgba(240,215,175,.9)"], [1, "rgba(240,215,175,0)"]]), 15258288));
+	//#endregion
+	//#region src/games/pacman/render/seasons/meadow/meadowThemes.ts
+	var THEMES = {
+		spring: springTheme,
+		summer: summerTheme,
+		autumn: {
+			name: "autumn",
+			bake: {
+				bg: "#8b7a3a",
+				groundCenter: "#b59a4c",
+				groundBlobs: ["rgba(255,200,110,.3)", "rgba(60,30,5,.1)"],
+				grass: [
+					"#7a6a2acc",
+					"#a08a3e99",
+					"#6a5a24aa",
+					"#d8b86088"
+				],
+				curls: "rgba(230,190,110,.22)",
+				stream: [
+					"rgba(40,30,10,.35)",
+					"#cdb57e",
+					"#4a8aa5",
+					"rgba(150,200,215,.55)"
+				],
+				shadow: "50,30,10",
+				bush: ["#f0a030", "#a8421a"],
+				pond: {
+					sand: "#c9b27a",
+					water: ["#8fc0d0", "#3a6f88"],
+					rim: "rgba(30,50,60,.45)",
+					highlight: "rgba(255,255,255,.6)",
+					stones: "#a38a55"
+				},
+				bridge: {
+					caps: "#e0762a",
+					middle: "rgba(220,90,30,.8)"
+				},
+				cabin: {
+					walls: [
+						"#bb6851",
+						"#a65240",
+						"#87423b",
+						"#6a342f"
+					],
+					roofBlobs: "rgba(224,110,30,.5)",
+					ridge: "#6a2f1a",
+					ridgeShadow: "rgba(60,25,10,.5)",
+					chimneyCap: "#5a3a28"
+				},
+				rock: [
+					"#a89c88",
+					"#5f5648",
+					"#8a9a4a",
+					"#b0a28a"
+				],
+				lair: {
+					base: "#2a1c12",
+					tiles: [
+						"#8c6a46",
+						"#80603e",
+						"#957250"
+					]
+				},
+				floor: {
+					tiles: [
+						"#4a3426",
+						"#45301f",
+						"#503a2a"
+					],
+					specks: [
+						"#5e4634",
+						"#2e2016",
+						"#6b5240"
+					]
+				},
+				portal: {
+					trail: (a) => `rgba(60,42,28,${a * .55})`,
+					grass: [
+						"#c9a04a",
+						"#a8762a",
+						"#e0b860"
+					],
+					plate: ["#8a7660", "#4a3a2c"],
+					core: [
+						"#f0d8ff",
+						"#9a4fe0",
+						"#2a0f52"
+					],
+					ring: "#d9a8ff",
+					corners: "#f0e0c0"
+				},
+				wall: {
+					base: "#7c3614",
+					moss: ["#c0502e", "#82301a"],
+					top: [
+						"#dc9c4e",
+						"#e2a456",
+						"#d49447"
+					],
+					bottom: [
+						"#a65a28",
+						"#ad622d",
+						"#9c5224"
+					],
+					mossSpecks: [
+						"#ffd27a",
+						"#e0602e",
+						"#fff0c0"
+					],
+					specks: ["rgba(255,225,150,.35)", "rgba(90,30,5,.28)"],
+					crack: "rgba(90,30,5,.25)",
+					joints: "rgba(90,30,5,.18)",
+					drifts: ["#e8743a", "#f6c25a"],
+					light: "rgba(255,236,180,.45)",
+					dark: "rgba(80,28,6,.38)",
+					flowers: [
+						"#e0502a",
+						"#ffc84a",
+						"#fff0c8"
+					],
+					shadow: "rgba(40,15,5,.45)"
+				},
+				edgeGrass: [
+					"#c9a04a",
+					"#a8762a",
+					"#e0b860"
+				],
+				trees: {
+					accent: [
+						"#ffd070",
+						"#e0502a",
+						"#8f2214"
+					],
+					plain: [
+						"#fff0a0",
+						"#f0a82a",
+						"#b8641a"
+					],
+					accentDots: ["rgba(255,230,120,.85)", "rgba(100,20,10,.5)"],
+					plainDots: ["rgba(255,248,190,.8)", "rgba(120,60,10,.45)"],
+					drifts: "rgba(230,120,30,.5)"
+				},
+				landmark: {
+					ex: [2.4, 2.2],
+					draw: ({ b, blob, sph, shade }, o) => {
+						const r = o.r ?? 0;
+						blob(o.x + r * .9, o.y + r, r * 2.1, r * 1.6, shade(.3), 0);
+						const U = r * 2;
+						sph(o.x, o.y, U, "#f6d878", "#c9922e");
+						b.strokeStyle = "rgba(120,70,10,.5)";
+						b.lineWidth = 1.2;
+						for (let i = 1; i < 5; i++) {
+							b.beginPath();
+							b.arc(o.x, o.y, U * i / 5, 0, 7);
+							b.stroke();
+						}
+					}
+				},
+				flowerPatch: ({ rr, pick, blob }, o) => {
+					const c = o.c ?? 0;
+					const cl = c < .3 ? ["#e0502a", "#c0381a"] : c < .55 ? ["#f0a82a", "#ffc84a"] : c < .8 ? ["#c9702a", "#a8501a"] : ["#8a3a1a", "#6a2a10"];
+					for (let i = 0; i < (o.n ?? 0); i++) blob(o.x + rr(-16, 16), o.y + rr(-12, 12), rr(2.4, 4), rr(1.3, 2.2), pick(cl));
+				},
+				pondExtras: ({ blob, pick }, o) => {
+					const rx = o.rx ?? 0;
+					const ry = o.ry ?? 0;
+					for (let i = 0; i < 5; i++) {
+						const a = i * 1.3 + .4;
+						blob(o.x + Math.cos(a) * rx * .5, o.y + Math.sin(a) * ry * .5, 5, 3, pick([
+							"#e0502a",
+							"#f0a82a",
+							"#c9702a"
+						]));
+					}
+				}
+			},
+			live: {
+				pellet: {
+					texture: acorn,
+					size: 10
+				},
+				energizer: {
+					texture: amanita,
+					size: 26,
+					glow: 16730666,
+					glowSize: 60.8 / 3,
+					motion: "sway"
+				},
+				portal: {
+					glow: 13142783,
+					ring: () => ringTexture("rgba(220,170,255,.95)")
+				},
+				glints: 16777215,
+				fog,
+				mistAlpha: (s) => .1 + .22 * s,
+				mistSpeed: (s) => 1 + 6 * s,
+				rays: (t, i, s, n) => (.12 + .05 * Math.sin(t * .5 + i * 2)) * (1 - .8 * n) * (1 - s),
+				lit: lazy(() => radial([[0, "rgba(255,190,110,.3)"], [1, "rgba(255,205,130,0)"]])),
+				litAlpha: () => 1,
+				drift: {
+					texture: (i) => tinted(leaf(), LEAVES[i % 4]),
+					size: (_sc, rand) => {
+						const s = .18 + rand * .14;
+						return [30 * s, 18 * s];
+					},
+					direction: 1,
+					speed: 16,
+					spin: true
+				},
+				wash: lazy(() => washTexture("rgba(255,170,80,.18)", "rgba(90,40,20,.14)")),
+				stormTint: "#4a5870",
+				stormAlpha: .3,
+				weather: {
+					count: 260,
+					make: (i, vw, vh) => {
+						const s = .9 + Math.random() * .9;
+						const vx = 3 + Math.random() * 2;
+						const vy = 20 + Math.random() * 10;
+						return {
+							st: true,
+							im: streakTexture(i % 3 === 0 ? 15134970 : 11125980),
+							w: 16 * s,
+							h: 2 * s * .4,
+							px: Math.random() * vw,
+							py: Math.random() * vh,
+							vx,
+							vy,
+							ph: 0,
+							rot: Math.atan2(vy, vx),
+							add: false
+						};
+					},
+					step: (p, d, _t, s, vw, vh) => {
+						p.px += p.vx * d * s;
+						p.py += p.vy * d * s;
+						if (p.py > vh + 30) {
+							p.py = -30;
+							p.px = Math.random() * vw;
+						}
+						if (p.px > vw + 30) p.px = -30;
+					},
+					alpha: (_p, s) => s * .6
+				},
+				nightTint: "#3a3a70",
+				nightAlpha: .55,
+				vignette: lazy(() => radial([[.5, "rgba(40,18,5,0)"], [1, "rgba(40,18,5,.42)"]])),
+				lights: {
+					energizer: 16734778,
+					portal: 13142783
+				},
+				chimneySmoke: true
+			},
+			decay: {
+				deep: 1182214,
+				mid: 3809812,
+				wisp: 15769648,
+				ice: 16767136,
+				rim: 16742970,
+				warm: 16773328
+			}
+		},
+		winter: winterTheme
+	};
+	/** The meadow theme of a season, or null when the season is drawn another way. */
+	function meadowThemeFor(season) {
+		return THEMES[season] ?? null;
+	}
+	//#endregion
+	//#region src/games/pacman/render/common/GlPass.ts
+	/**
+	* A full-screen WebGL2 fragment pass in its own canvas: compiles the program, keeps the
+	* uniform locations and the textures, and draws one triangle over the viewport.
+	* `create()` returns null when WebGL2 is unavailable or the shader does not build.
+	*/
+	var GlPass = class GlPass {
+		canvas;
+		gl;
+		loc;
+		textures = [];
+		constructor(canvas, gl, program, uniforms) {
+			this.canvas = canvas;
+			this.gl = gl;
+			gl.useProgram(program);
+			const buf = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+				-1,
+				-1,
+				3,
+				-1,
+				-1,
+				3
+			]), gl.STATIC_DRAW);
+			gl.enableVertexAttribArray(0);
+			gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+			const loc = {};
+			for (const name of uniforms) loc[name] = gl.getUniformLocation(program, name);
+			this.loc = loc;
+		}
+		static create(name, fragment, uniforms) {
+			if (typeof document === "undefined") return null;
+			const canvas = document.createElement("canvas");
+			const gl = canvas.getContext("webgl2", {
+				alpha: false,
+				antialias: false,
+				premultipliedAlpha: false,
+				preserveDrawingBuffer: false
+			});
+			if (!gl) {
+				console.warn(`${name}.create`, "WebGL2 is unavailable");
+				return null;
+			}
+			const compile = (type, source) => {
+				const shader = gl.createShader(type);
+				if (!shader) return null;
+				gl.shaderSource(shader, source);
+				gl.compileShader(shader);
+				if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+					console.error(`${name}.create`, gl.getShaderInfoLog(shader));
+					return null;
+				}
+				return shader;
+			};
+			const vs = compile(gl.VERTEX_SHADER, FULLSCREEN_VERTEX);
+			const fs = compile(gl.FRAGMENT_SHADER, fragment);
+			const program = gl.createProgram();
+			if (!vs || !fs || !program) return null;
+			gl.attachShader(program, vs);
+			gl.attachShader(program, fs);
+			gl.bindAttribLocation(program, 0, "aPos");
+			gl.linkProgram(program);
+			if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+				console.error(`${name}.create`, gl.getProgramInfoLog(program));
+				return null;
+			}
+			return new GlPass(canvas, gl, program, uniforms);
+		}
+		/** Adds a texture bound to `unit` and the sampler uniform `sampler`. */
+		addTexture(unit, sampler, filter) {
+			const gl = this.gl;
+			const t = gl.createTexture();
+			if (!t) throw new Error("GlPass.addTexture: createTexture failed");
+			const f = filter === "linear" ? gl.LINEAR : gl.NEAREST;
+			gl.activeTexture(gl.TEXTURE0 + unit);
+			gl.bindTexture(gl.TEXTURE_2D, t);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, f);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, f);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+			gl.uniform1i(this.loc[sampler], unit);
+			this.textures[unit] = t;
+		}
+		/** Uploads a canvas into texture `unit`. */
+		uploadCanvas(unit, source) {
+			const gl = this.gl;
+			gl.activeTexture(gl.TEXTURE0 + unit);
+			gl.bindTexture(gl.TEXTURE_2D, this.textures[unit]);
+			gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+		}
+		/** Uploads RGBA8 bytes into texture `unit`. */
+		uploadBytes(unit, data, width, height) {
+			const gl = this.gl;
+			gl.activeTexture(gl.TEXTURE0 + unit);
+			gl.bindTexture(gl.TEXTURE_2D, this.textures[unit]);
+			gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+		}
+		uniform(name) {
+			return this.loc[name];
+		}
+		/** Sizes the canvas and draws the pass; set the uniforms just before. */
+		draw(pixelWidth, pixelHeight) {
+			const gl = this.gl;
+			if (this.canvas.width !== pixelWidth || this.canvas.height !== pixelHeight) {
+				this.canvas.width = pixelWidth;
+				this.canvas.height = pixelHeight;
+			}
+			gl.viewport(0, 0, pixelWidth, pixelHeight);
+			gl.drawArrays(gl.TRIANGLES, 0, 3);
+		}
+	};
+	var FULLSCREEN_VERTEX = `#version 300 es
+in vec2 aPos;
+void main() { gl_Position = vec4(aPos, 0.0, 1.0); }`;
+	/** 0xRRGGBB as 0..1 floats for uniform3f. */
+	function rgb01(hex) {
+		return [
+			(hex >> 16 & 255) / 255,
+			(hex >> 8 & 255) / 255,
+			(hex & 255) / 255
+		];
+	}
+	/**
+	* The season turn, as one full-screen pass over two rendered worlds (the cleared level,
+	* the next season).
+	*
+	* 1. Light down the corridors: a geodesic field from the last dot; as its head and the
+	*    ripples behind it pass, a bead of light flares on every corridor tile (where the
+	*    eaten dots were) over a faint corridor glow (corridor mask: B channel of uDist).
+	* 2. Tile cards: every tile of the world (maze and meadow alike) is a card. It reads the
+	*    warped front at its centre (plus a little jitter) and turns over about the axis
+	*    across its direction of travel: seen from above it narrows to a line (|cos θ|) and
+	*    shows the next season on its back. The pass inverts the turn per pixel inside the
+	*    tile; where the narrowed card leaves the tile uncovered, the next season shows
+	*    through, shaded, under a warm rim.
+	* 3. A soft bloom on the fresh side right behind the front.
+	*/
+	var SEASON_TURN_FRAGMENT = `#version 300 es
+precision highp float;
+uniform sampler2D uOld;
+uniform sampler2D uNew;
+uniform sampler2D uDist;
+uniform vec2 uSizePx;
+uniform vec2 uScenePx;
+uniform vec4 uWorld;      // board origin (css px), world scale, tile size in world units
+uniform vec2 uDistSize;
+uniform float uMargin;
+uniform float uDMax;
+uniform float uGlow;      // head of the corridor light, tiles (< -50: off)
+uniform float uFront;     // turning front, tiles (< -50: not started)
+uniform float uTime;
+uniform vec2 uEpic;       // last dot, tile coords
+uniform vec3 uLight;      // corridor light and edge glints
+uniform vec3 uGap;        // light through the seams
+out vec4 outColor;
+
+const float BAND = ${3 .toFixed(2)};
+const float OUTSIDE = ${DECAY_OUTSIDE_RATE.toFixed(2)};
+
+float h21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+vec2 h22(vec2 p) { float n = h21(p); return vec2(n, h21(p + n + 17.17)); }
+float noise(vec2 p) {
+  vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h21(i), h21(i + vec2(1, 0)), u.x), mix(h21(i + vec2(0, 1)), h21(i + vec2(1, 1)), u.x), u.y);
+}
+float fbm(vec2 p) {
+  float s = 0.0, a = 0.5;
+  for (int i = 0; i < 4; i++) { s += a * noise(p); p = mat2(1.6, 1.2, -1.2, 1.6) * p; a *= 0.5; }
+  return s;
+}
+// x: distance, y: corridor mask
+vec2 texel(ivec2 c) {
+  vec4 v = texelFetch(uDist, c, 0);
+  return vec2((floor(v.r * 255.0 + 0.5) + v.g) / 255.0 * uDMax, v.b);
+}
+vec2 geo(vec2 t) {
+  vec2 g = t + uMargin - 0.5, mx = uDistSize - 1.0, gc = clamp(g, vec2(0.0), mx);
+  float extra = length(g - gc) * OUTSIDE;
+  vec2 i = min(floor(gc), mx - 1.0), f = gc - i;
+  ivec2 a = ivec2(i);
+  vec2 d00 = texel(a), d10 = texel(a + ivec2(1, 0)), d01 = texel(a + ivec2(0, 1)), d11 = texel(a + ivec2(1, 1));
+  vec2 v = mix(mix(d00, d10, f.x), mix(d01, d11, f.x), f.y);
+  return vec2(v.x + extra, extra > 0.0 ? 0.0 : v.y);
+}
+float warp(vec2 t) { return 1.4 * (fbm(t * 0.33 + vec2(5.2, 1.3)) - 0.5); }
+vec3 sceneOld(vec2 w) { return texture(uOld, (w * uWorld.z + uWorld.xy) / uScenePx).rgb; }
+vec3 sceneNew(vec2 w) { return texture(uNew, (w * uWorld.z + uWorld.xy) / uScenePx).rgb; }
+
+void main() {
+  vec2 css = vec2(gl_FragCoord.x, uSizePx.y - gl_FragCoord.y) / uSizePx * uScenePx;
+  float T = uWorld.w;
+  vec2 w = (css - uWorld.xy) / uWorld.z;
+  vec2 t = w / T;
+  vec2 g = geo(t);
+  float f = g.x + warp(t);
+
+  // how far the turn has got here (the light only runs over the old world)
+  float turned = clamp((uFront - f) / BAND, 0.0, 1.0);
+
+  vec3 col;
+  if (f > uFront + 4.5) {
+    col = sceneOld(w);
+  } else if (f < uFront - BAND - 4.5) {
+    col = sceneNew(w);
+  } else {
+    vec2 k = floor(t);
+    vec2 c = k + 0.5;
+    vec2 rn = h22(k + 7.1);
+    float fc = geo(c).x + warp(c) + (rn.x - 0.5) * 0.9;
+    float p = clamp((uFront - fc) / BAND, 0.0, 1.0);
+    p = p * p * (3.0 - 2.0 * p);
+    if (p <= 0.0) {
+      col = sceneOld(w);
+    } else if (p >= 1.0) {
+      col = sceneNew(w);
+    } else {
+      // turn across the main direction of travel: about a vertical or horizontal axis
+      vec2 away = c - uEpic;
+      bool alongX = abs(away.x) > abs(away.y);
+      float sgn = alongX ? sign(away.x + 1e-4) : sign(away.y + 1e-4);
+      float th = 3.14159 * p;
+      float cs = cos(th), sn = sin(th);
+      vec2 rel = t - c;
+      float a = alongX ? rel.x : rel.y;   // compressed coordinate
+      float src = a / max(abs(cs), 1e-3);
+      vec3 card;
+      if (abs(src) > 0.5) {
+        // the narrowed card no longer covers this part: the next season, in its shadow
+        float rim = exp(-(abs(a) - 0.5 * abs(cs)) * 14.0);
+        card = sceneNew(w) * (0.5 + 0.3 * (1.0 - sn)) + uGap * rim * 0.35 * sn;
+      } else {
+        vec2 q = c + (alongX ? vec2(src, rel.y) : vec2(rel.x, src));
+        bool back = th > 1.5708;
+        card = back ? sceneNew(q * T) : sceneOld(q * T);
+        // the leading half tips down, the trailing half rises into the light
+        float tilt = clamp(a * 2.0 * sgn, -1.0, 1.0) * sn;
+        card *= 0.82 + 0.18 * abs(cs) + 0.28 * tilt * (back ? -1.0 : 1.0);
+        float edge = 1.0 - smoothstep(0.0, 0.08, 0.5 - abs(src));
+        card += uLight * (edge * 0.22 * sn + pow(sn, 6.0) * 0.08);
+      }
+      col = card;
+    }
+  }
+
+  if (uGlow > -50.0) {
+    // one bead per corridor tile, lit by the wave at that tile
+    vec2 tk = floor(t);
+    vec2 tc = tk + 0.5;
+    float lane = texelFetch(uDist, ivec2(tk + uMargin), 0).b;
+    float d = geo(tc).x + warp(tc) - uGlow;
+    float head = exp(-d * d / 0.8);
+    float ripples = d < 0.0 ? exp(d * 0.22) * pow(0.5 + 0.5 * cos(d * 2.4), 3.0) : 0.0;
+    float wave = head + ripples * 0.55;
+    vec2 r = t - tc;
+    float rr = dot(r, r);
+    float bead = exp(-rr / 0.012) + 0.35 * exp(-rr / 0.09);
+    float wash = 0.12 * head * smoothstep(0.3, 0.9, g.y);
+    col += uLight * (lane * bead * wave * 1.1 + wash) * (1.0 - turned);
+  }
+  if (uFront > -50.0) {
+    float b = f - (uFront - BAND);
+    col += uGap * 0.1 * exp(-b * b / 1.2) * turned;
+  }
+  outColor = vec4(col, 1.0);
+}`;
+	//#endregion
+	//#region src/games/pacman/render/transitions/seasonTurn/seasonTurnTimeline.ts
+	/** Front value meaning "not running" for the shader. */
+	var TURN_OFF = -100;
+	/**
+	* Phases of the season turn, seconds from the last dot: the light runs down the corridors
+	* (`glow`), the mosaic turns over to the next season (`turn`, overlapping the light), the
+	* new world settles (`settle`).
+	*/
+	var SEASON_TURN = {
+		glowStart: .15,
+		glow: 2.2,
+		turnStart: 1.3,
+		turn: 3,
+		settle: 1
+	};
+	var SEASON_TURN_TOTAL = SEASON_TURN.turnStart + SEASON_TURN.turn + SEASON_TURN.settle;
+	var clamp01 = (x) => Math.min(1, Math.max(0, x));
+	/**
+	* Fronts at `elapsed` seconds; `end` is the largest field distance on screen, `glowEnd`
+	* the farthest corridor (the light only runs inside the maze).
+	*/
+	function seasonTurnFronts(elapsed, end, glowEnd) {
+		if (!(elapsed >= 0)) return {
+			glow: TURN_OFF,
+			front: TURN_OFF,
+			progress: 0
+		};
+		const { glowStart, glow, turnStart, turn } = SEASON_TURN;
+		const g = clamp01((elapsed - glowStart) / glow);
+		const glowHead = elapsed < glowStart || g >= 1 ? TURN_OFF : -1 + (glowEnd + 4) * (1 - Math.pow(1 - g, 1.6));
+		const p = clamp01((elapsed - turnStart) / turn);
+		return {
+			glow: glowHead,
+			front: elapsed < turnStart ? TURN_OFF : p >= 1 ? end + 3 + 12 : -3 + (end + 3 + 8) * Math.pow(p, 1.3),
+			progress: Math.pow(p, 1.3)
+		};
+	}
+	//#endregion
+	//#region src/games/pacman/render/transitions/seasonTurn/SeasonTurn.ts
+	var TILE_WORLD = 24;
+	/** Tiles the corridor light runs along: everything walkable outside the lair. */
+	function isCorridor(t) {
+		return t !== "WL" && t !== "ES" && ![
+			"LT",
+			"LE",
+			"BY",
+			"PY",
+			"IY",
+			"CE",
+			"DB"
+		].includes(t);
+	}
+	/** RG: the distance field as 16 bits of its maximum; B: corridor mask. */
+	function packTurnField(field, grid) {
+		const data = new Uint8Array(field.cols * field.rows * 4);
+		for (let r = 0; r < field.rows; r++) for (let c = 0; c < field.cols; c++) {
+			const i = r * field.cols + c;
+			const x = Math.min(254.999, field.dist[i] / field.max * 255);
+			const hi = Math.floor(x);
+			data[i * 4] = hi;
+			data[i * 4 + 1] = Math.floor((x - hi) * 255);
+			const t = grid[r - field.margin]?.[c - field.margin];
+			data[i * 4 + 2] = t && isCorridor(t) ? 255 : 0;
+			data[i * 4 + 3] = 255;
+		}
+		return data;
+	}
+	var MAX_PASS_RATIO = 1.5;
+	var UNIFORMS = [
+		"uOld",
+		"uNew",
+		"uDist",
+		"uSizePx",
+		"uScenePx",
+		"uWorld",
+		"uDistSize",
+		"uMargin",
+		"uDMax",
+		"uGlow",
+		"uFront",
+		"uTime",
+		"uEpic",
+		"uLight",
+		"uGap"
+	];
+	/**
+	* A cleared level turning into the next season: light runs down the corridors from the
+	* last dot, then a mosaic of cards turns over from the old world to the new one. Per frame:
+	* draw the cleared world into `old()`, the next season into `next()`, then `compose()`.
+	* Without WebGL2 it cross-fades.
+	*/
+	var SeasonTurn = class {
+		pass;
+		scenes = [null, null];
+		field = null;
+		fieldKey = "";
+		uploadedKey = "";
+		viewKey = "";
+		end = 1;
+		glowEnd = 1;
+		bits = [];
+		lastElapsed = 0;
+		emitted = 0;
+		old(pixelWidth, pixelHeight) {
+			return this.scene(0, pixelWidth, pixelHeight);
+		}
+		next(pixelWidth, pixelHeight) {
+			return this.scene(1, pixelWidth, pixelHeight);
+		}
+		compose(ctx, width, height, pixelRatio, layout, time, request) {
+			const [oldScene, newScene] = this.scenes;
+			if (!oldScene || !newScene) return;
+			this.prepareField(request);
+			this.fit(width, height, layout);
+			const fronts = seasonTurnFronts(request.elapsed, this.end, this.glowEnd);
+			if (this.pass === void 0) {
+				this.pass = GlPass.create("SeasonTurn", SEASON_TURN_FRAGMENT, UNIFORMS);
+				if (this.pass) {
+					this.pass.addTexture(0, "uOld", "linear");
+					this.pass.addTexture(1, "uNew", "linear");
+					this.pass.addTexture(2, "uDist", "nearest");
+				}
+			}
+			ctx.save();
+			ctx.globalAlpha = 1;
+			ctx.globalCompositeOperation = "source-over";
+			const pass = this.pass;
+			const field = this.field;
+			if (pass && field) {
+				if (this.uploadedKey !== this.fieldKey) {
+					pass.uploadBytes(2, packTurnField(field, request.grid), field.cols, field.rows);
+					this.uploadedKey = this.fieldKey;
+				}
+				pass.uploadCanvas(0, oldScene.cv);
+				pass.uploadCanvas(1, newScene.cv);
+				const gl = pass.gl;
+				const ratio = Math.min(pixelRatio, MAX_PASS_RATIO);
+				const pw = Math.round(width * ratio);
+				const ph = Math.round(height * ratio);
+				gl.uniform2f(pass.uniform("uSizePx"), pw, ph);
+				gl.uniform2f(pass.uniform("uScenePx"), width, height);
+				gl.uniform4f(pass.uniform("uWorld"), layout.offsetX, layout.offsetY, layout.tileSize / TILE_WORLD, TILE_WORLD);
+				gl.uniform2f(pass.uniform("uDistSize"), field.cols, field.rows);
+				gl.uniform1f(pass.uniform("uMargin"), field.margin);
+				gl.uniform1f(pass.uniform("uDMax"), field.max);
+				gl.uniform1f(pass.uniform("uGlow"), fronts.glow);
+				gl.uniform1f(pass.uniform("uFront"), fronts.front);
+				gl.uniform1f(pass.uniform("uTime"), time);
+				gl.uniform2f(pass.uniform("uEpic"), request.x, request.y);
+				gl.uniform3f(pass.uniform("uLight"), ...rgb01(request.light));
+				gl.uniform3f(pass.uniform("uGap"), ...rgb01(request.gap));
+				pass.draw(pw, ph);
+				ctx.drawImage(pass.canvas, 0, 0, width, height);
+			} else {
+				ctx.drawImage(oldScene.cv, 0, 0, width, height);
+				ctx.globalAlpha = fronts.progress;
+				ctx.drawImage(newScene.cv, 0, 0, width, height);
+			}
+			this.drawBits(ctx, width, height, layout, request, fronts.front);
+			ctx.restore();
+		}
+		scene(i, w, h) {
+			let s = this.scenes[i];
+			if (!s) {
+				const cv = makeCanvas(w, h);
+				s = {
+					cv,
+					ctx: canvasContext(cv)
+				};
+				this.scenes[i] = s;
+			}
+			if (s.cv.width !== w || s.cv.height !== h) {
+				s.cv.width = w;
+				s.cv.height = h;
+			}
+			return s.ctx;
+		}
+		prepareField(request) {
+			const x = Math.floor(request.x);
+			const y = Math.floor(request.y);
+			const key = `${x},${y}`;
+			if (key !== this.fieldKey || !this.field) {
+				const field = computeDecayField(request.grid, x, y);
+				this.field = field;
+				this.fieldKey = key;
+				this.viewKey = "";
+				let far = 0;
+				request.grid.forEach((row, r) => row.forEach((t, c) => {
+					if (isCorridor(t)) far = Math.max(far, field.dist[(r + field.margin) * field.cols + c + field.margin]);
+				}));
+				this.glowEnd = far + 1;
+			}
+		}
+		/** Largest distance on screen, so the fronts sweep the whole view. */
+		fit(width, height, layout) {
+			const key = `${this.fieldKey}|${width}x${height}|${layout.tileSize},${layout.offsetX},${layout.offsetY}`;
+			const field = this.field;
+			if (key === this.viewKey || !field || !(layout.tileSize > 0)) return;
+			const x0 = -layout.offsetX / layout.tileSize;
+			const y0 = -layout.offsetY / layout.tileSize;
+			const x1 = (width - layout.offsetX) / layout.tileSize;
+			const y1 = (height - layout.offsetY) / layout.tileSize;
+			let m = 0;
+			for (let y = y0; y <= y1 + .5; y += .5) for (let x = x0; x <= x1 + .5; x += .5) m = Math.max(m, sampleDecayField(field, x, y));
+			this.end = m + 2;
+			this.viewKey = key;
+		}
+		/** Leaves, snowflakes or petals of the new season, thrown up where cards turn. */
+		drawBits(ctx, width, height, layout, request, front) {
+			const field = this.field;
+			if (!field) return;
+			if (request.elapsed < this.lastElapsed) this.bits.length = 0;
+			const dt = Math.min(.1, Math.max(0, request.elapsed - this.lastElapsed));
+			this.lastElapsed = request.elapsed;
+			const ts = layout.tileSize;
+			if (front > -50 && dt > 0) {
+				const tries = Math.round(700 * dt);
+				for (let i = 0; i < tries && this.bits.length < 500; i++) {
+					const tx = -layout.offsetX / ts + Math.random() * width / ts;
+					const ty = -layout.offsetY / ts + Math.random() * height / ts;
+					const d = front - sampleDecayField(field, tx, ty);
+					if (d < .2 || d > 3 * .7) continue;
+					let ax = tx - request.x;
+					let ay = ty - request.y;
+					const l = Math.hypot(ax, ay) || 1;
+					ax /= l;
+					ay /= l;
+					const glow = Math.random() < .35;
+					const sp = .4 + Math.random() * 1.2;
+					this.bits.push({
+						im: glow ? glowTexture(request.light) : request.particle(this.emitted++),
+						x: tx,
+						y: ty,
+						vx: ax * sp + (Math.random() - .5) * .8,
+						vy: ay * sp + (Math.random() - .5) * .8 - .5,
+						rot: Math.random() * 6,
+						spin: (Math.random() - .5) * 6,
+						life: 0,
+						max: .9 + Math.random() * .9,
+						s: glow ? .12 + Math.random() * .2 : .28 + Math.random() * .18,
+						glow
+					});
+				}
+			}
+			for (let i = this.bits.length - 1; i >= 0; i--) {
+				const p = this.bits[i];
+				p.life += dt;
+				if (p.life >= p.max) {
+					this.bits.splice(i, 1);
+					continue;
+				}
+				p.x += p.vx * dt;
+				p.y += p.vy * dt;
+				p.vx *= .98;
+				p.vy *= .98;
+				p.rot += p.spin * dt;
+				const u = p.life / p.max;
+				const size = p.s * ts * (p.glow ? 1 - u * .5 : 1);
+				const h = p.glow ? size : size * (p.im.height / p.im.width);
+				ctx.globalCompositeOperation = p.glow ? "lighter" : "source-over";
+				ctx.globalAlpha = Math.min(1, (1 - u) * 1.4) * (p.glow ? .9 : 1);
+				ctx.save();
+				ctx.translate(layout.offsetX + p.x * ts, layout.offsetY + p.y * ts);
+				ctx.rotate(p.glow ? 0 : p.rot);
+				ctx.drawImage(p.im, -size / 2, -h / 2, size, h);
+				ctx.restore();
+			}
+			ctx.globalCompositeOperation = "source-over";
+			ctx.globalAlpha = 1;
+		}
+	};
+	//#endregion
+	//#region prototypes/pacman/level-clear/main.ts
+	var ORDER = [
+		"summer",
+		"autumn",
+		"winter",
+		"spring"
+	];
+	var LIGHT = 16769952;
+	var GAP = 16774358;
+	var $ = (id) => document.getElementById(id);
+	var view = $("view");
+	var ctx = view.getContext("2d");
+	var D = Math.min(window.devicePixelRatio || 1, 2);
+	var theme = (s) => meadowThemeFor(s);
+	var nextOf = (s) => ORDER[(ORDER.indexOf(s) + 1) % ORDER.length];
+	var from = "summer";
+	var oldWorld;
+	var newWorld;
+	var vw = 0;
+	var vh = 0;
+	/** Seconds since the level was cleared; -1 before, total after. */
+	var tl = -1;
+	var playing = false;
+	var speed = 1;
+	var finish = {
+		r: 19,
+		c: 12
+	};
+	var turn = new SeasonTurn();
+	/** Brings a world's mood (weather, night) to its target at once. */
+	function settle(world) {
+		for (let i = 0; i < 80; i++) world.update(.1);
+	}
+	function buildWorlds() {
+		oldWorld = new MeadowWorld(GRID_01, theme(from));
+		newWorld = new MeadowWorld(GRID_01, theme(nextOf(from)));
+		oldWorld.resize(vw, vh, D);
+		newWorld.resize(vw, vh, D);
+		oldWorld.setMood(1, 1);
+		newWorld.setMood(0, 0);
+		settle(oldWorld);
+		settle(newWorld);
+		for (const b of document.querySelectorAll("[data-season]")) b.setAttribute("aria-pressed", String(b.dataset.season === from));
+		$("note").textContent = `${label(from)} → ${label(nextOf(from))} · клик по коридору — где съедена последняя точка`;
+	}
+	var label = (s) => ({
+		summer: "Лето",
+		autumn: "Осень",
+		winter: "Зима",
+		spring: "Весна"
+	})[s];
+	function layout() {
+		vw = window.innerWidth;
+		vh = window.innerHeight;
+		view.width = Math.round(vw * D);
+		view.height = Math.round(vh * D);
+		view.style.width = `${vw}px`;
+		view.style.height = `${vh}px`;
+		buildWorlds();
+	}
+	var allEaten = () => true;
+	var noneEaten = () => false;
+	function drawWorld(target, world, eaten) {
+		target.setTransform(D, 0, 0, D, 0, 0);
+		target.globalAlpha = 1;
+		target.globalCompositeOperation = "source-over";
+		world.drawWorld(target, eaten);
+		world.drawMood(target);
+		world.drawOverlay(target);
+	}
+	/** Pac-Man on the last dot: a golden halo pulses while the light runs, then he bows out. */
+	function drawPac(t, time) {
+		const L = oldWorld.layout;
+		const x = L.offsetX + (finish.c + .5) * L.tileSize;
+		const y = L.offsetY + (finish.r + .5) * L.tileSize;
+		const r = L.tileSize * .42;
+		let scale = 1;
+		let alpha = 1;
+		if (t >= 0) {
+			const end = SEASON_TURN.turnStart + SEASON_TURN.turn;
+			scale = 1 + .18 * Math.max(0, Math.sin(Math.min(t, 1.2) * Math.PI * 2.5)) * (1 - Math.min(1, t / 1.2));
+			if (t > end) alpha = Math.max(0, 1 - (t - end) / SEASON_TURN.settle);
+			const halo = Math.max(0, 1 - t / (SEASON_TURN.glowStart + SEASON_TURN.glow));
+			if (halo > 0) {
+				ctx.globalCompositeOperation = "lighter";
+				ctx.globalAlpha = halo * (.6 + .4 * Math.sin(time * 8));
+				const s = L.tileSize * (1.6 + t * 1.5);
+				ctx.drawImage(glowTexture(LIGHT), x - s, y - s, s * 2, s * 2);
+			}
+		}
+		ctx.globalCompositeOperation = "source-over";
+		ctx.globalAlpha = alpha;
+		const m = Math.PI * (.12 + .14 * Math.abs(Math.sin(time * 9)));
+		ctx.fillStyle = "#ffd23f";
+		ctx.beginPath();
+		ctx.moveTo(x, y);
+		ctx.arc(x, y, r * scale, Math.PI + m, Math.PI - m + Math.PI * 2);
+		ctx.closePath();
+		ctx.fill();
+		ctx.strokeStyle = "rgba(120,80,0,.45)";
+		ctx.lineWidth = 1;
+		ctx.stroke();
+		ctx.globalAlpha = 1;
+	}
+	var slider = $("ts");
+	var tLabel = $("tt");
+	function setT(t) {
+		tl = t;
+		slider.value = String(Math.round(Math.max(0, t) / SEASON_TURN_TOTAL * 1e3));
+		tLabel.textContent = t < 0 ? "—" : `${t.toFixed(2)} с`;
+	}
+	$("bp").addEventListener("click", () => {
+		playing = true;
+		setT(0);
+	});
+	$("br").addEventListener("click", () => {
+		playing = false;
+		setT(-1);
+	});
+	$("bv").addEventListener("click", () => {
+		speed = speed === 1 ? .25 : 1;
+		$("bv").textContent = speed === 1 ? "1×" : "¼×";
+	});
+	for (const b of document.querySelectorAll("[data-season]")) b.addEventListener("click", () => {
+		from = b.dataset.season;
+		playing = false;
+		setT(-1);
+		buildWorlds();
+	});
+	slider.addEventListener("input", () => {
+		playing = false;
+		setT(Number(slider.value) / 1e3 * SEASON_TURN_TOTAL);
+	});
+	view.addEventListener("click", (e) => {
+		const L = oldWorld.layout;
+		const c = Math.floor((e.clientX - L.offsetX) / L.tileSize);
+		const r = Math.floor((e.clientY - L.offsetY) / L.tileSize);
+		const t = GRID_01[r]?.[c];
+		if (!t || t === "WL" || t === "ES" || [
+			"LT",
+			"LE",
+			"BY",
+			"PY",
+			"IY",
+			"CE"
+		].includes(t)) return;
+		finish = {
+			r,
+			c
+		};
+		playing = false;
+		setT(-1);
+	});
+	var time = 0;
+	var last = performance.now();
+	function frame(now) {
+		const dt = Math.min(.1, (now - last) / 1e3);
+		last = now;
+		time += dt;
+		if (playing) {
+			const nt = tl + dt * speed;
+			if (nt >= SEASON_TURN_TOTAL) {
+				playing = false;
+				setT(SEASON_TURN_TOTAL);
+			} else setT(nt);
+		}
+		oldWorld.update(dt);
+		newWorld.update(dt);
+		if (tl < 0) drawWorld(ctx, oldWorld, allEaten);
+		else if (tl >= SEASON_TURN_TOTAL) drawWorld(ctx, newWorld, noneEaten);
+		else {
+			drawWorld(turn.old(view.width, view.height), oldWorld, allEaten);
+			drawWorld(turn.next(view.width, view.height), newWorld, noneEaten);
+			ctx.setTransform(D, 0, 0, D, 0, 0);
+			turn.compose(ctx, vw, vh, D, oldWorld.layout, time, {
+				grid: GRID_01,
+				x: finish.c + .5,
+				y: finish.r + .5,
+				elapsed: tl,
+				light: LIGHT,
+				gap: GAP,
+				particle: (i) => theme(nextOf(from)).live.drift.texture(i)
+			});
+		}
+		ctx.setTransform(D, 0, 0, D, 0, 0);
+		if (tl < SEASON_TURN_TOTAL) drawPac(tl, time);
+		requestAnimationFrame(frame);
+	}
+	window.addEventListener("resize", layout);
+	layout();
+	setT(-1);
+	window.turn = {
+		play: () => $("bp").click(),
+		seek: (t) => {
+			playing = false;
+			setT(t);
+		},
+		season: (s) => {
+			from = s;
+			buildWorlds();
+		}
+	};
+	requestAnimationFrame(frame);
+	//#endregion
+})();
+
+    </script>
+  </body>
+</html>
