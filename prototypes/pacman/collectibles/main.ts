@@ -7,6 +7,7 @@ import { meadowThemeFor } from '../../../src/games/pacman/render/seasons/meadow/
 import type { MeadowTheme } from '../../../src/games/pacman/render/seasons/meadow/MeadowTheme';
 import { drawFruit, FRUIT_EXTENT } from '../../../src/games/pacman/render/items/fruit/FruitView';
 import { drawBonusLife } from '../../../src/games/pacman/render/items/BonusLifeView';
+import { drawExit } from '../../../src/games/pacman/render/items/ExitView';
 import { FRUIT } from '../../../src/games/pacman/logic/bonuses/fruitCatalog';
 
 type Season = 'summer' | 'autumn' | 'winter' | 'spring';
@@ -24,6 +25,7 @@ const fruit =
 		drawFruit(c, kind, x, y, tile, t);
 const ITEMS: Array<{ name: string; draw: Item }> = [
 	{ name: 'Cherry', draw: fruit(FRUIT.CHERRY) },
+	{ name: 'Strawberry', draw: fruit(FRUIT.STRAWBERRY) },
 	{ name: 'Orange', draw: fruit(FRUIT.ORANGE) },
 	{ name: 'Pretzel', draw: fruit(FRUIT.PRETZEL) },
 	{ name: 'Apple', draw: fruit(FRUIT.APPLE) },
@@ -32,12 +34,13 @@ const ITEMS: Array<{ name: string; draw: Item }> = [
 	{ name: 'Galaxian', draw: fruit(FRUIT.GALAXIAN) },
 	{ name: 'Bell', draw: fruit(FRUIT.BELL) },
 	{ name: 'Key', draw: fruit(FRUIT.KEY) },
-	{ name: 'Bonus life', draw: (c, x, y, tile, t) => drawBonusLife(c, x, y, tile * FRUIT_EXTENT, t) }
+	{ name: 'Bonus life', draw: (c, x, y, tile, t) => drawBonusLife(c, x, y, tile * FRUIT_EXTENT, t) },
+	{ name: 'Exit', draw: (c, x, y, tile, t) => drawExit(c, x, y, tile * FRUIT_EXTENT, t) }
 ];
-/** Corridor tiles of GRID_01: rows 5 and 2, columns 13..22, one item every other tile. */
-const SPOTS: ReadonlyArray<[number, number]> = Array.from({ length: 10 }, (_, i) => [
-	i < 5 ? 13 + i * 2 : 14 + (i - 5) * 2,
-	i < 5 ? 5 : 2
+/** Corridor tiles of GRID_01: rows 5 and 2, columns 12..23, one item every other tile. */
+const SPOTS: ReadonlyArray<[number, number]> = Array.from({ length: 12 }, (_, i) => [
+	i < 6 ? 12 + i * 2 : 13 + (i - 6) * 2,
+	i < 6 ? 5 : 2
 ]);
 
 let season: Season = 'spring';

@@ -144,6 +144,10 @@ export class PacmanAudioPlayer {
 			this.play('intermission.wav', 0.8);
 			return;
 		}
+		if (cue === 'bonus-life') {
+			this.play('extend.wav', 0.8);
+			return;
+		}
 		if (cue === 'teleport') {
 			this.play('eyes.wav', 0.55);
 			return;

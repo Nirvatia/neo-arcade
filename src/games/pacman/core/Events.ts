@@ -22,7 +22,8 @@ export type PacmanAudioCue =
 	| 'egg-collect'
 	| 'exit-open'
 	| 'exit-enter'
-	| 'teleport';
+	| 'teleport'
+	| 'bonus-life';
 
 export interface PacmanStateChangedPayload {
 	state: PacmanStateName;

@@ -36,7 +36,7 @@ render/
   doom/            DoomLevelRenderer, baked world, lamprey boss, combat and weapon FX
   transitions/decay/       level decay on death: field (Dijkstra), timeline, WebGL2 pass
   transitions/seasonTurn/  level clear: corridor lights + tile cards to the next world
-  maze/ actors/ items/ (fruit stubs: one file per fruit) overlay/ contracts/
+  maze/ actors/ items/ (fruit: one file each; bonus life, exit) overlay/ contracts/
   common/ (textures, GlPass, seededRandom, clamp, rgba)
 ui/          Svelte HUD (hell), overlay, debug panel, action bridges
 ```
@@ -69,6 +69,8 @@ menu ──fade──▶ ready(intro 5 s, jingle) ──▶ playing ──▶ de
                   │                              │  └─▶ level-clear 5.3 s (season turn) ─▶ ready(short)
 game-over ─fade───┘  (input locked 1 s)          └─ golden egg ──fade──▶ secret ready(short)
 hell: dying in the abyss ──fade──▶ next level, ready(short)
+boss level: boss dies → heart (where it fell) + exit (far end) → taking either ends the
+      level as a win (level-clear); the heart also gives +1 life (`BossRewardService`)
 pause (Space/P, Esc in play): ready, playing, death, level-clear — freezes and resumes the
 same state; tab hidden / window blur auto-pauses; requests during a fade apply after it.
 ```
@@ -136,7 +138,8 @@ and covers the canvas only (Svelte buttons stay on top); replace it there.
 - Boss: Doom-like, harsh and dangerous, changes visibly by phase, fits in one tile.
 - Ash and night are driven by boss phases, never by UI buttons.
 - Fruit views stay one file per fruit (`render/items/fruit/*View.ts`): each holds its own
-  art (the owner's mock-up texture code 1:1), the rest stay stubs until their art arrives.
+  art, the owner's mock-up texture code 1:1.
+- A boss level ends by the player's choice: the heart (+1 life) or the exit (no life).
 
 ## Plan (v2, set by the owner after plan v1)
 
@@ -158,9 +161,8 @@ on the real game code for the owner to approve.
      energizer / fruit, ghost eaten with the light streak from ahead, teleport wormholes,
      overdrive, invulnerability blink, death). Prototype: `prototypes/pacman/ms-pacman`
      (`node prototypes/pacman/build.mjs ms-pacman`).
-   - Fruit: the owner's mock-ups (COLLECTIBLE_*.html), arriving in batches. **Batches 1–2
-     ported, awaiting the verdict:** cherry, orange, pretzel, apple, pear, melon, Galaxian,
-     bell, key, plus the bonus-life heart. Strawberry is the last fruit still waiting for art.
+   - Fruit: the owner's mock-ups (COLLECTIBLE_*.html), arriving in batches. **All 10 fruit
+     ported (batches 1–3), awaiting the verdict**, plus the bonus-life heart.
      Shared engine `render/items/collectibleSprite.ts`: the mock-up's texture code is run
      1:1 once into a canvas, its two bloom copies are blurred once (canvas `filter`, or
      down-up sampling where unsupported), and each frame draws sprite + additive blooms with
@@ -168,13 +170,18 @@ on the real game code for the owner to approve.
      object bounds (glow excluded), the mock-up's display sizes and, when its ticker differs
      (pretzel), its own motion; `FruitView` fits the
      object's larger side to `FRUIT_EXTENT` = 0.9 tile, centred on the tile, and still
-     blinks while the timer runs out. The strawberry stays a stub on `fruitPrimitive`
-     until its art arrives. The orange's skin pores are random, as in its mock-up (placed
+     blinks while the timer runs out. The stub primitive is gone. The orange's skin pores are random, as in its mock-up (placed
      once per page load). Prototype:
      `prototypes/pacman/collectibles` (`node prototypes/pacman/build.mjs collectibles`).
-   - Bonus life (`render/items/BonusLifeView.ts`, heartbeat + orbiting particles): drawn,
-     not placed — no pickup grants a life today (lives come from score thresholds); the
-     owner decides how it enters the game.
+   - Boss reward (owner's rule): beating a boss ends the level through a choice. The boss
+     dies → the bonus life (`render/items/BonusLifeView.ts`, heartbeat + orbiting
+     particles) appears on its last tile and an exit (`render/items/ExitView.ts`, a stand-in
+     doorway until the owner's icon arrives) on the walkable tile farthest from it. Taking
+     the heart ends the level with +1 life, the exit ends it without; nothing ends it before
+     (`logic/bonuses/BossRewardService.ts`, wired in `PlayingState`, tests in
+     `bonuses/bossReward.test.ts`). Boss levels get it through `LevelSession.bossReward`
+     (the hell today, the stage-8 boss worlds later). The debug `COMPLETE LEVEL` still ends
+     the hell at once, without the choice.
    - Golden egg → Easter egg: the owner wants it redrawn as an Easter egg, by Claude, later.
    - Ghosts: art for each season (spring, summer, autumn, winter), with the normal,
      frightened, flashing and eaten (eyes only) states. `GhostView` is one generic look now.

@@ -13,6 +13,7 @@ import { LairCodeService } from '../rules/LairCodeService';
 import { EchoCloneService } from '../bonuses/EchoCloneService';
 import { DoomBossService } from '../doom/DoomBossService';
 import { DoomAbilityService } from '../doom/DoomAbilityService';
+import { BossRewardService } from '../bonuses/BossRewardService';
 import type { GameProfile } from '../rules/HypnosisService';
 import type { EventBus } from '../../engine/EventBus';
 import type { PacmanEventMap } from '../../core/Events';
@@ -47,6 +48,8 @@ export interface LevelSession {
 	readonly lairCode: LairCodeService;
 	/** Present on the hell level only. */
 	readonly doom: DoomSession | null;
+	/** Boss levels only: the bonus life and the exit offered when the boss dies. */
+	readonly bossReward: BossRewardService | null;
 }
 
 export interface LevelSessionRequest {
@@ -113,7 +116,8 @@ export function buildLevelSession(request: LevelSessionRequest): LevelSession {
 		hypnosis,
 		echo,
 		lairCode,
-		doom
+		doom,
+		bossReward: hell ? new BossRewardService(grid, events) : null
 	};
 }
 
@@ -129,6 +133,7 @@ export function resetLevelSession(session: LevelSession): void {
 	session.echo.reset();
 	session.doom?.boss.reset();
 	session.doom?.abilities.reset();
+	session.bossReward?.reset();
 	session.lairCode.reset();
 }
 
@@ -143,5 +148,6 @@ export function resetForNextLevel(session: LevelSession): void {
 	session.echo.reset();
 	session.doom?.boss.reset();
 	session.doom?.abilities.reset();
+	session.bossReward?.reset();
 	session.combat.nextLevel();
 }

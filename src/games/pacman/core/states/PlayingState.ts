@@ -63,8 +63,15 @@ export class PlayingState implements GameState {
 					return;
 				}
 			}
-			if (!combat.endRequested && doomBoss.defeated) {
-				combat.completeHellLevel();
+			// the boss is dead: the level ends when the player takes the heart or the exit
+			const reward = session.bossReward;
+			if (!combat.endRequested && doomBoss.defeated && reward) {
+				reward.offer(doomBoss.tile);
+				reward.update(player);
+				const choice = reward.consumeChoice();
+				if (choice) {
+					combat.completeHellLevel(choice === 'life');
+				}
 			}
 			if (!combat.endRequested && fireRequested) {
 				doom.fire(player);

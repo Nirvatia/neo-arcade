@@ -271,11 +271,15 @@ export class CombatService {
 		this.events.emit('audio:cue', { cue: 'death' });
 	}
 
-	completeHellLevel(): void {
+	/** Ends the boss level as a win; `bonusLife` when the player took the boss's heart. */
+	completeHellLevel(bonusLife = false): void {
 		if (this.completedValue || this.gameOverValue || this.deathActiveValue) {
 			return;
 		}
 
+		if (bonusLife) {
+			this.awardExtraLife();
+		}
 		this.completedValue = true;
 		this.resultValue = 'win';
 		this.scoreModel.add(SCORE_TABLE.hellBossDefeated);

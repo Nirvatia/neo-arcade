@@ -6,6 +6,7 @@ import type { CombatService } from '../rules/CombatService';
 import type { FruitService } from '../bonuses/FruitService';
 import type { GoldenEggService } from '../bonuses/GoldenEggService';
 import type { HypnosisService } from '../rules/HypnosisService';
+import type { BossRewardService } from '../bonuses/BossRewardService';
 import type { LairCodeService } from '../rules/LairCodeService';
 import type { EchoCloneService } from '../bonuses/EchoCloneService';
 import type { DoomBossService } from '../doom/DoomBossService';
@@ -137,6 +138,10 @@ export class LevelLoader {
 
 	get doom(): DoomAbilityService | null {
 		return this.sessionValue?.doom?.abilities ?? null;
+	}
+
+	get bossReward(): BossRewardService | null {
+		return this.sessionValue?.bossReward ?? null;
 	}
 
 	get lairCode(): LairCodeService | null {

@@ -4,8 +4,10 @@ import { MsPacmanView } from './actors/MsPacmanView';
 import type { PacmanAudioCue } from '../core/Events';
 import type { PlayerDrawOptions } from './actors/PlayerView';
 import { EchoCloneView } from './actors/EchoCloneView';
-import { FruitView } from './items/fruit/FruitView';
+import { FruitView, FRUIT_EXTENT } from './items/fruit/FruitView';
 import { GoldenEggView } from './items/GoldenEggView';
+import { drawBonusLife } from './items/BonusLifeView';
+import { drawExit } from './items/ExitView';
 import { OverlayView } from './overlay/OverlayView';
 import { buildOverlaySnapshot } from './overlay/overlaySnapshot';
 import type { RenderFrame } from './RenderFrame';
@@ -38,6 +40,29 @@ export class SharedLayers {
 		const echo = level.echo;
 		if (echo && (echo.phase === 'token' || echo.phase === 'clone')) {
 			this.echoCloneView.draw(ctx, echo, layout);
+		}
+
+		const reward = level.bossReward;
+		const heart = reward?.offered ? reward.heart : null;
+		const exit = reward?.offered ? reward.exit : null;
+		const S = layout.tileSize;
+		if (exit) {
+			drawExit(
+				ctx,
+				layout.offsetX + exit.x * S,
+				layout.offsetY + exit.y * S,
+				S * FRUIT_EXTENT,
+				frame.time
+			);
+		}
+		if (heart) {
+			drawBonusLife(
+				ctx,
+				layout.offsetX + heart.x * S,
+				layout.offsetY + heart.y * S,
+				S * FRUIT_EXTENT,
+				frame.time
+			);
 		}
 	}
 
