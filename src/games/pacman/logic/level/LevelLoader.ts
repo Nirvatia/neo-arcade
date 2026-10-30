@@ -79,6 +79,10 @@ export class LevelLoader {
 		return this.secretModeValue;
 	}
 
+	get godMode(): boolean {
+		return this.godModeValue;
+	}
+
 	get hellMode(): boolean {
 		return this.hellModeValue;
 	}

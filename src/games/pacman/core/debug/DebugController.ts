@@ -13,6 +13,31 @@ export interface DebugRenderFlags {
 	fronts: boolean;
 }
 
+/** What the dev panel shows live, read once per animation frame. */
+export interface DebugSnapshot {
+	readonly state: string;
+	readonly phase: string;
+	readonly phaseRemaining: number;
+	readonly remaining: number;
+	readonly paused: boolean;
+	readonly frozen: boolean;
+	readonly scale: number;
+	readonly level: number;
+	readonly hell: boolean;
+	readonly secret: boolean;
+	readonly profile: string;
+	readonly lives: number;
+	readonly score: number;
+	readonly godMode: boolean;
+	readonly boss: {
+		readonly hp: number;
+		readonly phase: number;
+		readonly state: string;
+		readonly forced: string | null;
+		readonly defeated: boolean;
+	} | null;
+}
+
 /**
  * Every dev command in one place (dev build only). The dev panel and the hotkeys call it;
  * it reaches the game through the director (state changes) and the level loader (the
@@ -32,6 +57,36 @@ export class DebugController {
 		private readonly loader: LevelLoader,
 		readonly time: TimeControl
 	) {}
+
+	snapshot(): DebugSnapshot {
+		const flow = this.director.flow;
+		const boss = this.loader.doomBoss;
+		return {
+			state: flow.state,
+			phase: flow.phase,
+			phaseRemaining: flow.phaseRemaining,
+			remaining: flow.remaining,
+			paused: flow.paused,
+			frozen: this.time.frozen,
+			scale: this.time.scale,
+			level: this.loader.level,
+			hell: this.loader.hellMode,
+			secret: this.loader.secretMode,
+			profile: this.loader.profile,
+			lives: this.loader.combat?.lives ?? 0,
+			score: this.loader.score,
+			godMode: this.loader.godMode,
+			boss: boss
+				? {
+						hp: boss.hp,
+						phase: boss.phase,
+						state: boss.state,
+						forced: boss.debugForcedAttack,
+						defeated: boss.defeated
+					}
+				: null
+		};
+	}
 
 	// ── flow ────────────────────────────────────────────────────────────────
 
