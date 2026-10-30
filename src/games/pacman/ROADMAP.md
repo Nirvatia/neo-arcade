@@ -89,9 +89,10 @@ and covers the canvas only (Svelte buttons stay on top); replace it there.
 - **Boss** (`logic/doom/`): three phases with distinct attack sets — phase 1 ambush chase,
   dash, rift; phase 2 seals, pull, cross, rift, void trail; phase 3 split + echo, eruption
   waves, corruption of outer corridors, blink, brood. Hazards in `DoomHazards.ts`, fairness
-  checks guarantee an escape. Visual: `render/doom/LampreyBossView.ts` (the lamprey).
-  Minions: lamprey spawn in `render/doom/DoomCombatView.ts`.
-- **Weapons**: BFG, barrel, berserk, medkit; effects in `render/doom/DoomFxView.ts`, fed by
+  checks guarantee an escape. Visual: `render/doom/HellBlinkyView.ts` (Blinky, lord of
+  hell). Minions: imps (`render/doom/HellImpView.ts`); shared ghost-demon drawing in
+  `render/doom/hellGhost.ts`.
+- **Weapons**: BFG, barrel, berserk (the fist), medkit; effects in `render/doom/DoomFxView.ts`, fed by
   an FX event queue from the doom logic.
 - **Pac-Man** (`render/actors/PlayerView.ts`, every level): living soft body, energized /
   berserk looks, ribbon trail, arcade-style death.
@@ -126,8 +127,7 @@ and covers the canvas only (Svelte buttons stay on top); replace it there.
 
 - Headless Chromium without a GPU runs the hell night at ~20 FPS (the reference prototype
   ~26); JS cost is ~2 ms/frame, the rest is software rasterisation. Check on real hardware.
-- Art not final: Pac-Man (plan stage 4), fruit and ghosts (stage 1), the
-  hell boss, berserk orb and pentagram attack (stage 3).
+- Art not final: Pac-Man (plan stage 4), fruit and ghosts (stage 1).
 - Regular levels have no Svelte HUD (only the canvas top bar); plan stage 5 adds one.
 - `DecayPass` still has its own WebGL boilerplate; move it onto `render/common/GlPass`
   (the season turn already uses it) when the decay is next touched.
@@ -222,7 +222,7 @@ on the real game code for the owner to approve.
      `Director.debugGotoLevel`.
    - Tests: `core/debug/debugTools.test.ts` (time control, boss phase / forced attack /
      kill, dev log silent in production).
-3. **Hell rework.** In progress (fourth chat). Owner's decisions: seals deal damage; the
+3. ✅ **Hell rework.** Done in the fourth chat. Owner's decisions: seals deal damage; the
    minions become small demon ghosts; the berserk pickup is a fist.
    - Done in the game logic: **eruption** is a disc (path distance ≤ `ERUPTION_INNER` = 3)
      that bursts after 1.2 s, then the ring out to 6 tiles 0.65 s later; it starts only if
@@ -233,18 +233,19 @@ on the real game code for the owner to approve.
      tile the player reaches as they burn (a junction near that point wins), the next
      junction past it, then others; standing on a seal when it burns is a hit; the sigil and
      its countdown arc stay inside the tile. Tests in `doomMechanics.test.ts`.
-   - Prototype, **awaiting the owner's verdict**: `prototypes/pacman/hell`
+   - Art approved by the owner and wired into the game. Prototype: `prototypes/pacman/hell`
      (`node prototypes/pacman/build.mjs hell`). Gallery: Blinky, lord of hell
      (`render/doom/HellBlinkyView.ts`; phases 1–3, wind-up, dash, cast, stunned, hit, echo),
      the imps (`HellImpView.ts`, Pinky / Inky / Clyde colours), the berserk fist
      (`berserkFistSprite` in `DoomSprites.ts`); large, on the maze and magnified. Fight: the
      real boss logic, Pac-Man on the arrow keys, attack buttons. Shared ghost-demon drawing
-     in `render/doom/hellGhost.ts`. Not wired into the game yet: after approval
-     `DoomLevelRenderer` takes `HellBlinkyView`, `DoomCombatView` draws `drawImp`, the fist
-     replaces the megasphere, and `LampreyBossView` is deleted.
+     in `render/doom/hellGhost.ts`. In the game: `DoomLevelRenderer` draws `HellBlinkyView`,
+     `DoomCombatView` draws the imps, the fist replaced the megasphere (pickup FX tint
+     orange too); `LampreyBossView` is deleted. Pac-Man's berserk look is unchanged.
    - Direction rule (also settles the stage 1 item): eyes look where the body heads (on a
      wind-up, at the player); hell actors add a small chevron on the tile's leading edge;
      Pac-Man keeps the mouth.
+   The original task list:
    - Boss art: the lamprey reads badly on a small tile. Return to the idea of Blinky as
      the lord of hell (a demon red ghost) — readable at tile size, changes by phase.
    - Direction indicator for every entity (boss, minions, Pac-Man, ghosts): the player

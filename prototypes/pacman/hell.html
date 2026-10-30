@@ -6152,25 +6152,6 @@
 		x.fillStyle = "rgba(0,0,0,.15)";
 		x.fillRect(-10, 5.5, 20, 3);
 	}));
-	var megasphereTexture = lazy(() => makeTexture(26, 26, (x) => {
-		x.translate(13, 13);
-		const g = x.createRadialGradient(-3.5, -4, 1, 0, 0, 11.5);
-		g.addColorStop(0, "#ffffff");
-		g.addColorStop(.35, "#40d0ff");
-		g.addColorStop(1, "#0a3a90");
-		x.fillStyle = g;
-		x.beginPath();
-		x.arc(0, 0, 11, 0, 7);
-		x.fill();
-		x.strokeStyle = "#d8ffff";
-		x.lineWidth = 1.1;
-		x.stroke();
-		x.strokeStyle = "rgba(255,255,255,.45)";
-		x.lineWidth = .9;
-		x.beginPath();
-		x.ellipse(0, 0, 11, 3.6, 0, 0, 7);
-		x.stroke();
-	}));
 	/** Berserk: a clenched red gauntlet with steel spikes on the knuckles and a steel cuff. */
 	var fistTexture = lazy(() => makeTexture(26, 26, (x) => {
 		x.translate(13, 14);
@@ -6241,16 +6222,11 @@
 			glow: 16726570
 		};
 		return {
-			icon: megasphereTexture(),
-			glow: 4247807
+			icon: fistTexture(),
+			glow: 16742938
 		};
 	}
 	var barrelSprite = barrelTexture;
-	/** The berserk fist, shown by the stage-3 prototype until it replaces the megasphere. */
-	var berserkFistSprite = () => ({
-		icon: fistTexture(),
-		glow: 16742938
-	});
 	//#endregion
 	//#region src/games/pacman/render/doom/DoomWorld.ts
 	var T = 24;
@@ -6718,12 +6694,278 @@
 		}
 	};
 	//#endregion
-	//#region src/games/pacman/render/doom/DoomCombatView.ts
-	var MINION_COLORS = {
-		pinky: "#ff9de2",
-		inky: "#59f0ff",
-		clyde: "#ffb14d"
+	//#region src/games/pacman/render/doom/hellGhost.ts
+	/**
+	* Shared drawing for the hell's ghost demons (the boss Blinky and its imps): the ghost
+	* outline, horns, eyes that look where the body is heading, and the heading chevron.
+	* Everything is sized from `r`, half the drawn extent, so a body stays inside its tile.
+	*/
+	var TAU$2 = Math.PI * 2;
+	function dirAngle(dir) {
+		if (dir === "UP") return -Math.PI / 2;
+		if (dir === "DOWN") return Math.PI / 2;
+		if (dir === "LEFT") return Math.PI;
+		return 0;
+	}
+	function glow$1(ctx, x, y, r, rgb, a) {
+		if (a <= 0 || r <= 0) return;
+		const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+		g.addColorStop(0, `rgba(${rgb},${Math.min(1, a)})`);
+		g.addColorStop(1, `rgba(${rgb},0)`);
+		ctx.fillStyle = g;
+		ctx.fillRect(x - r, y - r, r * 2, r * 2);
+	}
+	/** Seeded 0..1 noise, stable per (i, k). */
+	function noise(i, k) {
+		const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453;
+		return v - Math.floor(v);
+	}
+	/**
+	* Ghost outline around (x, y): a dome on top, straight sides and a skirt of feet that
+	* ripple with time (the arcade ghost's two-frame wiggle, smoothed).
+	*/
+	function ghostPath(ctx, x, y, shape, t) {
+		const { w, domeY, hem, feet, torn, seed } = shape;
+		const foot = (hem - domeY) * .22;
+		ctx.beginPath();
+		ctx.moveTo(x - w, y + domeY);
+		ctx.arc(x, y + domeY, w, Math.PI, 0);
+		ctx.lineTo(x + w, y + hem);
+		const n = feet * 2;
+		for (let i = 1; i <= n; i += 1) {
+			const u = i / n;
+			const px = x + w - u * 2 * w;
+			const up = i % 2 === 1;
+			const wiggle = Math.sin(t * 9 + i * Math.PI) * .35;
+			const rag = torn * (noise(seed, i) - .3) * foot * 1.4;
+			const py = y + hem - (up ? foot * (.75 + wiggle) + rag : -rag * .5);
+			const cx = px + w / n;
+			ctx.quadraticCurveTo(cx, y + hem + (up ? foot * .25 : -foot * .1), px, py);
+		}
+		ctx.closePath();
+	}
+	/**
+	* A pair of devil horns growing from the dome at angle `at` from the top (radians): thick
+	* at the root, sweeping outwards and hooking up to a point.
+	*/
+	function drawHorns(ctx, x, y, shape, at, style, pulse) {
+		const { w, domeY } = shape;
+		const n = 8;
+		for (const side of [-1, 1]) {
+			const a = -Math.PI / 2 + side * at;
+			const bx = x + Math.cos(a) * w * .86;
+			const by = y + domeY + Math.sin(a) * w * .86;
+			const len = w * style.length;
+			const c1x = bx + side * len * (.75 + style.curl * .3);
+			const c1y = by - len * .05;
+			const tx = bx + side * len * (.55 + style.curl * .25);
+			const ty = by - len * .95;
+			const left = [];
+			const right = [];
+			for (let i = 0; i <= n; i += 1) {
+				const u = i / n;
+				const px = (1 - u) * (1 - u) * bx + 2 * u * (1 - u) * c1x + u * u * tx;
+				const py = (1 - u) * (1 - u) * by + 2 * u * (1 - u) * c1y + u * u * ty;
+				const dx = 2 * (1 - u) * (c1x - bx) + 2 * u * (tx - c1x);
+				const dy = 2 * (1 - u) * (c1y - by) + 2 * u * (ty - c1y);
+				const l = Math.hypot(dx, dy) || 1;
+				const half = w * style.thick * (1 - u) ** 1.2;
+				left.push([px - dy / l * half, py + dx / l * half]);
+				right.push([px + dy / l * half, py - dx / l * half]);
+			}
+			const g = ctx.createLinearGradient(bx, by, tx, ty);
+			g.addColorStop(0, style.dark);
+			g.addColorStop(.55, style.dark);
+			g.addColorStop(1, style.light);
+			ctx.fillStyle = g;
+			ctx.beginPath();
+			left.forEach(([px, py], i) => i ? ctx.lineTo(px, py) : ctx.moveTo(px, py));
+			for (let i = right.length - 1; i >= 0; i -= 1) ctx.lineTo(right[i][0], right[i][1]);
+			ctx.closePath();
+			ctx.fill();
+			ctx.strokeStyle = "rgba(0,0,0,.6)";
+			ctx.lineWidth = Math.max(.6, w * .035);
+			ctx.stroke();
+			if (style.ember) {
+				ctx.save();
+				ctx.globalCompositeOperation = "lighter";
+				glow$1(ctx, tx, ty, w * .2, style.ember, .45 + .4 * pulse);
+				ctx.restore();
+			}
+		}
+	}
+	/**
+	* Two eyes looking along `look` (radians): the pupils shift toward the heading, the way
+	* arcade ghosts show where they go. `open` 0 closes them, `daze` turns them into spirals.
+	*/
+	function drawEyes(ctx, x, y, w, look, style, open, daze, t) {
+		const ex = w * .42;
+		const ey = -w * .18;
+		const rx = w * .3;
+		const ry = w * .36;
+		const lx = Math.cos(look);
+		const ly = Math.sin(look);
+		for (const side of [-1, 1]) {
+			const cx = x + side * ex + lx * w * .06;
+			const cy = y + ey + ly * w * .06;
+			if (style.glow && open > .05 && !daze) {
+				ctx.save();
+				ctx.globalCompositeOperation = "lighter";
+				glow$1(ctx, cx, cy, rx * 1.8, style.glow, .55);
+				ctx.restore();
+			}
+			if (open <= .05) {
+				ctx.strokeStyle = "rgba(10,0,0,.85)";
+				ctx.lineWidth = Math.max(1, w * .07);
+				ctx.beginPath();
+				ctx.moveTo(cx - rx, cy);
+				ctx.quadraticCurveTo(cx, cy + ry * .4, cx + rx, cy);
+				ctx.stroke();
+				continue;
+			}
+			ctx.fillStyle = style.sclera;
+			ctx.beginPath();
+			ctx.ellipse(cx, cy, rx, ry * open, 0, 0, TAU$2);
+			ctx.fill();
+			if (daze) {
+				ctx.strokeStyle = style.pupil;
+				ctx.lineWidth = Math.max(.8, w * .05);
+				ctx.beginPath();
+				for (let i = 0; i <= 18; i += 1) {
+					const a = side * (t * 7 + i * .6);
+					const d = i / 18 * rx * .8;
+					const px = cx + Math.cos(a) * d;
+					const py = cy + Math.sin(a) * d * open;
+					if (i === 0) ctx.moveTo(px, py);
+					else ctx.lineTo(px, py);
+				}
+				ctx.stroke();
+			} else {
+				ctx.fillStyle = style.pupil;
+				ctx.beginPath();
+				ctx.ellipse(cx + lx * rx * .48, cy + ly * ry * .48 * open, rx * .42, ry * .46 * open, 0, 0, TAU$2);
+				ctx.fill();
+			}
+			if (style.brows) {
+				ctx.strokeStyle = "rgba(15,0,0,.95)";
+				ctx.lineWidth = Math.max(1, w * .09);
+				ctx.lineCap = "round";
+				ctx.beginPath();
+				ctx.moveTo(cx + side * rx * 1.05, cy - ry * 1.2);
+				ctx.lineTo(cx - side * rx * .9, cy - ry * .55);
+				ctx.stroke();
+			}
+		}
+	}
+	/**
+	* The heading chevron, the shared direction rule of the hell: a small arrow on the tile's
+	* leading edge. `size` is the tile size, (x, y) the tile centre.
+	*/
+	function drawHeading(ctx, x, y, size, heading, rgb, alpha) {
+		if (alpha <= .01) return;
+		const d = size * .44;
+		const a = size * .09;
+		ctx.save();
+		ctx.translate(x + Math.cos(heading) * d, y + Math.sin(heading) * d);
+		ctx.rotate(heading);
+		ctx.globalCompositeOperation = "lighter";
+		ctx.globalAlpha = alpha;
+		ctx.strokeStyle = `rgb(${rgb})`;
+		ctx.lineWidth = Math.max(1, size * .045);
+		ctx.lineCap = "round";
+		ctx.lineJoin = "round";
+		ctx.beginPath();
+		ctx.moveTo(-a, -a * 1.1);
+		ctx.lineTo(0, 0);
+		ctx.lineTo(-a, a * 1.1);
+		ctx.stroke();
+		ctx.restore();
+	}
+	//#endregion
+	//#region src/games/pacman/render/doom/HellImpView.ts
+	/** Blinky's brood keeps the arcade colours of the three ghosts that chase like them. */
+	var IMP_SKINS = {
+		pinky: {
+			top: "#ffa8dc",
+			mid: "#d8308a",
+			low: "#3a0420",
+			tint: "255,120,200"
+		},
+		inky: {
+			top: "#a8f4ff",
+			mid: "#1aa0c8",
+			low: "#041a30",
+			tint: "90,230,255"
+		},
+		clyde: {
+			top: "#ffd08a",
+			mid: "#e0701a",
+			low: "#3a1404",
+			tint: "255,170,70"
+		}
 	};
+	var IMP_EYES = {
+		sclera: "#ffe27a",
+		pupil: "#1a0000",
+		glow: null,
+		brows: true
+	};
+	/**
+	* A minion: a small horned ghost in Pinky, Inky or Clyde colours, its eyes and the
+	* chevron on the tile edge pointing where it runs. (x, y) is the tile centre in pixels.
+	*/
+	function drawImp(ctx, kind, x, y, tileSize, facing, time, alpha) {
+		if (alpha <= .01 || !(tileSize > 0)) return;
+		const skin = IMP_SKINS[kind];
+		const R = tileSize * .5 * .66;
+		const seed = kind.length * 1.7;
+		const bob = Math.sin(time * 6 + seed) * R * .05;
+		const shape = {
+			w: R * .72,
+			domeY: -R * .1 + bob,
+			hem: R * .72 + bob,
+			feet: 3,
+			torn: .6,
+			seed
+		};
+		const heading = dirAngle(facing);
+		ctx.save();
+		ctx.globalAlpha = alpha;
+		ctx.lineJoin = "round";
+		ctx.lineCap = "round";
+		ctx.globalCompositeOperation = "lighter";
+		glow$1(ctx, x, y, R * 1.2, skin.tint, .28);
+		ctx.globalCompositeOperation = "source-over";
+		ctx.translate(x, y);
+		drawHorns(ctx, 0, 0, shape, .6, {
+			length: .45,
+			thick: .22,
+			dark: "#1a0404",
+			light: "#e8d8bc",
+			ember: null,
+			curl: .1
+		}, 0);
+		ghostPath(ctx, 0, 0, shape, time * 1.3 + seed);
+		const fill = ctx.createLinearGradient(0, shape.domeY - shape.w, 0, shape.hem);
+		fill.addColorStop(0, skin.top);
+		fill.addColorStop(.5, skin.mid);
+		fill.addColorStop(1, skin.low);
+		ctx.fillStyle = fill;
+		ctx.fill();
+		ctx.strokeStyle = "rgba(15,0,0,.8)";
+		ctx.lineWidth = Math.max(1, shape.w * .09);
+		ctx.stroke();
+		drawEyes(ctx, 0, shape.domeY + shape.w * .4, shape.w, heading, IMP_EYES, 1, false, time);
+		ctx.restore();
+		if (facing) {
+			ctx.save();
+			ctx.globalAlpha = alpha;
+			drawHeading(ctx, x, y, tileSize, heading, skin.tint, .85);
+			ctx.restore();
+		}
+	}
+	//#endregion
+	//#region src/games/pacman/render/doom/DoomCombatView.ts
 	var DoomCombatView = class {
 		/** Everything lying on the floor, drawn under the boss. */
 		drawGround(ctx, boss, doom, grid, layout, time) {
@@ -7091,76 +7333,12 @@
 				ctx.restore();
 			}
 		}
-		/** Lamprey spawn: a fleshy lump with a toothed maw, three trailing tentacles and eyes. */
+		/** Blinky's imps: small horned ghosts, eyes and chevron pointing where they run. */
 		drawMinions(ctx, boss, layout, time) {
 			const s = layout.tileSize;
 			for (const minion of boss.minionList) {
 				const pos = minionPosition(minion);
-				const px = layout.offsetX + pos.x * s;
-				const py = layout.offsetY + pos.y * s;
-				const r = s * .24;
-				const eyeColor = MINION_COLORS[minion.kind] ?? "#ffffff";
-				const dir = minion.facing === "UP" ? -Math.PI / 2 : minion.facing === "DOWN" ? Math.PI / 2 : minion.facing === "LEFT" ? Math.PI : 0;
-				const seed = minion.kind.length * 1.7;
-				ctx.save();
-				ctx.globalAlpha = Math.min(1, minion.lifetime / 2);
-				ctx.translate(px, py);
-				ctx.rotate(dir);
-				ctx.lineCap = "round";
-				for (let k = -1; k <= 1; k += 1) {
-					ctx.strokeStyle = "#5a1414";
-					ctx.lineWidth = Math.max(1, r * .28);
-					ctx.beginPath();
-					ctx.moveTo(-r * .6, k * r * .35);
-					for (let i = 1; i <= 4; i += 1) {
-						const u = i / 4;
-						ctx.lineTo(-r * (.6 + u * 1.1), k * r * .35 + Math.sin(time * 12 + seed + k * 2 + u * 4) * r * .35 * u);
-					}
-					ctx.stroke();
-				}
-				const pulse = 1 + Math.sin(time * 8 + seed) * .06;
-				const flesh = ctx.createRadialGradient(-r * .3, -r * .3, r * .1, 0, 0, r * 1.1);
-				flesh.addColorStop(0, "#d0605a");
-				flesh.addColorStop(.55, "#7a1414");
-				flesh.addColorStop(1, "#2a0404");
-				ctx.fillStyle = flesh;
-				ctx.beginPath();
-				ctx.ellipse(0, 0, r * pulse, r * .85 * pulse, 0, 0, Math.PI * 2);
-				ctx.fill();
-				ctx.strokeStyle = "rgba(0,0,0,.6)";
-				ctx.lineWidth = Math.max(1, r * .1);
-				ctx.stroke();
-				ctx.fillStyle = "#0a0000";
-				ctx.beginPath();
-				ctx.arc(r * .45, 0, r * .38, 0, Math.PI * 2);
-				ctx.fill();
-				ctx.fillStyle = "#efe4d2";
-				for (let i = 0; i < 6; i += 1) {
-					const a = i / 6 * Math.PI * 2 + time * 3;
-					ctx.beginPath();
-					ctx.moveTo(r * .45 + Math.cos(a - .3) * r * .38, Math.sin(a - .3) * r * .38);
-					ctx.lineTo(r * .45 + Math.cos(a) * r * .18, Math.sin(a) * r * .18);
-					ctx.lineTo(r * .45 + Math.cos(a + .3) * r * .38, Math.sin(a + .3) * r * .38);
-					ctx.fill();
-				}
-				for (const side of [-1, 1]) {
-					ctx.globalCompositeOperation = "lighter";
-					const g = ctx.createRadialGradient(-r * .05, side * r * .5, 0, -r * .05, side * r * .5, r * .45);
-					g.addColorStop(0, eyeColor);
-					g.addColorStop(1, "rgba(0,0,0,0)");
-					ctx.fillStyle = g;
-					ctx.fillRect(-r * .5, side * r * .5 - r * .45, r * .9, r * .9);
-					ctx.globalCompositeOperation = "source-over";
-					ctx.fillStyle = eyeColor;
-					ctx.beginPath();
-					ctx.arc(-r * .05, side * r * .5, r * .16, 0, Math.PI * 2);
-					ctx.fill();
-					ctx.fillStyle = "#120000";
-					ctx.beginPath();
-					ctx.arc(r * .02, side * r * .5, r * .07, 0, Math.PI * 2);
-					ctx.fill();
-				}
-				ctx.restore();
+				drawImp(ctx, minion.kind, layout.offsetX + pos.x * s, layout.offsetY + pos.y * s, s, minion.facing, time, Math.min(1, minion.lifetime / 2));
 			}
 		}
 	};
@@ -7203,7 +7381,7 @@
 	//#endregion
 	//#region src/games/pacman/render/doom/DoomFxView.ts
 	var POOL = 420;
-	var TAU$2 = Math.PI * 2;
+	var TAU$1 = Math.PI * 2;
 	var PLASMA_CORE = 16777215;
 	var PLASMA_HOT = 16772744;
 	var PLASMA = 16746496;
@@ -7212,7 +7390,7 @@
 		bfg: 4259664,
 		barrel: 12123952,
 		medkit: 16726570,
-		berserk: 4247807
+		berserk: 16742938
 	};
 	/**
 	* Weapon and impact effects of the hell level, in tile coordinates: the plasma orb fired by
@@ -7360,7 +7538,7 @@
 			for (const shot of shots) {
 				const speed = Math.hypot(shot.vx, shot.vy) || 1;
 				for (let i = 0; i < 2; i += 1) {
-					const a = Math.random() * TAU$2;
+					const a = Math.random() * TAU$1;
 					this.emit(shot.x, shot.y, -shot.vx / speed * 1.5 + Math.cos(a) * 1.2, -shot.vy / speed * 1.5 + Math.sin(a) * 1.2, .25 + Math.random() * .25, .05 + Math.random() * .06, i ? PLASMA_HOT : PLASMA, .9, "spark");
 				}
 			}
@@ -7386,7 +7564,7 @@
 				ctx.fillStyle = g;
 				ctx.beginPath();
 				for (let i = 0; i <= 12; i += 1) {
-					const ang = i / 12 * TAU$2;
+					const ang = i / 12 * TAU$1;
 					const rr = r * (.75 + .25 * Math.sin(d.seed + i * 2.3));
 					const px = cx + Math.cos(ang) * rr;
 					const py = cy + Math.sin(ang) * rr;
@@ -7432,11 +7610,11 @@
 				ctx.drawImage(glowTexture(PLASMA), x - corona / 2, y - corona / 2, corona, corona);
 				ctx.fillStyle = rgba(PLASMA_HOT, 1);
 				ctx.beginPath();
-				ctx.arc(x, y, S * .24 * wobble, 0, TAU$2);
+				ctx.arc(x, y, S * .24 * wobble, 0, TAU$1);
 				ctx.fill();
 				ctx.fillStyle = "#ffffff";
 				ctx.beginPath();
-				ctx.arc(x, y, S * .13, 0, TAU$2);
+				ctx.arc(x, y, S * .13, 0, TAU$1);
 				ctx.fill();
 			}
 			for (const f of this.flashes) {
@@ -7452,7 +7630,7 @@
 				ctx.strokeStyle = rgba(ring.tint, 1);
 				ctx.lineWidth = Math.max(1, ring.width * S * k);
 				ctx.beginPath();
-				ctx.arc(X(ring.x), Y(ring.y), Math.max(.5, r), 0, TAU$2);
+				ctx.arc(X(ring.x), Y(ring.y), Math.max(.5, r), 0, TAU$1);
 				ctx.stroke();
 			}
 			for (const slash of this.slashes) {
@@ -7478,7 +7656,7 @@
 					ctx.globalAlpha = k * .45;
 					ctx.fillStyle = rgba(p.tint, 1);
 					ctx.beginPath();
-					ctx.arc(x, y, r, 0, TAU$2);
+					ctx.arc(x, y, r, 0, TAU$1);
 					ctx.fill();
 					ctx.globalCompositeOperation = "lighter";
 				} else if (p.kind === "debris") {
@@ -7496,7 +7674,7 @@
 					ctx.drawImage(glowTexture(p.tint), x - r * 2, y - r * 2, r * 4, r * 4);
 					ctx.fillStyle = "rgba(255,255,240,0.9)";
 					ctx.beginPath();
-					ctx.arc(x, y, r * .45, 0, TAU$2);
+					ctx.arc(x, y, r * .45, 0, TAU$1);
 					ctx.fill();
 				}
 			}
@@ -7558,7 +7736,7 @@
 		/** Radial burst; speeds in tiles per second, sizes in tiles. */
 		radial(x, y, n, vmin, vmax, tint, kind, lmin, lmax) {
 			for (let i = 0; i < n; i += 1) {
-				const a = Math.random() * TAU$2;
+				const a = Math.random() * TAU$1;
 				const v = vmin + Math.random() * (vmax - vmin);
 				const size = kind === "smoke" ? .25 + Math.random() * .25 : kind === "debris" ? .06 + Math.random() * .08 : .05 + Math.random() * .07;
 				this.emit(x, y, Math.cos(a) * v, Math.sin(a) * v, lmin + Math.random() * (lmax - lmin), size, tint, kind === "smoke" ? .95 : .9, kind);
@@ -7603,194 +7781,6 @@
 			});
 		}
 	};
-	//#endregion
-	//#region src/games/pacman/render/doom/hellGhost.ts
-	/**
-	* Shared drawing for the hell's ghost demons (the boss Blinky and its imps): the ghost
-	* outline, horns, eyes that look where the body is heading, and the heading chevron.
-	* Everything is sized from `r`, half the drawn extent, so a body stays inside its tile.
-	*/
-	var TAU$1 = Math.PI * 2;
-	function dirAngle(dir) {
-		if (dir === "UP") return -Math.PI / 2;
-		if (dir === "DOWN") return Math.PI / 2;
-		if (dir === "LEFT") return Math.PI;
-		return 0;
-	}
-	function glow$1(ctx, x, y, r, rgb, a) {
-		if (a <= 0 || r <= 0) return;
-		const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-		g.addColorStop(0, `rgba(${rgb},${Math.min(1, a)})`);
-		g.addColorStop(1, `rgba(${rgb},0)`);
-		ctx.fillStyle = g;
-		ctx.fillRect(x - r, y - r, r * 2, r * 2);
-	}
-	/** Seeded 0..1 noise, stable per (i, k). */
-	function noise(i, k) {
-		const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453;
-		return v - Math.floor(v);
-	}
-	/**
-	* Ghost outline around (x, y): a dome on top, straight sides and a skirt of feet that
-	* ripple with time (the arcade ghost's two-frame wiggle, smoothed).
-	*/
-	function ghostPath(ctx, x, y, shape, t) {
-		const { w, domeY, hem, feet, torn, seed } = shape;
-		const foot = (hem - domeY) * .22;
-		ctx.beginPath();
-		ctx.moveTo(x - w, y + domeY);
-		ctx.arc(x, y + domeY, w, Math.PI, 0);
-		ctx.lineTo(x + w, y + hem);
-		const n = feet * 2;
-		for (let i = 1; i <= n; i += 1) {
-			const u = i / n;
-			const px = x + w - u * 2 * w;
-			const up = i % 2 === 1;
-			const wiggle = Math.sin(t * 9 + i * Math.PI) * .35;
-			const rag = torn * (noise(seed, i) - .3) * foot * 1.4;
-			const py = y + hem - (up ? foot * (.75 + wiggle) + rag : -rag * .5);
-			const cx = px + w / n;
-			ctx.quadraticCurveTo(cx, y + hem + (up ? foot * .25 : -foot * .1), px, py);
-		}
-		ctx.closePath();
-	}
-	/**
-	* A pair of devil horns growing from the dome at angle `at` from the top (radians): thick
-	* at the root, sweeping outwards and hooking up to a point.
-	*/
-	function drawHorns(ctx, x, y, shape, at, style, pulse) {
-		const { w, domeY } = shape;
-		const n = 8;
-		for (const side of [-1, 1]) {
-			const a = -Math.PI / 2 + side * at;
-			const bx = x + Math.cos(a) * w * .86;
-			const by = y + domeY + Math.sin(a) * w * .86;
-			const len = w * style.length;
-			const c1x = bx + side * len * (.75 + style.curl * .3);
-			const c1y = by - len * .05;
-			const tx = bx + side * len * (.55 + style.curl * .25);
-			const ty = by - len * .95;
-			const left = [];
-			const right = [];
-			for (let i = 0; i <= n; i += 1) {
-				const u = i / n;
-				const px = (1 - u) * (1 - u) * bx + 2 * u * (1 - u) * c1x + u * u * tx;
-				const py = (1 - u) * (1 - u) * by + 2 * u * (1 - u) * c1y + u * u * ty;
-				const dx = 2 * (1 - u) * (c1x - bx) + 2 * u * (tx - c1x);
-				const dy = 2 * (1 - u) * (c1y - by) + 2 * u * (ty - c1y);
-				const l = Math.hypot(dx, dy) || 1;
-				const half = w * style.thick * (1 - u) ** 1.2;
-				left.push([px - dy / l * half, py + dx / l * half]);
-				right.push([px + dy / l * half, py - dx / l * half]);
-			}
-			const g = ctx.createLinearGradient(bx, by, tx, ty);
-			g.addColorStop(0, style.dark);
-			g.addColorStop(.55, style.dark);
-			g.addColorStop(1, style.light);
-			ctx.fillStyle = g;
-			ctx.beginPath();
-			left.forEach(([px, py], i) => i ? ctx.lineTo(px, py) : ctx.moveTo(px, py));
-			for (let i = right.length - 1; i >= 0; i -= 1) ctx.lineTo(right[i][0], right[i][1]);
-			ctx.closePath();
-			ctx.fill();
-			ctx.strokeStyle = "rgba(0,0,0,.6)";
-			ctx.lineWidth = Math.max(.6, w * .035);
-			ctx.stroke();
-			if (style.ember) {
-				ctx.save();
-				ctx.globalCompositeOperation = "lighter";
-				glow$1(ctx, tx, ty, w * .2, style.ember, .45 + .4 * pulse);
-				ctx.restore();
-			}
-		}
-	}
-	/**
-	* Two eyes looking along `look` (radians): the pupils shift toward the heading, the way
-	* arcade ghosts show where they go. `open` 0 closes them, `daze` turns them into spirals.
-	*/
-	function drawEyes(ctx, x, y, w, look, style, open, daze, t) {
-		const ex = w * .42;
-		const ey = -w * .18;
-		const rx = w * .3;
-		const ry = w * .36;
-		const lx = Math.cos(look);
-		const ly = Math.sin(look);
-		for (const side of [-1, 1]) {
-			const cx = x + side * ex + lx * w * .06;
-			const cy = y + ey + ly * w * .06;
-			if (style.glow && open > .05 && !daze) {
-				ctx.save();
-				ctx.globalCompositeOperation = "lighter";
-				glow$1(ctx, cx, cy, rx * 1.8, style.glow, .55);
-				ctx.restore();
-			}
-			if (open <= .05) {
-				ctx.strokeStyle = "rgba(10,0,0,.85)";
-				ctx.lineWidth = Math.max(1, w * .07);
-				ctx.beginPath();
-				ctx.moveTo(cx - rx, cy);
-				ctx.quadraticCurveTo(cx, cy + ry * .4, cx + rx, cy);
-				ctx.stroke();
-				continue;
-			}
-			ctx.fillStyle = style.sclera;
-			ctx.beginPath();
-			ctx.ellipse(cx, cy, rx, ry * open, 0, 0, TAU$1);
-			ctx.fill();
-			if (daze) {
-				ctx.strokeStyle = style.pupil;
-				ctx.lineWidth = Math.max(.8, w * .05);
-				ctx.beginPath();
-				for (let i = 0; i <= 18; i += 1) {
-					const a = side * (t * 7 + i * .6);
-					const d = i / 18 * rx * .8;
-					const px = cx + Math.cos(a) * d;
-					const py = cy + Math.sin(a) * d * open;
-					if (i === 0) ctx.moveTo(px, py);
-					else ctx.lineTo(px, py);
-				}
-				ctx.stroke();
-			} else {
-				ctx.fillStyle = style.pupil;
-				ctx.beginPath();
-				ctx.ellipse(cx + lx * rx * .48, cy + ly * ry * .48 * open, rx * .42, ry * .46 * open, 0, 0, TAU$1);
-				ctx.fill();
-			}
-			if (style.brows) {
-				ctx.strokeStyle = "rgba(15,0,0,.95)";
-				ctx.lineWidth = Math.max(1, w * .09);
-				ctx.lineCap = "round";
-				ctx.beginPath();
-				ctx.moveTo(cx + side * rx * 1.05, cy - ry * 1.2);
-				ctx.lineTo(cx - side * rx * .9, cy - ry * .55);
-				ctx.stroke();
-			}
-		}
-	}
-	/**
-	* The heading chevron, the shared direction rule of the hell: a small arrow on the tile's
-	* leading edge. `size` is the tile size, (x, y) the tile centre.
-	*/
-	function drawHeading(ctx, x, y, size, heading, rgb, alpha) {
-		if (alpha <= .01) return;
-		const d = size * .44;
-		const a = size * .09;
-		ctx.save();
-		ctx.translate(x + Math.cos(heading) * d, y + Math.sin(heading) * d);
-		ctx.rotate(heading);
-		ctx.globalCompositeOperation = "lighter";
-		ctx.globalAlpha = alpha;
-		ctx.strokeStyle = `rgb(${rgb})`;
-		ctx.lineWidth = Math.max(1, size * .045);
-		ctx.lineCap = "round";
-		ctx.lineJoin = "round";
-		ctx.beginPath();
-		ctx.moveTo(-a, -a * 1.1);
-		ctx.lineTo(0, 0);
-		ctx.lineTo(-a, a * 1.1);
-		ctx.stroke();
-		ctx.restore();
-	}
 	//#endregion
 	//#region src/games/pacman/render/doom/HellBlinkyView.ts
 	var HELL_EYES = {
@@ -8070,89 +8060,6 @@
 			ctx.restore();
 		}
 	};
-	//#endregion
-	//#region src/games/pacman/render/doom/HellImpView.ts
-	/** Blinky's brood keeps the arcade colours of the three ghosts that chase like them. */
-	var IMP_SKINS = {
-		pinky: {
-			top: "#ffa8dc",
-			mid: "#d8308a",
-			low: "#3a0420",
-			tint: "255,120,200"
-		},
-		inky: {
-			top: "#a8f4ff",
-			mid: "#1aa0c8",
-			low: "#041a30",
-			tint: "90,230,255"
-		},
-		clyde: {
-			top: "#ffd08a",
-			mid: "#e0701a",
-			low: "#3a1404",
-			tint: "255,170,70"
-		}
-	};
-	var IMP_EYES = {
-		sclera: "#ffe27a",
-		pupil: "#1a0000",
-		glow: null,
-		brows: true
-	};
-	/**
-	* A minion: a small horned ghost in Pinky, Inky or Clyde colours, its eyes and the
-	* chevron on the tile edge pointing where it runs. (x, y) is the tile centre in pixels.
-	*/
-	function drawImp(ctx, kind, x, y, tileSize, facing, time, alpha) {
-		if (alpha <= .01 || !(tileSize > 0)) return;
-		const skin = IMP_SKINS[kind];
-		const R = tileSize * .5 * .66;
-		const seed = kind.length * 1.7;
-		const bob = Math.sin(time * 6 + seed) * R * .05;
-		const shape = {
-			w: R * .72,
-			domeY: -R * .1 + bob,
-			hem: R * .72 + bob,
-			feet: 3,
-			torn: .6,
-			seed
-		};
-		const heading = dirAngle(facing);
-		ctx.save();
-		ctx.globalAlpha = alpha;
-		ctx.lineJoin = "round";
-		ctx.lineCap = "round";
-		ctx.globalCompositeOperation = "lighter";
-		glow$1(ctx, x, y, R * 1.2, skin.tint, .28);
-		ctx.globalCompositeOperation = "source-over";
-		ctx.translate(x, y);
-		drawHorns(ctx, 0, 0, shape, .6, {
-			length: .45,
-			thick: .22,
-			dark: "#1a0404",
-			light: "#e8d8bc",
-			ember: null,
-			curl: .1
-		}, 0);
-		ghostPath(ctx, 0, 0, shape, time * 1.3 + seed);
-		const fill = ctx.createLinearGradient(0, shape.domeY - shape.w, 0, shape.hem);
-		fill.addColorStop(0, skin.top);
-		fill.addColorStop(.5, skin.mid);
-		fill.addColorStop(1, skin.low);
-		ctx.fillStyle = fill;
-		ctx.fill();
-		ctx.strokeStyle = "rgba(15,0,0,.8)";
-		ctx.lineWidth = Math.max(1, shape.w * .09);
-		ctx.stroke();
-		drawEyes(ctx, 0, shape.domeY + shape.w * .4, shape.w, heading, IMP_EYES, 1, false, time);
-		ctx.restore();
-		if (facing) {
-			ctx.save();
-			ctx.globalAlpha = alpha;
-			drawHeading(ctx, x, y, tileSize, heading, skin.tint, .85);
-			ctx.restore();
-		}
-	}
 	//#endregion
 	//#region src/games/pacman/render/actors/PlayerView.ts
 	var LOOKS = {
@@ -8793,7 +8700,7 @@
 		offsetY: cy - tile / 2
 	});
 	function drawFist(c, x, y, tile, time) {
-		const sprite = berserkFistSprite();
+		const sprite = pickupSprite("berserk");
 		const u = tile / 24;
 		const glow = 60.8 / 3 * u;
 		c.save();
@@ -8968,12 +8875,8 @@
 		}];
 		world.drawMood(ctx, lights);
 		const L = world.layout;
-		const S = L.tileSize;
 		fx.drawGround(ctx, L);
-		const others = doom.pickupList.filter((p) => !(p.visible && p.kind === "berserk"));
-		const proxy = Object.create(doom, { pickupList: { get: () => others } });
-		if (!boss.defeated) combat.drawGround(ctx, boss, proxy, grid, L, time);
-		for (const p of doom.pickupList) if (p.visible && p.kind === "berserk") drawFist(ctx, L.offsetX + (p.tile.x + .5) * S, L.offsetY + (p.tile.y + .5) * S, S, time);
+		if (!boss.defeated) combat.drawGround(ctx, boss, doom, grid, L, time);
 		if (!boss.defeated) {
 			const rs = boss.renderState;
 			const look = (at) => Math.atan2(player.position.y - at.y, player.position.x - at.x);
@@ -9007,11 +8910,7 @@
 				hit: 0,
 				echo: false
 			}, L, time);
-			combat.drawHazardBlasts(ctx, boss, L, time);
-			for (const m of boss.minionList) {
-				const pos = minionPosition(m);
-				drawImp(ctx, m.kind, L.offsetX + pos.x * S, L.offsetY + pos.y * S, S, m.facing, time, Math.min(1, m.lifetime / 2));
-			}
+			combat.drawAir(ctx, boss, L, time);
 			combat.drawPull(ctx, boss, player.position, L, time);
 		}
 		playerView.draw(ctx, player, L, time, {

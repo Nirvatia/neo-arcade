@@ -162,28 +162,6 @@ const medkitTexture = lazy(() =>
 	})
 );
 
-const megasphereTexture = lazy(() =>
-	makeTexture(26, 26, (x) => {
-		x.translate(13, 13);
-		const g = x.createRadialGradient(-3.5, -4, 1, 0, 0, 11.5);
-		g.addColorStop(0, '#ffffff');
-		g.addColorStop(0.35, '#40d0ff');
-		g.addColorStop(1, '#0a3a90');
-		x.fillStyle = g;
-		x.beginPath();
-		x.arc(0, 0, 11, 0, 7);
-		x.fill();
-		x.strokeStyle = '#d8ffff';
-		x.lineWidth = 1.1;
-		x.stroke();
-		x.strokeStyle = 'rgba(255,255,255,.45)';
-		x.lineWidth = 0.9;
-		x.beginPath();
-		x.ellipse(0, 0, 11, 3.6, 0, 0, 7);
-		x.stroke();
-	})
-);
-
 /** Berserk: a clenched red gauntlet with steel spikes on the knuckles and a steel cuff. */
 const fistTexture = lazy(() =>
 	makeTexture(26, 26, (x) => {
@@ -258,13 +236,7 @@ export function pickupSprite(kind: DoomPickupKind): { icon: HTMLCanvasElement; g
 	if (kind === 'medkit') {
 		return { icon: medkitTexture(), glow: 0xff3a2a };
 	}
-	return { icon: megasphereTexture(), glow: 0x40d0ff };
+	return { icon: fistTexture(), glow: 0xff7a1a };
 }
 
 export const barrelSprite = barrelTexture;
-
-/** The berserk fist, shown by the stage-3 prototype until it replaces the megasphere. */
-export const berserkFistSprite = (): { icon: HTMLCanvasElement; glow: number } => ({
-	icon: fistTexture(),
-	glow: 0xff7a1a
-});

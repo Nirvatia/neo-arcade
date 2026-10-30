@@ -17,7 +17,6 @@ import type { DoomAttackKind } from '../../../src/games/pacman/logic/doom/DoomAt
 import type { DoomDirection } from '../../../src/games/pacman/logic/doom/DoomGraph';
 import type { DoomStateName, DoomShape } from '../../../src/games/pacman/logic/doom/DoomBossModel';
 import type { DoomMinionKind } from '../../../src/games/pacman/logic/doom/DoomMinions';
-import { minionPosition } from '../../../src/games/pacman/logic/doom/DoomMinions';
 import { DoomWorld } from '../../../src/games/pacman/render/doom/DoomWorld';
 import type { DoomLight } from '../../../src/games/pacman/render/doom/DoomWorld';
 import { DoomCombatView } from '../../../src/games/pacman/render/doom/DoomCombatView';
@@ -26,11 +25,7 @@ import { DOOM_TILE } from '../../../src/games/pacman/render/doom/DoomBake';
 import { HellBlinkyView } from '../../../src/games/pacman/render/doom/HellBlinkyView';
 import type { BossSnapshot } from '../../../src/games/pacman/render/doom/HellBlinkyView';
 import { drawImp } from '../../../src/games/pacman/render/doom/HellImpView';
-import {
-	berserkFistSprite,
-	glowTexture,
-	pickupSprite
-} from '../../../src/games/pacman/render/doom/DoomSprites';
+import { glowTexture, pickupSprite } from '../../../src/games/pacman/render/doom/DoomSprites';
 import { PlayerView } from '../../../src/games/pacman/render/actors/PlayerView';
 import type { GridLayout } from '../../../src/games/pacman/render/maze/GridView';
 
@@ -113,7 +108,7 @@ const at = (cx: number, cy: number, tile: number): GridLayout => ({
 });
 
 function drawFist(c: CanvasRenderingContext2D, x: number, y: number, tile: number, time: number): void {
-	const sprite = berserkFistSprite();
+	const sprite = pickupSprite('berserk');
 	const u = tile / DOOM_TILE;
 	const glow = ((64 * 0.95) / 3) * u;
 	c.save();
@@ -309,18 +304,9 @@ function drawFight(f: Fight, dt: number, time: number): void {
 	];
 	world.drawMood(ctx, lights);
 	const L = world.layout;
-	const S = L.tileSize;
 	fx.drawGround(ctx, L);
-	// the berserk pickups are drawn as the fist (the game still shows the megasphere)
-	const others = doom.pickupList.filter((p) => !(p.visible && p.kind === 'berserk'));
-	const proxy = Object.create(doom, { pickupList: { get: () => others } }) as DoomAbilityService;
 	if (!boss.defeated) {
-		combat.drawGround(ctx, boss, proxy, grid, L, time);
-	}
-	for (const p of doom.pickupList) {
-		if (p.visible && p.kind === 'berserk') {
-			drawFist(ctx, L.offsetX + (p.tile.x + 0.5) * S, L.offsetY + (p.tile.y + 0.5) * S, S, time);
-		}
+		combat.drawGround(ctx, boss, doom, grid, L, time);
 	}
 	if (!boss.defeated) {
 		const rs = boss.renderState;
@@ -368,25 +354,7 @@ function drawFight(f: Fight, dt: number, time: number): void {
 			L,
 			time
 		);
-		(combat as unknown as { drawHazardBlasts(...a: unknown[]): void }).drawHazardBlasts(
-			ctx,
-			boss,
-			L,
-			time
-		);
-		for (const m of boss.minionList) {
-			const pos = minionPosition(m);
-			drawImp(
-				ctx,
-				m.kind,
-				L.offsetX + pos.x * S,
-				L.offsetY + pos.y * S,
-				S,
-				m.facing,
-				time,
-				Math.min(1, m.lifetime / 2)
-			);
-		}
+		combat.drawAir(ctx, boss, L, time);
 		combat.drawPull(ctx, boss, player.position, L, time);
 	}
 	playerView.draw(ctx, player, L, time, {

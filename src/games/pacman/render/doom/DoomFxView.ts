@@ -69,7 +69,7 @@ const PICKUP_TINT: Record<string, number> = {
 	bfg: 0x40ff50,
 	barrel: 0xb8ff30,
 	medkit: 0xff3a2a,
-	berserk: 0x40d0ff
+	berserk: 0xff7a1a
 };
 
 /**
