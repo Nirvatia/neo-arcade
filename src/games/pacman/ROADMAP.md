@@ -144,13 +144,20 @@ Order matters; new boss worlds come last. Each art or effect stage starts with a
 on the real game code for the owner to approve.
 
 1. **Migrate the remaining art.**
-   - Ms. Pac-Man: **ported, awaiting the owner's verdict.** The owner's "Stardust Heart"
-     mock-up, refined and redrawn in Canvas2D: `render/actors/MsPacmanView.ts`, picked by
-     `SharedLayers.drawPlayer` for the `ms-pacman` profile. Sizes scale with the tile, the
-     bow sits on top of the head toward the back, effects stay near the tile, the mouth
-     chomps only while moving, and reactions follow game events (dot, energizer / fruit,
-     ghost eaten, teleport wormholes, overdrive, invulnerability blink, death).
-     Prototype: `prototypes/pacman/ms-pacman` (`node prototypes/pacman/build.mjs ms-pacman`).
+   - Ms. Pac-Man: **ported 1:1, awaiting the owner's verdict.** The owner's "Stardust
+     Heart" mock-up (MS_PACMAN.html) in Canvas2D: `render/actors/MsPacmanView.ts`, picked by
+     `SharedLayers.drawPlayer` for the `ms-pacman` profile. Same palette, shapes, blend modes
+     (additive everywhere but the body), timings and effects; r = 0.42 tile, every mock-up
+     pixel scales with it, so the bow and aura reach past the tile as in the mock-up. The
+     first port re-styled it (lit body, small bow pinned to the top of the head); the owner
+     asked for 1:1, and the pinned bow sat at the mouth when moving up. Now the sprite
+     (body, mouth glow, bow) is drawn in its own frame rotated to the heading, bow at
+     heading + 0.85π as in the mock-up, mirrored by the last horizontal heading like the
+     arcade sprite: on top behind the head moving left/right, behind the head moving
+     up/down. The mouth chomps only while moving; reactions follow game events (dot,
+     energizer / fruit, ghost eaten with the light streak from ahead, teleport wormholes,
+     overdrive, invulnerability blink, death). Prototype: `prototypes/pacman/ms-pacman`
+     (`node prototypes/pacman/build.mjs ms-pacman`).
    - Fruit: real art for each of the 10 fruits (`render/items/fruit/*View.ts` are stubs on
      one shared primitive). Follow the food rule from the seasons: readable at tile size,
      no inner clutter.
