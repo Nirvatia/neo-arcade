@@ -1,6 +1,7 @@
 import type { GridLayout } from './maze/GridView';
 import { PlayerView } from './actors/PlayerView';
 import { MsPacmanView } from './actors/MsPacmanView';
+import { PacmanHeroView } from './actors/PacmanHeroView';
 import type { PacmanAudioCue } from '../core/Events';
 import type { PlayerDrawOptions } from './actors/PlayerView';
 import { EchoCloneView } from './actors/EchoCloneView';
@@ -17,6 +18,7 @@ import type { RenderFrame } from './RenderFrame';
  */
 export class SharedLayers {
 	readonly playerView = new PlayerView();
+	private readonly heroView = new PacmanHeroView();
 	private readonly msPacmanView = new MsPacmanView();
 	private readonly fruitView = new FruitView();
 	private readonly easterEggView = new EasterEggView();
@@ -54,6 +56,7 @@ export class SharedLayers {
 	/** Eating, power-ups, teleports: both players react, only the one on screen shows it. */
 	trigger(cue: PacmanAudioCue): void {
 		this.playerView.trigger(cue);
+		this.heroView.trigger(cue);
 		this.msPacmanView.trigger(cue);
 	}
 
@@ -64,8 +67,11 @@ export class SharedLayers {
 		}
 		if (frame.level.profile === 'ms-pacman') {
 			this.msPacmanView.draw(frame.ctx, player, layout, frame.time, this.playerOptions(frame));
-		} else {
+		} else if (frame.level.hellMode) {
 			this.playerView.draw(frame.ctx, player, layout, frame.time, this.playerOptions(frame));
+		} else {
+			// the season levels: Pac-Man the hero (stage 10.3)
+			this.heroView.draw(frame.ctx, player, layout, frame.time, this.playerOptions(frame));
 		}
 	}
 
@@ -86,6 +92,9 @@ export class SharedLayers {
 			level.profile === 'ms-pacman'
 				? Boolean(hypnosis && hypnosis.overdriveActive)
 				: Boolean(combat && combat.isPowerActive);
-		return { look: powered ? 'energized' : 'normal', charge: 0, dying };
+		// his look calms down over the energizer's last two seconds
+		const ending =
+			powered && level.profile !== 'ms-pacman' && Boolean(combat && combat.powerTimer < 2);
+		return { look: powered ? 'energized' : 'normal', charge: 0, dying, ending };
 	}
 }

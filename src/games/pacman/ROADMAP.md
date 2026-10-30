@@ -24,7 +24,10 @@ the owner says to go straight into the game.
     1. ~~**Fruit.**~~ Done: the fruit, the heart and the exit stay inside their tile with
        a calm glow (see Done).
     2. ~~**Easter egg + its mechanic.**~~ Done (see Done).
-    3. **Pac-Man art**, redone completely (was stage 4). `render/actors/PlayerView.ts`;
+    3. **Pac-Man art**, redone completely (was stage 4). *In progress*: the hero
+       (`render/actors/hero/PacmanHero`, prototype `hero`) plays on the season levels
+       through `PacmanHeroView`; the hell still uses `PlayerView` (berserk, BFG). Next:
+       the owner's review in the game, then a ghost-eaten beat and the hell looks. `render/actors/PlayerView.ts`;
        keep the design decisions (organic, wedge mouth, no eyes, ribbon trail) unless
        the owner changes them.
     4. **Ms. Pac-Man**, finish (`render/actors/MsPacmanView.ts`): today she reads a little

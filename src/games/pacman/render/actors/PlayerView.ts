@@ -13,6 +13,8 @@ export interface PlayerDrawOptions {
 	readonly charge: number;
 	/** The death sequence is running. */
 	readonly dying: boolean;
+	/** The energizer is in its last seconds. */
+	readonly ending?: boolean;
 }
 
 interface Palette {

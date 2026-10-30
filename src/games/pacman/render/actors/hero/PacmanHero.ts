@@ -26,6 +26,10 @@ export interface HeroState {
 	readonly power: boolean;
 	/** The power is running out. */
 	readonly ending: boolean;
+	/** He was caught: the death plays once, from when this turns true. */
+	readonly dying?: boolean;
+	/** Just respawned: ghosts pass through him. */
+	readonly invulnerable?: boolean;
 }
 
 interface Palette {
@@ -194,6 +198,10 @@ interface Burst {
 }
 
 const CHOMP_RATE = 4.2;
+/** Death: a hit (0..0.3), the mouth opens all the way round (to 1.3), he bursts into embers. */
+const DEATH_OPEN = 0.3;
+const DEATH_POP = 1.3;
+const DEATH_END = 1.75;
 const CHARGE = 0.18;
 
 export class PacmanHero {
@@ -211,6 +219,9 @@ export class PacmanHero {
 	private ending = false;
 	/** Seconds since the energizer was taken (the wind-up and burst), or -1. */
 	private transform = -1;
+	/** Seconds into the death, or -1. */
+	private dying = -1;
+	private invulnerable = false;
 	private chomp = 0;
 	private bite = -1;
 	private snap = -1;
@@ -245,6 +256,11 @@ export class PacmanHero {
 	}
 
 	/** He eats something small: a quick wind-up, a snapping bite, a squash. */
+	/** A dot: just a small glow at the lips (the run's chomp already bites). */
+	gulp(): void {
+		this.mouthFlash = Math.max(this.mouthFlash, 0.3);
+	}
+
 	eat(): void {
 		this.bite = 0;
 	}
@@ -252,6 +268,31 @@ export class PacmanHero {
 	update(dt: number, s: HeroState): void {
 		if (!Number.isFinite(dt) || dt < 0) dt = 0;
 		this.time += dt;
+		this.invulnerable = Boolean(s.invulnerable);
+		if (s.dying) {
+			if (this.dying < 0) {
+				this.dying = 0;
+				this.flash = 0.8;
+				this.bite = -1;
+			}
+			const before = this.dying;
+			this.dying += dt;
+			if (before < DEATH_POP && this.dying >= DEATH_POP) {
+				for (let i = 0; i < 26; i++) {
+					this.spawnEmber(this.power > 0.5, (i / 26) * Math.PI * 2, 4 + this.random() * 7);
+				}
+			}
+			this.trail.shrink(this.r * 10 * dt);
+			this.along.step(1, dt);
+			this.across.step(1, dt);
+			this.flash = Math.max(0, this.flash - dt / 0.3);
+			this.tick(dt);
+			return;
+		}
+		if (this.dying >= 0) {
+			this.reset();
+			this.dying = -1;
+		}
 		const step = Math.hypot(s.x - this.x, s.y - this.y);
 		this.x = s.x;
 		this.y = s.y;
@@ -336,6 +377,12 @@ export class PacmanHero {
 				this.spawnEmber(this.power > 0.5, a, 1.5 + this.random() * 2.5, true);
 			}
 		}
+		this.tick(dt);
+	}
+
+	/** Embers drift up and fade; bursts run their course. */
+	private tick(dt: number): void {
+		const r = this.r;
 		for (const e of this.embers) {
 			e.life -= dt;
 			e.x += e.vx * dt;
@@ -398,14 +445,37 @@ export class PacmanHero {
 		const pulse = this.ending && p > 0.5 ? 0.62 + 0.38 * (0.5 + 0.5 * Math.cos(this.time * 5)) : 1;
 
 		this.drawTrail(ctx, p);
+		const d = this.dying;
+		if (d >= DEATH_POP) {
+			this.drawEmbers(ctx);
+			// the last of him: a fading flare where he was
+			const k = clamp01((d - DEATH_POP) / (DEATH_END - DEATH_POP));
+			if (k < 1) {
+				const gs = r * (1.2 + 2.2 * easeOut(k));
+				ctx.globalCompositeOperation = 'lighter';
+				ctx.globalAlpha = 1 - k;
+				ctx.drawImage(glow([255, 214, 120]), this.x - gs, this.y - gs, gs * 2, gs * 2);
+				ctx.globalAlpha = 1;
+				ctx.globalCompositeOperation = 'source-over';
+			}
+			return;
+		}
 		this.drawEmbers(ctx);
 
 		const open = this.openness();
-		const m = 0.04 + Math.min(1.15, open) * 0.58;
-		const grin = this.moving ? 0.08 : 0.2;
-		const mu = m * (1 - grin);
-		const md = m * (1 + grin);
-		const S = 1 + 0.07 * p;
+		let m = 0.04 + Math.min(1.15, open) * 0.58;
+		let grin = this.moving ? 0.08 : 0.2;
+		let S = 1 + 0.07 * p;
+		if (d >= 0) {
+			// dying: the mouth opens all the way round as he shrinks
+			const k = clamp01((d - DEATH_OPEN) / (DEATH_POP - DEATH_OPEN));
+			const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+			m = 0.3 + (Math.PI - 0.3) * e;
+			grin = 0;
+			S *= 1 - 0.25 * e;
+		}
+		const mu = Math.min(Math.PI - 0.01, m * (1 - grin));
+		const md = Math.min(Math.PI - 0.01, m * (1 + grin));
 		// the light, in the frame (it stays put in the world while he turns)
 		const ca = Math.cos(this.angle);
 		const sa = Math.sin(this.angle);
@@ -571,6 +641,15 @@ export class PacmanHero {
 			ctx.drawImage(glow([255, 196, 90]), fx - gs, fy - gs, gs * 2, gs * 2);
 			ctx.globalAlpha = 1;
 			ctx.globalCompositeOperation = 'source-over';
+		}
+		// just respawned: a soft pulsing halo instead of blinking
+		if (this.invulnerable && d < 0) {
+			const k = 0.5 + 0.5 * Math.cos(this.time * 9);
+			ctx.strokeStyle = `rgba(255,248,220,${0.25 + 0.35 * k})`;
+			ctx.lineWidth = Math.max(1, R * 0.1);
+			ctx.beginPath();
+			ctx.arc(this.x, this.y, R * (1.3 + 0.08 * k), 0, Math.PI * 2);
+			ctx.stroke();
 		}
 		this.drawBursts(ctx);
 	}
