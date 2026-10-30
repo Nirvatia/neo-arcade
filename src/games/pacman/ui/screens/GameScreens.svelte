@@ -97,12 +97,11 @@
 	{:else if snap.state === 'death' && !arcade}
 		<div class="banner">
 			{#if snap.lives > 0}
-				<span class="lives">
-					{#each Array.from({ length: Math.min(6, snap.lives) }, (_, k) => k) as i (i)}
-						<LifeIcon ms={snap.profile === 'ms-pacman'} />
-					{/each}
-				</span>
-				{snap.lives === 1 ? $t('lastLife') : `${snap.lives} ${$t('livesLeft')}`}
+				{#if snap.lives === 1}
+					{$t('lastLife')}
+				{:else}
+					<b class="count">{snap.lives}</b> {$t('livesLeft')}
+				{/if}
 			{:else}
 				{$t('gameOver')}
 			{/if}
@@ -135,7 +134,8 @@
 		display: grid;
 		place-items: center;
 		color: #f4f1ea;
-		font-family: 'Segoe UI', system-ui, sans-serif;
+		font-family:
+			'Bahnschrift', 'DIN Condensed', 'Arial Narrow', 'Roboto Condensed', system-ui, sans-serif;
 		--glass: linear-gradient(180deg, rgba(28, 32, 42, 0.9), rgba(8, 10, 14, 0.94));
 	}
 	.veil {
@@ -153,12 +153,17 @@
 		max-width: calc(100vw - 32px);
 		padding: 22px 26px;
 		box-sizing: border-box;
-		background: var(--glass);
-		border: 1px solid rgba(255, 255, 255, 0.12);
-		border-top: 3px solid var(--accent);
-		border-radius: 16px;
-		box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
-		backdrop-filter: blur(8px);
+		background: rgba(8, 9, 12, 0.88);
+		clip-path: polygon(
+			18px 0,
+			100% 0,
+			100% calc(100% - 18px),
+			calc(100% - 18px) 100%,
+			0 100%,
+			0 18px
+		);
+		filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.5));
+		backdrop-filter: blur(6px);
 	}
 	.card.wide {
 		min-width: 340px;
@@ -166,8 +171,7 @@
 	h1,
 	h2 {
 		margin: 0;
-		font-family: 'Impact', 'Arial Narrow', system-ui, sans-serif;
-		font-weight: 400;
+		font-weight: 700;
 		letter-spacing: 3px;
 	}
 	h1 {
@@ -196,15 +200,14 @@
 		color: rgba(244, 241, 234, 0.6);
 	}
 	.stat b {
-		font-family: 'Impact', 'Arial Narrow', system-ui, sans-serif;
-		font-weight: 400;
+		font-weight: 700;
 		font-size: 22px;
 		color: #fff;
 		margin-left: 6px;
 	}
 	.record {
 		padding: 3px 10px;
-		border-radius: 999px;
+		clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
 		background: var(--accent);
 		color: #120d06;
 		font-size: 11px;
@@ -219,9 +222,11 @@
 	}
 	button {
 		pointer-events: auto;
-		border: 1px solid rgba(255, 255, 255, 0.16);
-		border-radius: 10px;
-		background: rgba(255, 255, 255, 0.05);
+		border: 0;
+		border-left: 3px solid rgba(255, 255, 255, 0.18);
+		background: rgba(255, 255, 255, 0.06);
+		clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+		text-align: left;
 		color: #f4f1ea;
 		font: inherit;
 		font-size: 13px;
@@ -235,8 +240,8 @@
 	}
 	button:hover,
 	button.on {
-		border-color: var(--accent);
-		background: color-mix(in srgb, var(--accent) 16%, transparent);
+		border-left-color: var(--accent);
+		background: color-mix(in srgb, var(--accent) 18%, transparent);
 	}
 	button.primary {
 		background: var(--accent);
@@ -268,7 +273,6 @@
 		transform: translateY(18%);
 	}
 	.ready .title {
-		font-family: 'Impact', 'Arial Narrow', system-ui, sans-serif;
 		font-size: 42px;
 		letter-spacing: 4px;
 		color: #fff;
@@ -280,9 +284,9 @@
 			0 0 44px color-mix(in srgb, var(--accent) 60%, transparent);
 	}
 	.ready .where {
-		padding: 4px 12px;
-		border-radius: 999px;
-		background: var(--glass);
+		padding: 4px 14px;
+		background: rgba(8, 9, 12, 0.8);
+		clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
 		font-size: 12px;
 		font-weight: 700;
 		letter-spacing: 2px;
@@ -305,17 +309,16 @@
 		display: flex;
 		align-items: center;
 		gap: 10px;
-		padding: 8px 16px;
-		border-radius: 999px;
-		background: var(--glass);
-		border: 1px solid rgba(255, 255, 255, 0.12);
+		padding: 8px 20px;
+		background: rgba(8, 9, 12, 0.82);
+		clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
 		font-size: 13px;
 		font-weight: 700;
 		letter-spacing: 2px;
 	}
-	.banner .lives {
-		display: flex;
-		gap: 3px;
+	.banner .count {
+		font-size: 20px;
+		color: var(--accent);
 	}
 	/* the original game's titles: yellow READY!, red GAME OVER, blocky letters */
 	.arcade .ready .title,

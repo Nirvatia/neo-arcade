@@ -226,7 +226,9 @@
 	.ctl {
 		position: fixed;
 		left: 12px;
-		bottom: 12px;
+		top: 50%;
+		transform: translateY(-50%);
+		width: 190px;
 		z-index: 100;
 		display: grid;
 		gap: 6px;

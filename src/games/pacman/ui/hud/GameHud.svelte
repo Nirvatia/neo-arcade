@@ -1,10 +1,11 @@
-<!-- The one HUD of the game: a dark glass plate tinted by the world's accent; boss levels
-	add the boss block under it. The secret level uses ArcadeHud instead. -->
+<!-- The one HUD of the game. No plate: numbers sit on the world over soft dark bands at the
+	screen edges; the world's colour only marks small accents. Boss levels add the boss bar
+	at the bottom of the screen and the player's fight status in the bottom-left corner.
+	The secret level uses ArcadeHud instead. -->
 <script lang="ts">
 	import type { HudSnapshot } from './hudSnapshot';
 	import { t } from '../i18n';
 	import FruitIcon from './FruitIcon.svelte';
-	import LifeIcon from './LifeIcon.svelte';
 
 	let { snap }: { snap: HudSnapshot } = $props();
 
@@ -17,100 +18,129 @@
 		secret: '#ffd23f'
 	};
 	const WEAPON_KEY = { bfg: 'bfg', barrel: 'barrel', berserk: 'berserk', '': 'none' } as const;
+	const ROMAN = ['', 'I', 'II', 'III'];
 
 	const fmt = (n: number) => Math.max(0, Math.floor(n)).toLocaleString('en-US');
-	const lives = $derived(Array.from({ length: Math.min(6, Math.max(0, snap.lives)) }, (_, i) => i));
-	const timerRatio = $derived(
+	const ratio = $derived(
 		snap.timer && snap.timer.duration > 0
 			? Math.max(0, Math.min(1, snap.timer.remaining / snap.timer.duration))
 			: 0
 	);
+	/** The power timer as Pac-Man: the mouth opens wider as the time runs out. */
+	const pie = $derived.by(() => {
+		const open = (1 - ratio) * Math.PI * 0.98;
+		const a0 = open / 2;
+		const a1 = Math.PI * 2 - open / 2;
+		const r = 15;
+		const p = (a: number) =>
+			`${(16 + Math.cos(a) * r).toFixed(2)} ${(16 + Math.sin(a) * r).toFixed(2)}`;
+		return `M16 16 L${p(a0)} A${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${p(a1)} Z`;
+	});
+
 	const boss = $derived(snap.boss);
-	const bossRatio = $derived(boss ? Math.max(0, Math.min(1, boss.hp / boss.hpMax)) : 0);
+	/** The bar in three phase segments (top band first), each 0..1 full. */
+	const segments = $derived.by(() => {
+		if (!boss) return [];
+		const edges = [1, ...boss.marks, 0].map((m) => m * boss.hpMax);
+		const out: number[] = [];
+		for (let i = 0; i < edges.length - 1; i++) {
+			const hi = edges[i];
+			const lo = edges[i + 1];
+			out.push(Math.max(0, Math.min(1, (boss.hp - lo) / (hi - lo))));
+		}
+		// drawn left to right: the last band to go is on the left
+		return out.reverse();
+	});
 </script>
 
 <div class="hud" style:--accent={ACCENT[snap.world]}>
-	<div class="plate">
-		<div class="cell">
-			<small>{$t('score')}</small>
-			<b>{fmt(snap.score)}</b>
-			<span class="sub">{$t('high')} {fmt(snap.highScore)}</span>
+	<div class="band top"></div>
+
+	<div class="corner tl">
+		<span class="label">{$t('score')}</span>
+		<span class="score">{fmt(snap.score)}</span>
+		<span class="minor"><i class="dot"></i>{$t('high')} {fmt(snap.highScore)}</span>
+	</div>
+
+	<div class="corner tr">
+		<div class="stat">
+			<span class="label">{$t('level')}</span>
+			<span class="num">{snap.level}</span>
+			<span class="minor">{$t(`world_${snap.world}`)}</span>
 		</div>
-		<div class="cell">
-			<small>{$t('level')}</small>
-			<b>{snap.level}</b>
-			<span class="sub world">{$t(`world_${snap.world}`)}</span>
+		<div class="stat">
+			<span class="label">{$t('lives')}</span>
+			<span class="num">{Math.max(0, snap.lives)}</span>
 		</div>
-		<div class="cell">
-			<small>{$t('lives')}</small>
-			<span class="lives">
-				{#each lives as i (i)}
-					<LifeIcon ms={snap.profile === 'ms-pacman'} />
-				{:else}
-					<span class="sub">0</span>
-				{/each}
-			</span>
-		</div>
-		{#if boss}
-			<div class="cell weapon" class:armed={boss.weapon !== ''}>
-				<small>{$t('weapon')}</small>
-				<b>{$t(WEAPON_KEY[boss.weapon])}</b>
-				{#if boss.weapon === 'berserk'}
-					<span class="sub">{boss.berserk.toFixed(1)} s</span>
-				{:else if boss.charge > 0}
-					<span class="meter"><i style:width="{boss.charge * 100}%"></i></span>
-				{/if}
-			</div>
-		{:else}
-			<div class="cell timer" class:on={snap.timer}>
-				<small>{snap.timer ? $t(snap.timer.kind) : $t('power')}</small>
-				<b>{snap.timer ? snap.timer.remaining.toFixed(1) : '—'}</b>
-				<span class="meter"><i style:width="{timerRatio * 100}%"></i></span>
-			</div>
-		{/if}
 	</div>
 
 	{#if !boss}
-		<div class="dots" title="{$t('weather')} 50% · {$t('night')} 75%">
+		<div class="progress" title="{$t('weather')} 50% · {$t('night')} 75%">
 			<i style:width="{snap.dots * 100}%"></i>
 			<em style:left="50%"></em>
 			<em style:left="75%"></em>
 		</div>
 	{/if}
 
-	{#if boss && !boss.defeated}
-		<div class="boss" class:enraged={boss.phase >= 3}>
-			<div class="boss-head">
-				<span>{$t('boss_hell')}</span>
-				<span>{$t('phase')} {boss.phase}</span>
-			</div>
-			<div class="track">
-				<div class="fill" style:width="{bossRatio * 100}%"></div>
-				{#each boss.marks as m (m)}<em style:left="{m * 100}%"></em>{/each}
-			</div>
-			<div class="player-hp">
-				<small>{$t('hp')}</small>
-				{#each Array.from({ length: boss.playerHpMax }, (_, k) => k) as i (i)}
-					<svg viewBox="0 0 24 22" width="16" height="14" aria-hidden="true">
-						<path
-							d="M12 21s-9-6.2-9-12.2C3 5.6 5.4 3 8.4 3c1.6 0 2.9.8 3.6 2 .7-1.2 2-2 3.6-2 3 0 5.4 2.6 5.4 5.8C21 14.8 12 21 12 21z"
-							fill={i < boss.playerHp ? '#e0343c' : 'rgba(255,255,255,.18)'}
-							stroke={i < boss.playerHp ? '#fff4dc' : 'rgba(255,255,255,.35)'}
-							stroke-width="1.5"
-						/>
-					</svg>
-				{/each}
-			</div>
+	{#if snap.timer}
+		<div class="power">
+			<svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
+				<circle cx="16" cy="16" r="15" fill="rgba(0,0,0,.35)" />
+				<path d={pie} fill="var(--accent)" />
+			</svg>
+			<span class="label">{$t(snap.timer.kind)}</span>
+			<span class="sec">{snap.timer.remaining.toFixed(1)}</span>
 		</div>
-	{:else if boss?.rewardOffered}
-		<div class="hint">{$t('rewardHint')}</div>
 	{/if}
 
-	<div class="fruits">
-		{#each snap.fruits as kind, i (i)}
-			<FruitIcon {kind} size={24} />
-		{/each}
-	</div>
+	{#if boss}
+		<div class="band bottom"></div>
+		<div class="corner bl">
+			<div class="hp">
+				{#each Array.from({ length: boss.playerHpMax }, (_, k) => k) as i (i)}
+					<i class:on={i < boss.playerHp}></i>
+				{/each}
+			</div>
+			<div class="weapon" class:armed={boss.weapon !== ''}>
+				<span class="label">{$t('weapon')}</span>
+				<span class="name">{$t(WEAPON_KEY[boss.weapon])}</span>
+				{#if boss.weapon === 'berserk'}
+					<span class="gauge"><i style:width="{Math.min(1, boss.berserk / 10) * 100}%"></i></span>
+				{:else if boss.charge > 0}
+					<span class="gauge"><i style:width="{boss.charge * 100}%"></i></span>
+				{/if}
+			</div>
+		</div>
+
+		{#if !boss.defeated}
+			<div class="boss" class:enraged={boss.phase >= 3}>
+				<div class="boss-title">
+					<span class="boss-name">{$t('boss_hell')}</span>
+					<span class="boss-phase">{ROMAN[boss.phase] ?? boss.phase}</span>
+				</div>
+				<div class="bar">
+					{#each segments as fill, i (i)}
+						<div class="seg" class:spent={fill <= 0}>
+							<b class="trail" style:width="{fill * 100}%"></b>
+							<b class="fill" style:width="{fill * 100}%"></b>
+						</div>
+					{/each}
+				</div>
+			</div>
+		{:else if boss.rewardOffered}
+			<div class="boss hint">
+				<span>{$t('rewardHint')}</span>
+			</div>
+		{/if}
+	{/if}
+
+	{#if !boss}
+		<div class="fruits">
+			{#each snap.fruits as kind, i (i)}
+				<FruitIcon {kind} size={26} />
+			{/each}
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -119,208 +149,267 @@
 		inset: 0;
 		pointer-events: none;
 		z-index: 20;
-		color: #f4f1ea;
-		font-family: 'Impact', 'Arial Narrow', 'Segoe UI', system-ui, sans-serif;
-		--glass: linear-gradient(180deg, rgba(28, 32, 42, 0.86), rgba(8, 10, 14, 0.9));
+		color: #fbf7ee;
+		font-family:
+			'Bahnschrift', 'DIN Condensed', 'Arial Narrow', 'Roboto Condensed', system-ui, sans-serif;
+		--shadow: 0 1px 0 rgba(0, 0, 0, 0.55), 0 0 12px rgba(0, 0, 0, 0.5);
 	}
-	.plate {
+	.band {
 		position: absolute;
-		top: 10px;
-		left: 50%;
-		transform: translateX(-50%);
+		left: 0;
+		right: 0;
+		height: 96px;
+	}
+	.band.top {
+		top: 0;
+		background: linear-gradient(rgba(4, 5, 8, 0.62), rgba(4, 5, 8, 0));
+	}
+	.band.bottom {
+		bottom: 0;
+		height: 120px;
+		background: linear-gradient(rgba(4, 5, 8, 0), rgba(4, 5, 8, 0.7));
+	}
+	.corner {
+		position: absolute;
 		display: grid;
+		text-shadow: var(--shadow);
+	}
+	.tl {
+		top: 14px;
+		left: 22px;
+	}
+	.tr {
+		top: 14px;
+		right: 22px;
 		grid-auto-flow: column;
-		grid-auto-columns: minmax(96px, auto);
-		background: var(--glass);
-		border: 1px solid rgba(255, 255, 255, 0.12);
-		border-top: 2px solid var(--accent);
-		border-radius: 12px;
-		box-shadow:
-			0 10px 24px rgba(0, 0, 0, 0.45),
-			inset 0 1px 0 rgba(255, 255, 255, 0.08);
-		backdrop-filter: blur(6px);
-		overflow: hidden;
+		gap: 26px;
 	}
-	.cell {
-		display: grid;
-		justify-items: center;
-		align-content: center;
-		gap: 1px;
-		padding: 6px 14px 7px;
-		min-height: 52px;
-		box-sizing: border-box;
+	.bl {
+		bottom: 18px;
+		left: 22px;
+		gap: 8px;
 	}
-	.cell + .cell {
-		border-left: 1px solid rgba(255, 255, 255, 0.08);
-	}
-	small {
-		font-family: 'Segoe UI', system-ui, sans-serif;
-		font-size: 9px;
-		font-weight: 700;
-		letter-spacing: 2px;
-		color: var(--accent);
-	}
-	b {
-		font-size: 22px;
-		font-weight: 400;
-		line-height: 1;
-		font-variant-numeric: tabular-nums;
-	}
-	.sub {
-		font-family: 'Segoe UI', system-ui, sans-serif;
-		font-size: 9px;
-		letter-spacing: 1px;
-		color: rgba(244, 241, 234, 0.5);
-	}
-	.world {
-		color: rgba(244, 241, 234, 0.75);
-	}
-	.lives {
-		display: flex;
-		gap: 3px;
-		min-height: 22px;
-		align-items: center;
-	}
-	.timer:not(.on) b,
-	.weapon:not(.armed) b {
-		color: rgba(244, 241, 234, 0.35);
-	}
-	.meter {
-		display: block;
-		width: 64px;
-		height: 4px;
-		border-radius: 2px;
-		background: rgba(255, 255, 255, 0.1);
-		overflow: hidden;
-	}
-	.meter i {
-		display: block;
-		height: 100%;
-		background: var(--accent);
-		box-shadow: 0 0 6px var(--accent);
-	}
-	.dots {
-		position: absolute;
-		top: 68px;
-		left: 50%;
-		transform: translateX(-50%);
-		width: 220px;
-		height: 3px;
-		border-radius: 2px;
-		background: rgba(0, 0, 0, 0.45);
-	}
-	.dots i {
-		display: block;
-		height: 100%;
-		border-radius: 2px;
-		background: var(--accent);
-		opacity: 0.85;
-	}
-	.dots em {
-		position: absolute;
-		top: -2px;
-		width: 1px;
-		height: 7px;
-		background: rgba(255, 255, 255, 0.6);
-	}
-	.boss {
-		position: absolute;
-		top: 72px;
-		left: 50%;
-		transform: translateX(-50%);
-		width: min(420px, calc(100vw - 32px));
-		padding: 6px 10px 8px;
-		box-sizing: border-box;
-		border-radius: 8px;
-		background:
-			linear-gradient(rgba(10, 6, 4, 0.82), rgba(10, 6, 4, 0.82)),
-			repeating-linear-gradient(135deg, #ffcc00 0 8px, #14110f 8px 16px);
-		border: 2px solid transparent;
-		background-clip: padding-box, border-box;
-		background-origin: border-box;
-	}
-	.boss-head {
-		display: flex;
-		justify-content: space-between;
-		font-family: 'Segoe UI', system-ui, sans-serif;
+	.label {
 		font-size: 10px;
 		font-weight: 700;
-		letter-spacing: 2px;
-		color: #ff8a5a;
+		letter-spacing: 3px;
+		opacity: 0.7;
 	}
-	.track {
-		position: relative;
-		margin-top: 4px;
-		height: 10px;
-		border-radius: 999px;
-		background: linear-gradient(#1a1c20, #2a2d32);
-		overflow: hidden;
+	.score {
+		font-size: 40px;
+		font-weight: 700;
+		line-height: 0.95;
+		letter-spacing: 1px;
+		font-variant-numeric: tabular-nums;
 	}
-	.fill {
-		height: 100%;
-		background: linear-gradient(#ff6a1a, #b02a08);
-		transition: width 0.15s;
-	}
-	.enraged .fill {
-		background: linear-gradient(#e01a10, #6a0a06);
-	}
-	.track em {
-		position: absolute;
-		top: 0;
-		bottom: 0;
-		width: 2px;
-		background: rgba(0, 0, 0, 0.7);
-	}
-	.player-hp {
+	.minor {
 		display: flex;
 		align-items: center;
-		gap: 3px;
-		margin-top: 5px;
+		gap: 6px;
+		margin-top: 3px;
+		font-size: 11px;
+		font-weight: 600;
+		letter-spacing: 2px;
+		opacity: 0.75;
 	}
-	.player-hp small {
-		color: #ff8a5a;
-		margin-right: 4px;
+	.dot {
+		width: 6px;
+		height: 6px;
+		background: var(--accent);
+		transform: rotate(45deg);
 	}
-	.hint {
+	.stat {
+		display: grid;
+		justify-items: end;
+	}
+	.num {
+		font-size: 34px;
+		font-weight: 700;
+		line-height: 0.95;
+		font-variant-numeric: tabular-nums;
+	}
+	.stat .minor {
+		color: var(--accent);
+		opacity: 1;
+	}
+	.progress {
 		position: absolute;
-		top: 76px;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 3px;
+		background: rgba(0, 0, 0, 0.35);
+	}
+	.progress i {
+		display: block;
+		height: 100%;
+		background: var(--accent);
+		box-shadow: 0 0 8px var(--accent);
+	}
+	.progress em {
+		position: absolute;
+		top: 0;
+		width: 2px;
+		height: 7px;
+		background: #fbf7ee;
+	}
+	.power {
+		position: absolute;
+		top: 16px;
 		left: 50%;
 		transform: translateX(-50%);
-		padding: 6px 14px;
-		border-radius: 999px;
-		background: var(--glass);
-		border: 1px solid var(--accent);
-		font-family: 'Segoe UI', system-ui, sans-serif;
-		font-size: 12px;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		text-shadow: var(--shadow);
+	}
+	.power .label {
+		opacity: 1;
+		color: var(--accent);
+	}
+	.sec {
+		font-size: 22px;
 		font-weight: 700;
-		letter-spacing: 1px;
-		animation: pulse 1.2s ease-in-out infinite;
+		font-variant-numeric: tabular-nums;
+		min-width: 3ch;
 	}
 	.fruits {
 		position: absolute;
-		right: 14px;
-		bottom: 12px;
+		right: 18px;
+		bottom: 14px;
 		display: flex;
+		gap: 4px;
+		filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+	}
+	/* ── boss levels ───────────────────────────────────────────── */
+	.hp {
+		display: flex;
+		gap: 6px;
+	}
+	.hp i {
+		width: 16px;
+		height: 16px;
+		clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+		background: rgba(255, 255, 255, 0.18);
+	}
+	.hp i.on {
+		background: linear-gradient(#ff6b5a, #c4141c);
+		box-shadow: 0 0 10px #ff3b2f;
+	}
+	.weapon {
+		display: grid;
 		gap: 2px;
-		padding: 4px 6px;
-		border-radius: 10px;
-		background: var(--glass);
-		border: 1px solid rgba(255, 255, 255, 0.1);
 	}
-	@keyframes pulse {
+	.weapon .name {
+		font-size: 24px;
+		font-weight: 700;
+		line-height: 1;
+		letter-spacing: 2px;
+	}
+	.weapon:not(.armed) .name {
+		opacity: 0.35;
+	}
+	.gauge {
+		display: block;
+		width: 120px;
+		height: 4px;
+		background: rgba(255, 255, 255, 0.12);
+	}
+	.gauge i {
+		display: block;
+		height: 100%;
+		background: var(--accent);
+		box-shadow: 0 0 8px var(--accent);
+	}
+	.boss {
+		position: absolute;
+		left: 50%;
+		bottom: 22px;
+		transform: translateX(-50%);
+		width: min(560px, calc(100vw - 340px));
+		min-width: 280px;
+	}
+	.boss-title {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		margin-bottom: 6px;
+		text-shadow: var(--shadow);
+	}
+	.boss-name {
+		font-size: 15px;
+		font-weight: 700;
+		letter-spacing: 6px;
+	}
+	.boss-phase {
+		font-family: 'Georgia', 'Times New Roman', serif;
+		font-size: 22px;
+		font-weight: 700;
+		color: var(--accent);
+	}
+	.bar {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 5px;
+		padding: 4px;
+		background: rgba(8, 4, 3, 0.75);
+		clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+	}
+	.seg {
+		position: relative;
+		height: 12px;
+		background: rgba(255, 255, 255, 0.07);
+		clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+	}
+	.seg b {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		left: 0;
+	}
+	/* the chunk just lost lingers white, then drains */
+	.trail {
+		background: #fff6e8;
+		transition: width 0.5s ease-in 0.35s;
+	}
+	.fill {
+		background: linear-gradient(#ff8a3a, #c2300c 60%, #7a1606);
+		transition: width 0.08s;
+	}
+	.enraged .fill {
+		background: linear-gradient(#ff4434, #a40e10 60%, #4c0405);
+		animation: throb 0.9s ease-in-out infinite;
+	}
+	.seg.spent {
+		background: rgba(255, 255, 255, 0.04);
+	}
+	.hint {
+		display: grid;
+		place-items: center;
+		padding: 10px 18px;
+		background: rgba(8, 4, 3, 0.75);
+		clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+		font-size: 15px;
+		font-weight: 700;
+		letter-spacing: 3px;
+		color: var(--accent);
+		animation: throb 1.2s ease-in-out infinite;
+	}
+	@keyframes throb {
 		50% {
-			box-shadow: 0 0 16px var(--accent);
+			filter: brightness(1.35);
 		}
 	}
-	@media (max-width: 560px) {
-		.plate {
-			grid-auto-columns: minmax(64px, auto);
+	@media (max-width: 640px) {
+		.score {
+			font-size: 28px;
 		}
-		.cell {
-			padding: 5px 8px 6px;
+		.num {
+			font-size: 24px;
 		}
-		b {
-			font-size: 17px;
+		.boss {
+			width: calc(100vw - 32px);
+			bottom: 92px;
 		}
 	}
 </style>
