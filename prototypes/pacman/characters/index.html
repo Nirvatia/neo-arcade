@@ -4,10 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
     <title>Pac-Man · Characters</title>
-    <!-- Prototype: Pac-Man and Ms. Pac-Man (stage 10.3/10.4), one design each, shaded per
-         pixel in WebGL2: large on the left, in the summer maze at game scale on the right.
-         Built from the sources: `node prototypes/pacman/build.mjs characters`; open as a
-         file. -->
+    <!-- Prototype: Pac-Man ("Solar Flare") and Ms. Pac-Man ("Stardust Heart") as baked
+         sprites (render/actors/sprite): large on the left, in the summer maze at game scale on
+         the right, with the energizer, a ghost, a teleport and death on buttons. Built from
+         the sources: `node prototypes/pacman/build.mjs characters`; open as a file. -->
     <style>
       html,body{height:100%;margin:0;overflow:hidden;background:#1a1a14}
       #view{position:fixed;inset:0;display:block}
@@ -20,6 +20,9 @@
     <canvas id="view"></canvas>
     <div id="ctl">
       <button class="bt" id="power">⚡ Энерджайзер</button>
+      <button class="bt" id="ghost">Съесть призрака</button>
+      <button class="bt" id="tele">Телепорт</button>
+      <button class="bt" id="die">☠ Смерть</button>
       <button class="bt" id="stop" aria-pressed="false">■ Стоп</button>
     </div>
     <script>

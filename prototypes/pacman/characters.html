@@ -4,10 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
     <title>Pac-Man · Characters</title>
-    <!-- Prototype: Pac-Man and Ms. Pac-Man (stage 10.3/10.4), one design each, shaded per
-         pixel in WebGL2: large on the left, in the summer maze at game scale on the right.
-         Built from the sources: `node prototypes/pacman/build.mjs characters`; open as a
-         file. -->
+    <!-- Prototype: Pac-Man ("Solar Flare") and Ms. Pac-Man ("Stardust Heart") as baked
+         sprites (render/actors/sprite): large on the left, in the summer maze at game scale on
+         the right, with the energizer, a ghost, a teleport and death on buttons. Built from
+         the sources: `node prototypes/pacman/build.mjs characters`; open as a file. -->
     <style>
       html,body{height:100%;margin:0;overflow:hidden;background:#1a1a14}
       #view{position:fixed;inset:0;display:block}
@@ -20,6 +20,9 @@
     <canvas id="view"></canvas>
     <div id="ctl">
       <button class="bt" id="power">⚡ Энерджайзер</button>
+      <button class="bt" id="ghost">Съесть призрака</button>
+      <button class="bt" id="tele">Телепорт</button>
+      <button class="bt" id="die">☠ Смерть</button>
       <button class="bt" id="stop" aria-pressed="false">■ Стоп</button>
     </div>
     <script>
@@ -733,7 +736,7 @@
 	];
 	//#endregion
 	//#region src/games/pacman/render/common/textures.ts
-	function makeCanvas(width, height) {
+	function makeCanvas$1(width, height) {
 		const canvas = document.createElement("canvas");
 		canvas.width = Math.max(1, Math.floor(width));
 		canvas.height = Math.max(1, Math.floor(height));
@@ -756,7 +759,7 @@
 	}
 	function radialTexture(size, stops) {
 		const safeSize = Math.max(2, Math.floor(size));
-		const canvas = makeCanvas(safeSize, safeSize);
+		const canvas = makeCanvas$1(safeSize, safeSize);
 		const ctx = canvasContext(canvas);
 		const gradient = ctx.createRadialGradient(safeSize / 2, safeSize / 2, 0, safeSize / 2, safeSize / 2, safeSize / 2);
 		for (const stop of stops) gradient.addColorStop(stop[0], stop[1]);
@@ -779,7 +782,7 @@
 	}
 	function makeTexture(width, height, painter) {
 		const scale = 3;
-		const canvas = makeCanvas(width * scale, height * scale);
+		const canvas = makeCanvas$1(width * scale, height * scale);
 		const ctx = canvasContext(canvas);
 		ctx.scale(scale, scale);
 		painter(ctx);
@@ -956,7 +959,7 @@
 		const BG = P.bg;
 		const DEC = meadowDecor(R, C, P.landmark.ex);
 		const isW = (r, c) => !!S[r] && S[r][c] === "WL";
-		const cv = makeCanvas(Math.ceil(w * RS), Math.ceil(h * RS));
+		const cv = makeCanvas$1(Math.ceil(w * RS), Math.ceil(h * RS));
 		const b = canvasContext(cv);
 		b.scale(RS, RS);
 		b.translate(-x0, -y0);
@@ -1571,7 +1574,7 @@
 	}
 	/** Linear 64×64 colour wash laid over the whole screen. */
 	function washTexture(from, to) {
-		const c = makeCanvas(64, 64);
+		const c = makeCanvas$1(64, 64);
 		const x = canvasContext(c);
 		const q = x.createLinearGradient(0, 0, 64, 64);
 		q.addColorStop(0, from);
@@ -1583,7 +1586,7 @@
 	}
 	/** Soft sun ray falling from the top edge. */
 	var rayTexture = lazy(() => {
-		const c = makeCanvas(70, 520);
+		const c = makeCanvas$1(70, 520);
 		const x = canvasContext(c);
 		let q = x.createLinearGradient(0, 0, 70, 0);
 		q.addColorStop(0, "rgba(255,230,170,0)");
@@ -1655,7 +1658,7 @@
 		}
 		const cached = byTint.get(tint);
 		if (cached) return cached;
-		const c = makeCanvas(im.width, im.height);
+		const c = makeCanvas$1(im.width, im.height);
 		const x = canvasContext(c);
 		x.drawImage(im, 0, 0);
 		x.globalCompositeOperation = "multiply";
@@ -3453,340 +3456,1750 @@
 		return THEMES[season] ?? null;
 	}
 	//#endregion
-	//#region prototypes/pacman/characters/shaders.ts
-	var VERTEX = `#version 300 es
-in vec2 aCorner;
-uniform vec2 uRes;
-uniform vec4 uBox;
-void main() {
-	vec2 pos = mix(uBox.xy, uBox.zw, aCorner * 0.5 + 0.5);
-	gl_Position = vec4(pos.x / uRes.x * 2.0 - 1.0, 1.0 - pos.y / uRes.y * 2.0, 0.0, 1.0);
-}`;
-	var COMMON = `#version 300 es
-precision highp float;
-uniform vec2 uRes;
-uniform float uT;
-uniform float uPow;
-uniform float uKind;
-out vec4 o;
-
-float hash(vec2 p) {
-	p = fract(p * vec2(123.34, 456.21));
-	p += dot(p, p + 45.32);
-	return fract(p.x * p.y);
-}
-float noise(vec2 p) {
-	vec2 i = floor(p);
-	vec2 f = fract(p);
-	vec2 u = f * f * (3.0 - 2.0 * f);
-	return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y);
-}
-float fbm(vec2 p) {
-	float a = 0.5;
-	float s = 0.0;
-	for (int i = 0; i < 5; i++) {
-		s += a * noise(p);
-		p = p * 2.03 + vec2(1.7, 9.2);
-		a *= 0.5;
+	//#region src/games/pacman/render/actors/sprite/bakeKit.ts
+	function makeCanvas(w, h) {
+		const c = document.createElement("canvas");
+		c.width = Math.max(1, Math.ceil(w));
+		c.height = Math.max(1, Math.ceil(h));
+		return c;
 	}
-	return s;
-}
-vec4 over(vec4 top, vec4 under) {
-	return top + under * (1.0 - top.a);
-}
-/** Canvas px, y down, like the 2D canvas. */
-vec2 canvasPx() {
-	return vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
-}
-`;
-	var CHARACTER = `${COMMON}
-uniform vec2 uC;
-uniform float uR;
-uniform float uAng;
-uniform float uFlip;
-uniform float uMouth;
-uniform float uEnd;
-
-float sdPie(vec2 p, vec2 c, float r) {
-	p.x = abs(p.x);
-	float l = length(p) - r;
-	float m = length(p - c * clamp(dot(p, c), 0.0, r));
-	return max(l, m * sign(c.y * p.x - c.x * p.y));
-}
-float smax(float a, float b, float k) {
-	float h = clamp(0.5 - 0.5 * (b - a) / k, 0.0, 1.0);
-	return mix(b, a, h) + k * h * (1.0 - h);
-}
-float sdSeg(vec2 p, vec2 a, vec2 b) {
-	vec2 pa = p - a;
-	vec2 ba = b - a;
-	float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
-	return length(pa - ba * h);
-}
-mat2 rot(float a) {
-	float c = cos(a);
-	float s = sin(a);
-	return mat2(c, s, -s, c);
-}
-/** A soft four-pointed twinkle. */
-float twinkle(vec2 s, float size) {
-	s /= size;
-	float core = exp(-dot(s, s) * 18.0);
-	float rays = exp(-abs(s.y) * 40.0 - abs(s.x) * 5.0) + exp(-abs(s.x) * 40.0 - abs(s.y) * 5.0);
-	return core + rays * 0.9;
-}
-
-/** The satin bow: two pinched loops and a knot; returns colour (premultiplied). */
-vec4 bow(vec2 q, float aa, float glow) {
-	vec2 p = rot(0.35) * (q - vec2(-0.33, -0.88)) / 0.47;
-	float ax = abs(p.x);
-	float pinch = 0.42 + 0.58 * clamp(ax / 0.75, 0.0, 1.0);
-	vec2 lp = vec2(ax - 0.6, p.y + 0.04 * ax);
-	float dLoop = (length(lp / vec2(0.62, 0.44 * pinch)) - 1.0) * 0.38;
-	float dKnot = length(p * vec2(1.0, 0.85)) - 0.27;
-	float d = min(dLoop, dKnot);
-	float a = 1.0 - smoothstep(-aa * 2.2, aa * 2.2, d);
-	if (a <= 0.0) return vec4(0);
-	// satin: folds radiating from the knot, light from the top, a sheen band
-	float fold = 0.78 + 0.22 * cos(atan(p.y, ax + 0.05) * 5.0 + ax * 3.0);
-	float light = 0.75 + 0.35 * clamp(-p.y * 0.9 + 0.3, 0.0, 1.0);
-	float sheen = exp(-pow((p.y + 0.22 - 0.18 * ax) * 5.5, 2.0)) * smoothstep(0.15, 0.5, ax);
-	vec3 red = vec3(0.98, 0.13, 0.33);
-	vec3 c = red * fold * light + vec3(1.0, 0.75, 0.82) * sheen * 0.75;
-	if (dKnot < 0.0) {
-		c = red * (0.85 + 0.3 * clamp(-p.y * 2.0 + 0.4, 0.0, 1.0)) + vec3(1.0, 0.8, 0.85) * exp(-dot(p + vec2(0.08, 0.1), p + vec2(0.08, 0.1)) * 40.0) * 0.6;
+	function context(c) {
+		const ctx = c.getContext("2d");
+		if (!ctx) throw new Error("bakeKit: no 2D context");
+		return ctx;
 	}
-	// polka dots on the loops
-	vec2 g = vec2(ax, p.y) * 4.2;
-	float pd = length(fract(g) - 0.5) - 0.14;
-	float dots = (1.0 - smoothstep(-0.04, 0.04, pd)) * step(0.0, -dLoop) * step(0.3, ax);
-	c = mix(c, vec3(1.0, 0.92, 0.94), dots * 0.85);
-	c += vec3(1.0, 0.6, 0.8) * glow;
-	// a dark rim so the bow reads at tile size
-	float rim = smoothstep(-0.1, -0.02, d);
-	c = mix(c, vec3(0.32, 0.02, 0.1), rim * 0.9);
-	return vec4(c * a, a);
-}
-
-void main() {
-	vec2 pc = canvasPx() - uC;
-	vec2 q = rot(-uAng) * pc;
-	q = vec2(q.x, q.y * uFlip);
-	bool ms = uKind > 0.5;
-	float R = uR * (1.0 + (ms ? 0.06 : 0.12) * uPow);
-	q /= R;
-	float aa = 1.2 / R;
-	float r = length(q);
-
-	// the mouth: a wedge from just behind the centre, rounded at the lips
-	float m = 0.05 + uMouth * (ms ? 0.5 : 0.62);
-	float dC = r - 1.0;
-	float dP = sdPie(vec2(q.y, q.x + 0.15), vec2(sin(m), cos(m)), 3.0);
-	float dB = smax(dC, -dP, 0.06);
-	float inBody = 1.0 - smoothstep(-aa, aa, dB);
-	float inMouth = (1.0 - smoothstep(-aa, aa, dC)) * (1.0 - inBody);
-
-	// contact shadow under the body
-	float sh = length((q - vec2(0.1, 0.24)) * vec2(1.0, 1.3)) - 0.9;
-	vec4 col = vec4(0.0, 0.0, 0.0, (1.0 - smoothstep(-0.15, 0.45, sh)) * 0.38);
-
-	// behind the body: his corona of fire / her halo
-	if (uPow > 0.0) {
-		float ang = atan(q.y, q.x);
-		if (!ms) {
-			float f = fbm(vec2(ang * 2.6 + uT * 0.6, dC * 5.0 - uT * 3.6));
-			float flame = clamp(f * 1.5 - dC * 2.2 - 0.25, 0.0, 1.0) * step(0.0, dC + 0.05);
-			vec3 fire = mix(vec3(1.0, 0.18, 0.0), vec3(1.0, 0.9, 0.55), flame * flame);
-			float halo = exp(-max(dC, 0.0) * 5.0) * 0.35;
-			col.rgb += (fire * flame * 1.4 + vec3(1.0, 0.55, 0.15) * halo) * uPow;
-		} else {
-			float halo = exp(-max(dC, 0.0) * 4.0) * 0.45;
-			col.rgb += vec3(1.0, 0.7, 0.9) * halo * uPow;
+	/** A small seeded generator (mulberry32): the same sequence every run. */
+	function seeded(seed) {
+		let a = seed >>> 0;
+		return () => {
+			a = a + 1831565813 >>> 0;
+			let t = a;
+			t = Math.imul(t ^ t >>> 15, t | 1);
+			t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+			return ((t ^ t >>> 14) >>> 0) / 4294967296;
+		};
+	}
+	function hash(x, y, seed) {
+		let h = x * 374761393 + y * 668265263 + seed * 2147483647 | 0;
+		h = Math.imul(h ^ h >>> 13, 1274126177);
+		return ((h ^ h >>> 16) >>> 0) / 4294967296;
+	}
+	function valueNoise(x, y, seed) {
+		const ix = Math.floor(x);
+		const iy = Math.floor(y);
+		const fx = x - ix;
+		const fy = y - iy;
+		const ux = fx * fx * (3 - 2 * fx);
+		const uy = fy * fy * (3 - 2 * fy);
+		const a = hash(ix, iy, seed);
+		const b = hash(ix + 1, iy, seed);
+		const c = hash(ix, iy + 1, seed);
+		const d = hash(ix + 1, iy + 1, seed);
+		return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy;
+	}
+	function fbm(x, y, seed, octaves = 4) {
+		let s = 0;
+		let a = .5;
+		let n = 0;
+		for (let i = 0; i < octaves; i++) {
+			s += a * valueNoise(x, y, seed + i * 31);
+			n += a;
+			x = x * 2.03 + 17.1;
+			y = y * 2.03 + 3.7;
+			a *= .5;
 		}
+		return s / n;
 	}
-
-	// sphere normal, light from the upper left (y is down)
-	float z = sqrt(max(0.0, 1.0 - r * r));
-	vec3 n = normalize(vec3(q, z + 0.001));
-	vec3 L = normalize(vec3(-0.45, -0.62, 0.64));
-	vec3 H = normalize(L + vec3(0, 0, 1));
-	float ndl = dot(n, L);
-	float wrap = clamp((ndl + 0.4) / 1.4, 0.0, 1.0);
-	float nh = max(dot(n, H), 0.0);
-	float fres = pow(1.0 - z, 2.0);
-	vec2 back = normalize(vec2(0.7, 0.75));
-	float rim = pow(1.0 - z, 3.0) * max(0.0, dot(normalize(q + 1e-4), back));
-
-	// the open mouth: a throat darkening towards the hinge
-	if (inMouth > 0.0) {
-		float k = clamp(r, 0.0, 1.0);
-		float lip = smoothstep(0.0, 0.16, -dP);
-		vec3 cav = ms ? mix(vec3(0.28, 0.03, 0.12), vec3(0.88, 0.32, 0.48), k * k)
-			: mix(vec3(0.1, 0.015, 0.0), vec3(0.6, 0.1, 0.03), k * k);
-		if (ms) {
-			float tongue = 1.0 - smoothstep(0.0, 0.05, length((q - vec2(0.62, 0.16)) * vec2(1.0, 1.6)) - 0.2);
-			cav = mix(cav, vec3(1.0, 0.5, 0.62), tongue * 0.8);
+	/**
+	* Two noise fields blended round a circle: frame k of n is A·cos + B·sin, so the last frame
+	* flows back into the first without a jump. Returns a sampler per frame over the unit disc.
+	*/
+	function loopingField(grid, scale, seed) {
+		const a = new Float32Array(grid * grid);
+		const b = new Float32Array(grid * grid);
+		for (let j = 0; j < grid; j++) for (let i = 0; i < grid; i++) {
+			const x = i / (grid - 1) * 2 - 1;
+			const y = j / (grid - 1) * 2 - 1;
+			a[j * grid + i] = fbm(x * scale + 5, y * scale + 9, seed) - .5;
+			b[j * grid + i] = fbm(x * scale + 41, y * scale + 23, seed + 7) - .5;
 		}
-		cav *= 0.55 + 0.45 * lip;
-		cav = mix(cav, vec3(1.0, 0.85, 0.45) * (1.25 - k * 0.6), ms ? 0.0 : uPow * 0.85);
-		cav = mix(cav, vec3(1.0, 0.85, 0.92) * (1.2 - k * 0.5), ms ? uPow * 0.5 : 0.0);
-		col = over(vec4(cav * inMouth, inMouth), col);
+		return (frame, frames, x, y) => {
+			const i = Math.min(grid - 1, Math.max(0, Math.round((x + 1) / 2 * (grid - 1))));
+			const j = Math.min(grid - 1, Math.max(0, Math.round((y + 1) / 2 * (grid - 1))));
+			const th = frame / frames * Math.PI * 2;
+			return .5 + (a[j * grid + i] * Math.cos(th) + b[j * grid + i] * Math.sin(th)) * 1.41;
+		};
 	}
-
-	if (inBody > 0.0) {
-		vec3 c;
-		vec3 line;
-		// depth at the lips: the body darkens towards the mouth's edges
-		float lipAO = mix(0.62, 1.0, smoothstep(0.0, 0.22, dP));
-		if (!ms) {
-			// molten gold: deep and heavy, oranger underneath
-			vec3 base = mix(vec3(1.0, 0.86, 0.26), vec3(0.93, 0.47, 0.02), smoothstep(-0.7, 1.0, q.y + q.x * 0.15));
-			c = base * (0.22 + 0.9 * wrap);
-			c *= 0.95 + 0.05 * noise(q * 10.0);
-			c += vec3(1.0, 0.36, 0.0) * fres * 0.3;
-			c += vec3(1.0, 0.72, 0.3) * rim * 1.1;
-			c += vec3(1.0, 0.98, 0.9) * (pow(nh, 90.0) * 1.4 + pow(nh, 12.0) * 0.22);
-			// overcharge: white-hot, with plasma veins flowing under the skin
-			if (uPow > 0.0) {
-				vec2 w = q * 2.4 + vec2(uT * 0.5, -uT * 0.35);
-				float v = fbm(w + fbm(w * 1.3 - uT * 0.4) * 1.8);
-				// thin glowing veins, the gold staying rich around them
-				float vein = exp(-pow((v - 0.55) * 28.0, 2.0));
-				vec3 hot = vec3(1.0, 0.8, 0.32) * (0.55 + 0.6 * wrap);
-				c = mix(c, hot, uPow * 0.3);
-				c += vec3(1.0, 0.92, 0.6) * vein * uPow * 1.3;
-				c += vec3(1.0, 0.45, 0.08) * fres * uPow * 0.9;
+	var mixRGB = (a, b, k) => [
+		a[0] + (b[0] - a[0]) * k,
+		a[1] + (b[1] - a[1]) * k,
+		a[2] + (b[2] - a[2]) * k
+	];
+	/** A colour ramp over stops [position, colour], position 0..1. */
+	function ramp(stops, t) {
+		if (t <= stops[0][0]) return stops[0][1];
+		for (let i = 1; i < stops.length; i++) if (t <= stops[i][0]) {
+			const [p0, c0] = stops[i - 1];
+			const [p1, c1] = stops[i];
+			return mixRGB(c0, c1, (t - p0) / (p1 - p0));
+		}
+		return stops[stops.length - 1][1];
+	}
+	/**
+	* Paints a disc pixel by pixel on a `size`-square canvas, radius R at the centre. `shade`
+	* gets the unit-disc position (y down) and the sphere's height z, and returns a colour;
+	* the edge is antialiased and ringed by an `outline` of `width` (fraction of R).
+	*/
+	function paintDisc(size, R, shade, outline, width) {
+		const c = makeCanvas(size, size);
+		const ctx = context(c);
+		const img = ctx.createImageData(c.width, c.height);
+		const d = img.data;
+		const mid = c.width / 2;
+		const edge = width * R;
+		for (let py = 0; py < c.height; py++) for (let px = 0; px < c.width; px++) {
+			const dx = px + .5 - mid;
+			const dy = py + .5 - mid;
+			const r = Math.hypot(dx, dy);
+			const cover = Math.min(1, Math.max(0, R - r + .5));
+			if (cover <= 0) continue;
+			const x = dx / R;
+			const y = dy / R;
+			let col = shade(x, y, Math.sqrt(Math.max(0, 1 - x * x - y * y)));
+			const ring = Math.min(1, Math.max(0, (r - (R - edge)) / Math.max(1, edge * .6)));
+			col = mixRGB(col, outline, ring * .9);
+			const o = (py * c.width + px) * 4;
+			d[o] = col[0];
+			d[o + 1] = col[1];
+			d[o + 2] = col[2];
+			d[o + 3] = cover * 255;
+		}
+		ctx.putImageData(img, 0, 0);
+		return c;
+	}
+	/** Shrinks a canvas to `w`×`h` by halving steps, so the result stays smooth and crisp. */
+	function downscale(src, w, h) {
+		let cur = src;
+		while (cur.width / 2 >= w * 1.2 && cur.height / 2 >= h * 1.2) {
+			const half = makeCanvas(cur.width / 2, cur.height / 2);
+			const hx = context(half);
+			hx.imageSmoothingQuality = "high";
+			hx.drawImage(cur, 0, 0, half.width, half.height);
+			cur = half;
+		}
+		const out = makeCanvas(w, h);
+		const ox = context(out);
+		ox.imageSmoothingQuality = "high";
+		ox.drawImage(cur, 0, 0, out.width, out.height);
+		return out;
+	}
+	/** A soft round glow, white core to a transparent edge, tinted. */
+	function glowSprite(rgb, size = 64) {
+		const c = makeCanvas(size, size);
+		const ctx = context(c);
+		const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+		const [r, gr, b] = rgb.map(Math.round);
+		g.addColorStop(0, `rgba(${r},${gr},${b},1)`);
+		g.addColorStop(.35, `rgba(${r},${gr},${b},0.45)`);
+		g.addColorStop(1, `rgba(${r},${gr},${b},0)`);
+		ctx.fillStyle = g;
+		ctx.fillRect(0, 0, size, size);
+		return c;
+	}
+	var rgba = (c, a) => `rgba(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])},${a})`;
+	//#endregion
+	//#region src/games/pacman/render/actors/sprite/RibbonTrail.ts
+	var RibbonTrail = class {
+		points = [];
+		reset() {
+			this.points = [];
+		}
+		/** The newest point first; a jump longer than `jump` (a teleport) restarts the trail. */
+		push(x, y, step, maxLength, jump) {
+			const head = this.points[0];
+			if (head && Math.hypot(head.x - x, head.y - y) > jump) this.points = [];
+			const fixed = this.points[1];
+			if (this.points.length === 0) this.points.push({
+				x,
+				y
+			});
+			else if (!fixed || Math.hypot(fixed.x - x, fixed.y - y) >= step) this.points.unshift({
+				x,
+				y
+			});
+			else {
+				this.points[0].x = x;
+				this.points[0].y = y;
 			}
-			line = mix(vec3(0.24, 0.08, 0.0), vec3(0.75, 0.2, 0.0), uPow);
-		} else {
-			// pearly candy: soft, translucent, an iridescent sheen at the rim
-			vec3 base = mix(vec3(1.0, 0.86, 0.91), vec3(0.96, 0.5, 0.7), smoothstep(-0.7, 1.0, q.y + q.x * 0.15));
-			c = base * (0.45 + 0.65 * wrap);
-			c += vec3(1.0, 0.45, 0.62) * fres * 0.32;
-			vec3 irid = 0.5 + 0.5 * cos(6.2832 * (fres * 1.3 + vec3(0.0, 0.33, 0.67) + uT * 0.04));
-			c = mix(c, c * 0.65 + irid * 0.45, fres * (0.4 + 0.4 * uPow));
-			c += vec3(1.0, 0.85, 0.92) * rim * 0.6;
-			c += vec3(1.0) * (pow(nh, 140.0) * 1.3 + pow(nh, 16.0) * 0.32);
-			if (uPow > 0.0) {
-				c = mix(c, vec3(1.0, 0.94, 0.97) * (0.85 + 0.3 * wrap), uPow * 0.42);
-				c += vec3(1.0, 0.72, 0.9) * fres * uPow * 0.7;
-			}
-			// the face: a happy closed eye with lashes, a blush, a beauty mark
-			vec2 e = vec2(0.1, -0.42);
-			float arc = abs(length(q - e) - 0.17) - 0.034;
-			arc = max(arc, (q.y - e.y) - 0.02);
-			float lash1 = sdSeg(q, e + 0.17 * vec2(cos(3.55), sin(3.55)), e + 0.3 * vec2(cos(3.5), sin(3.5))) - 0.026;
-			float lash2 = sdSeg(q, e + 0.17 * vec2(cos(4.0), sin(4.0)), e + 0.31 * vec2(cos(3.98), sin(3.98))) - 0.026;
-			float eye = min(arc, min(lash1, lash2));
-			float blush = 1.0 - smoothstep(-0.05, 0.12, length((q - vec2(0.13, -0.15)) / vec2(1.0, 0.6)) - 0.13);
-			c = mix(c, vec3(1.0, 0.38, 0.55), blush * 0.45);
-			float mark = length(q - vec2(0.5, -0.4)) - 0.045;
-			float ink = 1.0 - smoothstep(-aa, aa, min(eye, mark));
-			c = mix(c, vec3(0.32, 0.06, 0.18), ink);
-			line = mix(vec3(0.33, 0.07, 0.2), vec3(0.85, 0.35, 0.6), uPow);
-		}
-		c *= lipAO;
-		// a dark rim keeps the silhouette at tile size
-		float edge = smoothstep(-0.13, -0.02, dB);
-		c = mix(c, line, edge * 0.85);
-		if (uEnd > 0.0 && sin(uT * 22.0) > 0.0) c = mix(c, vec3(1.0), 0.55);
-		col = over(vec4(c * inBody, inBody), col);
-	}
-
-	// in front: her bow and the stars of her power
-	if (ms) {
-		col = over(bow(q, aa, uPow * 0.25), col);
-		if (uPow > 0.0) {
-			for (int i = 0; i < 5; i++) {
-				float a = uT * 1.7 + float(i) * 1.2566;
-				vec2 s = q - vec2(cos(a), sin(a)) * 1.62;
-				float tw = 0.75 + 0.25 * sin(uT * 9.0 + float(i) * 2.0);
-				col.rgb += vec3(1.0, 0.85, 0.95) * twinkle(rot(uT * 0.8) * s, 0.42) * tw * uPow;
+			let len = 0;
+			for (let i = 1; i < this.points.length; i++) {
+				len += Math.hypot(this.points[i].x - this.points[i - 1].x, this.points[i].y - this.points[i - 1].y);
+				if (len > maxLength) {
+					this.points.length = i + 1;
+					break;
+				}
 			}
 		}
-	}
-	o = col;
-}`;
-	var TRAIL = `${COMMON}
-uniform vec2 uPts[48];
-uniform int uN;
-uniform float uR;
-uniform float uLen;
-
-void main() {
-	vec2 p = canvasPx();
-	float best = 1e9;
-	float sBest = 0.0;
-	float side = 1.0;
-	float acc = 0.0;
-	for (int i = 0; i < 47; i++) {
-		if (i >= uN - 1) break;
-		vec2 a = uPts[i];
-		vec2 b = uPts[i + 1];
-		vec2 ab = b - a;
-		float l = length(ab);
-		float h = l > 0.0 ? clamp(dot(p - a, ab) / (l * l), 0.0, 1.0) : 0.0;
-		vec2 to = p - a - ab * h;
-		float d = length(to);
-		if (d < best) {
-			best = d;
-			sBest = acc + h * l;
-			side = sign(ab.x * to.y - ab.y * to.x);
+		/** Shrinks the trail towards the head (standing still, it draws in). */
+		shrink(amount) {
+			while (this.points.length > 1 && amount > 0) {
+				const n = this.points.length;
+				const a = this.points[n - 2];
+				const b = this.points[n - 1];
+				const len = Math.hypot(b.x - a.x, b.y - a.y);
+				if (len <= amount) {
+					this.points.pop();
+					amount -= len;
+				} else {
+					const k = amount / len;
+					b.x += (a.x - b.x) * k;
+					b.y += (a.y - b.y) * k;
+					amount = 0;
+				}
+			}
 		}
-		acc += l;
-	}
-	float fade = clamp(1.0 - sBest / max(uLen, 1.0), 0.0, 1.0);
-	float u = sBest / uR;
-	bool ms = uKind > 0.5;
-	vec4 col = vec4(0);
-	if (!ms) {
-		// his energy ribbon: a hot core, wisps torn off by flowing noise; flame when powered
-		float w = uR * mix(0.78, 1.05, uPow) * pow(fade, 0.65);
-		float v = best / max(w, 1e-3);
-		float nz = fbm(vec2(u * 1.1 - uT * 4.5, side * v * 1.6 + uT * 0.7));
-		float shape = (1.0 - smoothstep(0.15, 1.0, v + (nz - 0.5) * mix(0.9, 1.5, uPow) * (1.15 - fade)));
-		float core = (1.0 - smoothstep(0.0, 0.75, v));
-		float a = shape * pow(fade, 1.25);
-		vec3 gold = mix(vec3(1.0, 0.42, 0.04), vec3(1.0, 0.93, 0.6), core * fade);
-		vec3 fire = mix(mix(vec3(0.85, 0.08, 0.0), vec3(1.0, 0.6, 0.1), fade), vec3(1.0, 0.97, 0.85), core * fade * fade);
-		vec3 c = mix(gold, fire, uPow) * (0.85 + 0.3 * nz);
-		col = vec4(c * a * 1.2, a * 0.7);
-		// sparks riding the ribbon
-		for (int k = 0; k < 14; k++) {
-			float fk = float(k);
-			float sk = fract(hash(vec2(fk, 1.7)) + uT * mix(0.45, 0.8, uPow)) * uLen;
-			float off = (hash(vec2(fk, 4.1)) - 0.5) * uR * mix(1.0, 1.8, uPow) * (sk / uLen + 0.2);
-			float dd = length(vec2(sBest - sk, side * best - off));
-			float sz = uR * (0.05 + 0.05 * hash(vec2(fk, 7.3)));
-			float g = exp(-dd * dd / (sz * sz)) * (1.0 - sk / uLen);
-			col.rgb += mix(vec3(1.0, 0.8, 0.35), vec3(1.0, 0.95, 0.75), uPow) * g * 1.6;
+		get length() {
+			let len = 0;
+			for (let i = 1; i < this.points.length; i++) len += Math.hypot(this.points[i].x - this.points[i - 1].x, this.points[i].y - this.points[i - 1].y);
+			return len;
 		}
-	} else {
-		// her silk ribbon: pearly, folding as it waves, glitter twinkling in it; a rainbow when powered
-		float w = uR * mix(0.58, 0.8, uPow) * pow(fade, 0.55);
-		float v = best / max(w, 1e-3);
-		float fold = 0.8 + 0.2 * sin(u * 2.6 - uT * 7.0 + side * v * 1.5);
-		float shape = (1.0 - smoothstep(0.55, 1.0, v));
-		float a = shape * pow(fade, 1.05);
-		// a pastel palette only: pink, lilac, peach
-		float hp = fract(u * 0.07 - uT * 0.18);
-		vec3 hue = hp < 0.33 ? mix(vec3(1.0, 0.62, 0.82), vec3(0.8, 0.66, 1.0), hp * 3.0)
-			: hp < 0.66 ? mix(vec3(0.8, 0.66, 1.0), vec3(1.0, 0.8, 0.66), hp * 3.0 - 1.0)
-			: mix(vec3(1.0, 0.8, 0.66), vec3(1.0, 0.62, 0.82), hp * 3.0 - 2.0);
-		vec3 pearl = mix(vec3(1.0, 0.68, 0.84), vec3(0.88, 0.7, 1.0), smoothstep(0.0, 4.0, u));
-		vec3 c = mix(pearl, mix(pearl, hue, 0.75), 0.25 + 0.65 * uPow) * fold;
-		c += vec3(1.0) * pow(1.0 - v, 4.0) * 0.35 * fade;
-		col = vec4(c * a * 1.25, a * 0.6);
-		vec2 cell = floor(vec2(sBest / (uR * 0.32), side * best / (uR * 0.32)));
-		vec2 f = fract(vec2(sBest / (uR * 0.32), side * best / (uR * 0.32))) - 0.5;
-		float h = hash(cell);
-		float on = step(mix(0.82, 0.6, uPow), h) * shape;
-		float tw = 0.5 + 0.5 * sin(uT * 8.0 + h * 40.0);
-		float st = exp(-abs(f.y) * 22.0 - abs(f.x) * 4.0) + exp(-abs(f.x) * 22.0 - abs(f.y) * 4.0);
-		col.rgb += vec3(1.0, 0.97, 1.0) * st * on * tw * fade * 0.9;
+		/** The point `d` px back along the trail, or null past its end. */
+		at(d) {
+			let rest = d;
+			for (let i = 1; i < this.points.length; i++) {
+				const a = this.points[i - 1];
+				const b = this.points[i];
+				const len = Math.hypot(b.x - a.x, b.y - a.y);
+				if (rest <= len && len > 0) {
+					const k = rest / len;
+					return {
+						x: a.x + (b.x - a.x) * k,
+						y: a.y + (b.y - a.y) * k
+					};
+				}
+				rest -= len;
+			}
+			return null;
+		}
+		/** Fills each layer as one ribbon, `r` the body radius, `alpha` overall. */
+		draw(ctx, r, layers, alpha = 1) {
+			const pts = this.points;
+			const n = pts.length;
+			if (n < 2 || alpha <= 0) return;
+			const total = this.length;
+			if (total < r * .3) return;
+			for (const layer of layers) {
+				const left = [];
+				const right = [];
+				let acc = 0;
+				for (let i = 0; i < n; i++) {
+					if (i > 0) acc += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+					const a = pts[Math.max(0, i - 1)];
+					const b = pts[Math.min(n - 1, i + 1)];
+					let dx = b.x - a.x;
+					let dy = b.y - a.y;
+					const len = Math.hypot(dx, dy) || 1;
+					dx /= len;
+					dy /= len;
+					const k = acc / total;
+					const w = layer.width * r * Math.pow(1 - k, .75);
+					left.push({
+						x: pts[i].x - dy * w,
+						y: pts[i].y + dx * w
+					});
+					right.push({
+						x: pts[i].x + dy * w,
+						y: pts[i].y - dx * w
+					});
+				}
+				const tail = pts[n - 1];
+				const g = ctx.createLinearGradient(pts[0].x, pts[0].y, tail.x, tail.y);
+				for (const [o, c, a] of layer.stops) g.addColorStop(o, rgba(c, a * alpha));
+				ctx.fillStyle = g;
+				ctx.beginPath();
+				ctx.moveTo(left[0].x, left[0].y);
+				for (let i = 1; i < n; i++) {
+					const p = left[i - 1];
+					const q = left[i];
+					ctx.quadraticCurveTo(p.x, p.y, (p.x + q.x) / 2, (p.y + q.y) / 2);
+				}
+				ctx.lineTo(tail.x, tail.y);
+				for (let i = n - 1; i > 0; i--) {
+					const p = right[i];
+					const q = right[i - 1];
+					ctx.quadraticCurveTo(p.x, p.y, (p.x + q.x) / 2, (p.y + q.y) / 2);
+				}
+				ctx.lineTo(right[0].x, right[0].y);
+				ctx.arc(pts[0].x, pts[0].y, layer.width * r, Math.atan2(right[0].y - pts[0].y, right[0].x - pts[0].x), Math.atan2(left[0].y - pts[0].y, left[0].x - pts[0].x));
+				ctx.closePath();
+				ctx.fill();
+			}
+		}
+	};
+	//#endregion
+	//#region src/games/pacman/render/actors/sprite/Particles.ts
+	var glows = /* @__PURE__ */ new Map();
+	function glowFor(c) {
+		const key = c.join(",");
+		let g = glows.get(key);
+		if (!g) {
+			g = glowSprite(c);
+			glows.set(key, g);
+		}
+		return g;
 	}
-	o = col;
-}`;
+	var Particles = class {
+		pool;
+		random;
+		constructor(size, seed) {
+			this.random = seeded(seed);
+			this.pool = Array.from({ length: size }, () => ({
+				x: 0,
+				y: 0,
+				vx: 0,
+				vy: 0,
+				life: 0,
+				max: 1,
+				size: 1,
+				spin: 0,
+				rot: 0,
+				color: [
+					255,
+					255,
+					255
+				],
+				shape: "glow",
+				active: false
+			}));
+		}
+		reset() {
+			for (const p of this.pool) p.active = false;
+		}
+		spawn(s) {
+			const p = this.pool.find((q) => !q.active);
+			if (!p) return;
+			p.x = s.x;
+			p.y = s.y;
+			p.vx = s.vx;
+			p.vy = s.vy;
+			p.life = s.life;
+			p.max = s.life;
+			p.size = s.size;
+			p.color = s.color;
+			p.shape = s.shape;
+			p.spin = s.spin ?? 0;
+			p.rot = this.random() * Math.PI * 2;
+			p.active = true;
+		}
+		update(dt, drag = .9) {
+			const k = Math.pow(drag, dt * 60);
+			for (const p of this.pool) {
+				if (!p.active) continue;
+				p.life -= dt;
+				if (p.life <= 0) {
+					p.active = false;
+					continue;
+				}
+				p.x += p.vx * dt;
+				p.y += p.vy * dt;
+				p.vx *= k;
+				p.vy *= k;
+				p.rot += p.spin * dt;
+			}
+		}
+		draw(ctx) {
+			for (const p of this.pool) {
+				if (!p.active) continue;
+				const u = p.life / p.max;
+				const a = Math.min(1, (1 - u) * 6) * Math.pow(u, .8);
+				const s = p.size * (.6 + .4 * u);
+				ctx.globalAlpha = a * .7;
+				const g = glowFor(p.color);
+				ctx.drawImage(g, p.x - s * 2.2, p.y - s * 2.2, s * 4.4, s * 4.4);
+				ctx.globalAlpha = a;
+				if (p.shape === "star") {
+					ctx.fillStyle = "rgba(255,255,250,1)";
+					ctx.beginPath();
+					for (let i = 0; i < 4; i++) {
+						const an = p.rot + i * Math.PI / 2;
+						ctx.lineTo(p.x + Math.cos(an) * s * 1.6, p.y + Math.sin(an) * s * 1.6);
+						ctx.lineTo(p.x + Math.cos(an + Math.PI / 4) * s * .35, p.y + Math.sin(an + Math.PI / 4) * s * .35);
+					}
+					ctx.closePath();
+					ctx.fill();
+				} else if (p.shape === "heart") {
+					ctx.fillStyle = rgba(p.color, 1);
+					const h = s * 1.2;
+					ctx.beginPath();
+					ctx.moveTo(p.x, p.y + h * .9);
+					ctx.bezierCurveTo(p.x - h * 1.3, p.y + h * .1, p.x - h * .9, p.y - h * 1.1, p.x, p.y - h * .4);
+					ctx.bezierCurveTo(p.x + h * .9, p.y - h * 1.1, p.x + h * 1.3, p.y + h * .1, p.x, p.y + h * .9);
+					ctx.fill();
+				} else {
+					ctx.fillStyle = p.shape === "ember" ? rgba(p.color, 1) : "rgba(255,255,245,1)";
+					ctx.beginPath();
+					ctx.arc(p.x, p.y, s * (p.shape === "ember" ? .55 : .45), 0, Math.PI * 2);
+					ctx.fill();
+				}
+			}
+			ctx.globalAlpha = 1;
+		}
+	};
+	//#endregion
+	//#region src/games/pacman/render/actors/sprite/CharacterSprite.ts
+	/** Baked canvases span ±2 body radii round the centre. */
+	var SPAN = 2;
+	var POWER_EASE = .3;
+	var DEATH_TIME$1 = 2;
+	var SHADOW = glowSprite([
+		20,
+		10,
+		0
+	]);
+	var cache = /* @__PURE__ */ new Map();
+	var CharacterSprite = class {
+		x = 0;
+		y = 0;
+		angle = 0;
+		flip = 1;
+		lastH = 1;
+		moving = false;
+		time = 0;
+		/** Energizer look 0..1, eased. */
+		power = 0;
+		ending = false;
+		mouthPhase = 0;
+		r = 10;
+		dpr = 1;
+		baked = null;
+		scratch = null;
+		trail = new RibbonTrail();
+		particles;
+		rings = [];
+		travelled = 0;
+		deathClock = 0;
+		/** Seconds into the death, or -1. */
+		dying = -1;
+		flash = 0;
+		flashMax = 1;
+		constructor(seed) {
+			this.particles = new Particles(220, seed);
+		}
+		coronaFrames = 8;
+		trailEmit = 1;
+		/** Body radius in css px and the device pixel ratio; rebakes when they change. */
+		setSize(r, dpr) {
+			this.r = r;
+			this.dpr = dpr;
+			const unit = Math.max(4, Math.round(r * dpr));
+			const key = `${this.id}:${unit}`;
+			let baked = cache.get(key);
+			if (!baked) {
+				baked = this.bake(unit);
+				cache.set(key, baked);
+			}
+			this.baked = baked;
+			const side = Math.ceil(unit * SPAN * 2);
+			if (!this.scratch || this.scratch.width !== side) this.scratch = makeCanvas(side, side);
+		}
+		bake(unit) {
+			const hiR = Math.max(96, Math.ceil(unit * 1.3));
+			const hiSide = Math.ceil(hiR * SPAN * 2);
+			const side = Math.ceil(unit * SPAN * 2);
+			const frame = (paint) => {
+				const c = makeCanvas(hiSide, hiSide);
+				const ctx = context(c);
+				ctx.translate(hiSide / 2, hiSide / 2);
+				paint(ctx);
+				return downscale(c, side, side);
+			};
+			const looks = [0, 1];
+			return {
+				unit,
+				body: looks.map((look) => Array.from({ length: this.surfaceFrames }, (_, k) => {
+					const disc = paintDisc(Math.ceil(hiR * 2 + 4), hiR, this.shader(look, k), this.outline(look), .09);
+					return frame((ctx) => ctx.drawImage(disc, -disc.width / 2, -disc.height / 2));
+				})),
+				extra: this.paintExtra ? looks.map((look) => frame((ctx) => this.paintExtra?.(ctx, hiR, look))) : null,
+				corona: this.paintCorona ? Array.from({ length: this.coronaFrames }, (_, k) => frame((ctx) => this.paintCorona?.(ctx, hiR, k, this.coronaFrames))) : null
+			};
+		}
+		reset() {
+			this.trail.reset();
+			this.particles.reset();
+			this.rings.length = 0;
+			this.dying = -1;
+			this.power = 0;
+			this.flash = 0;
+		}
+		update(dt, s) {
+			this.time += dt;
+			const dx = s.x - this.x;
+			const dy = s.y - this.y;
+			const step = Math.hypot(dx, dy);
+			this.x = s.x;
+			this.y = s.y;
+			this.angle = s.angle;
+			this.moving = s.moving;
+			this.ending = s.ending;
+			if (Math.abs(Math.cos(s.angle)) > .5) this.lastH = Math.cos(s.angle) > 0 ? 1 : -1;
+			const vertical = Math.abs(Math.sin(s.angle)) > .5;
+			this.flip = (vertical ? this.lastH : Math.cos(s.angle) > 0 ? 1 : -1) < 0 ? -1 : 1;
+			const target = s.power ? 1 : 0;
+			this.power += Math.sign(target - this.power) * Math.min(Math.abs(target - this.power), dt / POWER_EASE);
+			if (this.moving) this.mouthPhase += dt * this.mouthSpeed * (1 + .35 * this.power);
+			this.flash = Math.max(0, this.flash - dt);
+			if (this.dying >= 0) {
+				this.dying += dt;
+				this.trail.shrink(this.r * 12 * dt);
+				if (this.dying >= .3 && this.dying < 1.8) {
+					this.deathClock += dt;
+					const every = .06 - Math.min(1, (this.dying - .3) / 1.5) * .035;
+					while (this.deathClock > every) {
+						this.deathClock -= every;
+						this.emitWhileDying();
+					}
+				}
+			} else {
+				this.trail.push(s.x, s.y, this.r * .25, this.r * this.trailLength * (1 + .3 * this.power), this.r * 3);
+				if (!this.moving) this.trail.shrink(this.r * 6 * dt);
+				if (step < this.r * 3) {
+					this.travelled += step;
+					while (this.travelled > this.r * this.trailEmit) {
+						this.travelled -= this.r * this.trailEmit;
+						this.emitWhileMoving();
+					}
+				}
+			}
+			this.particles.update(dt);
+			for (let i = this.rings.length - 1; i >= 0; i--) {
+				this.rings[i].t += dt;
+				if (this.rings[i].t >= this.rings[i].max) this.rings.splice(i, 1);
+			}
+		}
+		/** A game moment: eating, the energizer, a ghost, a teleport (at the exit), dying. */
+		trigger(event) {
+			if (event === "death") {
+				if (this.dying < 0) {
+					this.dying = 0;
+					this.deathClock = 0;
+				}
+			} else if (event === "revive") this.reset();
+			else if (event === "dot") {
+				const a = this.angle;
+				this.ring("dot", this.x + Math.cos(a) * this.r * .9, this.y + Math.sin(a) * this.r * .9, .22);
+			} else if (event === "energizer") {
+				this.ring("pill", this.x, this.y, .55);
+				this.flash = this.flashMax = .45;
+			} else if (event === "ghost") {
+				this.ring("ghost", this.x, this.y, .45);
+				this.flash = this.flashMax = .4;
+			} else if (event === "teleport") {
+				this.ring("warp", this.x, this.y, .4);
+				this.trail.reset();
+			}
+			this.emitOnEvent(event);
+		}
+		ring(kind, x, y, max) {
+			this.rings.push({
+				x,
+				y,
+				kind,
+				t: 0,
+				max,
+				spin: this.particles.random() * Math.PI
+			});
+		}
+		/** The mouth's half-opening, radians. */
+		mouthAngle() {
+			if (this.dying >= 0) return .06;
+			const open = this.moving ? Math.abs(Math.sin(this.mouthPhase)) : .22;
+			return Math.max(.06, open * this.mouthMax * (1 + .15 * this.power));
+		}
+		/** The body's scale this frame: power swell, death convulsion and collapse. */
+		bodyScale() {
+			let s = 1 + .08 * this.power;
+			if (this.dying >= 0) {
+				const d = this.dying;
+				if (d < .3) s *= 1 + Math.sin(d * 45) * .1 * (1 - d / .3);
+				else s *= Math.max(0, 1 - (d - .3) / 1.5 * .88);
+			}
+			return s;
+		}
+		/** The look actually drawn: power, a calm blink at its end, white-hot while dying. */
+		look() {
+			let p = this.power;
+			if (this.ending && p > .5) p = .55 + .45 * (.5 + .5 * Math.cos(this.time * 9));
+			if (this.dying >= .3) p = Math.max(p, Math.min(1, (this.dying - .3) / 1.2));
+			return p;
+		}
+		draw(ctx) {
+			const baked = this.baked;
+			const scratch = this.scratch;
+			if (!baked || !scratch) return;
+			if (this.dying >= DEATH_TIME$1) {
+				this.particles.draw(ctx);
+				return;
+			}
+			const r = this.r;
+			const p = this.look();
+			const scale = this.bodyScale();
+			const layersN = this.trailLayers(0);
+			const layersP = this.trailLayers(1);
+			this.trail.draw(ctx, r, layersN, 1 - this.power);
+			this.trail.draw(ctx, r, layersP, this.power);
+			ctx.globalAlpha = .32 * Math.min(1, scale);
+			ctx.drawImage(SHADOW, this.x - r * 1.1 + r * .12, this.y - r * .55 + r * .42, r * 2.2, r * 1.1);
+			ctx.globalAlpha = 1;
+			const sx = context(scratch);
+			const side = scratch.width;
+			const u = baked.unit;
+			const c = side / 2;
+			sx.setTransform(1, 0, 0, 1, 0, 0);
+			sx.globalCompositeOperation = "source-over";
+			sx.globalAlpha = 1;
+			sx.clearRect(0, 0, side, side);
+			const n = this.surfaceFrames;
+			const f = this.time * this.surfaceRate % n;
+			const k0 = Math.floor(f);
+			const k1 = (k0 + 1) % n;
+			const blend = f - k0;
+			const layer = (look, alpha) => {
+				if (alpha <= .001) return;
+				sx.globalAlpha = alpha;
+				sx.drawImage(baked.body[look][k0], 0, 0);
+				if (n > 1) {
+					sx.globalAlpha = alpha * blend;
+					sx.drawImage(baked.body[look][k1], 0, 0);
+				}
+			};
+			layer(0, 1);
+			layer(1, p);
+			sx.globalAlpha = 1;
+			const m = this.mouthAngle();
+			const wedge = () => {
+				sx.beginPath();
+				sx.moveTo(c - u * .08, c);
+				sx.lineTo(c + Math.cos(m) * u * 1.2, c + Math.sin(m) * u * 1.2);
+				sx.lineTo(c + Math.cos(-m) * u * 1.2, c + Math.sin(-m) * u * 1.2);
+				sx.closePath();
+			};
+			sx.globalCompositeOperation = "destination-out";
+			wedge();
+			sx.fill();
+			sx.globalCompositeOperation = "source-over";
+			const [g0, a0, g1, a1] = this.mouthGlow(p > .5 ? 1 : 0);
+			sx.save();
+			wedge();
+			sx.clip();
+			const glow = sx.createRadialGradient(c, c, 0, c, c, u * .92);
+			glow.addColorStop(0, rgba(g0, a0));
+			glow.addColorStop(1, rgba(g1, a1));
+			sx.fillStyle = glow;
+			sx.beginPath();
+			sx.arc(c, c, u * .92, 0, Math.PI * 2);
+			sx.fill();
+			sx.restore();
+			sx.strokeStyle = rgba(this.outline(p > .5 ? 1 : 0), .9);
+			sx.lineWidth = Math.max(1, u * .1);
+			sx.lineCap = "round";
+			sx.beginPath();
+			sx.moveTo(c + Math.cos(m) * u * .96, c + Math.sin(m) * u * .96);
+			sx.lineTo(c - u * .06, c);
+			sx.lineTo(c + Math.cos(-m) * u * .96, c + Math.sin(-m) * u * .96);
+			sx.stroke();
+			const css = side / this.dpr;
+			ctx.save();
+			ctx.translate(this.x, this.y);
+			ctx.rotate(this.angle);
+			ctx.scale(scale, scale * this.flip);
+			if (baked.corona && p > .01) {
+				const cf = this.time * 12 % baked.corona.length;
+				ctx.globalAlpha = p;
+				ctx.drawImage(baked.corona[Math.floor(cf)], -css / 2, -css / 2, css, css);
+				ctx.globalAlpha = p * (cf - Math.floor(cf));
+				ctx.drawImage(baked.corona[(Math.floor(cf) + 1) % baked.corona.length], -css / 2, -css / 2, css, css);
+				ctx.globalAlpha = 1;
+			}
+			ctx.drawImage(scratch, -css / 2, -css / 2, css, css);
+			if (baked.extra) {
+				ctx.drawImage(baked.extra[0], -css / 2, -css / 2, css, css);
+				if (p > .001) {
+					ctx.globalAlpha = p;
+					ctx.drawImage(baked.extra[1], -css / 2, -css / 2, css, css);
+					ctx.globalAlpha = 1;
+				}
+			}
+			ctx.restore();
+			this.drawOver?.(ctx);
+			if (this.flash > 0) {
+				const a = this.flash / this.flashMax;
+				const g = this.flashGlow();
+				ctx.globalAlpha = a * .75;
+				const s = r * (1.6 + (1 - a) * 1.4);
+				ctx.drawImage(g, this.x - s, this.y - s, s * 2, s * 2);
+				ctx.globalAlpha = 1;
+			}
+			this.drawRings(ctx);
+			this.drawDeath(ctx);
+			this.particles.draw(ctx);
+		}
+		glowCache = null;
+		flashGlow() {
+			if (!this.glowCache) this.glowCache = glowSprite(this.ringColor());
+			return this.glowCache;
+		}
+		drawRings(ctx) {
+			const col = this.ringColor();
+			const r = this.r;
+			for (const ring of this.rings) {
+				const k = ring.t / ring.max;
+				const a = 1 - k;
+				const ease = 1 - Math.pow(1 - k, 3);
+				ctx.lineCap = "round";
+				if (ring.kind === "dot") {
+					ctx.strokeStyle = rgba(col, a * .9);
+					ctx.lineWidth = Math.max(1, r * .12 * a);
+					ctx.beginPath();
+					ctx.arc(ring.x, ring.y, r * .4 * (1 - ease * .8), 0, Math.PI * 2);
+					ctx.stroke();
+				} else if (ring.kind === "pill" || ring.kind === "ghost") {
+					const R = r * (ring.kind === "pill" ? 3.4 : 2.4) * ease;
+					ctx.strokeStyle = rgba(col, a * .35);
+					ctx.lineWidth = r * .5 * a;
+					ctx.beginPath();
+					ctx.arc(ring.x, ring.y, R, 0, Math.PI * 2);
+					ctx.stroke();
+					ctx.strokeStyle = rgba([
+						255,
+						255,
+						245
+					], a * .9);
+					ctx.lineWidth = Math.max(1, r * .12 * a);
+					ctx.stroke();
+				} else {
+					const R = r * 1.8 * (1 - ease * .7);
+					for (let i = 0; i < 10; i++) {
+						const an = ring.spin + i / 10 * Math.PI * 2 + ease * 4;
+						ctx.strokeStyle = rgba(i % 3 === 0 ? [
+							255,
+							255,
+							245
+						] : col, a * .8);
+						ctx.lineWidth = Math.max(1, r * (i % 3 === 0 ? .12 : .07) * a);
+						ctx.beginPath();
+						ctx.arc(ring.x, ring.y, R * (.55 + .45 * (i * 7 % 10) / 10), an, an + .9);
+						ctx.stroke();
+					}
+				}
+			}
+		}
+		/** The end of the collapse: a pop of light, then a fading flash. */
+		drawDeath(ctx) {
+			const d = this.dying;
+			if (d < 1.5) return;
+			const g = this.flashGlow();
+			const k = Math.min(1, (d - 1.5) / .5);
+			const a = d < 1.8 ? 1 : 1 - (d - 1.8) / .2;
+			const s = this.r * (.6 + k * 3.2);
+			ctx.globalAlpha = Math.max(0, a) * .85;
+			ctx.drawImage(g, this.x - s, this.y - s, s * 2, s * 2);
+			ctx.globalAlpha = 1;
+		}
+		/** Behind the actor, at its back edge. */
+		backPoint(spread = .6) {
+			const rnd = this.particles.random;
+			const angle = this.angle + Math.PI + (rnd() - .5) * spread;
+			return {
+				x: this.x - Math.cos(this.angle) * this.r * .75,
+				y: this.y - Math.sin(this.angle) * this.r * .75,
+				angle
+			};
+		}
+	};
+	//#endregion
+	//#region src/games/pacman/render/actors/sprite/SolarPacmanSprite.ts
+	var LIMB = [[
+		[0, [
+			255,
+			244,
+			190
+		]],
+		[.35, [
+			255,
+			208,
+			82
+		]],
+		[.68, [
+			252,
+			145,
+			32
+		]],
+		[.9, [
+			222,
+			80,
+			12
+		]],
+		[1, [
+			168,
+			40,
+			6
+		]]
+	], [
+		[0, [
+			255,
+			255,
+			246
+		]],
+		[.35, [
+			255,
+			243,
+			178
+		]],
+		[.68, [
+			255,
+			196,
+			86
+		]],
+		[.9, [
+			255,
+			124,
+			34
+		]],
+		[1, [
+			226,
+			62,
+			12
+		]]
+	]];
+	var L$1 = (() => {
+		const v = [
+			-.45,
+			-.6,
+			.66
+		];
+		const n = Math.hypot(v[0], v[1], v[2]);
+		return v.map((c) => c / n);
+	})();
+	var H$1 = (() => {
+		const v = [
+			L$1[0],
+			L$1[1],
+			L$1[2] + 1
+		];
+		const n = Math.hypot(v[0], v[1], v[2]);
+		return v.map((c) => c / n);
+	})();
+	var FIRE = [
+		[0, [
+			230,
+			40,
+			0
+		]],
+		[.45, [
+			255,
+			140,
+			30
+		]],
+		[.8, [
+			255,
+			222,
+			120
+		]],
+		[1, [
+			255,
+			252,
+			225
+		]]
+	];
+	var SolarPacmanSprite = class extends CharacterSprite {
+		id = "solar-pacman";
+		surfaceFrames = 8;
+		surfaceRate = 7;
+		mouthMax = Math.PI / 2.9;
+		mouthSpeed = 10;
+		trailLength = 4.2;
+		granulation = loopingField(112, 3.4, 11);
+		flames = loopingField(128, 5.5, 23);
+		constructor() {
+			super(7);
+		}
+		shader(look, frame) {
+			const stops = LIMB[look];
+			return (x, y, z) => {
+				const t = 1 - z;
+				const base = ramp(stops, Math.pow(t, .85));
+				const g = this.granulation(frame, this.surfaceFrames, x, y);
+				const cells = look ? .72 + .56 * g : .8 + .4 * g;
+				const lam = .8 + .28 * (x * L$1[0] + y * L$1[1] + z * L$1[2]);
+				const spec = Math.pow(Math.max(0, x * H$1[0] + y * H$1[1] + z * H$1[2]), 34) * (look ? .15 : .32);
+				let col = mixRGB(base, [
+					255,
+					232,
+					168
+				], Math.pow(t, 2.5) * Math.max(0, x) * .55);
+				col = [
+					col[0] * cells * lam,
+					col[1] * cells * lam,
+					col[2] * cells * lam
+				];
+				return [
+					Math.min(255, col[0] + 255 * spec),
+					Math.min(255, col[1] + 250 * spec),
+					Math.min(255, col[2] + 230 * spec)
+				];
+			};
+		}
+		outline(look) {
+			return look ? [
+				140,
+				44,
+				0
+			] : [
+				84,
+				22,
+				0
+			];
+		}
+		mouthGlow(look) {
+			return look ? [
+				[
+					150,
+					50,
+					0
+				],
+				.7,
+				[
+					255,
+					210,
+					120
+				],
+				.55
+			] : [
+				[
+					90,
+					22,
+					0
+				],
+				.72,
+				[
+					255,
+					150,
+					40
+				],
+				.4
+			];
+		}
+		trailLayers(look) {
+			return look ? [{
+				width: 1.1,
+				stops: [
+					[
+						0,
+						[
+							255,
+							160,
+							60
+						],
+						.45
+					],
+					[
+						.6,
+						[
+							255,
+							80,
+							10
+						],
+						.2
+					],
+					[
+						1,
+						[
+							220,
+							40,
+							0
+						],
+						0
+					]
+				]
+			}, {
+				width: .6,
+				stops: [
+					[
+						0,
+						[
+							255,
+							255,
+							240
+						],
+						1
+					],
+					[
+						.5,
+						[
+							255,
+							220,
+							120
+						],
+						.75
+					],
+					[
+						1,
+						[
+							255,
+							140,
+							40
+						],
+						0
+					]
+				]
+			}] : [{
+				width: .85,
+				stops: [
+					[
+						0,
+						[
+							255,
+							110,
+							20
+						],
+						.35
+					],
+					[
+						.6,
+						[
+							230,
+							60,
+							10
+						],
+						.15
+					],
+					[
+						1,
+						[
+							200,
+							40,
+							0
+						],
+						0
+					]
+				]
+			}, {
+				width: .42,
+				stops: [
+					[
+						0,
+						[
+							255,
+							240,
+							170
+						],
+						.95
+					],
+					[
+						.5,
+						[
+							255,
+							170,
+							60
+						],
+						.6
+					],
+					[
+						1,
+						[
+							255,
+							110,
+							20
+						],
+						0
+					]
+				]
+			}];
+		}
+		/** A ring of flames round the body, one frame of a looping cycle. */
+		paintCorona(ctx, R, frame, frames) {
+			const c = ctx.canvas;
+			const img = context(c).createImageData(c.width, c.height);
+			const d = img.data;
+			const mid = c.width / 2;
+			for (let py = 0; py < c.height; py++) for (let px = 0; px < c.width; px++) {
+				const dx = px + .5 - mid;
+				const dy = py + .5 - mid;
+				const rr = Math.hypot(dx, dy) / R;
+				if (rr < .85 || rr > 1.85) continue;
+				const f = this.flames(frame, frames, dx / (1.85 * R), dy / (1.85 * R));
+				const h = .22 + .6 * Math.max(0, f - .25);
+				const k = 1 - (rr - .92) / h;
+				if (k <= 0) continue;
+				const heat = Math.min(1, k);
+				const col = ramp(FIRE, heat);
+				const a = Math.pow(heat, 1.3) * Math.min(1, (rr - .85) / .1);
+				const o = (py * c.width + px) * 4;
+				d[o] = col[0];
+				d[o + 1] = col[1];
+				d[o + 2] = col[2];
+				d[o + 3] = a * 235;
+			}
+			context(c).putImageData(img, 0, 0);
+		}
+		ringColor() {
+			return [
+				255,
+				196,
+				90
+			];
+		}
+		emitWhileMoving() {
+			const rnd = this.particles.random;
+			if (rnd() > .5 + .4 * this.power) return;
+			const b = this.backPoint(.9);
+			const speed = this.r * (2 + rnd() * 2.5);
+			this.particles.spawn({
+				x: b.x + (rnd() - .5) * this.r * .6,
+				y: b.y + (rnd() - .5) * this.r * .6,
+				vx: Math.cos(b.angle) * speed,
+				vy: Math.sin(b.angle) * speed,
+				life: .35 + rnd() * .3,
+				size: this.r * (.09 + rnd() * .06),
+				color: this.power > .5 ? [
+					255,
+					236,
+					170
+				] : [
+					255,
+					180,
+					70
+				],
+				shape: "ember"
+			});
+		}
+		emitOnEvent(event) {
+			const rnd = this.particles.random;
+			const burst = (n, speed, color, life) => {
+				for (let i = 0; i < n; i++) {
+					const a = i / n * Math.PI * 2 + rnd() * .3;
+					const v = this.r * speed * (.6 + rnd() * .8);
+					this.particles.spawn({
+						x: this.x + Math.cos(a) * this.r * .6,
+						y: this.y + Math.sin(a) * this.r * .6,
+						vx: Math.cos(a) * v,
+						vy: Math.sin(a) * v,
+						life: life * (.7 + rnd() * .6),
+						size: this.r * (.08 + rnd() * .08),
+						color,
+						shape: "ember"
+					});
+				}
+			};
+			if (event === "energizer") burst(22, 9, [
+				255,
+				220,
+				120
+			], .6);
+			else if (event === "ghost") burst(18, 11, [
+				255,
+				245,
+				200
+			], .55);
+			else if (event === "teleport") burst(10, 6, [
+				255,
+				200,
+				90
+			], .4);
+		}
+		/** Jets of plasma out of both poles of the collapsing star. */
+		emitWhileDying() {
+			const rnd = this.particles.random;
+			for (let i = 0; i < 3; i++) {
+				const jet = rnd() < .5;
+				const a = jet ? this.angle + (rnd() < .5 ? Math.PI / 2 : -Math.PI / 2) + (rnd() - .5) * .5 : rnd() * Math.PI * 2;
+				const v = this.r * (jet ? 9 + rnd() * 8 : 3 + rnd() * 4);
+				this.particles.spawn({
+					x: this.x,
+					y: this.y,
+					vx: Math.cos(a) * v,
+					vy: Math.sin(a) * v,
+					life: .4 + rnd() * .5,
+					size: this.r * (.07 + rnd() * .1),
+					color: [
+						255,
+						200 + rnd() * 55,
+						120
+					],
+					shape: "ember"
+				});
+			}
+		}
+	};
+	//#endregion
+	//#region src/games/pacman/render/actors/sprite/StardustMsPacmanSprite.ts
+	var BODY = [[
+		[0, [
+			200,
+			56,
+			122
+		]],
+		[.5, [
+			222,
+			70,
+			136
+		]],
+		[.8, [
+			250,
+			112,
+			172
+		]],
+		[.95, [
+			255,
+			172,
+			210
+		]],
+		[1, [
+			255,
+			202,
+			226
+		]]
+	], [
+		[0, [
+			246,
+			140,
+			192
+		]],
+		[.5, [
+			255,
+			176,
+			212
+		]],
+		[.8, [
+			255,
+			208,
+			226
+		]],
+		[.95, [
+			255,
+			226,
+			166
+		]],
+		[1, [
+			255,
+			236,
+			176
+		]]
+	]];
+	var L = (() => {
+		const v = [
+			-.45,
+			-.6,
+			.66
+		];
+		const n = Math.hypot(v[0], v[1], v[2]);
+		return v.map((c) => c / n);
+	})();
+	var H = (() => {
+		const v = [
+			L[0],
+			L[1],
+			L[2] + 1
+		];
+		const n = Math.hypot(v[0], v[1], v[2]);
+		return v.map((c) => c / n);
+	})();
+	/** Stardust inside the body: fixed points, each twinkling on its own phase. */
+	var STARDUST = (() => {
+		const rnd = seeded(41);
+		const out = [];
+		while (out.length < 16) {
+			const x = rnd() * 2 - 1;
+			const y = rnd() * 2 - 1;
+			if (x * x + y * y < .7) out.push({
+				x,
+				y,
+				ph: rnd(),
+				s: .025 + rnd() * .025
+			});
+		}
+		return out;
+	})();
+	/** The bow's angle in the frame: behind and above the head. */
+	var BOW_ANGLE = -.85 * Math.PI;
+	var GOLD_STAR = glowSprite([
+		255,
+		214,
+		110
+	]);
+	var StardustMsPacmanSprite = class extends CharacterSprite {
+		id = "stardust-ms-pacman";
+		surfaceFrames = 6;
+		surfaceRate = 4;
+		mouthMax = Math.PI / 3.2;
+		mouthSpeed = 8.5;
+		trailLength = 4;
+		constructor() {
+			super(19);
+		}
+		shader(look, frame) {
+			const stops = BODY[look];
+			return (x, y, z) => {
+				const t = 1 - z;
+				let col = ramp(stops, Math.pow(t, .9));
+				const lam = .84 + .22 * (x * L[0] + y * L[1] + z * L[2]);
+				col = [
+					col[0] * lam,
+					col[1] * lam,
+					col[2] * lam
+				];
+				col = mixRGB(col, look ? [
+					255,
+					236,
+					170
+				] : [
+					255,
+					196,
+					222
+				], Math.pow(t, 2.4) * Math.max(0, x) * .5);
+				let dust = 0;
+				for (const s of STARDUST) {
+					const d2 = (x - s.x) ** 2 + (y - s.y) ** 2;
+					const tw = .5 + .5 * Math.cos(Math.PI * 2 * (frame / this.surfaceFrames + s.ph));
+					dust += Math.exp(-d2 / (s.s * s.s)) * tw;
+				}
+				const nh = Math.max(0, x * H[0] + y * H[1] + z * H[2]);
+				const spec = Math.pow(nh, 18) * .38 + Math.pow(nh, 140) * .9;
+				const add = Math.min(1, dust * .8) * .85 + spec;
+				return [
+					Math.min(255, col[0] + 255 * add),
+					Math.min(255, col[1] + 236 * add),
+					Math.min(255, col[2] + 246 * add)
+				];
+			};
+		}
+		outline(look) {
+			return look ? [
+				150,
+				70,
+				100
+			] : [
+				92,
+				14,
+				54
+			];
+		}
+		mouthGlow(look) {
+			return look ? [
+				[
+					140,
+					50,
+					90
+				],
+				.65,
+				[
+					255,
+					220,
+					170
+				],
+				.5
+			] : [
+				[
+					86,
+					10,
+					46
+				],
+				.7,
+				[
+					255,
+					130,
+					190
+				],
+				.38
+			];
+		}
+		trailLayers(look) {
+			return look ? [{
+				width: .95,
+				stops: [
+					[
+						0,
+						[
+							255,
+							210,
+							130
+						],
+						.4
+					],
+					[
+						.6,
+						[
+							255,
+							150,
+							180
+						],
+						.18
+					],
+					[
+						1,
+						[
+							255,
+							140,
+							180
+						],
+						0
+					]
+				]
+			}, {
+				width: .5,
+				stops: [
+					[
+						0,
+						[
+							255,
+							252,
+							225
+						],
+						1
+					],
+					[
+						.5,
+						[
+							255,
+							222,
+							150
+						],
+						.7
+					],
+					[
+						1,
+						[
+							255,
+							180,
+							130
+						],
+						0
+					]
+				]
+			}] : [{
+				width: .75,
+				stops: [
+					[
+						0,
+						[
+							255,
+							80,
+							160
+						],
+						.33
+					],
+					[
+						.6,
+						[
+							240,
+							60,
+							140
+						],
+						.14
+					],
+					[
+						1,
+						[
+							240,
+							60,
+							140
+						],
+						0
+					]
+				]
+			}, {
+				width: .36,
+				stops: [
+					[
+						0,
+						[
+							255,
+							222,
+							236
+						],
+						.95
+					],
+					[
+						.5,
+						[
+							255,
+							150,
+							200
+						],
+						.6
+					],
+					[
+						1,
+						[
+							255,
+							120,
+							180
+						],
+						0
+					]
+				]
+			}];
+		}
+		/**
+		* The bow, behind and above the head: two rounded loops lying along the head, a knot and
+		* two short tails, shaded like satin (a crease at the knot, light on the loops' tops).
+		*/
+		paintExtra(ctx, R, look) {
+			const bx = Math.cos(BOW_ANGLE) * R * .86;
+			const by = Math.sin(BOW_ANGLE) * R * .86;
+			const deep = look ? [
+				206,
+				128,
+				18
+			] : [
+				178,
+				14,
+				80
+			];
+			const mid = look ? [
+				255,
+				204,
+				70
+			] : [
+				255,
+				58,
+				136
+			];
+			const light = look ? [
+				255,
+				244,
+				180
+			] : [
+				255,
+				158,
+				200
+			];
+			const line = look ? [
+				112,
+				60,
+				0
+			] : [
+				82,
+				6,
+				40
+			];
+			const len = R * .8;
+			const wid = R * .6;
+			const loop = (dir) => {
+				const ux = Math.cos(dir);
+				const uy = Math.sin(dir);
+				const px = -uy;
+				const py = ux;
+				const ex = bx + ux * len;
+				const ey = by + uy * len;
+				ctx.beginPath();
+				ctx.moveTo(bx, by);
+				ctx.bezierCurveTo(bx + ux * len * .3 + px * wid * .75, by + uy * len * .3 + py * wid * .75, ex - ux * len * .15 + px * wid * .6, ey - uy * len * .15 + py * wid * .6, ex + ux * len * .1, ey + uy * len * .1);
+				ctx.bezierCurveTo(ex - ux * len * .15 - px * wid * .6, ey - uy * len * .15 - py * wid * .6, bx + ux * len * .3 - px * wid * .75, by + uy * len * .3 - py * wid * .75, bx, by);
+				ctx.closePath();
+				return {
+					ex,
+					ey,
+					px,
+					py
+				};
+			};
+			const tail = (dir) => {
+				const ux = Math.cos(dir);
+				const uy = Math.sin(dir);
+				ctx.beginPath();
+				ctx.moveTo(bx - uy * R * .08, by + ux * R * .08);
+				ctx.lineTo(bx + ux * R * .5 - uy * R * .13, by + uy * R * .5 + ux * R * .13);
+				ctx.lineTo(bx + ux * R * .42, by + uy * R * .42);
+				ctx.lineTo(bx + ux * R * .5 + uy * R * .13, by + uy * R * .5 - ux * R * .13);
+				ctx.lineTo(bx + uy * R * .08, by - ux * R * .08);
+				ctx.closePath();
+			};
+			const along = BOW_ANGLE + Math.PI / 2;
+			const dirs = [along - .3, along + Math.PI + .3];
+			const tails = [BOW_ANGLE + Math.PI - .45, BOW_ANGLE + Math.PI + .45];
+			ctx.lineJoin = "round";
+			ctx.lineCap = "round";
+			ctx.strokeStyle = rgba(line, 1);
+			ctx.lineWidth = R * .16;
+			for (const d of tails) {
+				tail(d);
+				ctx.stroke();
+			}
+			for (const d of dirs) {
+				loop(d);
+				ctx.stroke();
+			}
+			ctx.beginPath();
+			ctx.arc(bx, by, R * .24, 0, Math.PI * 2);
+			ctx.stroke();
+			for (const d of tails) {
+				tail(d);
+				ctx.fillStyle = rgba(deep, 1);
+				ctx.fill();
+			}
+			for (const d of dirs) {
+				const { ex, ey } = loop(d);
+				const g = ctx.createLinearGradient(bx, by, ex, ey);
+				g.addColorStop(0, rgba(deep, 1));
+				g.addColorStop(.45, rgba(mid, 1));
+				g.addColorStop(1, rgba(light, 1));
+				ctx.fillStyle = g;
+				ctx.fill();
+				ctx.save();
+				ctx.clip();
+				const top = ctx.createLinearGradient(bx, by - R * .6, bx, by + R * .3);
+				top.addColorStop(0, "rgba(255,255,255,0.55)");
+				top.addColorStop(.45, "rgba(255,255,255,0)");
+				ctx.fillStyle = top;
+				ctx.fillRect(bx - R * 1.2, by - R * 1.2, R * 2.4, R * 2.4);
+				ctx.restore();
+			}
+			const k = ctx.createRadialGradient(bx - R * .07, by - R * .07, 0, bx, by, R * .24);
+			k.addColorStop(0, rgba(light, 1));
+			k.addColorStop(1, rgba(deep, 1));
+			ctx.fillStyle = k;
+			ctx.beginPath();
+			ctx.arc(bx, by, R * .24, 0, Math.PI * 2);
+			ctx.fill();
+			ctx.fillStyle = "rgba(255,255,255,0.85)";
+			ctx.beginPath();
+			ctx.arc(bx - R * .08, by - R * .08, R * .06, 0, Math.PI * 2);
+			ctx.fill();
+		}
+		ringColor() {
+			return this.power > .5 ? [
+				255,
+				214,
+				110
+			] : [
+				255,
+				120,
+				190
+			];
+		}
+		/** Powered: five gold stars circling her, twinkling slowly. */
+		drawOver(ctx) {
+			const p = this.power;
+			if (p <= .01 || this.dying >= 0) return;
+			const r = this.r;
+			for (let i = 0; i < 5; i++) {
+				const a = this.time * 1.6 + i / 5 * Math.PI * 2;
+				const x = this.x + Math.cos(a) * r * 1.5;
+				const y = this.y + Math.sin(a) * r * 1.5;
+				const tw = .75 + .25 * Math.sin(this.time * 4 + i * 1.3);
+				const s = r * .32 * tw;
+				ctx.globalAlpha = p * .8;
+				ctx.drawImage(GOLD_STAR, x - s * 1.6, y - s * 1.6, s * 3.2, s * 3.2);
+				ctx.globalAlpha = p;
+				ctx.fillStyle = "rgba(255,250,225,1)";
+				ctx.beginPath();
+				for (let j = 0; j < 4; j++) {
+					const an = this.time * .8 + j * Math.PI / 2;
+					ctx.lineTo(x + Math.cos(an) * s, y + Math.sin(an) * s);
+					ctx.lineTo(x + Math.cos(an + Math.PI / 4) * s * .25, y + Math.sin(an + Math.PI / 4) * s * .25);
+				}
+				ctx.closePath();
+				ctx.fill();
+			}
+			ctx.globalAlpha = 1;
+		}
+		emitWhileMoving() {
+			const rnd = this.particles.random;
+			if (rnd() > .45 + .4 * this.power) return;
+			const b = this.backPoint(1.2);
+			const speed = this.r * (1 + rnd() * 1.5);
+			this.particles.spawn({
+				x: b.x + (rnd() - .5) * this.r * .8,
+				y: b.y + (rnd() - .5) * this.r * .8,
+				vx: Math.cos(b.angle) * speed,
+				vy: Math.sin(b.angle) * speed,
+				life: .5 + rnd() * .4,
+				size: this.r * (.1 + rnd() * .06),
+				color: this.power > .5 ? [
+					255,
+					214,
+					110
+				] : [
+					255,
+					140,
+					200
+				],
+				shape: "star",
+				spin: (rnd() - .5) * 6
+			});
+		}
+		emitOnEvent(event) {
+			const rnd = this.particles.random;
+			const burst = (n, speed, color, shape, life) => {
+				for (let i = 0; i < n; i++) {
+					const a = i / n * Math.PI * 2 + rnd() * .3;
+					const v = this.r * speed * (.6 + rnd() * .7);
+					this.particles.spawn({
+						x: this.x + Math.cos(a) * this.r * .5,
+						y: this.y + Math.sin(a) * this.r * .5,
+						vx: Math.cos(a) * v,
+						vy: Math.sin(a) * v,
+						life: life * (.7 + rnd() * .6),
+						size: this.r * (.12 + rnd() * .08),
+						color,
+						shape,
+						spin: (rnd() - .5) * 8
+					});
+				}
+			};
+			if (event === "energizer") burst(14, 7, [
+				255,
+				214,
+				110
+			], "star", .7);
+			else if (event === "ghost") {
+				burst(8, 6, [
+					255,
+					70,
+					140
+				], "heart", .8);
+				burst(10, 9, [
+					255,
+					220,
+					240
+				], "star", .6);
+			} else if (event === "teleport") burst(10, 5, [
+				255,
+				160,
+				210
+			], "star", .45);
+		}
+		/** Hearts and stars spilling out as she fades. */
+		emitWhileDying() {
+			const rnd = this.particles.random;
+			for (let i = 0; i < 2; i++) {
+				const a = rnd() * Math.PI * 2;
+				const v = this.r * (3 + rnd() * 6);
+				const heart = rnd() < .35;
+				this.particles.spawn({
+					x: this.x + Math.cos(a) * this.r * .3,
+					y: this.y + Math.sin(a) * this.r * .3,
+					vx: Math.cos(a) * v,
+					vy: Math.sin(a) * v,
+					life: .6 + rnd() * .6,
+					size: this.r * (.1 + rnd() * .1),
+					color: heart ? [
+						255,
+						70,
+						140
+					] : [
+						255,
+						210,
+						235
+					],
+					shape: heart ? "heart" : "star",
+					spin: (rnd() - .5) * 8
+				});
+			}
+		}
+	};
 	//#endregion
 	//#region prototypes/pacman/characters/main.ts
 	var $ = (id) => document.getElementById(id);
@@ -3795,110 +5208,8 @@ void main() {
 	var D = Math.min(window.devicePixelRatio || 1, 2);
 	var POWER_TIME = 6;
 	var POWER_ENDING = 1.6;
-	var POWER_EASE = .35;
 	var SPEED = 5.2;
-	/** Length of path kept for the trail, in body radii. */
-	var TRAIL_LENGTH = 4.6;
-	var glCanvas = document.createElement("canvas");
-	var gl = glCanvas.getContext("webgl2", {
-		premultipliedAlpha: true,
-		alpha: true,
-		antialias: false,
-		preserveDrawingBuffer: true
-	});
-	function program(fragment) {
-		const make = (type, src) => {
-			const sh = gl.createShader(type);
-			gl.shaderSource(sh, src);
-			gl.compileShader(sh);
-			if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) console.error("characters shader", gl.getShaderInfoLog(sh));
-			return sh;
-		};
-		const p = gl.createProgram();
-		gl.attachShader(p, make(gl.VERTEX_SHADER, VERTEX));
-		gl.attachShader(p, make(gl.FRAGMENT_SHADER, fragment));
-		gl.bindAttribLocation(p, 0, "aCorner");
-		gl.linkProgram(p);
-		if (!gl.getProgramParameter(p, gl.LINK_STATUS)) console.error("characters program", gl.getProgramInfoLog(p));
-		return p;
-	}
-	var charProg = program(CHARACTER);
-	var trailProg = program(TRAIL);
-	var quad = gl.createBuffer();
-	gl.bindBuffer(gl.ARRAY_BUFFER, quad);
-	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-		-1,
-		-1,
-		1,
-		-1,
-		-1,
-		1,
-		1,
-		1
-	]), gl.STATIC_DRAW);
-	gl.enableVertexAttribArray(0);
-	gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-	var loc = (p, name) => gl.getUniformLocation(p, name);
-	function drawTrail(a, power, t) {
-		const pts = a.trail;
-		if (pts.length < 2) return;
-		const step = Math.max(1, Math.ceil(pts.length / 48));
-		const used = [];
-		for (let i = 0; i < pts.length; i += step) used.push(pts[i]);
-		if (used[used.length - 1] !== pts[pts.length - 1]) used.push(pts[pts.length - 1]);
-		const flat = /* @__PURE__ */ new Float32Array(96);
-		let len = 0;
-		let x0 = Infinity;
-		let y0 = Infinity;
-		let x1 = -Infinity;
-		let y1 = -Infinity;
-		used.slice(0, 48).forEach((p, i) => {
-			flat[i * 2] = p.x * D;
-			flat[i * 2 + 1] = p.y * D;
-			if (i > 0) len += Math.hypot(p.x - used[i - 1].x, p.y - used[i - 1].y) * D;
-			x0 = Math.min(x0, p.x);
-			y0 = Math.min(y0, p.y);
-			x1 = Math.max(x1, p.x);
-			y1 = Math.max(y1, p.y);
-		});
-		const m = a.r * 2;
-		gl.useProgram(trailProg);
-		gl.uniform2f(loc(trailProg, "uRes"), glCanvas.width, glCanvas.height);
-		gl.uniform4f(loc(trailProg, "uBox"), (x0 - m) * D, (y0 - m) * D, (x1 + m) * D, (y1 + m) * D);
-		gl.uniform2fv(loc(trailProg, "uPts"), flat);
-		gl.uniform1i(loc(trailProg, "uN"), Math.min(48, used.length));
-		gl.uniform1f(loc(trailProg, "uR"), a.r * D);
-		gl.uniform1f(loc(trailProg, "uLen"), len);
-		gl.uniform1f(loc(trailProg, "uPow"), power);
-		gl.uniform1f(loc(trailProg, "uKind"), a.kind);
-		gl.uniform1f(loc(trailProg, "uT"), t);
-		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-	}
-	function drawActor(a, power, ending, t) {
-		const m = a.r * 2.4;
-		gl.useProgram(charProg);
-		gl.uniform2f(loc(charProg, "uRes"), glCanvas.width, glCanvas.height);
-		gl.uniform4f(loc(charProg, "uBox"), (a.x - m) * D, (a.y - m) * D, (a.x + m) * D, (a.y + m) * D);
-		gl.uniform2f(loc(charProg, "uC"), a.x * D, a.y * D);
-		gl.uniform1f(loc(charProg, "uR"), a.r * D);
-		gl.uniform1f(loc(charProg, "uAng"), a.angle);
-		gl.uniform1f(loc(charProg, "uFlip"), a.flip);
-		gl.uniform1f(loc(charProg, "uMouth"), a.mouth);
-		gl.uniform1f(loc(charProg, "uPow"), power);
-		gl.uniform1f(loc(charProg, "uEnd"), ending);
-		gl.uniform1f(loc(charProg, "uKind"), a.kind);
-		gl.uniform1f(loc(charProg, "uT"), t);
-		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-	}
-	var world;
-	var vw = 0;
-	var vh = 0;
-	var panelW = 0;
-	var stopped = false;
-	var powerTimer = 0;
-	var power = 0;
-	/** The large pair's angle on their ellipses. */
-	var bigPhase = 0;
+	var DEATH_TIME = 2.6;
 	/** Corridor loops in GRID_01 (tile corners, clockwise from the bottom-left). */
 	var LOOPS = [[
 		[13, 5],
@@ -3939,49 +5250,29 @@ void main() {
 			angle: 0
 		};
 	}
-	var newActor = (kind) => ({
-		kind,
-		x: 0,
-		y: 0,
-		r: 10,
-		angle: 0,
-		flip: 1,
-		lastH: 1,
-		mouth: 0,
-		trail: []
-	});
-	var mazeActors = [newActor(0), newActor(1)];
-	var bigActors = [newActor(0), newActor(1)];
-	var along = [0, 7];
-	/** Moves an actor and records its path for the trail. */
-	function place(a, x, y, angle, dt, t) {
-		a.x = x;
-		a.y = y;
-		a.angle = angle;
-		if (Math.abs(Math.cos(angle)) > .5) a.lastH = Math.cos(angle) > 0 ? 1 : -1;
-		a.flip = (Math.abs(Math.sin(angle)) > .5 ? a.lastH : Math.cos(angle) > 0 ? 1 : -1) < 0 ? -1 : 1;
-		a.mouth = stopped ? .35 : Math.abs(Math.sin(t * 13));
-		for (const p of a.trail) p.age += dt;
-		a.trail.unshift({
-			x,
-			y,
-			age: 0
-		});
-		let len = 0;
-		for (let i = 1; i < a.trail.length; i++) {
-			len += Math.hypot(a.trail[i].x - a.trail[i - 1].x, a.trail[i].y - a.trail[i - 1].y);
-			if (len > a.r * TRAIL_LENGTH) {
-				a.trail.length = i + 1;
-				break;
-			}
-		}
-		if (stopped) a.trail.length = Math.min(a.trail.length, 1);
-	}
+	var maze = [{
+		sprite: new SolarPacmanSprite(),
+		along: 0,
+		lastTile: 0
+	}, {
+		sprite: new StardustMsPacmanSprite(),
+		along: 7,
+		lastTile: 7
+	}];
+	var big = [new SolarPacmanSprite(), new StardustMsPacmanSprite()];
+	var all = [...maze.map((m) => m.sprite), ...big];
+	var world;
+	var vw = 0;
+	var vh = 0;
+	var panelW = 0;
+	var stopped = false;
+	var powerTimer = 0;
+	var deathTimer = -1;
+	var bigPhase = 0;
 	function buildWorld() {
 		world = new MeadowWorld(GRID_01, meadowThemeFor("summer"));
 		world.resize(vw - panelW, vh, D);
 		for (let i = 0; i < 80; i++) world.update(.1);
-		for (const a of [...mazeActors, ...bigActors]) a.trail = [];
 	}
 	function layout() {
 		vw = window.innerWidth;
@@ -3991,29 +5282,87 @@ void main() {
 		view.height = Math.round(vh * D);
 		view.style.width = `${vw}px`;
 		view.style.height = `${vh}px`;
-		glCanvas.width = view.width;
-		glCanvas.height = view.height;
 		buildWorld();
+		const S = world.layout.tileSize;
+		for (const m of maze) m.sprite.setSize(S * .44, D);
+		for (const b of big) b.setSize(Math.min(panelW * .11, vh * .08), D);
+		for (const s of all) s.reset();
 	}
+	var send = (e) => {
+		for (const s of all) s.trigger(e);
+	};
 	$("power").addEventListener("click", () => {
 		powerTimer = POWER_TIME;
+		send("energizer");
+	});
+	$("ghost").addEventListener("click", () => send("ghost"));
+	$("tele").addEventListener("click", () => {
+		for (const m of maze) m.along += 9;
+		bigPhase += Math.PI;
+		stepAll(0, true);
+		send("teleport");
+	});
+	$("die").addEventListener("click", () => {
+		if (deathTimer < 0) {
+			deathTimer = 0;
+			send("death");
+		}
 	});
 	$("stop").addEventListener("click", () => {
 		stopped = !stopped;
 		$("stop").setAttribute("aria-pressed", String(stopped));
 	});
-	var time = 0;
-	var last = performance.now();
-	function frame(now, loop = true) {
-		const dt = Math.min(.1, (now - last) / 1e3);
-		last = now;
-		time += dt;
-		const move = stopped ? 0 : dt;
+	/** Moves everyone by `dt` (0 just re-places them, e.g. after a teleport). */
+	function stepAll(dt, placeOnly = false) {
+		const frozen = stopped || deathTimer >= 0;
+		const move = frozen ? 0 : dt;
+		const power = powerTimer > 0;
+		const ending = powerTimer > 0 && powerTimer < POWER_ENDING;
+		const L = world.layout;
+		const S = L.tileSize;
+		for (const m of maze) {
+			m.along += SPEED * move;
+			const p = onLoop(LOOPS[maze.indexOf(m)], m.along);
+			m.sprite.update(placeOnly ? 0 : dt, {
+				x: panelW + L.offsetX + p.x * S,
+				y: L.offsetY + p.y * S,
+				angle: p.angle,
+				moving: !frozen,
+				power,
+				ending
+			});
+			const tile = Math.floor(m.along);
+			if (!placeOnly && tile !== m.lastTile) {
+				m.lastTile = tile;
+				m.sprite.trigger("dot");
+			}
+		}
+		bigPhase += 2 * move;
+		big.forEach((b, i) => {
+			const ph = bigPhase + i * 1.3;
+			const rx = panelW * .26;
+			const ry = vh * .09;
+			b.update(placeOnly ? 0 : dt, {
+				x: panelW / 2 + Math.cos(ph) * rx,
+				y: vh * (i === 0 ? .3 : .7) + Math.sin(ph) * ry,
+				angle: Math.atan2(Math.cos(ph) * ry, -Math.sin(ph) * rx),
+				moving: !frozen,
+				power,
+				ending
+			});
+		});
+	}
+	function frame(dt) {
 		powerTimer = Math.max(0, powerTimer - dt);
-		const target = powerTimer > 0 ? 1 : 0;
-		power += Math.sign(target - power) * Math.min(Math.abs(target - power), dt / POWER_EASE);
-		const ending = powerTimer > 0 && powerTimer < POWER_ENDING ? 1 : 0;
+		if (deathTimer >= 0) {
+			deathTimer += dt;
+			if (deathTimer > DEATH_TIME) {
+				deathTimer = -1;
+				send("revive");
+			}
+		}
 		world.update(dt);
+		stepAll(dt);
 		ctx.setTransform(D, 0, 0, D, 0, 0);
 		ctx.globalAlpha = 1;
 		ctx.globalCompositeOperation = "source-over";
@@ -4023,68 +5372,45 @@ void main() {
 		world.drawMood(ctx);
 		world.drawFood(ctx, () => true);
 		ctx.restore();
-		const L = world.layout;
-		const S = L.tileSize;
-		mazeActors.forEach((a, i) => {
-			along[i] += SPEED * move;
-			const p = onLoop(LOOPS[i], along[i]);
-			a.r = S * .44;
-			place(a, panelW + L.offsetX + p.x * S, L.offsetY + p.y * S, p.angle, dt, time);
-		});
-		bigPhase += 2.2 * move;
 		const g = ctx.createLinearGradient(0, 0, 0, vh);
 		g.addColorStop(0, "#141826");
 		g.addColorStop(1, "#07080e");
 		ctx.fillStyle = g;
 		ctx.fillRect(0, 0, panelW, vh);
-		const bigR = Math.min(panelW * .12, vh * .085);
-		bigActors.forEach((a, i) => {
-			const cx = panelW / 2;
-			const cy = vh * (i === 0 ? .3 : .7);
-			const ph = bigPhase + i * 1.3;
-			const rx = panelW * .26;
-			const ry = vh * .09;
-			const ang = stopped ? 0 : Math.atan2(Math.cos(ph) * ry, -Math.sin(ph) * rx);
-			a.r = bigR;
-			place(a, cx + Math.cos(ph) * rx, cy + Math.sin(ph) * ry, ang, dt, time);
-		});
 		ctx.fillStyle = "rgba(210,220,235,.7)";
 		ctx.font = "12px \"Courier New\", monospace";
 		ctx.textAlign = "center";
-		ctx.fillText("PAC-MAN", panelW / 2, vh * .3 + vh * .17);
-		ctx.fillText("MS. PAC-MAN", panelW / 2, vh * .7 + vh * .17);
-		gl.viewport(0, 0, glCanvas.width, glCanvas.height);
-		gl.clearColor(0, 0, 0, 0);
-		gl.clear(gl.COLOR_BUFFER_BIT);
-		gl.enable(gl.BLEND);
-		gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-		const all = [...mazeActors, ...bigActors];
-		for (const a of all) drawTrail(a, power, time);
-		for (const a of all) drawActor(a, power, ending, time);
-		ctx.setTransform(1, 0, 0, 1, 0, 0);
-		ctx.drawImage(glCanvas, 0, 0);
-		ctx.setTransform(D, 0, 0, D, 0, 0);
+		ctx.fillText("PAC-MAN · SOLAR FLARE", panelW / 2, vh * .47);
+		ctx.fillText("MS. PAC-MAN · STARDUST HEART", panelW / 2, vh * .87);
 		ctx.save();
-		ctx.translate(panelW, 0);
 		ctx.beginPath();
-		ctx.rect(0, 0, vw - panelW, vh);
+		ctx.rect(0, 0, panelW, vh);
 		ctx.clip();
+		for (const b of big) b.draw(ctx);
+		ctx.restore();
+		ctx.save();
+		ctx.beginPath();
+		ctx.rect(panelW, 0, vw - panelW, vh);
+		ctx.clip();
+		for (const m of maze) m.sprite.draw(ctx);
+		ctx.translate(panelW, 0);
 		world.drawOverlay(ctx);
 		ctx.restore();
-		if (loop) requestAnimationFrame((n) => frame(n));
 	}
 	window.addEventListener("resize", layout);
 	layout();
-	if (new URLSearchParams(location.search).has("capture")) {
-		let clock = 0;
-		window.__advance = (seconds) => {
-			for (let i = 0; i < Math.round(seconds * 60); i++) {
-				clock += 1e3 / 60;
-				frame(clock, false);
-			}
+	if (new URLSearchParams(location.search).has("capture")) window.__advance = (seconds) => {
+		for (let i = 0; i < Math.round(seconds * 60); i++) frame(1 / 60);
+	};
+	else {
+		let last = performance.now();
+		const loop = (now) => {
+			frame(Math.min(.1, (now - last) / 1e3));
+			last = now;
+			requestAnimationFrame(loop);
 		};
-		last = 0;
-	} else requestAnimationFrame(frame);
+		requestAnimationFrame(loop);
+	}
 	//#endregion
 })();
 
