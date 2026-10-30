@@ -35,6 +35,10 @@ export class GameMain implements GameModule {
 		const hudAdapter = new SvelteHudAdapter(events, pacmanHudStore);
 		const loop = new GameLoop(
 			(dt) => {
+				const held = input.heldDirection;
+				if (held && (director.stateName === 'playing' || director.stateName === 'ready')) {
+					level.setDesiredDirection(held);
+				}
 				director.update(dt);
 			},
 			() => {

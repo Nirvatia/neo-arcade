@@ -9,9 +9,22 @@ export interface InputHandlers {
 	profile?: () => void;
 }
 
+const DIRECTION_KEYS: Record<string, InputDirection> = {
+	ArrowUp: 'UP',
+	KeyW: 'UP',
+	ArrowDown: 'DOWN',
+	KeyS: 'DOWN',
+	ArrowLeft: 'LEFT',
+	KeyA: 'LEFT',
+	ArrowRight: 'RIGHT',
+	KeyD: 'RIGHT'
+};
+
 export class InputController {
 	private readonly handlers: InputHandlers;
 	private attached = false;
+	/** Direction keys held down, the latest pressed last. */
+	private held: InputDirection[] = [];
 
 	constructor(handlers: InputHandlers) {
 		this.handlers = handlers;
@@ -26,6 +39,8 @@ export class InputController {
 			return;
 		}
 		window.addEventListener('keydown', this.handleKeyDown);
+		window.addEventListener('keyup', this.handleKeyUp);
+		window.addEventListener('blur', this.releaseAll);
 		this.attached = true;
 	}
 
@@ -38,7 +53,19 @@ export class InputController {
 			return;
 		}
 		window.removeEventListener('keydown', this.handleKeyDown);
+		window.removeEventListener('keyup', this.handleKeyUp);
+		window.removeEventListener('blur', this.releaseAll);
+		this.held = [];
 		this.attached = false;
+	}
+
+	/**
+	 * The direction key held down most recently, or null. Applied every frame, so a held key
+	 * steers even when its press fell into a pause, a death or a fade, and releasing the
+	 * latest key falls back to one still held.
+	 */
+	get heldDirection(): InputDirection | null {
+		return this.held.length > 0 ? this.held[this.held.length - 1] : null;
 	}
 
 	pressDirection(direction: InputDirection): void {
@@ -67,7 +94,15 @@ export class InputController {
 
 	private handleKeyDown = (event: KeyboardEvent): void => {
 		if (event.repeat) {
+			if (DIRECTION_KEYS[event.code]) {
+				event.preventDefault();
+			}
 			return;
+		}
+		const direction = DIRECTION_KEYS[event.code];
+		if (direction) {
+			this.held = this.held.filter((d) => d !== direction);
+			this.held.push(direction);
 		}
 		switch (event.code) {
 			case 'ArrowUp':
@@ -116,5 +151,18 @@ export class InputController {
 			default:
 				break;
 		}
+	};
+
+	private handleKeyUp = (event: KeyboardEvent): void => {
+		const direction = DIRECTION_KEYS[event.code];
+		if (!direction) {
+			return;
+		}
+		// another key for the same direction may still be down (W and ArrowUp): rare, ignored
+		this.held = this.held.filter((d) => d !== direction);
+	};
+
+	private releaseAll = (): void => {
+		this.held = [];
 	};
 }

@@ -17,6 +17,8 @@ const RECOIL_SPEED = 9;
 const DASH_SPEED = 10;
 const DASH_INVULNERABILITY = 0.5;
 const TRAIN_TRAIL_LENGTH = 96;
+/** A turn pressed this far (in tiles) past a junction still takes it. */
+const LATE_TURN = 0.15;
 
 export class PlayerService {
 	private readonly grid: GridService;
@@ -106,6 +108,26 @@ export class PlayerService {
 
 	setDesiredDirection(direction: PlayerDirection): void {
 		this.player.setDesired(direction);
+		const facing = this.player.facing;
+		if (
+			!this.player.target ||
+			!facing ||
+			direction === facing ||
+			this.isRecoiling ||
+			this.isDashing ||
+			this.movementLockedValue
+		) {
+			return;
+		}
+		if (direction === this.oppositeDirection(facing)) {
+			// a reversal never waits for the next tile: turn round on the spot, as in the arcade
+			this.player.reverse(direction);
+			return;
+		}
+		if (this.player.progress <= LATE_TURN && this.canMoveFrom(this.player.tile, direction)) {
+			// pressed a moment after passing the turn: step back onto the junction and take it
+			this.player.cancelMove();
+		}
 	}
 
 	setTrainMode(value: boolean): void {

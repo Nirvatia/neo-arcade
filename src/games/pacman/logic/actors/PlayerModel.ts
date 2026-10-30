@@ -115,6 +115,24 @@ export class PlayerModel {
 		this.progressValue = 0;
 	}
 
+	/** Turns round mid-move: heads back to the tile it left, from the same spot. */
+	reverse(direction: PlayerDirection): void {
+		if (!this.targetValue) {
+			return;
+		}
+		const from = this.tileValue;
+		this.tileValue = this.targetValue;
+		this.targetValue = from;
+		this.progressValue = 1 - this.progressValue;
+		this.facingValue = direction;
+	}
+
+	/** Drops the move just begun: back on the tile it was leaving. */
+	cancelMove(): void {
+		this.targetValue = null;
+		this.progressValue = 0;
+	}
+
 	addProgress(amount: number): void {
 		if (!Number.isFinite(amount) || amount < 0) {
 			console.error('PlayerModel.addProgress', 'invalid progress amount', amount);

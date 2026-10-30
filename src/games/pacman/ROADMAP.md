@@ -111,6 +111,13 @@ and covers the canvas only (Svelte buttons stay on top); replace it there.
   now fades for 0.8 s before READY; wait for it before `showPlaying()` / `debugEnter*()`
   (both are ignored during a fade). `director.flow` shows the state, phase and timers.
 - Fire key is `F` / `Shift`; `Space` pauses.
+- Controls (fixed after plan v2 stage 1): a reversal turns Pac-Man round on the spot
+  (`PlayerModel.reverse`, no wait for the next tile); a turn pressed up to 0.15 tile past
+  a junction still takes it (`LATE_TURN`); `InputController` tracks held direction keys and
+  `GameMain` applies the latest held one every frame, so a held key survives pauses, deaths
+  and fades, and releasing it falls back to a key still held. The sprite turns ~2.5×
+  faster. Tests: `logic/actors/playerControl.test.ts`. Speed is unchanged (Pac-Man 6
+  tiles/s, ghosts 5.4).
 - Deterministic screenshots: Playwright `page.clock.install()` + a seeded `Math.random`
   init script make most frames repeatable (noise < 0.1 %). Boss phase 3 and the death wave
   stay chaotic; compare those by eye.

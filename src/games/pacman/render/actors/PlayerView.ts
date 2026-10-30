@@ -263,7 +263,7 @@ export class PlayerView {
 		if (Math.abs(turn) > 1 && this.turnKick <= 0) {
 			this.turnKick = 1;
 		}
-		this.angle = lerpAngle(this.angle, target, Math.min(1, dt * 18));
+		this.angle = lerpAngle(this.angle, target, Math.min(1, dt * 45));
 
 		const running = this.speed > 0.5;
 		this.chomp += dt * (running ? 11 : 2.5);
