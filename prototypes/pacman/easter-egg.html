@@ -1,0 +1,7014 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>Pac-Man · Easter egg</title>
+    <!-- Prototype: the lair code's reward on level 7 (stage 10.2), run by the game's own
+         services and views: the ghosts vanish, the lair gate slides open, the Easter egg
+         appears in the lair's centre and Pac-Man walks in to take it. A 3× close-up of the
+         lair and the egg large on a dark strip. Built from the sources:
+         `node prototypes/pacman/build.mjs easter-egg`; open as a file. -->
+    <style>
+      html,body{height:100%;margin:0;overflow:hidden;background:#1a1a14}
+      #view{position:fixed;inset:0;display:block}
+      #ctl{position:fixed;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:5;display:flex;flex-wrap:wrap;justify-content:center;gap:8px;width:calc(100vw - 32px);max-width:860px}
+      .bt{border:0;cursor:pointer;padding:9px 14px;border-radius:999px;font:700 14px "Trebuchet MS","Segoe UI",system-ui,sans-serif;color:#2a2410;background:linear-gradient(#fffaf0,#f2e2b8);box-shadow:0 3px 0 #c9ac62,0 8px 14px rgba(40,30,10,.22)}
+      .bt[aria-pressed="true"]{transform:translateY(2px);color:#fff;background:linear-gradient(#e0a838,#a8721a);box-shadow:0 1px 0 #5a3a08,0 0 14px rgba(255,200,80,.6)}
+    </style>
+  </head>
+  <body>
+    <canvas id="view"></canvas>
+    <div id="ctl">
+      <button class="bt" data-season="summer">Лето</button>
+      <button class="bt" data-season="autumn">Осень</button>
+      <button class="bt" data-season="winter">Зима</button>
+      <button class="bt" data-season="spring">Весна</button>
+      <button class="bt" id="night" aria-pressed="false">☾ Ночь</button>
+      <button class="bt" id="solve">Код логова решён</button>
+      <button class="bt" id="again">Заново</button>
+    </div>
+    <script>
+(function() {
+	var TOKEN_SET = /* @__PURE__ */ new Set([
+		"WL",
+		"DT",
+		"EU",
+		"ES",
+		"FL",
+		"LE",
+		"LT",
+		"PM",
+		"BY",
+		"PY",
+		"IY",
+		"CE",
+		"FT",
+		"DB"
+	]);
+	function isTeleportToken(token) {
+		return token.length === 2 && token.charAt(0) === "0";
+	}
+	function isTileToken(token) {
+		return TOKEN_SET.has(token) || isTeleportToken(token);
+	}
+	var GRID_01 = [
+		[
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"EU",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"EU",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES"
+		],
+		[
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"LE",
+			"LE",
+			"LE",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"LT",
+			"LT",
+			"LT",
+			"LT",
+			"LT",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"0A",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"BY",
+			"IY",
+			"LT",
+			"PY",
+			"CE",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"0A",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"LT",
+			"LT",
+			"LT",
+			"LT",
+			"LT",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES"
+		],
+		[
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"FT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"PM",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"DT",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"DT",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"EU",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"DT",
+			"EU",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"WL",
+			"ES"
+		],
+		[
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES",
+			"ES"
+		]
+	];
+	//#endregion
+	//#region src/games/pacman/render/common/textures.ts
+	function makeCanvas$1(width, height) {
+		const canvas = document.createElement("canvas");
+		canvas.width = Math.max(1, Math.floor(width));
+		canvas.height = Math.max(1, Math.floor(height));
+		return canvas;
+	}
+	function canvasContext(canvas) {
+		const ctx = canvas.getContext("2d");
+		if (!ctx) {
+			console.error("textures.canvasContext", "2d context unavailable");
+			throw new Error("textures.canvasContext: 2d context unavailable");
+		}
+		return ctx;
+	}
+	function hexChannels(value) {
+		return [
+			value >> 16 & 255,
+			value >> 8 & 255,
+			value & 255
+		];
+	}
+	function radialTexture(size, stops) {
+		const safeSize = Math.max(2, Math.floor(size));
+		const canvas = makeCanvas$1(safeSize, safeSize);
+		const ctx = canvasContext(canvas);
+		const gradient = ctx.createRadialGradient(safeSize / 2, safeSize / 2, 0, safeSize / 2, safeSize / 2, safeSize / 2);
+		for (const stop of stops) gradient.addColorStop(stop[0], stop[1]);
+		ctx.fillStyle = gradient;
+		ctx.fillRect(0, 0, safeSize, safeSize);
+		return canvas;
+	}
+	var glowCache = /* @__PURE__ */ new Map();
+	function glowTexture(tint) {
+		const cached = glowCache.get(tint);
+		if (cached) return cached;
+		const [r, g, b] = hexChannels(tint);
+		const texture = radialTexture(64, [
+			[0, `rgb(${r},${g},${b})`],
+			[.35, `rgba(${r},${g},${b},0.35)`],
+			[1, `rgba(${r},${g},${b},0)`]
+		]);
+		glowCache.set(tint, texture);
+		return texture;
+	}
+	function makeTexture(width, height, painter) {
+		const scale = 3;
+		const canvas = makeCanvas$1(width * scale, height * scale);
+		const ctx = canvasContext(canvas);
+		ctx.scale(scale, scale);
+		painter(ctx);
+		return canvas;
+	}
+	var T$1 = 24;
+	var LAIR = /* @__PURE__ */ new Set([
+		"LT",
+		"BY",
+		"IY",
+		"PY",
+		"CE",
+		"DB"
+	]);
+	/** Seeded per-tile generator (Park–Miller), identical to the mock-ups' `hs`. */
+	function tileRandom(a, b) {
+		let s = ((a + 50) * 7919 + (b + 50) * 104729) % 2147483646 + 1;
+		return () => (s = s * 16807 % 2147483647) / 2147483647;
+	}
+	/** Stream centre line (world y for a world x). */
+	function streamY(rows, x) {
+		return (rows + 4.7) * T$1 + Math.sin(x / 216) * 2.5 * T$1 + Math.sin(x / (3.7 * T$1) + 1) * .6 * T$1;
+	}
+	var decorCache = /* @__PURE__ */ new Map();
+	/**
+	* Fixed landmarks plus seeded scatter, sorted back to front. Shared with the live layer.
+	* The landmarks' keep-out radii differ per season and shift the scatter, as in the mock-ups.
+	*/
+	function meadowDecor(rows, cols, landmarkEx) {
+		const cacheKey = `${rows}x${cols}:${landmarkEx[0]},${landmarkEx[1]}`;
+		const cached = decorCache.get(cacheKey);
+		if (cached) return cached;
+		const R = rows;
+		const C = cols;
+		const TY = 12.5 * T$1;
+		let s = 91;
+		const P = [
+			{
+				k: "cabin",
+				x: -8.5,
+				y: 7,
+				w: 7,
+				h: 5,
+				ex: 4.2
+			},
+			{
+				k: "cabin",
+				x: 33.5,
+				y: 19,
+				w: 7,
+				h: 5,
+				ex: 4.2
+			},
+			{
+				k: "cabin",
+				x: 23.5,
+				y: -5,
+				w: 6,
+				h: 4.4,
+				ex: 3.8
+			},
+			{
+				k: "pond",
+				x: 1.5,
+				y: -4.5,
+				rx: 3.6,
+				ry: 2.4,
+				ex: 4.2
+			},
+			{
+				k: "landmark",
+				x: -3.6,
+				y: 3.2,
+				r: .8,
+				ex: landmarkEx[0]
+			},
+			{
+				k: "landmark",
+				x: 28.6,
+				y: 23.5,
+				r: .7,
+				ex: landmarkEx[1]
+			},
+			{
+				k: "lamp",
+				x: -2,
+				y: -2,
+				ex: 1
+			},
+			{
+				k: "lamp",
+				x: 27,
+				y: -2,
+				ex: 1
+			},
+			{
+				k: "lamp",
+				x: -2,
+				y: 28,
+				ex: 1
+			},
+			{
+				k: "lamp",
+				x: 27,
+				y: 28,
+				ex: 1
+			}
+		].map((o) => {
+			const q = {
+				...o,
+				x: o.x * T$1,
+				y: o.y * T$1
+			};
+			for (const key of [
+				"w",
+				"h",
+				"rx",
+				"ry",
+				"r",
+				"ex"
+			]) {
+				const v = o[key];
+				if (v !== void 0) q[key] = v * T$1;
+			}
+			return q;
+		});
+		P.push({
+			k: "bridge",
+			x: 12.5 * T$1,
+			y: streamY(R, 12.5 * T$1),
+			ex: 48
+		});
+		const g = () => (s = s * 16807 % 2147483647) / 2147483647;
+		const free = (x, y, m) => !(x > -m && x < C * T$1 + m && y > -m && y < R * T$1 + m) && Math.abs(y - streamY(R, x)) > 3.6 * T$1 && !(Math.abs(y - TY) < 2.4 * T$1 && (x < 0 || x > C * T$1));
+		const add = (k, n, dist, m, f) => {
+			let t = 0;
+			let cnt = 0;
+			while (cnt < n && t++ < 6e3) {
+				const x = (-34 + g() * (C + 68)) * T$1;
+				const y = (-25 + g() * (R + 50)) * T$1;
+				if (!free(x, y, m) || P.some((q) => Math.hypot(q.x - x, q.y - y) < dist + (q.ex || 0))) continue;
+				P.push({
+					k,
+					x,
+					y,
+					...f()
+				});
+				cnt++;
+			}
+		};
+		add("tree", 80, 5.5 * T$1, 96, () => ({
+			r: (1.5 + g() * .7) * T$1,
+			pk: g() < .45,
+			s: g() * 99 | 0
+		}));
+		add("rock", 28, 72, 72, () => ({ r: (.5 + g() * .4) * T$1 }));
+		add("bush", 44, 2.5 * T$1, 72, () => ({ r: (.6 + g() * .4) * T$1 }));
+		add("fl", 110, 48, 48, () => ({
+			n: 6 + (g() * 6 | 0),
+			c: g()
+		}));
+		P.sort((a, c) => a.y - c.y);
+		decorCache.set(cacheKey, P);
+		return P;
+	}
+	/**
+	* Bakes the static world inside the world-space rect (x0, y0, w, h) at RS canvas pixels
+	* per world unit: meadow, stream, decorations, path cells, lair, portals, walls and tree
+	* crowns, faded into the background colour at the edge of the world.
+	*/
+	function bakeMeadow(S, P, x0, y0, w, h, RS) {
+		const R = S.length;
+		const C = S[0].length;
+		const BG = P.bg;
+		const DEC = meadowDecor(R, C, P.landmark.ex);
+		const isW = (r, c) => !!S[r] && S[r][c] === "WL";
+		const cv = makeCanvas$1(Math.ceil(w * RS), Math.ceil(h * RS));
+		const b = canvasContext(cv);
+		b.scale(RS, RS);
+		b.translate(-x0, -y0);
+		const X1 = x0 + w;
+		const Y1 = y0 + h;
+		const vis = (x, y, m = 70) => x > x0 - m && x < X1 + m && y > y0 - m && y < Y1 + m;
+		let sd = 11;
+		const rnd = () => (sd = sd * 16807 % 2147483647) / 2147483647;
+		const rr = (a, c) => a + rnd() * (c - a);
+		const pick = (a) => a[rnd() * a.length | 0];
+		const shade = (alpha) => `rgba(${P.shadow},${alpha})`;
+		const lin = (a, c, d, e, f, g) => {
+			const q = b.createLinearGradient(a, c, d, e);
+			q.addColorStop(0, f);
+			q.addColorStop(1, g);
+			return q;
+		};
+		const blob = (x, y, rx, ry, col, rot) => {
+			b.fillStyle = col;
+			b.beginPath();
+			b.ellipse(x, y, rx, ry, rot ?? rnd() * 3, 0, 7);
+			b.fill();
+		};
+		const rp = (x, y, w2, h2, [a, c, d, e]) => {
+			b.beginPath();
+			b.moveTo(x + a, y);
+			b.lineTo(x + w2 - c, y);
+			b.arcTo(x + w2, y, x + w2, y + c, c);
+			b.lineTo(x + w2, y + h2 - d);
+			b.arcTo(x + w2, y + h2, x + w2 - d, y + h2, d);
+			b.lineTo(x + e, y + h2);
+			b.arcTo(x, y + h2, x, y + h2 - e, e);
+			b.lineTo(x, y + a);
+			b.arcTo(x, y, x + a, y, a);
+		};
+		const fl5 = (x, y, r, col, mid) => {
+			for (let k = 0; k < 5; k++) {
+				const a = k * 1.2566 + .3;
+				blob(x + Math.cos(a) * r * .7, y + Math.sin(a) * r * .7, r * .6, r * .6, col, 0);
+			}
+			blob(x, y, r * .38, r * .38, mid, 0);
+		};
+		const sph = (x, y, r, c0, c1) => {
+			const g = b.createRadialGradient(x - r * .35, y - r * .35, .5, x, y, r);
+			g.addColorStop(0, c0);
+			g.addColorStop(1, c1);
+			b.fillStyle = g;
+			b.beginPath();
+			b.arc(x, y, r, 0, 7);
+			b.fill();
+		};
+		const kit = {
+			b,
+			rnd,
+			rr,
+			pick,
+			blob,
+			fl5,
+			sph,
+			lin,
+			shade
+		};
+		const q = b.createRadialGradient(C * T$1 / 2, R * T$1 / 2, 0, C * T$1 / 2, R * T$1 / 2, 912);
+		q.addColorStop(0, P.groundCenter);
+		q.addColorStop(1, BG);
+		b.fillStyle = q;
+		b.fillRect(x0, y0, w, h);
+		const A = w * h;
+		for (let i = 0; i < A / 5e4; i++) {
+			const x = x0 + rnd() * w;
+			const y = y0 + rnd() * h;
+			const r = rr(70, 130);
+			const g = b.createRadialGradient(x, y, 0, x, y, r);
+			const d = i % 2;
+			g.addColorStop(0, d ? P.groundBlobs[0] : P.groundBlobs[1]);
+			g.addColorStop(1, "rgba(0,0,0,0)");
+			b.fillStyle = g;
+			b.fillRect(x - r, y - r, 2 * r, 2 * r);
+		}
+		for (let i = 0; i < A / 1100; i++) {
+			b.strokeStyle = pick(P.grass);
+			const x = x0 + rnd() * w;
+			const y = y0 + rnd() * h;
+			b.lineWidth = 1;
+			b.beginPath();
+			b.moveTo(x, y);
+			b.lineTo(x + rr(-2, 2), y - rr(3, 7));
+			b.stroke();
+		}
+		for (let i = 0; i < A / 8e3; i++) {
+			const x = x0 + rnd() * w;
+			const y = y0 + rnd() * h;
+			const L = rr(14, 40);
+			b.strokeStyle = P.curls;
+			b.lineWidth = 1.4;
+			b.beginPath();
+			b.moveTo(x, y);
+			b.quadraticCurveTo(x + L / 2, y - rr(2, 6), x + L, y);
+			b.stroke();
+		}
+		const sy = (x) => streamY(R, x);
+		if (Y1 > sy(x0) - 40 && y0 < sy(x0) + 60) {
+			const line = () => {
+				b.beginPath();
+				for (let x = x0 - 20; x <= X1 + 20; x += 12) if (x === x0 - 20) b.moveTo(x, sy(x));
+				else b.lineTo(x, sy(x));
+			};
+			b.lineCap = b.lineJoin = "round";
+			for (const [lw, c] of [
+				[40, P.stream[0]],
+				[32, P.stream[1]],
+				[27, P.stream[2]],
+				[13, P.stream[3]]
+			]) {
+				b.lineWidth = lw;
+				b.strokeStyle = c;
+				line();
+				b.stroke();
+			}
+			for (let x = x0; x < X1; x += 16) {
+				const y = sy(x) + rr(-9, 9);
+				b.strokeStyle = "rgba(255,255,255,.4)";
+				b.lineWidth = 1;
+				b.beginPath();
+				b.moveTo(x, y);
+				b.lineTo(x + rr(6, 14), y);
+				b.stroke();
+			}
+		}
+		for (const o of DEC) {
+			if (!vis(o.x, o.y, 60 + (o.w || (o.rx || 0) * 2))) continue;
+			const r = o.r ?? 0;
+			if (o.k === "fl") P.flowerPatch(kit, o);
+			else if (o.k === "bush") {
+				blob(o.x + 3, o.y + 4, r, r * .7, shade(.3), 0);
+				for (let i = 0; i < 4; i++) {
+					const px = o.x + rr(-.5, .5) * r;
+					const py = o.y + rr(-.4, .4) * r;
+					const g = b.createRadialGradient(px - 2, py - 2, 1, px, py, r * .7);
+					g.addColorStop(0, P.bush[0]);
+					g.addColorStop(1, P.bush[1]);
+					b.fillStyle = g;
+					b.beginPath();
+					b.arc(px, py, r * .7, 0, 7);
+					b.fill();
+				}
+			} else if (o.k === "pond") {
+				const rx = o.rx ?? 0;
+				const ry = o.ry ?? 0;
+				blob(o.x + 3, o.y + 4, rx * 1.05, ry * 1.05, shade(.25), 0);
+				blob(o.x, o.y, rx * 1.1, ry * 1.12, P.pond.sand, 0);
+				b.fillStyle = lin(o.x - rx, o.y - ry, o.x + rx, o.y + ry, P.pond.water[0], P.pond.water[1]);
+				b.beginPath();
+				b.ellipse(o.x, o.y, rx, ry, 0, 0, 7);
+				b.fill();
+				b.strokeStyle = P.pond.rim;
+				b.lineWidth = 1.5;
+				b.stroke();
+				b.strokeStyle = "rgba(255,255,255,.8)";
+				b.lineWidth = 1;
+				for (let i = 0; i < 5; i++) {
+					const a = rnd() * 6.28;
+					const L = rr(.3, .8);
+					b.beginPath();
+					b.moveTo(o.x + Math.cos(a) * rx * .1, o.y + Math.sin(a) * ry * .1);
+					b.lineTo(o.x + Math.cos(a + .2) * rx * L * .6, o.y + Math.sin(a + .2) * ry * L);
+					b.lineTo(o.x + Math.cos(a - .1) * rx * L, o.y + Math.sin(a - .1) * ry * L * 1.1);
+					b.stroke();
+				}
+				blob(o.x - rx * .35, o.y - ry * .4, rx * .3, ry * .1, P.pond.highlight, -.3);
+				P.pondExtras?.(kit, o);
+				for (let i = 0; i < 9; i++) {
+					const a = i * .7 + rnd() * .4;
+					blob(o.x + Math.cos(a) * rx * 1.05, o.y + Math.sin(a) * ry * 1.07, rr(3, 5), rr(2, 3.4), P.pond.stones);
+				}
+			} else if (o.k === "landmark") P.landmark.draw(kit, o);
+			else if (o.k === "lamp") {
+				blob(o.x + 2, o.y + 3, 5, 3.5, shade(.35), 0);
+				sph(o.x, o.y, 4.2, "#7b7268", "#2f2a27");
+				sph(o.x, o.y, 2.6, "#fff6cf", "#ffc561");
+				blob(o.x - 2.6, o.y - 3, 2.4, 1.2, "#ffffff", 0);
+			} else if (o.k === "bridge") {
+				const bx = o.x - 26;
+				const by = o.y - 34;
+				b.fillStyle = shade(.35);
+				b.fillRect(bx + 4, by + 5, 52, 68);
+				for (let yy = by, i = 0; yy < by + 68; yy += 5, i++) {
+					b.fillStyle = i % 2 ? "#8c6342" : "#795634";
+					b.fillRect(bx + 2, yy, 48, 4.2);
+					b.fillStyle = "rgba(255,230,190,.25)";
+					b.fillRect(bx + 2, yy, 48, .8);
+				}
+				b.fillStyle = "#4f3622";
+				b.fillRect(bx, by, 4, 68);
+				b.fillRect(bx + 48, by, 4, 68);
+				for (const [px, py] of [
+					[bx - 1, by - 1],
+					[bx + 47, by - 1],
+					[bx - 1, by + 63],
+					[bx + 47, by + 63]
+				]) {
+					b.fillStyle = "#3a281a";
+					b.fillRect(px, py, 6, 6);
+					blob(px + 3, py + 1, 2.8, 1.6, P.bridge.caps, 0);
+				}
+				blob(bx + 26, by + 20, 7, 2.6, P.bridge.middle, .2);
+			} else if (o.k === "cabin") {
+				const ow = o.w ?? 0;
+				const oh = o.h ?? 0;
+				const X = o.x - ow / 2;
+				const Y = o.y - oh / 2;
+				b.fillStyle = shade(.3);
+				rp(X + 6, Y + 8, ow, oh, [
+					4,
+					4,
+					4,
+					4
+				]);
+				b.fill();
+				b.save();
+				rp(X, Y, ow, oh, [
+					4,
+					4,
+					4,
+					4
+				]);
+				b.clip();
+				b.fillStyle = lin(X, Y, X, o.y, P.cabin.walls[0], P.cabin.walls[1]);
+				b.fillRect(X, Y, ow, oh / 2);
+				b.fillStyle = lin(X, o.y, X, Y + oh, P.cabin.walls[2], P.cabin.walls[3]);
+				b.fillRect(X, o.y, ow, oh / 2);
+				b.strokeStyle = "rgba(40,20,20,.22)";
+				b.lineWidth = 1;
+				for (let r2 = 0; r2 < oh / 6; r2++) {
+					b.beginPath();
+					b.moveTo(X, Y + r2 * 6);
+					b.lineTo(X + ow, Y + r2 * 6);
+					for (let xx = X + r2 % 2 * 5; xx < X + ow; xx += 10) {
+						b.moveTo(xx, Y + r2 * 6);
+						b.lineTo(xx, Y + r2 * 6 + 6);
+					}
+					b.stroke();
+				}
+				for (let i = 0; i < 16; i++) blob(X + rnd() * ow, Y + rnd() * oh, rr(8, 18), rr(4, 8), P.cabin.roofBlobs);
+				b.restore();
+				b.lineCap = "round";
+				b.strokeStyle = P.cabin.ridge;
+				b.lineWidth = 4;
+				b.beginPath();
+				b.moveTo(X + 3, o.y);
+				b.lineTo(X + ow - 3, o.y);
+				b.stroke();
+				b.strokeStyle = P.cabin.ridgeShadow;
+				b.lineWidth = 1;
+				b.beginPath();
+				b.moveTo(X + 3, o.y + 2.8);
+				b.lineTo(X + ow - 3, o.y + 2.8);
+				b.stroke();
+				b.strokeStyle = "rgba(45,25,25,.5)";
+				b.lineWidth = 1.5;
+				rp(X, Y, ow, oh, [
+					4,
+					4,
+					4,
+					4
+				]);
+				b.stroke();
+				const cx = o.x + ow * .25;
+				const cy = o.y - oh * .22;
+				b.fillStyle = shade(.35);
+				b.fillRect(cx - 2, cy - 1, 12, 12);
+				b.fillStyle = "#8c8179";
+				b.fillRect(cx - 6, cy - 6, 12, 12);
+				b.fillStyle = "#2b2523";
+				b.fillRect(cx - 3.5, cy - 3.5, 7, 7);
+				blob(cx - 4, cy - 5, 3, 1.5, P.cabin.chimneyCap, 0);
+			} else if (o.k === "rock") {
+				blob(o.x + 3, o.y + 5, r * 1.1, r * .7, shade(.35), 0);
+				b.fillStyle = lin(o.x - r, o.y - r, o.x + r, o.y + r, P.rock[0], P.rock[1]);
+				b.beginPath();
+				b.ellipse(o.x, o.y, r, r * .75, 0, 0, 7);
+				b.fill();
+				blob(o.x - r * .3, o.y - r * .35, r * .6, r * .28, P.rock[2], 0);
+				blob(o.x + r * .4, o.y - r * .2, r * .25, r * .15, P.rock[3], 0);
+			}
+		}
+		const TP = [];
+		for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
+			const t = S[r][c];
+			const x = c * T$1;
+			const y = r * T$1;
+			if (t === "ES" || t === "WL" || !vis(x + T$1 / 2, y + T$1 / 2, T$1)) continue;
+			const k = tileRandom(r, c);
+			if (LAIR.has(t)) {
+				b.fillStyle = P.lair.base;
+				b.fillRect(x - .5, y - .5, 25, 25);
+				for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
+					b.fillStyle = P.lair.tiles[k() * 3 | 0];
+					rp(x + i * T$1 / 2 + 1, y + j * T$1 / 2 + 1, T$1 / 2 - 2, T$1 / 2 - 2, [
+						3,
+						3,
+						3,
+						3
+					]);
+					b.fill();
+				}
+				blob(x + k() * T$1, y + k() * T$1, 3, 1.4, "rgba(255,255,255,.9)", 0);
+				continue;
+			}
+			b.fillStyle = P.floor.tiles[k() * 3 | 0];
+			b.fillRect(x - .5, y - .5, 25, 25);
+			for (let i = 0; i < 3; i++) blob(x + k() * T$1, y + k() * T$1, .6 + k() * 1.4, .5 + k(), P.floor.specks[k() * 3 | 0], k() * 3);
+			if (isTeleportToken(t)) TP.push([
+				x,
+				y,
+				c
+			]);
+		}
+		for (const [x, y, c] of TP) {
+			const dir = c < C / 2 ? -1 : 1;
+			const L = 264;
+			const px = x + T$1 / 2;
+			const py = y + T$1 / 2;
+			for (let i = 0; i < 240; i++) {
+				const u = i / 240;
+				const xx = px + dir * u * L;
+				const yy = py + Math.sin(u * 6 + dir) * 5 * u + rr(-1.2, 1.2);
+				const a = u < .1 ? 1 : Math.pow(1 - (u - .1) / .9, 1.5);
+				if (vis(xx, yy, 30)) blob(xx, yy, 11 - 5 * u + rr(0, 2), 10 - 4 * u, P.portal.trail(a));
+			}
+			for (let i = 0; i < 260; i++) {
+				const u = rnd();
+				const xx = px + dir * u * L;
+				const yy = py + Math.sin(u * 6 + dir) * 5 * u + (rnd() < .5 ? 1 : -1) * (rr(9, 14) - 5 * u);
+				if (u > .1 && vis(xx, yy, 10)) {
+					b.strokeStyle = pick(P.portal.grass);
+					b.lineWidth = 1.2;
+					b.beginPath();
+					b.moveTo(xx, yy);
+					b.lineTo(xx + rr(-3, 3), yy - rr(3, 7));
+					b.stroke();
+				}
+			}
+			blob(px + 1.5, py + 2, 10, 9.5, shade(.38), 0);
+			b.fillStyle = lin(x, y, x + T$1, y + T$1, P.portal.plate[0], P.portal.plate[1]);
+			rp(x + 1.5, y + 1.5, 21, 21, [
+				6,
+				6,
+				6,
+				6
+			]);
+			b.fill();
+			b.strokeStyle = "rgba(255,255,255,.55)";
+			b.lineWidth = 1;
+			rp(x + 2.5, y + 2.5, 19, 19, [
+				5,
+				5,
+				5,
+				5
+			]);
+			b.stroke();
+			const q2 = b.createRadialGradient(px, py, 1, px, py, 8.5);
+			q2.addColorStop(0, P.portal.core[0]);
+			q2.addColorStop(.45, P.portal.core[1]);
+			q2.addColorStop(1, P.portal.core[2]);
+			b.fillStyle = q2;
+			b.beginPath();
+			b.arc(px, py, 8.5, 0, 7);
+			b.fill();
+			b.strokeStyle = P.portal.ring;
+			b.lineWidth = 1.2;
+			b.stroke();
+			for (const [dx, dy] of [
+				[5, 5],
+				[19, 5],
+				[5, 19],
+				[19, 19]
+			]) blob(x + dx, y + dy, 1.5, 1.2, P.portal.corners, 0);
+		}
+		const WL = [];
+		for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) if (isW(r, c) && vis(c * T$1 + T$1 / 2, r * T$1 + T$1 / 2, T$1)) WL.push([r, c]);
+		const wsh = (r, c, i, j, k, all) => {
+			const oL = !isW(r, c - 1);
+			const oU = !isW(r - 1, c);
+			const oR = !isW(r, c + 1);
+			const oD = !isW(r + 1, c);
+			const L = oL ? i : j;
+			const U = oU ? i : j;
+			const Rr = oR ? i : j;
+			const Dd = oD ? i : j;
+			rp(c * T$1 + L, r * T$1 + U, T$1 - L - Rr, T$1 - U - Dd, all ? [
+				k,
+				k,
+				k,
+				k
+			] : [
+				oU && oL ? k : 0,
+				oU && oR ? k : 0,
+				oD && oR ? k : 0,
+				oD && oL ? k : 0
+			]);
+		};
+		const SIDES = [
+			[0, -1],
+			[0, 1],
+			[-1, 0],
+			[1, 0]
+		];
+		const W = P.wall;
+		for (const [r, c] of WL) for (const [dr, dc] of SIDES) {
+			const n = S[r + dr] && S[r + dr][c + dc];
+			if (!n || n === "ES" || n === "WL") continue;
+			b.fillStyle = LAIR.has(n) ? P.lair.base : P.floor.tiles[0];
+			const x = c * T$1;
+			const y = r * T$1;
+			b.fillRect(dc ? dc > 0 ? x + T$1 / 2 : x : x, dr ? dr > 0 ? y + T$1 / 2 : y : y, dc ? T$1 / 2 : T$1, dr ? T$1 / 2 : T$1);
+		}
+		b.save();
+		b.shadowColor = W.shadow;
+		b.shadowBlur = 7 * RS;
+		b.shadowOffsetX = 2 * RS;
+		b.shadowOffsetY = 3 * RS;
+		b.fillStyle = W.base;
+		for (const [r, c] of WL) {
+			wsh(r, c, 0, -.4, 8, false);
+			b.fill();
+		}
+		b.restore();
+		b.fillStyle = W.base;
+		for (const [r, c] of WL) {
+			wsh(r, c, 0, -.4, 8, false);
+			b.fill();
+		}
+		for (const [r, c] of WL) {
+			const k = tileRandom(r, c);
+			const v = k();
+			const x = c * T$1;
+			const y = r * T$1;
+			const hd = v < .08;
+			b.save();
+			b.fillStyle = hd ? lin(x, y, x + T$1, y + T$1, W.moss[0], W.moss[1]) : lin(x, y, x + T$1, y + T$1, W.top[k() * 3 | 0], W.bottom[k() * 3 | 0]);
+			wsh(r, c, .6, .6, 8, false);
+			b.fill();
+			b.restore();
+			wsh(r, c, .6, .6, 8, false);
+			b.save();
+			b.clip();
+			if (hd) for (let i = 0; i < 14; i++) blob(x + k() * T$1, y + k() * T$1, 1.5 + k() * 1.5, .8 + k() * .8, W.mossSpecks[k() * 3 | 0], k() * 3);
+			else {
+				for (let i = 0; i < 8; i++) blob(x + k() * T$1, y + k() * T$1, .5 + k(), .4 + k() * .6, k() < .5 ? W.specks[0] : W.specks[1], k() * 3);
+				b.strokeStyle = W.crack;
+				b.lineWidth = 1;
+				b.beginPath();
+				b.moveTo(x + 4 + k() * 16, y);
+				b.lineTo(x + 4 + k() * 16, y + T$1 * .6);
+				b.lineTo(x + 4 + k() * 16, y + T$1);
+				b.stroke();
+				const o1 = r + c & 1;
+				b.strokeStyle = W.joints;
+				b.lineWidth = .8;
+				b.beginPath();
+				b.moveTo(x, y + T$1 / 2);
+				b.lineTo(x + T$1, y + T$1 / 2);
+				b.moveTo(x + (o1 ? T$1 * .34 : T$1 * .66), y);
+				b.lineTo(x + (o1 ? T$1 * .34 : T$1 * .66), y + T$1 / 2);
+				b.moveTo(x + (o1 ? T$1 * .68 : T$1 * .32), y + T$1 / 2);
+				b.lineTo(x + (o1 ? T$1 * .68 : T$1 * .32), y + T$1);
+				b.stroke();
+				const n = v < .3 ? 2 : 1;
+				for (let i = 0; i < n; i++) {
+					blob(x + k() * T$1 * .7 + 3, y + k() * T$1 * .55 + 3, 5 + k() * 4, 3 + k() * 2.5, W.drifts[0]);
+					blob(x + k() * T$1 * .8, y + k() * T$1 * .6, 3 + k() * 3, 1.5 + k() * 1.5, W.drifts[1]);
+				}
+			}
+			b.strokeStyle = W.light;
+			b.lineWidth = 2;
+			b.save();
+			b.translate(-1.2, -1.2);
+			wsh(r, c, .6, .6, 8, false);
+			b.stroke();
+			b.restore();
+			b.strokeStyle = W.dark;
+			b.save();
+			b.translate(1.2, 1.2);
+			wsh(r, c, .6, .6, 8, false);
+			b.stroke();
+			b.restore();
+			b.restore();
+			if (v > .96) {
+				const px = x + 6 + k() * 12;
+				const py = y + 6 + k() * 12;
+				for (let i = 0; i < 4; i++) blob(px + k() * 6 - 3, py + k() * 5 - 2.5, 1.8, 1.8, W.flowers[k() * 3 | 0], 0);
+				blob(px, py, 1, 1, "#ffd45e", 0);
+			}
+		}
+		for (const [r, c] of WL) {
+			const k = tileRandom(r + 9, c + 9);
+			for (const [dr, dc] of SIDES) {
+				const n = S[r + dr] && S[r + dr][c + dc];
+				if (n && n !== "ES" || k() < .45) continue;
+				for (let i = 0; i < 4; i++) {
+					const t = k();
+					const x = c * T$1 + (dc ? dc > 0 ? T$1 : 0 : t * T$1);
+					const y = r * T$1 + (dr ? dr > 0 ? T$1 : 0 : t * T$1);
+					b.strokeStyle = P.edgeGrass[k() * 3 | 0];
+					b.lineWidth = 1.2;
+					b.beginPath();
+					b.moveTo(x, y);
+					b.lineTo(x + dc * k() * 4 + (k() - .5) * 3, y + dr * k() * 4 - 2 - k() * 3);
+					b.stroke();
+				}
+			}
+		}
+		const TR = P.trees;
+		for (const o of DEC) {
+			const r = o.r ?? 0;
+			if (o.k !== "tree" || !vis(o.x, o.y, r * 2)) continue;
+			const k = tileRandom(o.s ?? 0, 7);
+			const pal = o.pk ? TR.accent : TR.plain;
+			blob(o.x + r * .3, o.y + r * .4, r * 1.3, r, shade(.34), 0);
+			for (let i = 0; i < 11; i++) {
+				const a = i * .62 + k() * 2;
+				const d = i ? r * (.3 + k() * .45) : 0;
+				const px = o.x + Math.cos(a) * d;
+				const py = o.y + Math.sin(a) * d;
+				const pr = r * (.36 + k() * .2);
+				const g = b.createRadialGradient(px - pr * .35, py - pr * .35, 1, px, py, pr);
+				g.addColorStop(0, pal[0]);
+				g.addColorStop(.55, pal[1]);
+				g.addColorStop(1, pal[2]);
+				b.fillStyle = g;
+				b.beginPath();
+				b.arc(px, py, pr, 0, 7);
+				b.fill();
+			}
+			for (let i = 0; i < 24; i++) {
+				const a = k() * 6.28;
+				const d = Math.sqrt(k()) * r * .85;
+				const rx = 1.2 + k() * 1.4;
+				const ry = 1 + k();
+				const dots = o.pk ? TR.accentDots : TR.plainDots;
+				const light = o.pk ? k() < .6 : k() < .5;
+				blob(o.x + Math.cos(a) * d - r * .1, o.y + Math.sin(a) * d - r * .1, rx, ry, light ? dots[0] : dots[1], 0);
+			}
+			for (let i = 0; i < 8; i++) blob(o.x + rr(.4, 1.9) * r, o.y + rr(.2, 1.7) * r, rr(3, 6), rr(1.5, 3), TR.drifts);
+		}
+		const X0 = -864;
+		const X2 = (C + 36) * T$1;
+		const Y0 = -648;
+		const Y2 = (R + 27) * T$1;
+		const F = 144;
+		b.fillStyle = BG;
+		if (x0 < X0) b.fillRect(x0, y0, X0 - x0, h);
+		if (X1 > X2) b.fillRect(X2, y0, X1 - X2, h);
+		if (y0 < Y0) b.fillRect(x0, y0, w, Y0 - y0);
+		if (Y1 > Y2) b.fillRect(x0, Y2, w, Y1 - Y2);
+		for (const [a, c, d, e, f, g, i, j] of [
+			[
+				X0,
+				0,
+				-720,
+				0,
+				X0,
+				y0,
+				F,
+				h
+			],
+			[
+				X2,
+				0,
+				X2 - F,
+				0,
+				X2 - F,
+				y0,
+				F,
+				h
+			],
+			[
+				0,
+				Y0,
+				0,
+				-504,
+				x0,
+				Y0,
+				w,
+				F
+			],
+			[
+				0,
+				Y2,
+				0,
+				Y2 - F,
+				x0,
+				Y2 - F,
+				w,
+				F
+			]
+		]) {
+			const gr = b.createLinearGradient(a, c, d, e);
+			gr.addColorStop(0, BG);
+			gr.addColorStop(1, BG + "00");
+			b.fillStyle = gr;
+			b.fillRect(f, g, i, j);
+		}
+		return cv;
+	}
+	//#endregion
+	//#region src/games/pacman/render/seasons/meadow/meadowSprites.ts
+	function lazy(make) {
+		let value = null;
+		return () => value ??= make();
+	}
+	/** Linear 64×64 colour wash laid over the whole screen. */
+	function washTexture(from, to) {
+		const c = makeCanvas$1(64, 64);
+		const x = canvasContext(c);
+		const q = x.createLinearGradient(0, 0, 64, 64);
+		q.addColorStop(0, from);
+		q.addColorStop(.5, "rgba(255,255,255,0)");
+		q.addColorStop(1, to);
+		x.fillStyle = q;
+		x.fillRect(0, 0, 64, 64);
+		return c;
+	}
+	/** Soft sun ray falling from the top edge. */
+	var rayTexture = lazy(() => {
+		const c = makeCanvas$1(70, 520);
+		const x = canvasContext(c);
+		let q = x.createLinearGradient(0, 0, 70, 0);
+		q.addColorStop(0, "rgba(255,230,170,0)");
+		q.addColorStop(.5, "rgba(255,230,170,1)");
+		q.addColorStop(1, "rgba(255,230,170,0)");
+		x.fillStyle = q;
+		x.fillRect(0, 0, 70, 520);
+		x.globalCompositeOperation = "destination-in";
+		q = x.createLinearGradient(0, 0, 0, 520);
+		q.addColorStop(0, "rgba(0,0,0,1)");
+		q.addColorStop(1, "rgba(0,0,0,0)");
+		x.fillStyle = q;
+		x.fillRect(0, 0, 70, 520);
+		return c;
+	});
+	var streakCache = /* @__PURE__ */ new Map();
+	/** 16×2 streak fading in from the left, tinted (rain, blizzard, wind). */
+	function streakTexture(tint) {
+		const cached = streakCache.get(tint);
+		if (cached) return cached;
+		const r = tint >> 16 & 255;
+		const g = tint >> 8 & 255;
+		const b = tint & 255;
+		const texture = makeTexture(16, 2, (x) => {
+			const q = x.createLinearGradient(0, 0, 16, 0);
+			q.addColorStop(0, `rgba(${r},${g},${b},0)`);
+			q.addColorStop(1, `rgba(${r},${g},${b},1)`);
+			x.fillStyle = q;
+			x.fillRect(0, 0, 16, 2);
+		});
+		streakCache.set(tint, texture);
+		return texture;
+	}
+	/** Portal swirl: three spiral arms (the same in every season). */
+	var swirlTexture = lazy(() => makeTexture(20, 20, (x) => {
+		x.translate(10, 10);
+		x.lineCap = "round";
+		for (let arm = 0; arm < 3; arm++) {
+			x.strokeStyle = "rgba(255,255,255,.9)";
+			x.lineWidth = 1.2;
+			x.beginPath();
+			for (let i = 0; i <= 20; i++) {
+				const u = i / 20;
+				const a = u * 3.6 + arm * Math.PI * 2 / 3;
+				const r = 1 + u * 6.8;
+				if (i) x.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+				else x.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+			}
+			x.stroke();
+		}
+	}));
+	/** Portal ring in the season's colour. */
+	function ringTexture(color) {
+		return makeTexture(20, 20, (x) => {
+			x.strokeStyle = color;
+			x.lineWidth = 1.2;
+			x.beginPath();
+			x.arc(10, 10, 8.8, 0, 7);
+			x.stroke();
+		});
+	}
+	/** A sprite texture multiplied by a tint, keeping its alpha (PIXI's `tint`). */
+	var tintCache = /* @__PURE__ */ new WeakMap();
+	function tinted(im, tint) {
+		let byTint = tintCache.get(im);
+		if (!byTint) {
+			byTint = /* @__PURE__ */ new Map();
+			tintCache.set(im, byTint);
+		}
+		const cached = byTint.get(tint);
+		if (cached) return cached;
+		const c = makeCanvas$1(im.width, im.height);
+		const x = canvasContext(c);
+		x.drawImage(im, 0, 0);
+		x.globalCompositeOperation = "multiply";
+		x.fillStyle = "#" + tint.toString(16).padStart(6, "0");
+		x.fillRect(0, 0, c.width, c.height);
+		x.globalCompositeOperation = "destination-in";
+		x.drawImage(im, 0, 0);
+		byTint.set(tint, c);
+		return c;
+	}
+	/** Radial fog / light / vignette in one call. */
+	function radial(stops) {
+		return radialTexture(256, stops);
+	}
+	//#endregion
+	//#region src/games/pacman/render/seasons/meadow/MeadowWorld.ts
+	var T = 24;
+	var REBAKE_DELAY_MS = 160;
+	/** Centred sprite; size in the current transform's units. */
+	function sprite(ctx, im, x, y, w, h, a = 1, rot = 0, add = false) {
+		if (a <= .003 || w <= 0 || h <= 0) return;
+		ctx.globalAlpha = a > 1 ? 1 : a;
+		ctx.globalCompositeOperation = add ? "lighter" : "source-over";
+		if (rot) {
+			ctx.save();
+			ctx.translate(x, y);
+			ctx.rotate(rot);
+			ctx.drawImage(im, -w / 2, -h / 2, w, h);
+			ctx.restore();
+		} else ctx.drawImage(im, x - w / 2, y - h / 2, w, h);
+	}
+	var MeadowWorld = class {
+		S;
+		theme;
+		R;
+		C;
+		ring;
+		pellets = [];
+		energizers = [];
+		portals = [];
+		/** Lair gates: runs of LE tiles, world units from x0 to x1 at height y. */
+		gates = [];
+		gateOpen = 0;
+		glints = [];
+		smoke = [];
+		lights = [];
+		mist;
+		drift;
+		weather = [];
+		motion;
+		vw = 0;
+		vh = 0;
+		dpr = 1;
+		sc = 1;
+		wx = 0;
+		wy = 0;
+		t = 0;
+		stormV = 0;
+		stormT = 0;
+		nightV = 0;
+		nightT = 0;
+		bg = null;
+		bgX = 0;
+		bgY = 0;
+		bgRS = 1;
+		rebakeAt = 0;
+		constructor(S, theme) {
+			this.S = S;
+			this.theme = theme;
+			this.R = S.length;
+			this.C = S[0].length;
+			const live = theme.live;
+			this.ring = live.portal.ring();
+			const reduce = typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+			this.motion = reduce ? .2 : 1;
+			const ctr = (r, c) => ({
+				x: (c + .5) * T,
+				y: (r + .5) * T
+			});
+			S.forEach((row, r) => row.forEach((tt, c) => {
+				const p = ctr(r, c);
+				if (tt === "DT") this.pellets.push({
+					...p,
+					r,
+					c
+				});
+				else if (tt === "EU") {
+					this.energizers.push({
+						...p,
+						r,
+						c,
+						ph: Math.random() * 6
+					});
+					this.lights.push({
+						...p,
+						r: 1.7 * T,
+						tint: live.lights.energizer,
+						a: .8,
+						flicker: false
+					});
+				} else if (isTeleportToken(tt)) {
+					this.portals.push({
+						...p,
+						i: this.portals.length,
+						ph: r + c
+					});
+					this.lights.push({
+						...p,
+						r: 1.6 * T,
+						tint: live.lights.portal,
+						a: .7,
+						flicker: false
+					});
+				}
+			}));
+			S.forEach((row, r) => {
+				let start = -1;
+				row.forEach((tt, c) => {
+					if (tt === "LE" && start < 0) start = c;
+					if (start >= 0 && (tt !== "LE" || c === row.length - 1)) {
+						const end = tt === "LE" ? c + 1 : c;
+						this.gates.push({
+							x0: start * T,
+							x1: end * T,
+							y: (r + .5) * T
+						});
+						start = -1;
+					}
+				});
+			});
+			const lair = ctr(Math.floor((this.R - 1) / 2), Math.floor((this.C - 1) / 2));
+			this.lights.push({
+				...lair,
+				r: 3.4 * T,
+				tint: 16767392,
+				a: .4,
+				flicker: false
+			});
+			for (let i = 0; i < 22; i++) {
+				const x = (-18 + i * (this.C + 36) / 22) * T + Math.random() * T * 2;
+				this.glints.push({
+					x,
+					y: streamY(this.R, x) + (Math.random() - .5) * 10,
+					ph: Math.random() * 6
+				});
+			}
+			for (const o of meadowDecor(this.R, this.C, theme.bake.landmark.ex)) if (o.k === "lamp") this.lights.push({
+				x: o.x,
+				y: o.y,
+				r: 4 * T,
+				tint: 16767120,
+				a: .85,
+				flicker: true
+			});
+			else if (o.k === "cabin") {
+				const w = o.w ?? 0;
+				const h = o.h ?? 0;
+				this.lights.push({
+					x: o.x,
+					y: o.y,
+					r: 5 * T,
+					tint: 16762746,
+					a: .5,
+					flicker: false
+				});
+				if (live.chimneySmoke) for (let i = 0; i < 5; i++) this.smoke.push({
+					cx: o.x + w * .25,
+					cy: o.y - h * .22,
+					u: i / 5,
+					ph: i
+				});
+			}
+			this.mist = [
+				0,
+				1,
+				2,
+				3
+			].map((i) => ({
+				x: 0,
+				y: 0,
+				w: 0,
+				h: 0,
+				v: .15 + i * .04
+			}));
+			this.drift = Array.from({ length: 80 }, (_, i) => ({
+				im: live.drift.texture(i),
+				a: .55 + Math.random() * .35,
+				px: Math.random(),
+				py: Math.random(),
+				v: 4e-4 + Math.random() * 4e-4,
+				ph: Math.random() * 6,
+				rand: Math.random(),
+				w: 0,
+				h: 0
+			}));
+		}
+		/** Board placement for the actors: one tile = MEADOW_TILE world units. */
+		get layout() {
+			return {
+				tileSize: T * this.sc,
+				offsetX: this.wx,
+				offsetY: this.wy
+			};
+		}
+		/** How far the lair gate is open, 0 (shut) .. 1 (slid into its posts). */
+		setLairGate(open) {
+			this.gateOpen = Number.isFinite(open) ? Math.max(0, Math.min(1, open)) : 0;
+		}
+		/** Weather and night targets, 0..1; both ease in and out like the mock-up toggles. */
+		setMood(storm, night) {
+			this.stormT = storm;
+			this.nightT = night;
+		}
+		resize(vw, vh, dpr) {
+			if (vw === this.vw && vh === this.vh && dpr === this.dpr) return;
+			const first = this.vw === 0;
+			this.vw = vw;
+			this.vh = vh;
+			this.dpr = dpr;
+			this.sc = .75 * Math.min(vw / ((this.C + 2.5) * T), vh / ((this.R + 2.5) * T));
+			this.wx = vw / 2 - this.C * T / 2 * this.sc;
+			this.wy = vh / 2 - this.R * T / 2 * this.sc;
+			const W = Math.max(vw, vh);
+			this.mist.forEach((f, i) => {
+				f.w = W * .8;
+				f.h = W * .5;
+				f.y = vh * (.15 + i * .22);
+			});
+			for (const p of this.drift) [p.w, p.h] = this.theme.live.drift.size(this.sc, p.rand);
+			if (first) {
+				const weather = this.theme.live.weather;
+				this.weather = Array.from({ length: weather.count }, (_, i) => weather.make(i, vw, vh));
+				this.rebake();
+			} else this.rebakeAt = performance.now() + REBAKE_DELAY_MS;
+		}
+		update(dt) {
+			const live = this.theme.live;
+			const ms = Math.min(Math.max(dt * 1e3, 0), 100);
+			const k = this.motion;
+			this.t += ms / 1e3 * k;
+			const d = ms * .06 * k;
+			const t = this.t;
+			const ez = Math.min(1, .04 * d);
+			this.stormV += (this.stormT - this.stormV) * ez;
+			this.nightV += (this.nightT - this.nightV) * ez;
+			for (const f of this.mist) {
+				f.x += f.v * d * live.mistSpeed(this.stormV);
+				if (f.x > this.vw + f.w / 2) f.x = -f.w / 2;
+			}
+			const dir = live.drift.direction;
+			for (const p of this.drift) {
+				p.py += dir * p.v * d * live.drift.speed;
+				p.px += Math.sin(t * .9 + p.ph) * 4e-4;
+				if (dir > 0 && p.py > 1.03) {
+					p.py = -.03;
+					p.px = Math.random();
+				} else if (dir < 0 && p.py < -.03) {
+					p.py = 1.03;
+					p.px = Math.random();
+				}
+			}
+			if (this.stormV > .02) for (const p of this.weather) live.weather.step(p, d, t, this.stormV, this.vw, this.vh);
+			for (const q of this.smoke) q.u = (q.u + .0025 * d) % 1;
+		}
+		/**
+		* Background, maze, food still on the board and the animated world objects.
+		* `collected(x, y)` tells which food was eaten. Leaves the context untransformed.
+		*/
+		drawWorld(ctx, collected) {
+			if (this.rebakeAt > 0 && performance.now() >= this.rebakeAt) this.rebake();
+			const live = this.theme.live;
+			const t = this.t;
+			ctx.save();
+			ctx.globalAlpha = 1;
+			ctx.globalCompositeOperation = "source-over";
+			ctx.fillStyle = this.theme.bake.bg;
+			ctx.fillRect(0, 0, this.vw, this.vh);
+			ctx.translate(this.wx, this.wy);
+			ctx.scale(this.sc, this.sc);
+			if (this.bg) ctx.drawImage(this.bg, this.bgX, this.bgY, this.bg.width / this.bgRS, this.bg.height / this.bgRS);
+			this.drawGates(ctx);
+			const pellet = live.pellet.texture();
+			const ps = live.pellet.size;
+			for (const p of this.pellets) if (!collected(p.c, p.r)) ctx.drawImage(pellet, p.x - ps / 2, p.y - ps / 2, ps, ps);
+			const en = live.energizer;
+			const enGlow = glowTexture(en.glow);
+			const enIm = en.texture();
+			for (const o of this.energizers) {
+				if (collected(o.c, o.r)) continue;
+				const s = 1 + .05 * Math.sin(t * 2.6 + o.ph);
+				const rot = en.motion === "spin" ? t * .4 : Math.sin(t * 2 + o.ph) * .12;
+				sprite(ctx, enGlow, o.x, o.y, en.glowSize * s, en.glowSize * s, .7, 0, true);
+				sprite(ctx, enIm, o.x, o.y, en.size * s, en.size * s, 1, rot);
+			}
+			const portalGlow = glowTexture(live.portal.glow);
+			for (const o of this.portals) {
+				sprite(ctx, portalGlow, o.x, o.y, 19.2, 19.2, .5 + .3 * Math.sin(t * 1.8 + o.i), 0, true);
+				sprite(ctx, swirlTexture(), o.x, o.y, 20, 20, .7 + .2 * Math.sin(t * 1.6 + o.ph), t * .9);
+				sprite(ctx, swirlTexture(), o.x, o.y, 12.4, 12.4, .75, -t * 1.5);
+				const br = .5 + .5 * Math.sin(t * 1.8 + o.ph);
+				const rs = 20 * (.94 + .08 * br);
+				sprite(ctx, this.ring, o.x, o.y, rs, rs, .45 + .5 * br);
+			}
+			const glint = glowTexture(live.glints);
+			for (const g of this.glints) {
+				const a = Math.pow(Math.max(0, Math.sin(t * 2 + g.ph)), 3) * .8;
+				sprite(ctx, glint, g.x, g.y, 6.4, 6.4, a, 0, true);
+			}
+			const puff = glowTexture(15922938);
+			for (const q of this.smoke) {
+				const s = 8 + q.u * 22;
+				sprite(ctx, puff, q.cx + q.u * 26 + Math.sin(t * 1.5 + q.ph) * 4, q.cy - q.u * 34, s, s, (1 - q.u) * .5 * Math.min(1, q.u * 8));
+			}
+			ctx.restore();
+		}
+		/**
+		* The lair gate, as the bake used to paint it: a plank bar between two dark posts with a
+		* flower in the middle. Opening, each half slides into its post and the flower fades.
+		*/
+		drawGates(ctx) {
+			const o = this.gateOpen;
+			for (const g of this.gates) {
+				const mid = (g.x0 + g.x1) / 2;
+				const half = (mid - g.x0) * (1 - o);
+				for (const [from, dir] of [[g.x0, 1], [g.x1, -1]]) {
+					const left = dir > 0 ? from : from - half;
+					if (half > .01) {
+						ctx.fillStyle = "#7a5636";
+						ctx.fillRect(left, g.y - 5, half, 10);
+						ctx.fillStyle = "#a07848";
+						for (let i = 0; i < 3; i++) ctx.fillRect(left, g.y - 4 + i * 3.3, half, 1.2);
+					}
+					ctx.fillStyle = "#4f3622";
+					ctx.fillRect(dir > 0 ? from : from - 4, g.y - 6, 4, 12);
+				}
+				if (o < 1) {
+					ctx.save();
+					ctx.globalAlpha *= 1 - o;
+					const r = 2.6;
+					ctx.fillStyle = "#d9333a";
+					for (let k = 0; k < 5; k++) {
+						const a = k * 1.2566 + .3;
+						ctx.beginPath();
+						ctx.arc(mid + Math.cos(a) * r * .7, g.y - 5 + Math.sin(a) * r * .7, r * .6, 0, 7);
+						ctx.fill();
+					}
+					ctx.fillStyle = "#ffffff";
+					ctx.beginPath();
+					ctx.arc(mid, g.y - 5, r * .38, 0, 7);
+					ctx.fill();
+					ctx.restore();
+				}
+			}
+		}
+		/** Atmosphere under the actors: mist, rays, light, drift, wash, weather haze, night. */
+		drawMood(ctx) {
+			const live = this.theme.live;
+			const vw = this.vw;
+			const vh = this.vh;
+			const t = this.t;
+			ctx.save();
+			const fog = live.fog();
+			const mistA = live.mistAlpha(this.stormV);
+			for (const f of this.mist) sprite(ctx, fog, f.x, f.y, f.w, f.h, mistA);
+			for (let i = 0; i < 2; i++) {
+				const a = live.rays(t, i, this.stormV, this.nightV);
+				if (a > .003) {
+					const w = 70 * (1.6 + i);
+					const h = vh * 1.6;
+					ctx.save();
+					ctx.translate(vw * (.1 + i * .22), -20);
+					ctx.rotate(-.5);
+					ctx.globalAlpha = Math.min(1, a);
+					ctx.globalCompositeOperation = "lighter";
+					ctx.drawImage(rayTexture(), -w / 2, 0, w, h);
+					ctx.restore();
+				}
+			}
+			const W = Math.max(vw, vh) * 1.5;
+			ctx.globalAlpha = Math.min(1, live.litAlpha(this.stormV, this.nightV));
+			ctx.globalCompositeOperation = "lighter";
+			ctx.drawImage(live.lit(), 0, 0, W, W);
+			const spin = live.drift.spin;
+			for (const p of this.drift) sprite(ctx, p.im, p.px * vw, p.py * vh, p.w, p.h, p.a, spin ? t + p.ph : 0);
+			ctx.globalAlpha = 1;
+			ctx.globalCompositeOperation = "source-over";
+			ctx.drawImage(live.wash(), 0, 0, vw, vh);
+			if (this.stormV > .002) {
+				ctx.globalAlpha = live.stormAlpha * this.stormV;
+				ctx.fillStyle = live.stormTint;
+				ctx.fillRect(0, 0, vw, vh);
+			}
+			if (this.nightV > .002) {
+				ctx.globalAlpha = live.nightAlpha * this.nightV;
+				ctx.globalCompositeOperation = "multiply";
+				ctx.fillStyle = live.nightTint;
+				ctx.fillRect(0, 0, vw, vh);
+				ctx.save();
+				ctx.translate(this.wx, this.wy);
+				ctx.scale(this.sc, this.sc);
+				for (const g of this.lights) {
+					const a = this.nightV * g.a * (g.flicker ? .88 + .12 * Math.sin(t * 7 + g.x) : 1);
+					sprite(ctx, glowTexture(g.tint), g.x, g.y, 2 * g.r, 2 * g.r, a, 0, true);
+				}
+				ctx.restore();
+			}
+			ctx.restore();
+		}
+		/** Screen-space layer over the actors: the weather particles and the vignette. */
+		drawOverlay(ctx) {
+			const live = this.theme.live;
+			ctx.save();
+			if (this.stormV > .02) for (const p of this.weather) sprite(ctx, p.im, p.px, p.py, p.w, p.h, live.weather.alpha(p, this.stormV), p.rot, p.add);
+			ctx.globalAlpha = 1;
+			ctx.globalCompositeOperation = "source-over";
+			ctx.drawImage(live.vignette(), 0, 0, this.vw, this.vh);
+			ctx.restore();
+		}
+		rebake() {
+			this.rebakeAt = 0;
+			const m = 2 * T;
+			const bx = -this.wx / this.sc - m;
+			const by = -this.wy / this.sc - m;
+			const bw = this.vw / this.sc + 2 * m;
+			const bh = this.vh / this.sc + 2 * m;
+			let RS = this.sc * this.dpr;
+			while (RS * RS * bw * bh > 13e6) RS *= .92;
+			this.bg = bakeMeadow(this.S, this.theme.bake, bx, by, bw, bh, RS);
+			this.bgX = bx;
+			this.bgY = by;
+			this.bgRS = RS;
+		}
+	};
+	`${2.2.toFixed(2)}${1.8.toFixed(2)}${2.4.toFixed(2)}`;
+	//#endregion
+	//#region src/games/pacman/render/transitions/decay/LevelDecay.ts
+	var ICE_PALETTE = {
+		deep: 330263,
+		mid: 1321802,
+		wisp: 4234961,
+		ice: 13429503,
+		rim: 7585791,
+		warm: 16773849
+	};
+	//#endregion
+	//#region src/games/pacman/render/seasons/winter/winterTheme.ts
+	var pellet = lazy(() => makeTexture(10, 10, (x) => {
+		const q = x.createLinearGradient(2, 1, 8, 9);
+		q.addColorStop(0, "#f4fcff");
+		q.addColorStop(1, "#62b8e6");
+		x.fillStyle = q;
+		x.beginPath();
+		x.moveTo(5, .8);
+		x.lineTo(7.8, 5);
+		x.lineTo(5, 9.2);
+		x.lineTo(2.2, 5);
+		x.closePath();
+		x.fill();
+		x.strokeStyle = "rgba(255,255,255,.8)";
+		x.lineWidth = .5;
+		x.beginPath();
+		x.moveTo(2.2, 5);
+		x.lineTo(7.8, 5);
+		x.moveTo(5, .8);
+		x.lineTo(5, 9.2);
+		x.stroke();
+	}));
+	var crystal = lazy(() => makeTexture(20, 20, (x) => {
+		x.translate(10, 10);
+		const g = x.createRadialGradient(-2, -2, .5, 0, 0, 9);
+		g.addColorStop(0, "#ffffff");
+		g.addColorStop(.5, "#9fe0ff");
+		g.addColorStop(1, "#3b8fd0");
+		x.fillStyle = g;
+		x.beginPath();
+		for (let i = 0; i < 8; i++) {
+			const a = i * Math.PI / 4 - Math.PI / 2;
+			const r = i % 2 ? 4.8 : 9;
+			if (i) x.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+			else x.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+		}
+		x.closePath();
+		x.fill();
+		x.strokeStyle = "rgba(255,255,255,.8)";
+		x.lineWidth = .6;
+		x.beginPath();
+		for (let i = 0; i < 8; i += 2) {
+			const a = i * Math.PI / 4 - Math.PI / 2;
+			x.moveTo(0, 0);
+			x.lineTo(Math.cos(a) * 9, Math.sin(a) * 9);
+		}
+		x.stroke();
+		x.fillStyle = "#fff";
+		x.beginPath();
+		x.arc(0, 0, 1.7, 0, 7);
+		x.fill();
+	}));
+	var fog$3 = lazy(() => tinted(radial([[0, "rgba(235,245,235,.9)"], [1, "rgba(235,245,235,0)"]]), 14412021));
+	var winterTheme = {
+		name: "winter",
+		bake: {
+			bg: "#c9d8e8",
+			groundCenter: "#f2f7fc",
+			groundBlobs: ["rgba(255,255,255,.4)", "rgba(90,120,170,.06)"],
+			grass: [
+				"#9aa888aa",
+				"#b8c0a488",
+				"#6f7f66aa",
+				"#ffffff66"
+			],
+			curls: "rgba(150,175,215,.28)",
+			stream: [
+				"rgba(70,95,130,.35)",
+				"#dbe9f3",
+				"#b4d6e8",
+				"rgba(150,200,225,.6)"
+			],
+			shadow: "50,70,110",
+			bush: ["#ffffff", "#a9bfd6"],
+			pond: {
+				sand: "#f4f9fd",
+				water: ["#eaf6fd", "#8fc3de"],
+				rim: "rgba(60,100,140,.35)",
+				highlight: "rgba(255,255,255,.85)",
+				stones: "#ffffff"
+			},
+			bridge: {
+				caps: "#f4f9fd",
+				middle: "rgba(255,255,255,.9)"
+			},
+			cabin: {
+				walls: [
+					"#bb6851",
+					"#a65240",
+					"#87423b",
+					"#6a342f"
+				],
+				roofBlobs: "rgba(248,252,255,.93)",
+				ridge: "#f6fafd",
+				ridgeShadow: "rgba(110,130,160,.45)",
+				chimneyCap: "#f4f9fd"
+			},
+			rock: [
+				"#b9c4d0",
+				"#6f7d8d",
+				"#ffffff",
+				"#e8f1f9"
+			],
+			lair: {
+				base: "#6a7688",
+				tiles: [
+					"#dbe6f0",
+					"#cfdde9",
+					"#c3d3e2"
+				]
+			},
+			floor: {
+				tiles: [
+					"#566274",
+					"#515d6f",
+					"#5b6779"
+				],
+				specks: [
+					"#6a768a",
+					"#3a4452",
+					"#7a869a"
+				]
+			},
+			portal: {
+				trail: (a) => `rgba(86,98,116,${a * .55})`,
+				grass: [
+					"#b9c4a6",
+					"#8a9a7a",
+					"#e8eef2"
+				],
+				plate: ["#aeb9c6", "#6c7a8c"],
+				core: [
+					"#d8f4ff",
+					"#4f9fd8",
+					"#1b2d52"
+				],
+				ring: "#9fe3ff",
+				corners: "#f4f9fd"
+			},
+			wall: {
+				base: "#5d6a62",
+				moss: ["#4f7f66", "#2f5a4a"],
+				top: [
+					"#a3afbf",
+					"#a9b0bd",
+					"#9aa8b8"
+				],
+				bottom: [
+					"#7a8799",
+					"#838c9a",
+					"#74869a"
+				],
+				mossSpecks: [
+					"#8fb8a2",
+					"#2a4f40",
+					"#e8f2f8"
+				],
+				specks: ["rgba(255,255,255,.4)", "rgba(40,55,48,.3)"],
+				crack: "rgba(50,65,58,.22)",
+				joints: "rgba(45,60,72,.17)",
+				drifts: ["#f4f9fd", "#ffffff"],
+				light: "rgba(255,255,240,.4)",
+				dark: "rgba(30,45,38,.32)",
+				flowers: [
+					"#d9333a",
+					"#ff6b6b",
+					"#ffffff"
+				],
+				shadow: "rgba(30,40,70,.45)"
+			},
+			edgeGrass: [
+				"#b9c4a6",
+				"#8a9a7a",
+				"#e8eef2"
+			],
+			trees: {
+				accent: [
+					"#ffffff",
+					"#9fbfae",
+					"#3b6a58"
+				],
+				plain: [
+					"#f4f9fd",
+					"#b4c8d8",
+					"#5a7a8e"
+				],
+				accentDots: ["rgba(255,255,255,.85)", "rgba(40,90,70,.5)"],
+				plainDots: ["rgba(255,255,255,.8)", "rgba(70,95,115,.45)"],
+				drifts: "rgba(255,255,255,.55)"
+			},
+			landmark: {
+				ex: [1.8, 1.6],
+				draw: ({ b, blob, sph, shade }, o) => {
+					const r = o.r ?? 0;
+					blob(o.x + r * .5, o.y + r * .6, r * 1.15, r * .8, shade(.32), 0);
+					b.strokeStyle = "#5a4028";
+					b.lineWidth = 1.6;
+					b.beginPath();
+					b.moveTo(o.x - r * .9, o.y - r * .1);
+					b.lineTo(o.x + r * .9, o.y + r * .1);
+					b.stroke();
+					sph(o.x, o.y + r * .2, r, "#ffffff", "#b4c9de");
+					sph(o.x - r * .1, o.y - r * .55, r * .62, "#ffffff", "#bfd2e4");
+					b.strokeStyle = "#d9333a";
+					b.lineWidth = 2.4;
+					b.beginPath();
+					b.arc(o.x - r * .1, o.y - r * .55, r * .58, .3, 2.9);
+					b.stroke();
+					blob(o.x - r * .1, o.y - r * .55, r * .34, r * .34, "#2b3340", 0);
+					blob(o.x - r * .1, o.y - r * .58, r * .2, r * .2, "#4a5566", 0);
+				}
+			},
+			flowerPatch: ({ rr, pick, fl5 }, o) => {
+				const c = o.c ?? 0;
+				const cl = c < .3 ? ["#ffffff", "#e8f2fb"] : c < .55 ? ["#c9dcef", "#e8f2fb"] : c < .8 ? ["#d9333a", "#ff6b6b"] : ["#f4d4d8", "#ffffff"];
+				for (let i = 0; i < (o.n ?? 0); i++) fl5(o.x + rr(-16, 16), o.y + rr(-12, 12), rr(2, 3), pick(cl), "#ffcf4d");
+			}
+		},
+		live: {
+			pellet: {
+				texture: pellet,
+				size: 10
+			},
+			energizer: {
+				texture: crystal,
+				size: 20,
+				glow: 8378623,
+				glowSize: 39.68 / 3,
+				motion: "spin"
+			},
+			portal: {
+				glow: 11065599,
+				ring: () => ringTexture("rgba(170,232,255,.95)")
+			},
+			glints: 16777215,
+			fog: fog$3,
+			mistAlpha: (s) => .1 + .22 * s,
+			mistSpeed: (s) => 1 + 6 * s,
+			rays: () => 0,
+			lit: lazy(() => radial([[0, "rgba(205,228,255,.4)"], [1, "rgba(255,205,130,0)"]])),
+			litAlpha: () => 1,
+			drift: {
+				texture: () => glowTexture(16777215),
+				size: (sc, rand) => {
+					const s = 64 * sc * (.035 + rand * .05);
+					return [s, s];
+				},
+				direction: 1,
+				speed: 16,
+				spin: false
+			},
+			wash: lazy(() => washTexture("rgba(255,236,200,.14)", "rgba(70,90,150,.16)")),
+			stormTint: "#e4edf6",
+			stormAlpha: .24,
+			weather: {
+				count: 220,
+				make: (i, vw, vh) => {
+					const st = i % 2 === 0;
+					const s = st ? .8 + Math.random() : .14 + Math.random() * .2;
+					return {
+						st,
+						im: st ? streakTexture(i % 4 === 0 ? 16777215 : 11124182) : glowTexture(16777215),
+						w: st ? 16 * s : 64 * s / 3,
+						h: st ? 2 * s : 64 * s / 3,
+						px: Math.random() * vw,
+						py: Math.random() * vh,
+						vx: st ? 12 + Math.random() * 8 : 3 + Math.random() * 3,
+						vy: st ? 4 + Math.random() * 3 : 2 + Math.random() * 2,
+						ph: Math.random() * 6,
+						rot: st ? .3 : 0,
+						add: false
+					};
+				},
+				step: (p, d, t, s, vw, vh) => {
+					p.px += p.vx * d * s;
+					p.py += p.vy * d * s + (p.st ? 0 : Math.sin(t * 2 + p.ph) * .3);
+					if (p.px > vw + 30) {
+						p.px = -30;
+						p.py = Math.random() * vh;
+					}
+					if (p.py > vh + 30) {
+						p.py = -30;
+						p.px = Math.random() * vw;
+					}
+				},
+				alpha: (p, s) => s * (p.st ? .7 : .9)
+			},
+			nightTint: "#5a6ea6",
+			nightAlpha: .55,
+			vignette: lazy(() => radial([[.5, "rgba(12,22,44,0)"], [1, "rgba(12,22,44,.5)"]])),
+			lights: {
+				energizer: 8378623,
+				portal: 10475775
+			},
+			chimneySmoke: true
+		},
+		decay: ICE_PALETTE
+	};
+	//#endregion
+	//#region src/games/pacman/render/seasons/spring/springTheme.ts
+	var PETALS = [
+		16761561,
+		16777215,
+		16768488,
+		16230596
+	];
+	var clover = lazy(() => makeTexture(10, 10, (x) => {
+		x.translate(5, 5);
+		x.strokeStyle = "#d8ff9a";
+		x.lineWidth = .9;
+		x.beginPath();
+		x.moveTo(0, .5);
+		x.lineTo(.6, 4.6);
+		x.stroke();
+		x.fillStyle = "#9dff5a";
+		x.strokeStyle = "rgba(235,255,200,.95)";
+		x.lineWidth = .5;
+		for (const [a, c] of [
+			[-2, .2],
+			[2, .2],
+			[0, -2.4]
+		]) {
+			x.beginPath();
+			x.arc(a, c, 2.1, 0, 7);
+			x.fill();
+			x.stroke();
+		}
+	}));
+	var tulip = lazy(() => makeTexture(26, 26, (x) => {
+		x.translate(13, 13);
+		x.lineWidth = 1.2;
+		x.strokeStyle = "#5a0f2e";
+		x.fillStyle = "#4fa83a";
+		x.beginPath();
+		x.moveTo(-1, 2);
+		x.lineTo(-1, 12);
+		x.lineTo(1, 12);
+		x.lineTo(1, 2);
+		x.closePath();
+		x.fill();
+		x.stroke();
+		x.beginPath();
+		x.moveTo(1, 11);
+		x.quadraticCurveTo(10, 8, 9, 2);
+		x.quadraticCurveTo(3, 5, 1, 11);
+		x.fill();
+		x.stroke();
+		const g = x.createLinearGradient(0, -12, 0, 4);
+		g.addColorStop(0, "#ff8fc0");
+		g.addColorStop(1, "#d0246e");
+		x.fillStyle = g;
+		x.beginPath();
+		x.moveTo(-8, -8);
+		x.lineTo(-4.5, -3);
+		x.lineTo(0, -11);
+		x.lineTo(4.5, -3);
+		x.lineTo(8, -8);
+		x.bezierCurveTo(10, 0, 5, 6, 0, 6);
+		x.bezierCurveTo(-5, 6, -10, 0, -8, -8);
+		x.closePath();
+		x.fill();
+		x.stroke();
+		x.strokeStyle = "rgba(255,230,240,.7)";
+		x.lineWidth = .9;
+		x.beginPath();
+		x.moveTo(-4.5, -3);
+		x.quadraticCurveTo(-3, 2, 0, 5);
+		x.moveTo(4.5, -3);
+		x.quadraticCurveTo(3, 2, 0, 5);
+		x.stroke();
+	}));
+	/** A single petal, white: tinted per particle. */
+	var petal = lazy(() => makeTexture(10, 6, (x) => {
+		x.fillStyle = "#fff";
+		x.beginPath();
+		x.moveTo(.5, 3);
+		x.quadraticCurveTo(3, -1, 9.5, 3);
+		x.quadraticCurveTo(3, 7, .5, 3);
+		x.fill();
+	}));
+	var fog$2 = lazy(() => tinted(radial([[0, "rgba(240,255,240,.9)"], [1, "rgba(240,255,240,0)"]]), 15267296));
+	var springTheme = {
+		name: "spring",
+		bake: {
+			bg: "#9ad66b",
+			groundCenter: "#d2ef9a",
+			groundBlobs: ["rgba(255,255,220,.4)", "rgba(40,110,40,.07)"],
+			grass: [
+				"#5fa83acc",
+				"#86c94f99",
+				"#4a9030aa",
+				"#e0f59a88"
+			],
+			curls: "rgba(255,255,200,.25)",
+			stream: [
+				"rgba(30,70,60,.3)",
+				"#e8f0d0",
+				"#5ec0e0",
+				"rgba(200,245,255,.6)"
+			],
+			shadow: "30,50,20",
+			bush: ["#a8e070", "#3f8f3a"],
+			pond: {
+				sand: "#d9cf9c",
+				water: ["#8fe0f0", "#2a9ac0"],
+				rim: "rgba(20,80,100,.45)",
+				highlight: "rgba(255,255,255,.85)",
+				stones: "#c4b890"
+			},
+			bridge: {
+				caps: "#8fd05a",
+				middle: "rgba(255,190,215,.8)"
+			},
+			cabin: {
+				walls: [
+					"#bb6851",
+					"#a65240",
+					"#87423b",
+					"#6a342f"
+				],
+				roofBlobs: "rgba(255,190,215,.3)",
+				ridge: "#6a3a2a",
+				ridgeShadow: "rgba(60,30,20,.4)",
+				chimneyCap: "#5a4a3a"
+			},
+			rock: [
+				"#b8b8a8",
+				"#6a6a5a",
+				"#7fbf4a",
+				"#9fd46a"
+			],
+			lair: {
+				base: "#4a5236",
+				tiles: [
+					"#cfd6b8",
+					"#c4cdaa",
+					"#d8dec2"
+				]
+			},
+			floor: {
+				tiles: [
+					"#5a4636",
+					"#54402f",
+					"#604b3a"
+				],
+				specks: [
+					"#6e5846",
+					"#3a2c20",
+					"#7a6452"
+				]
+			},
+			portal: {
+				trail: (a) => `rgba(60,45,30,${a * .55})`,
+				grass: [
+					"#5faa3a",
+					"#86c94f",
+					"#b8e07a"
+				],
+				plate: ["#d8d6c0", "#8f8c70"],
+				core: [
+					"#fffbd0",
+					"#ffd23f",
+					"#a8741a"
+				],
+				ring: "#fff3a0",
+				corners: "#fffbe0"
+			},
+			wall: {
+				base: "#24481f",
+				moss: ["#4a8a3e", "#2a5a2a"],
+				top: [
+					"#5a9a48",
+					"#62a24e",
+					"#528f42"
+				],
+				bottom: [
+					"#2f6a2c",
+					"#357230",
+					"#2a6028"
+				],
+				mossSpecks: [
+					"#ffc2d9",
+					"#f58fb5",
+					"#ffffff"
+				],
+				specks: ["rgba(190,230,130,.3)", "rgba(15,50,20,.32)"],
+				crack: "rgba(15,50,20,.28)",
+				joints: "rgba(15,50,20,.2)",
+				drifts: ["#8fcf6a", "#a8dc80"],
+				light: "rgba(210,240,160,.35)",
+				dark: "rgba(10,40,15,.4)",
+				flowers: [
+					"#ffffff",
+					"#ffc2d9",
+					"#f58fb5"
+				],
+				shadow: "rgba(20,50,20,.5)"
+			},
+			edgeGrass: [
+				"#5faa3a",
+				"#86c94f",
+				"#b8e07a"
+			],
+			trees: {
+				accent: [
+					"#ffe6ef",
+					"#f5a6c4",
+					"#c85a88"
+				],
+				plain: [
+					"#d8f58a",
+					"#78c050",
+					"#3a7a30"
+				],
+				accentDots: ["rgba(255,255,255,.85)", "rgba(150,50,90,.5)"],
+				plainDots: ["rgba(235,255,170,.7)", "rgba(25,80,30,.45)"],
+				drifts: "rgba(255,200,220,.5)"
+			},
+			landmark: {
+				ex: [2.4, 2.2],
+				draw: ({ b, blob }, o) => {
+					const r = o.r ?? 0;
+					const U = r * 2.2;
+					b.save();
+					b.translate(o.x, o.y);
+					b.rotate(.3);
+					b.fillStyle = "rgba(30,60,20,.3)";
+					b.fillRect(-U + 3, -U * .75 + 4, U * 2, U * 1.5);
+					for (let i = 0; i < 6; i++) for (let j = 0; j < 4; j++) {
+						b.fillStyle = (i + j) % 2 ? "#fff4e6" : "#e8574a";
+						b.fillRect(-U + i * U * 2 / 6, -U * .75 + j * U * 1.5 / 4, U * 2 / 6 + .5, U * 1.5 / 4 + .5);
+					}
+					b.restore();
+					blob(o.x + U * .2, o.y - U * .1, r * .8, r * .55, "#b8864a", 0);
+					blob(o.x + U * .2, o.y - U * .2, r * .6, r * .3, "#d9a868", 0);
+				}
+			},
+			flowerPatch: ({ rr, pick, fl5 }, o) => {
+				const c = o.c ?? 0;
+				const cl = c < .3 ? ["#ffffff", "#fff0f6"] : c < .55 ? ["#ff9ec4", "#ffc2d9"] : c < .8 ? ["#ffe14d", "#ffd23f"] : ["#b58cff", "#d9c8ff"];
+				const mid = c >= .55 && c < .8 ? "#d9731a" : "#ffcf4d";
+				for (let i = 0; i < (o.n ?? 0); i++) fl5(o.x + rr(-16, 16), o.y + rr(-12, 12), rr(2, 3), pick(cl), mid);
+			},
+			pondExtras: ({ blob, fl5 }, o) => {
+				const rx = o.rx ?? 0;
+				const ry = o.ry ?? 0;
+				for (let i = 0; i < 4; i++) {
+					const a = i * 1.7 + .5;
+					const px = o.x + Math.cos(a) * rx * .45;
+					const py = o.y + Math.sin(a) * ry * .45;
+					blob(px, py, 6, 4.5, "#4fbf4a", 0);
+					if (i % 2) fl5(px, py, 2.4, "#ff9ec4", "#ffe14d");
+				}
+			}
+		},
+		live: {
+			pellet: {
+				texture: clover,
+				size: 10
+			},
+			energizer: {
+				texture: tulip,
+				size: 26,
+				glow: 16736160,
+				glowSize: 60.8 / 3,
+				motion: "sway"
+			},
+			portal: {
+				glow: 16769120,
+				ring: () => ringTexture("rgba(255,226,110,.95)")
+			},
+			glints: 16777215,
+			fog: fog$2,
+			mistAlpha: (s) => .1 + .22 * s,
+			mistSpeed: (s) => 1 + 6 * s,
+			rays: (t, i, _s, n) => (.1 + .04 * Math.sin(t * .5 + i * 2)) * (1 - .8 * n),
+			lit: lazy(() => radial([[0, "rgba(255,250,210,.25)"], [1, "rgba(255,205,130,0)"]])),
+			litAlpha: () => 1,
+			drift: {
+				texture: (i) => tinted(petal(), PETALS[i % 4]),
+				size: (_sc, rand) => {
+					const s = .16 + rand * .12;
+					return [30 * s, 18 * s];
+				},
+				direction: 1,
+				speed: 16,
+				spin: true
+			},
+			wash: lazy(() => washTexture("rgba(255,255,220,.16)", "rgba(120,200,255,.1)")),
+			stormTint: "#eef8e8",
+			stormAlpha: .14,
+			weather: {
+				count: 240,
+				make: (i, vw, vh) => {
+					const st = i % 3 === 0;
+					const s = st ? 1.2 + Math.random() * 1.6 : .9 + Math.random() * .8;
+					return {
+						st,
+						im: st ? streakTexture(16777215) : tinted(petal(), PETALS[i % 4]),
+						w: st ? 16 * s : 10 * s,
+						h: st ? 2 * s * .5 : 6 * s,
+						px: Math.random() * vw,
+						py: Math.random() * vh,
+						vx: st ? 22 + Math.random() * 10 : 9 + Math.random() * 7,
+						vy: st ? .5 + Math.random() * 1.5 : 1 + Math.random() * 3,
+						ph: Math.random() * 6,
+						rot: st ? .06 : Math.random() * 6,
+						add: false
+					};
+				},
+				step: (p, d, t, s, vw, vh) => {
+					if (!p.st) p.rot += .12 * d;
+					p.px += p.vx * d * s;
+					p.py += p.vy * d * s + (p.st ? 0 : Math.sin(t * 3 + p.ph) * 1.2 * s);
+					if (p.px > vw + 40) {
+						p.px = -40;
+						p.py = Math.random() * vh;
+					}
+					if (p.py > vh + 30) p.py = -30;
+				},
+				alpha: (p, s) => s * (p.st ? .4 : .9)
+			},
+			nightTint: "#4a5a9a",
+			nightAlpha: .55,
+			vignette: lazy(() => radial([[.5, "rgba(20,50,20,0)"], [1, "rgba(20,50,20,.3)"]])),
+			lights: {
+				energizer: 16740270,
+				portal: 16769120
+			},
+			chimneySmoke: true
+		},
+		decay: {
+			deep: 398348,
+			mid: 1194534,
+			wisp: 5822112,
+			ice: 16766696,
+			rim: 16748480,
+			warm: 16774872
+		}
+	};
+	//#endregion
+	//#region src/games/pacman/render/seasons/summer/summerTheme.ts
+	/**
+	* Pellet: a small amber drop, ~5 world units across (a fifth of a tile). Light centre and
+	* a dark rim so it holds against the sand; no inner detail, because 200 of them are on
+	* screen at once.
+	*/
+	var drop = lazy(() => makeTexture(10, 10, (x) => {
+		x.translate(5, 5);
+		x.fillStyle = "rgba(90,45,10,.35)";
+		x.beginPath();
+		x.arc(.5, .7, 2.7, 0, 7);
+		x.fill();
+		const g = x.createRadialGradient(-.8, -.9, .2, 0, 0, 2.6);
+		g.addColorStop(0, "#fffbe2");
+		g.addColorStop(.55, "#ffd56a");
+		g.addColorStop(1, "#f29a2e");
+		x.fillStyle = g;
+		x.beginPath();
+		x.arc(0, 0, 2.6, 0, 7);
+		x.fill();
+		x.strokeStyle = "#a8501a";
+		x.lineWidth = .7;
+		x.stroke();
+	}));
+	/** Energizer: a watermelon slice — red, green and big, nothing like a pellet. */
+	var watermelon = lazy(() => makeTexture(24, 24, (x) => {
+		x.translate(12, 13);
+		const R = 10;
+		const arc = (r) => {
+			x.beginPath();
+			x.moveTo(-r, -2);
+			x.arc(0, -2, r, 0, Math.PI);
+			x.closePath();
+		};
+		x.fillStyle = "rgba(60,20,10,.3)";
+		x.save();
+		x.translate(.8, 1.2);
+		arc(R);
+		x.fill();
+		x.restore();
+		x.fillStyle = "#1f7a34";
+		arc(R);
+		x.fill();
+		x.fillStyle = "#c9f0a0";
+		arc(8.4);
+		x.fill();
+		const g = x.createRadialGradient(0, -2, 1, 0, -2, 7.6);
+		g.addColorStop(0, "#ff7a86");
+		g.addColorStop(1, "#e8283e");
+		x.fillStyle = g;
+		arc(7.6);
+		x.fill();
+		x.fillStyle = "#2a1414";
+		for (const [sx, sy] of [
+			[-4.2, .6],
+			[-1.4, 2.6],
+			[1.6, 2.6],
+			[4.4, .6],
+			[0, 4.8]
+		]) {
+			x.beginPath();
+			x.ellipse(sx, sy, .75, 1.1, Math.atan2(sy + 2, sx) - Math.PI / 2, 0, 7);
+			x.fill();
+		}
+		x.strokeStyle = "rgba(255,255,255,.7)";
+		x.lineWidth = .8;
+		x.beginPath();
+		x.moveTo(-7.4, -1.4);
+		x.lineTo(7.4, -1.4);
+		x.stroke();
+		x.strokeStyle = "#0f4a20";
+		x.lineWidth = .9;
+		arc(R);
+		x.stroke();
+	}));
+	var fog$1 = lazy(() => tinted(radial([[0, "rgba(255,244,210,.9)"], [1, "rgba(255,244,210,0)"]]), 16773576));
+	/** Heat shimmer band, white: tinted below. */
+	var band = lazy(() => makeTexture(48, 6, (x) => {
+		const q = x.createLinearGradient(0, 0, 48, 0);
+		q.addColorStop(0, "rgba(255,255,255,0)");
+		q.addColorStop(.5, "rgba(255,255,255,.6)");
+		q.addColorStop(1, "rgba(255,255,255,0)");
+		x.fillStyle = q;
+		x.beginPath();
+		x.ellipse(24, 3, 24, 2.2, 0, 0, 7);
+		x.fill();
+	}));
+	var summerTheme = {
+		name: "summer",
+		bake: {
+			bg: "#8cc152",
+			groundCenter: "#c6e67e",
+			groundBlobs: ["rgba(255,248,170,.35)", "rgba(30,90,30,.08)"],
+			grass: [
+				"#4f8f2fcc",
+				"#6fb03c99",
+				"#3a7a28aa",
+				"#d8f27a88"
+			],
+			curls: "rgba(255,244,160,.25)",
+			stream: [
+				"rgba(30,90,60,.35)",
+				"#ecdca8",
+				"#26b5c9",
+				"rgba(160,245,240,.6)"
+			],
+			shadow: "60,45,15",
+			bush: ["#8fdc4f", "#2f7a2c"],
+			pond: {
+				sand: "#f0dca0",
+				water: ["#8ff0ea", "#1a8fb0"],
+				rim: "rgba(10,90,110,.45)",
+				highlight: "rgba(255,255,255,.85)",
+				stones: "#cdb27a"
+			},
+			bridge: {
+				caps: "#8fd05a",
+				middle: "rgba(90,190,70,.7)"
+			},
+			cabin: {
+				walls: [
+					"#f08a4b",
+					"#d9693a",
+					"#c24f2c",
+					"#9b3a22"
+				],
+				roofBlobs: "rgba(255,214,150,.22)",
+				ridge: "#ffe7a8",
+				ridgeShadow: "rgba(120,50,20,.5)",
+				chimneyCap: "#d8cdbf"
+			},
+			rock: [
+				"#d8c9a8",
+				"#8a7a5c",
+				"#efe2c0",
+				"#c8b68c"
+			],
+			lair: {
+				base: "#a07f4e",
+				tiles: [
+					"#f6e8c4",
+					"#efdcae",
+					"#e8d3a0"
+				]
+			},
+			floor: {
+				tiles: [
+					"#c2a06a",
+					"#bc9a64",
+					"#c7a671"
+				],
+				specks: [
+					"#d2b588",
+					"#9c7a46",
+					"#d8bd90"
+				]
+			},
+			portal: {
+				trail: (a) => `rgba(190,150,90,${a * .5})`,
+				grass: [
+					"#7fb34a",
+					"#5f9a3a",
+					"#b8dc6a"
+				],
+				plate: ["#f0dfb0", "#b08d58"],
+				core: [
+					"#d6fff6",
+					"#1fc2b4",
+					"#0b5a66"
+				],
+				ring: "#7ff5e0",
+				corners: "#fff3cf"
+			},
+			wall: {
+				base: "#2f5a2a",
+				moss: ["#5fae3e", "#2f7a2c"],
+				top: [
+					"#86cc4e",
+					"#8fd356",
+					"#7cc247"
+				],
+				bottom: [
+					"#3f8f2e",
+					"#468f30",
+					"#3a842c"
+				],
+				mossSpecks: [
+					"#ffd23f",
+					"#ff7a59",
+					"#fff4c2"
+				],
+				specks: ["rgba(214,255,140,.4)", "rgba(15,70,20,.3)"],
+				crack: "rgba(15,70,20,.25)",
+				joints: "rgba(15,70,20,.2)",
+				drifts: ["#a6e65e", "#c4f57e"],
+				light: "rgba(230,255,170,.45)",
+				dark: "rgba(10,50,15,.4)",
+				flowers: [
+					"#ff5c8a",
+					"#ffd23f",
+					"#ffffff"
+				],
+				shadow: "rgba(25,50,15,.5)"
+			},
+			edgeGrass: [
+				"#7fb34a",
+				"#5f9a3a",
+				"#b8dc6a"
+			],
+			trees: {
+				accent: [
+					"#d4f08a",
+					"#6dba45",
+					"#2f7a2c"
+				],
+				plain: [
+					"#b6ee6e",
+					"#5fae3e",
+					"#2a6a2a"
+				],
+				accentDots: ["rgba(255,140,40,.95)", "rgba(20,70,25,.5)"],
+				plainDots: ["rgba(214,255,140,.7)", "rgba(20,70,25,.45)"],
+				drifts: "rgba(30,80,30,.25)"
+			},
+			landmark: {
+				ex: [2.4, 2.2],
+				draw: ({ b, blob, shade }, o) => {
+					const r = o.r ?? 0;
+					blob(o.x + r * .9, o.y + r * 1.1, r * 2.2, r * 1.7, shade(.3), 0);
+					const U = r * 2;
+					for (let i = 0; i < 8; i++) {
+						b.fillStyle = i % 2 ? "#ff5a4f" : "#fff4dc";
+						b.beginPath();
+						b.moveTo(o.x, o.y);
+						b.arc(o.x, o.y, U, i * Math.PI / 4, (i + 1) * Math.PI / 4);
+						b.closePath();
+						b.fill();
+					}
+					b.strokeStyle = "rgba(120,40,30,.5)";
+					b.lineWidth = 1.2;
+					b.beginPath();
+					b.arc(o.x, o.y, U, 0, 7);
+					b.stroke();
+					blob(o.x, o.y, 3, 3, "#ffd23f", 0);
+				}
+			},
+			flowerPatch: ({ rr, pick, fl5 }, o) => {
+				const c = o.c ?? 0;
+				const cl = c < .3 ? ["#ffffff", "#f6f2d0"] : c < .55 ? ["#ffd23f", "#ffe36e"] : c < .8 ? ["#e8383d", "#ff6b6b"] : ["#a77bff", "#d9c2ff"];
+				const mid = c >= .3 && c < .55 ? "#8a4b14" : "#ffcf4d";
+				for (let i = 0; i < (o.n ?? 0); i++) fl5(o.x + rr(-16, 16), o.y + rr(-12, 12), rr(2, 3), pick(cl), mid);
+			},
+			pondExtras: ({ blob, fl5 }, o) => {
+				const rx = o.rx ?? 0;
+				const ry = o.ry ?? 0;
+				for (let i = 0; i < 4; i++) {
+					const a = i * 1.7 + .5;
+					const px = o.x + Math.cos(a) * rx * .45;
+					const py = o.y + Math.sin(a) * ry * .45;
+					blob(px, py, 6, 4.5, "#3fae4a", 0);
+					if (i % 2) fl5(px, py, 2.4, "#ff9ec4", "#ffe14d");
+				}
+			}
+		},
+		live: {
+			pellet: {
+				texture: drop,
+				size: 10
+			},
+			energizer: {
+				texture: watermelon,
+				size: 24,
+				glow: 16734830,
+				glowSize: 54.4 / 3,
+				motion: "sway"
+			},
+			portal: {
+				glow: 6288856,
+				ring: () => ringTexture("rgba(120,255,225,.95)")
+			},
+			glints: 16775104,
+			fog: fog$1,
+			mistAlpha: (s) => .07 + .2 * s,
+			mistSpeed: (s) => 1 + 3 * s,
+			rays: (t, i, s, n) => (.1 + .05 * Math.sin(t * .6 + i * 2)) * (1 + s) * (1 - .8 * n),
+			lit: lazy(() => radial([[0, "rgba(255,226,150,.3)"], [1, "rgba(255,205,130,0)"]])),
+			litAlpha: (s, n) => (.8 + .7 * s) * (1 - .7 * n),
+			drift: {
+				texture: () => glowTexture(16773280),
+				size: (sc, rand) => {
+					const s = 64 * sc * (.035 + rand * .05);
+					return [s, s];
+				},
+				direction: -1,
+				speed: 10,
+				spin: false
+			},
+			wash: lazy(() => washTexture("rgba(255,225,130,.22)", "rgba(255,150,60,.08)")),
+			stormTint: "#ff9d3a",
+			stormAlpha: .2,
+			weather: {
+				count: 160,
+				make: (i, vw, vh) => {
+					const st = i % 2 === 0;
+					const s = st ? 2 + Math.random() * 3 : .14 + Math.random() * .2;
+					return {
+						st,
+						im: st ? tinted(band(), 16773312) : glowTexture(16765802),
+						w: st ? 48 * s : 64 * s / 3,
+						h: st ? 6 * s : 64 * s / 3,
+						px: Math.random() * vw,
+						py: Math.random() * vh,
+						vx: 0,
+						vy: st ? .5 + Math.random() * .7 : .8 + Math.random() * 1.2,
+						ph: Math.random() * 6,
+						rot: 0,
+						add: false
+					};
+				},
+				step: (p, d, t, s, vw, vh) => {
+					p.px += (p.st ? Math.sin(t * 1.6 + p.ph) * .5 : Math.sin(t * 2 + p.ph) * .6) * d;
+					p.py -= p.vy * d * s;
+					if (p.py < -30) {
+						p.py = vh + 30;
+						p.px = Math.random() * vw;
+					}
+				},
+				alpha: (p, s) => s * (p.st ? .45 : .9)
+			},
+			nightTint: "#4a3f86",
+			nightAlpha: .6,
+			vignette: lazy(() => radial([[.5, "rgba(70,45,10,0)"], [1, "rgba(70,45,10,.32)"]])),
+			lights: {
+				energizer: 16738938,
+				portal: 7337434
+			},
+			chimneySmoke: false
+		},
+		decay: {
+			deep: 657176,
+			mid: 1972810,
+			wisp: 4186320,
+			ice: 16771240,
+			rim: 16757575,
+			warm: 16774352
+		}
+	};
+	//#endregion
+	//#region src/games/pacman/render/seasons/autumn/autumnTheme.ts
+	var LEAVES = [
+		14700586,
+		15771690,
+		16765040,
+		12084250
+	];
+	/**
+	* Pellet: a small acorn, ~5×6 world units (a fifth of a tile): a light amber nut under a
+	* darker cap, no outline clutter, bright enough for the dark path.
+	*/
+	var acorn = lazy(() => makeTexture(10, 10, (x) => {
+		x.translate(5, 5.3);
+		const g = x.createRadialGradient(-.7, 0, .2, 0, .6, 2.6);
+		g.addColorStop(0, "#fff0bf");
+		g.addColorStop(.6, "#f2c060");
+		g.addColorStop(1, "#d08a2e");
+		x.fillStyle = g;
+		x.beginPath();
+		x.ellipse(0, .7, 2.2, 2.6, 0, 0, 7);
+		x.fill();
+		x.fillStyle = "#8a4a1e";
+		x.beginPath();
+		x.ellipse(0, -1.3, 2.6, 1.35, 0, 0, 7);
+		x.fill();
+		x.fillRect(-.35, -3.6, .7, 1.4);
+		x.fillStyle = "rgba(255,220,160,.55)";
+		x.beginPath();
+		x.ellipse(-.7, -1.7, 1, .4, 0, 0, 7);
+		x.fill();
+	}));
+	var amanita = lazy(() => makeTexture(26, 26, (x) => {
+		x.translate(13, 13);
+		x.lineWidth = 1.2;
+		x.strokeStyle = "#4a1408";
+		x.fillStyle = "#f6e8c8";
+		x.beginPath();
+		x.moveTo(-3.6, 2);
+		x.lineTo(-4.4, 10.5);
+		x.quadraticCurveTo(0, 12.6, 4.4, 10.5);
+		x.lineTo(3.6, 2);
+		x.closePath();
+		x.fill();
+		x.stroke();
+		const g = x.createLinearGradient(0, -10, 0, 4);
+		g.addColorStop(0, "#ff8a5a");
+		g.addColorStop(1, "#c0261a");
+		x.fillStyle = g;
+		x.beginPath();
+		x.moveTo(-11.5, 3.5);
+		x.bezierCurveTo(-11.5, -12, 11.5, -12, 11.5, 3.5);
+		x.quadraticCurveTo(0, 6.5, -11.5, 3.5);
+		x.closePath();
+		x.fill();
+		x.stroke();
+		x.fillStyle = "#fff7e0";
+		for (const [a, c, r] of [
+			[
+				-5,
+				-2.5,
+				2.4
+			],
+			[
+				3,
+				-5.5,
+				2.6
+			],
+			[
+				6.5,
+				-.5,
+				1.8
+			],
+			[
+				-.5,
+				0,
+				1.5
+			]
+		]) {
+			x.beginPath();
+			x.arc(a, c, r, 0, 7);
+			x.fill();
+		}
+	}));
+	/** A single leaf, white: tinted per particle. */
+	var leaf = lazy(() => makeTexture(10, 6, (x) => {
+		x.fillStyle = "#fff";
+		x.beginPath();
+		x.moveTo(.5, 3);
+		x.quadraticCurveTo(5, -1.5, 9.5, 3);
+		x.quadraticCurveTo(5, 7.5, .5, 3);
+		x.fill();
+	}));
+	var fog = lazy(() => tinted(radial([[0, "rgba(240,215,175,.9)"], [1, "rgba(240,215,175,0)"]]), 15258288));
+	//#endregion
+	//#region src/games/pacman/render/seasons/meadow/meadowThemes.ts
+	var THEMES = {
+		spring: springTheme,
+		summer: summerTheme,
+		autumn: {
+			name: "autumn",
+			bake: {
+				bg: "#8b7a3a",
+				groundCenter: "#b59a4c",
+				groundBlobs: ["rgba(255,200,110,.3)", "rgba(60,30,5,.1)"],
+				grass: [
+					"#7a6a2acc",
+					"#a08a3e99",
+					"#6a5a24aa",
+					"#d8b86088"
+				],
+				curls: "rgba(230,190,110,.22)",
+				stream: [
+					"rgba(40,30,10,.35)",
+					"#cdb57e",
+					"#4a8aa5",
+					"rgba(150,200,215,.55)"
+				],
+				shadow: "50,30,10",
+				bush: ["#f0a030", "#a8421a"],
+				pond: {
+					sand: "#c9b27a",
+					water: ["#8fc0d0", "#3a6f88"],
+					rim: "rgba(30,50,60,.45)",
+					highlight: "rgba(255,255,255,.6)",
+					stones: "#a38a55"
+				},
+				bridge: {
+					caps: "#e0762a",
+					middle: "rgba(220,90,30,.8)"
+				},
+				cabin: {
+					walls: [
+						"#bb6851",
+						"#a65240",
+						"#87423b",
+						"#6a342f"
+					],
+					roofBlobs: "rgba(224,110,30,.5)",
+					ridge: "#6a2f1a",
+					ridgeShadow: "rgba(60,25,10,.5)",
+					chimneyCap: "#5a3a28"
+				},
+				rock: [
+					"#a89c88",
+					"#5f5648",
+					"#8a9a4a",
+					"#b0a28a"
+				],
+				lair: {
+					base: "#2a1c12",
+					tiles: [
+						"#8c6a46",
+						"#80603e",
+						"#957250"
+					]
+				},
+				floor: {
+					tiles: [
+						"#4a3426",
+						"#45301f",
+						"#503a2a"
+					],
+					specks: [
+						"#5e4634",
+						"#2e2016",
+						"#6b5240"
+					]
+				},
+				portal: {
+					trail: (a) => `rgba(60,42,28,${a * .55})`,
+					grass: [
+						"#c9a04a",
+						"#a8762a",
+						"#e0b860"
+					],
+					plate: ["#8a7660", "#4a3a2c"],
+					core: [
+						"#f0d8ff",
+						"#9a4fe0",
+						"#2a0f52"
+					],
+					ring: "#d9a8ff",
+					corners: "#f0e0c0"
+				},
+				wall: {
+					base: "#7c3614",
+					moss: ["#c0502e", "#82301a"],
+					top: [
+						"#dc9c4e",
+						"#e2a456",
+						"#d49447"
+					],
+					bottom: [
+						"#a65a28",
+						"#ad622d",
+						"#9c5224"
+					],
+					mossSpecks: [
+						"#ffd27a",
+						"#e0602e",
+						"#fff0c0"
+					],
+					specks: ["rgba(255,225,150,.35)", "rgba(90,30,5,.28)"],
+					crack: "rgba(90,30,5,.25)",
+					joints: "rgba(90,30,5,.18)",
+					drifts: ["#e8743a", "#f6c25a"],
+					light: "rgba(255,236,180,.45)",
+					dark: "rgba(80,28,6,.38)",
+					flowers: [
+						"#e0502a",
+						"#ffc84a",
+						"#fff0c8"
+					],
+					shadow: "rgba(40,15,5,.45)"
+				},
+				edgeGrass: [
+					"#c9a04a",
+					"#a8762a",
+					"#e0b860"
+				],
+				trees: {
+					accent: [
+						"#ffd070",
+						"#e0502a",
+						"#8f2214"
+					],
+					plain: [
+						"#fff0a0",
+						"#f0a82a",
+						"#b8641a"
+					],
+					accentDots: ["rgba(255,230,120,.85)", "rgba(100,20,10,.5)"],
+					plainDots: ["rgba(255,248,190,.8)", "rgba(120,60,10,.45)"],
+					drifts: "rgba(230,120,30,.5)"
+				},
+				landmark: {
+					ex: [2.4, 2.2],
+					draw: ({ b, blob, sph, shade }, o) => {
+						const r = o.r ?? 0;
+						blob(o.x + r * .9, o.y + r, r * 2.1, r * 1.6, shade(.3), 0);
+						const U = r * 2;
+						sph(o.x, o.y, U, "#f6d878", "#c9922e");
+						b.strokeStyle = "rgba(120,70,10,.5)";
+						b.lineWidth = 1.2;
+						for (let i = 1; i < 5; i++) {
+							b.beginPath();
+							b.arc(o.x, o.y, U * i / 5, 0, 7);
+							b.stroke();
+						}
+					}
+				},
+				flowerPatch: ({ rr, pick, blob }, o) => {
+					const c = o.c ?? 0;
+					const cl = c < .3 ? ["#e0502a", "#c0381a"] : c < .55 ? ["#f0a82a", "#ffc84a"] : c < .8 ? ["#c9702a", "#a8501a"] : ["#8a3a1a", "#6a2a10"];
+					for (let i = 0; i < (o.n ?? 0); i++) blob(o.x + rr(-16, 16), o.y + rr(-12, 12), rr(2.4, 4), rr(1.3, 2.2), pick(cl));
+				},
+				pondExtras: ({ blob, pick }, o) => {
+					const rx = o.rx ?? 0;
+					const ry = o.ry ?? 0;
+					for (let i = 0; i < 5; i++) {
+						const a = i * 1.3 + .4;
+						blob(o.x + Math.cos(a) * rx * .5, o.y + Math.sin(a) * ry * .5, 5, 3, pick([
+							"#e0502a",
+							"#f0a82a",
+							"#c9702a"
+						]));
+					}
+				}
+			},
+			live: {
+				pellet: {
+					texture: acorn,
+					size: 10
+				},
+				energizer: {
+					texture: amanita,
+					size: 26,
+					glow: 16730666,
+					glowSize: 60.8 / 3,
+					motion: "sway"
+				},
+				portal: {
+					glow: 13142783,
+					ring: () => ringTexture("rgba(220,170,255,.95)")
+				},
+				glints: 16777215,
+				fog,
+				mistAlpha: (s) => .1 + .22 * s,
+				mistSpeed: (s) => 1 + 6 * s,
+				rays: (t, i, s, n) => (.12 + .05 * Math.sin(t * .5 + i * 2)) * (1 - .8 * n) * (1 - s),
+				lit: lazy(() => radial([[0, "rgba(255,190,110,.3)"], [1, "rgba(255,205,130,0)"]])),
+				litAlpha: () => 1,
+				drift: {
+					texture: (i) => tinted(leaf(), LEAVES[i % 4]),
+					size: (_sc, rand) => {
+						const s = .18 + rand * .14;
+						return [30 * s, 18 * s];
+					},
+					direction: 1,
+					speed: 16,
+					spin: true
+				},
+				wash: lazy(() => washTexture("rgba(255,170,80,.18)", "rgba(90,40,20,.14)")),
+				stormTint: "#4a5870",
+				stormAlpha: .3,
+				weather: {
+					count: 260,
+					make: (i, vw, vh) => {
+						const s = .9 + Math.random() * .9;
+						const vx = 3 + Math.random() * 2;
+						const vy = 20 + Math.random() * 10;
+						return {
+							st: true,
+							im: streakTexture(i % 3 === 0 ? 15134970 : 11125980),
+							w: 16 * s,
+							h: 2 * s * .4,
+							px: Math.random() * vw,
+							py: Math.random() * vh,
+							vx,
+							vy,
+							ph: 0,
+							rot: Math.atan2(vy, vx),
+							add: false
+						};
+					},
+					step: (p, d, _t, s, vw, vh) => {
+						p.px += p.vx * d * s;
+						p.py += p.vy * d * s;
+						if (p.py > vh + 30) {
+							p.py = -30;
+							p.px = Math.random() * vw;
+						}
+						if (p.px > vw + 30) p.px = -30;
+					},
+					alpha: (_p, s) => s * .6
+				},
+				nightTint: "#3a3a70",
+				nightAlpha: .55,
+				vignette: lazy(() => radial([[.5, "rgba(40,18,5,0)"], [1, "rgba(40,18,5,.42)"]])),
+				lights: {
+					energizer: 16734778,
+					portal: 13142783
+				},
+				chimneySmoke: true
+			},
+			decay: {
+				deep: 1182214,
+				mid: 3809812,
+				wisp: 15769648,
+				ice: 16767136,
+				rim: 16742970,
+				warm: 16773328
+			}
+		},
+		winter: winterTheme
+	};
+	/** The meadow theme of a season, or null when the season is drawn another way. */
+	function meadowThemeFor(season) {
+		return THEMES[season] ?? null;
+	}
+	//#endregion
+	//#region src/games/pacman/engine/EventBus.ts
+	var EventBus = class {
+		handlers = /* @__PURE__ */ new Map();
+		on(event, handler) {
+			let set = this.handlers.get(event);
+			if (!set) {
+				set = /* @__PURE__ */ new Set();
+				this.handlers.set(event, set);
+			}
+			set.add(handler);
+			return () => {
+				this.off(event, handler);
+			};
+		}
+		off(event, handler) {
+			const set = this.handlers.get(event);
+			if (!set) return;
+			set.delete(handler);
+			if (set.size === 0) this.handlers.delete(event);
+		}
+		emit(event, payload) {
+			const set = this.handlers.get(event);
+			if (!set) return;
+			for (const handler of Array.from(set)) try {
+				handler(payload);
+			} catch (error) {
+				console.error("EventBus.emit", String(event), error);
+			}
+		}
+		clear() {
+			this.handlers.clear();
+		}
+	};
+	//#endregion
+	//#region src/games/pacman/logic/maze/GridModel.ts
+	var GridModel = class {
+		width;
+		height;
+		dotCount;
+		energizerCount;
+		playerSpawn;
+		ghostSpawns;
+		tiles;
+		teleportPositions;
+		constructor(raw) {
+			if (!Array.isArray(raw) || raw.length === 0) {
+				console.error("GridModel.constructor", "level map is empty");
+				throw new Error("GridModel.constructor: level map is empty");
+			}
+			const rows = [];
+			let width = 0;
+			let dotCount = 0;
+			let energizerCount = 0;
+			let playerSpawn = null;
+			const ghostSpawns = {
+				BLINKY: null,
+				PINKY: null,
+				INKY: null,
+				CLYDE: null
+			};
+			const teleportPositions = /* @__PURE__ */ new Map();
+			for (let y = 0; y < raw.length; y += 1) {
+				const row = raw[y];
+				if (!Array.isArray(row) || row.length === 0) {
+					console.error("GridModel.constructor", "invalid row", { y });
+					throw new Error("GridModel.constructor: invalid row");
+				}
+				if (width === 0) width = row.length;
+				else if (row.length !== width) {
+					console.error("GridModel.constructor", "row width mismatch", {
+						y,
+						expected: width,
+						actual: row.length
+					});
+					throw new Error("GridModel.constructor: row width mismatch");
+				}
+				const tileRow = [];
+				for (let x = 0; x < row.length; x += 1) {
+					const token = row[x];
+					if (typeof token !== "string" || !isTileToken(token)) {
+						console.error("GridModel.constructor", "unknown tile token", {
+							x,
+							y,
+							token
+						});
+						throw new Error("GridModel.constructor: unknown tile token");
+					}
+					if (token === "DT") dotCount += 1;
+					if (token === "EU") energizerCount += 1;
+					if (token === "PM") {
+						if (playerSpawn) {
+							console.error("GridModel.constructor", "duplicate player spawn", {
+								x,
+								y
+							});
+							throw new Error("GridModel.constructor: duplicate player spawn");
+						}
+						playerSpawn = {
+							x,
+							y
+						};
+					}
+					if (token === "BY") {
+						if (ghostSpawns.BLINKY) {
+							console.error("GridModel.constructor", "duplicate ghost spawn", {
+								token,
+								x,
+								y
+							});
+							throw new Error("GridModel.constructor: duplicate ghost spawn");
+						}
+						ghostSpawns.BLINKY = {
+							x,
+							y
+						};
+					}
+					if (token === "PY") {
+						if (ghostSpawns.PINKY) {
+							console.error("GridModel.constructor", "duplicate ghost spawn", {
+								token,
+								x,
+								y
+							});
+							throw new Error("GridModel.constructor: duplicate ghost spawn");
+						}
+						ghostSpawns.PINKY = {
+							x,
+							y
+						};
+					}
+					if (token === "IY") {
+						if (ghostSpawns.INKY) {
+							console.error("GridModel.constructor", "duplicate ghost spawn", {
+								token,
+								x,
+								y
+							});
+							throw new Error("GridModel.constructor: duplicate ghost spawn");
+						}
+						ghostSpawns.INKY = {
+							x,
+							y
+						};
+					}
+					if (token === "CE") {
+						if (ghostSpawns.CLYDE) {
+							console.error("GridModel.constructor", "duplicate ghost spawn", {
+								token,
+								x,
+								y
+							});
+							throw new Error("GridModel.constructor: duplicate ghost spawn");
+						}
+						ghostSpawns.CLYDE = {
+							x,
+							y
+						};
+					}
+					if (isTeleportToken(token)) {
+						let positions = teleportPositions.get(token);
+						if (!positions) {
+							positions = [];
+							teleportPositions.set(token, positions);
+						}
+						positions.push({
+							x,
+							y
+						});
+					}
+					tileRow.push(token);
+				}
+				rows.push(tileRow);
+			}
+			if (width <= 0 || rows.length <= 0) {
+				console.error("GridModel.constructor", "invalid grid size", {
+					width,
+					height: rows.length
+				});
+				throw new Error("GridModel.constructor: invalid grid size");
+			}
+			if (!playerSpawn) {
+				console.error("GridModel.constructor", "missing player spawn");
+				throw new Error("GridModel.constructor: missing player spawn");
+			}
+			const blinkySpawn = ghostSpawns.BLINKY;
+			const pinkySpawn = ghostSpawns.PINKY;
+			const inkySpawn = ghostSpawns.INKY;
+			const clydeSpawn = ghostSpawns.CLYDE;
+			if (!blinkySpawn || !pinkySpawn || !inkySpawn || !clydeSpawn) {
+				console.error("GridModel.constructor", "missing ghost spawns");
+				throw new Error("GridModel.constructor: missing ghost spawns");
+			}
+			for (const [id, positions] of teleportPositions) if (positions.length !== 2) {
+				console.error("GridModel.constructor", "invalid teleport pair", {
+					id,
+					count: positions.length
+				});
+				throw new Error("GridModel.constructor: invalid teleport pair");
+			}
+			this.width = width;
+			this.height = rows.length;
+			this.dotCount = dotCount;
+			this.energizerCount = energizerCount;
+			this.playerSpawn = playerSpawn;
+			this.ghostSpawns = {
+				BLINKY: blinkySpawn,
+				PINKY: pinkySpawn,
+				INKY: inkySpawn,
+				CLYDE: clydeSpawn
+			};
+			this.tiles = rows;
+			this.teleportPositions = teleportPositions;
+		}
+		isInside(x, y) {
+			return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < this.width && y < this.height;
+		}
+		tileAt(x, y) {
+			if (!this.isInside(x, y)) return "ES";
+			const row = this.tiles[y];
+			if (!row) {
+				console.error("GridModel.tileAt", "missing row", {
+					x,
+					y
+				});
+				return "ES";
+			}
+			const tile = row[x];
+			if (!tile) {
+				console.error("GridModel.tileAt", "missing tile", {
+					x,
+					y
+				});
+				return "ES";
+			}
+			return tile;
+		}
+		getTeleportDestination(id, x, y) {
+			const positions = this.teleportPositions.get(id);
+			if (!positions) return;
+			const first = positions[0];
+			const second = positions[1];
+			if (!first || !second) {
+				console.error("GridModel.getTeleportDestination", "invalid teleport pair", {
+					id,
+					x,
+					y
+				});
+				return;
+			}
+			if (first.x === x && first.y === y) return second;
+			if (second.x === x && second.y === y) return first;
+		}
+	};
+	//#endregion
+	//#region src/games/pacman/logic/maze/LairExit.ts
+	function isLairToken(token) {
+		return token === "LE" || token === "LT" || token === "BY" || token === "PY" || token === "IY" || token === "CE";
+	}
+	function isLairTile(grid, x, y) {
+		if (!grid.isInside(x, y)) return false;
+		return isLairToken(grid.tileAt(x, y));
+	}
+	function resolveExitTarget(grid, from) {
+		for (let y = 0; y < grid.height; y += 1) for (let x = 0; x < grid.width; x += 1) {
+			if (grid.tileAt(x, y) !== "LE") continue;
+			const candidates = [
+				{
+					x,
+					y: y - 1
+				},
+				{
+					x,
+					y: y + 1
+				},
+				{
+					x: x - 1,
+					y
+				},
+				{
+					x: x + 1,
+					y
+				}
+			];
+			for (const candidate of candidates) {
+				if (!grid.isInside(candidate.x, candidate.y)) continue;
+				const token = grid.tileAt(candidate.x, candidate.y);
+				if (token === "WL" || token === "ES") continue;
+				if (isLairToken(token)) continue;
+				if (!grid.isPlayerWalkable(candidate.x, candidate.y)) continue;
+				return {
+					x: candidate.x,
+					y: candidate.y
+				};
+			}
+		}
+		let best = null;
+		let bestScore = Number.POSITIVE_INFINITY;
+		for (let y = 0; y < grid.height; y += 1) for (let x = 0; x < grid.width; x += 1) {
+			const token = grid.tileAt(x, y);
+			if (token === "WL" || token === "ES") continue;
+			if (isLairToken(token)) continue;
+			const dx = x - from.x;
+			const dy = y - from.y;
+			const score = dx * dx + dy * dy;
+			if (score < bestScore) {
+				bestScore = score;
+				best = {
+					x,
+					y
+				};
+			}
+		}
+		if (!best) console.error("LairExit.resolveExitTarget", "exit tile not found", { from });
+		return best;
+	}
+	//#endregion
+	//#region src/games/pacman/logic/maze/GridService.ts
+	var GridService = class {
+		model;
+		lairOpenValue = false;
+		lairEggTileValue = null;
+		lairEggTileResolved = false;
+		voidBlockedTiles = /* @__PURE__ */ new Set();
+		constructor(model) {
+			if (!model || !Number.isFinite(model.width) || model.width <= 0 || !Number.isFinite(model.height) || model.height <= 0) {
+				console.error("GridService.constructor", "invalid grid model");
+				throw new Error("GridService.constructor: invalid grid model");
+			}
+			this.model = model;
+		}
+		get width() {
+			return this.model.width;
+		}
+		get height() {
+			return this.model.height;
+		}
+		get dotCount() {
+			return this.model.dotCount;
+		}
+		get energizerCount() {
+			return this.model.energizerCount;
+		}
+		get playerSpawn() {
+			return this.model.playerSpawn;
+		}
+		get ghostSpawns() {
+			return this.model.ghostSpawns;
+		}
+		get lairOpen() {
+			return this.lairOpenValue;
+		}
+		setLairOpen(value) {
+			this.lairOpenValue = value;
+		}
+		tileAt(x, y) {
+			return this.model.tileAt(x, y);
+		}
+		isInside(x, y) {
+			return this.model.isInside(x, y);
+		}
+		/** Inside the maze and not a wall; the empty ES border around the maze is never walkable. */
+		isWalkable(x, y) {
+			if (!this.isInside(x, y)) return false;
+			const tile = this.model.tileAt(x, y);
+			return tile !== "WL" && tile !== "ES";
+		}
+		isPlayerWalkable(x, y) {
+			if (!this.isInside(x, y)) return false;
+			const tile = this.tileAt(x, y);
+			if (tile === "WL" || tile === "ES") return false;
+			if (this.voidBlockedTiles.has(`${x},${y}`)) return false;
+			if (isLairToken(tile)) return this.lairOpenValue;
+			return true;
+		}
+		isGhostWalkable(x, y, allowLair) {
+			if (!this.isInside(x, y)) return false;
+			const tile = this.tileAt(x, y);
+			if (tile === "WL" || tile === "ES") return false;
+			if (allowLair) return true;
+			return !isLairToken(tile);
+		}
+		isDot(x, y) {
+			return this.model.tileAt(x, y) === "DT";
+		}
+		isEnergizer(x, y) {
+			return this.model.tileAt(x, y) === "EU";
+		}
+		isTeleport(x, y) {
+			return isTeleportToken(this.model.tileAt(x, y));
+		}
+		teleportDestination(x, y) {
+			const tile = this.model.tileAt(x, y);
+			if (!isTeleportToken(tile)) return;
+			return this.model.getTeleportDestination(tile, x, y);
+		}
+		bossSpawn() {
+			for (let y = 0; y < this.height; y += 1) for (let x = 0; x < this.width; x += 1) if (this.tileAt(x, y) === "DB") return {
+				x,
+				y
+			};
+			return null;
+		}
+		setVoidBlocked(x, y, blocked) {
+			const key = `${x},${y}`;
+			if (blocked) this.voidBlockedTiles.add(key);
+			else this.voidBlockedTiles.delete(key);
+		}
+		clearVoidBlocked() {
+			this.voidBlockedTiles.clear();
+		}
+		isVoidBlocked(x, y) {
+			return this.voidBlockedTiles.has(`${x},${y}`);
+		}
+		/** The lair's centre: the tile between the ghosts' spawns, else the first lair tile. */
+		lairEggTile() {
+			if (this.lairEggTileResolved) return this.lairEggTileValue;
+			this.lairEggTileResolved = true;
+			const spawns = Object.values(this.ghostSpawns);
+			if (spawns.length > 0) {
+				const x = Math.round(spawns.reduce((sum, p) => sum + p.x, 0) / spawns.length);
+				const y = Math.round(spawns.reduce((sum, p) => sum + p.y, 0) / spawns.length);
+				if (this.isInside(x, y) && isLairToken(this.tileAt(x, y))) {
+					this.lairEggTileValue = {
+						x,
+						y
+					};
+					return this.lairEggTileValue;
+				}
+				console.warn("GridService.lairEggTile", "the spawns centre is not a lair tile", {
+					x,
+					y
+				});
+			}
+			for (let y = 0; y < this.height; y += 1) for (let x = 0; x < this.width; x += 1) if (this.tileAt(x, y) === "LT") {
+				this.lairEggTileValue = {
+					x,
+					y
+				};
+				return this.lairEggTileValue;
+			}
+			for (let y = 0; y < this.height; y += 1) for (let x = 0; x < this.width; x += 1) if (this.tileAt(x, y) === "LE") {
+				this.lairEggTileValue = {
+					x,
+					y
+				};
+				return this.lairEggTileValue;
+			}
+			this.lairEggTileValue = null;
+			return null;
+		}
+		neighbors(x, y) {
+			return [
+				{
+					x: x - 1,
+					y
+				},
+				{
+					x: x + 1,
+					y
+				},
+				{
+					x,
+					y: y - 1
+				},
+				{
+					x,
+					y: y + 1
+				}
+			].filter((point) => this.model.isInside(point.x, point.y));
+		}
+		walkableNeighbors(x, y) {
+			return this.neighbors(x, y).filter((point) => this.isWalkable(point.x, point.y));
+		}
+		exitsCount(x, y) {
+			return this.walkableNeighbors(x, y).length;
+		}
+	};
+	//#endregion
+	//#region src/games/pacman/config/scoreConfig.ts
+	var SCORE_TABLE = {
+		dot: 10,
+		energizer: 50,
+		ghostChain: [
+			200,
+			400,
+			800,
+			1600
+		],
+		hypnosis: 200,
+		hypnosisTransfer: 200,
+		fruit: {
+			CHERRY: 100,
+			STRAWBERRY: 300,
+			ORANGE: 500,
+			PRETZEL: 500,
+			APPLE: 700,
+			PEAR: 1e3,
+			MELON: 1e3,
+			GALAXIAN: 2e3,
+			BELL: 3e3,
+			KEY: 5e3
+		},
+		easterEgg: 500,
+		goldenExitDotValue: 20,
+		levelClear: 1e3,
+		perfectClear: 2e3,
+		hellBossDefeated: 5e3,
+		firstLifeThreshold: 1e4,
+		lifeThresholdStep: 3e4
+	};
+	//#endregion
+	//#region src/games/pacman/logic/level/LevelProgress.ts
+	var LevelProgress = class {
+		grid;
+		scoreModel;
+		events;
+		collected = /* @__PURE__ */ new Set();
+		remainingDotsValue;
+		remainingEnergizersValue;
+		pendingEnergizerValue = false;
+		destroyedDotsValue = 0;
+		constructor(grid, scoreModel, events) {
+			if (!grid) {
+				console.error("LevelProgress.constructor", "missing grid service");
+				throw new Error("LevelProgress.constructor: missing grid service");
+			}
+			if (!scoreModel) {
+				console.error("LevelProgress.constructor", "missing score model");
+				throw new Error("LevelProgress.constructor: missing score model");
+			}
+			if (!events) {
+				console.error("LevelProgress.constructor", "missing event bus");
+				throw new Error("LevelProgress.constructor: missing event bus");
+			}
+			this.grid = grid;
+			this.scoreModel = scoreModel;
+			this.events = events;
+			this.remainingDotsValue = grid.dotCount;
+			this.remainingEnergizersValue = grid.energizerCount;
+		}
+		get score() {
+			return this.scoreModel.score;
+		}
+		get remainingDots() {
+			return this.remainingDotsValue;
+		}
+		get collectedDots() {
+			return Math.max(0, this.grid.dotCount - this.remainingDotsValue);
+		}
+		get destroyedDots() {
+			return this.destroyedDotsValue;
+		}
+		get collectionRatio() {
+			if (this.grid.dotCount <= 0) return 1;
+			return Math.min(1, Math.max(0, this.collectedDots / this.grid.dotCount));
+		}
+		isCollected(x, y) {
+			if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0) return false;
+			return this.collected.has(this.key(x, y));
+		}
+		safeSpawnTiles() {
+			const tiles = [];
+			for (let y = 0; y < this.grid.height; y += 1) for (let x = 0; x < this.grid.width; x += 1) {
+				if (this.grid.tileAt(x, y) !== "DT") continue;
+				if (!this.collected.has(this.key(x, y))) continue;
+				tiles.push({
+					x,
+					y
+				});
+			}
+			return tiles;
+		}
+		consumePendingEnergizer() {
+			if (!this.pendingEnergizerValue) return false;
+			this.pendingEnergizerValue = false;
+			return true;
+		}
+		convertRemainingDots() {
+			const converted = Math.max(0, this.remainingDotsValue);
+			for (let y = 0; y < this.grid.height; y += 1) for (let x = 0; x < this.grid.width; x += 1) {
+				if (this.grid.tileAt(x, y) !== "DT") continue;
+				const id = this.key(x, y);
+				if (!this.collected.has(id)) this.collected.add(id);
+			}
+			this.remainingDotsValue = 0;
+			return converted;
+		}
+		destroyDotAt(x, y) {
+			if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0) {
+				console.error("LevelProgress.destroyDotAt", "invalid tile position", {
+					x,
+					y
+				});
+				return false;
+			}
+			if (!this.grid.isInside(x, y)) {
+				console.error("LevelProgress.destroyDotAt", "position is outside grid", {
+					x,
+					y
+				});
+				return false;
+			}
+			const id = this.key(x, y);
+			if (this.collected.has(id)) return false;
+			if (this.grid.tileAt(x, y) !== "DT") return false;
+			if (this.remainingDotsValue <= 0) return false;
+			this.collected.add(id);
+			this.remainingDotsValue = Math.max(0, this.remainingDotsValue - 1);
+			this.destroyedDotsValue += 1;
+			return true;
+		}
+		collectAt(x, y) {
+			if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0) {
+				console.error("LevelProgress.collectAt", "invalid tile position", {
+					x,
+					y
+				});
+				return;
+			}
+			if (!this.grid.isInside(x, y)) {
+				console.error("LevelProgress.collectAt", "position is outside grid", {
+					x,
+					y
+				});
+				return;
+			}
+			const id = this.key(x, y);
+			if (this.collected.has(id)) return;
+			const tile = this.grid.tileAt(x, y);
+			if (tile === "DT") {
+				if (this.remainingDotsValue <= 0) return;
+				this.collected.add(id);
+				this.remainingDotsValue = Math.max(0, this.remainingDotsValue - 1);
+				this.scoreModel.add(SCORE_TABLE.dot);
+				this.events.emit("audio:cue", { cue: "dot" });
+				return;
+			}
+			if (tile === "EU") {
+				if (this.remainingEnergizersValue <= 0) return;
+				this.collected.add(id);
+				this.remainingEnergizersValue = Math.max(0, this.remainingEnergizersValue - 1);
+				this.scoreModel.add(SCORE_TABLE.energizer);
+				this.pendingEnergizerValue = true;
+				this.events.emit("audio:cue", { cue: "energizer" });
+				this.events.emit("fx:event", {
+					kind: "energizer",
+					x: x + .5,
+					y: y + .5
+				});
+			}
+		}
+		collectDotOnly(x, y) {
+			if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0) {
+				console.error("LevelProgress.collectDotOnly", "invalid tile position", {
+					x,
+					y
+				});
+				return;
+			}
+			if (!this.grid.isInside(x, y)) {
+				console.error("LevelProgress.collectDotOnly", "position is outside grid", {
+					x,
+					y
+				});
+				return;
+			}
+			const id = this.key(x, y);
+			if (this.collected.has(id)) return;
+			if (this.grid.tileAt(x, y) !== "DT") return;
+			if (this.remainingDotsValue <= 0) return;
+			this.collected.add(id);
+			this.remainingDotsValue = Math.max(0, this.remainingDotsValue - 1);
+			this.scoreModel.add(SCORE_TABLE.dot);
+			this.events.emit("audio:cue", { cue: "dot" });
+		}
+		resetDots() {
+			this.collected.clear();
+			this.remainingDotsValue = this.grid.dotCount;
+			this.remainingEnergizersValue = this.grid.energizerCount;
+			this.pendingEnergizerValue = false;
+			this.destroyedDotsValue = 0;
+		}
+		reset() {
+			this.collected.clear();
+			this.remainingDotsValue = this.grid.dotCount;
+			this.remainingEnergizersValue = this.grid.energizerCount;
+			this.pendingEnergizerValue = false;
+			this.destroyedDotsValue = 0;
+			this.scoreModel.reset();
+		}
+		key(x, y) {
+			return `${x}:${y}`;
+		}
+	};
+	//#endregion
+	//#region src/games/pacman/logic/level/ScoreModel.ts
+	var ScoreModel = class {
+		scoreValue = 0;
+		get score() {
+			return this.scoreValue;
+		}
+		add(points) {
+			if (!Number.isFinite(points) || points < 0) {
+				console.error("ScoreModel.add", "invalid points", points);
+				return;
+			}
+			this.scoreValue += Math.floor(points);
+		}
+		reset() {
+			this.scoreValue = 0;
+		}
+	};
+	//#endregion
+	//#region src/games/pacman/logic/actors/PlayerModel.ts
+	var RESPAWN_INVULNERABILITY = 2;
+	var TELEPORT_INVULNERABILITY = .5;
+	var TELEPORT_IMPULSE = .3;
+	var PlayerModel = class {
+		tileValue;
+		targetValue = null;
+		facingValue = null;
+		desiredValue = null;
+		progressValue = 0;
+		speedValue;
+		invulnerableValue = 0;
+		impulseValue = 0;
+		constructor(spawn, speed = 6) {
+			if (!Number.isInteger(spawn.x) || !Number.isInteger(spawn.y) || spawn.x < 0 || spawn.y < 0) {
+				console.error("PlayerModel.constructor", "invalid spawn", spawn);
+				throw new Error("PlayerModel.constructor: invalid spawn");
+			}
+			if (!Number.isFinite(speed) || speed <= 0) {
+				console.error("PlayerModel.constructor", "invalid speed", speed);
+				throw new Error("PlayerModel.constructor: speed must be positive");
+			}
+			this.tileValue = {
+				x: spawn.x,
+				y: spawn.y
+			};
+			this.speedValue = speed;
+		}
+		get tile() {
+			return this.tileValue;
+		}
+		get target() {
+			return this.targetValue;
+		}
+		get facing() {
+			return this.facingValue;
+		}
+		get desired() {
+			return this.desiredValue;
+		}
+		get progress() {
+			return this.progressValue;
+		}
+		get speed() {
+			return this.speedValue;
+		}
+		get isInvulnerable() {
+			return this.invulnerableValue > 0;
+		}
+		get invulnerableTimer() {
+			return this.invulnerableValue;
+		}
+		get isImpulsing() {
+			return this.impulseValue > 0;
+		}
+		get position() {
+			const baseX = this.tileValue.x + .5;
+			const baseY = this.tileValue.y + .5;
+			if (!this.targetValue) return {
+				x: baseX,
+				y: baseY
+			};
+			const t = Math.min(1, Math.max(0, this.progressValue));
+			const dx = this.targetValue.x - this.tileValue.x;
+			const dy = this.targetValue.y - this.tileValue.y;
+			return {
+				x: baseX + dx * t,
+				y: baseY + dy * t
+			};
+		}
+		setDesired(direction) {
+			this.desiredValue = direction;
+		}
+		grantInvulnerability(seconds) {
+			if (!Number.isFinite(seconds) || seconds < 0) {
+				console.error("PlayerModel.grantInvulnerability", "invalid duration", seconds);
+				return;
+			}
+			this.invulnerableValue = Math.max(this.invulnerableValue, seconds);
+		}
+		beginMove(direction, target) {
+			if (!Number.isInteger(target.x) || !Number.isInteger(target.y) || target.x < 0 || target.y < 0) {
+				console.error("PlayerModel.beginMove", "invalid target", target);
+				throw new Error("PlayerModel.beginMove: invalid target");
+			}
+			if (Math.abs(target.x - this.tileValue.x) + Math.abs(target.y - this.tileValue.y) !== 1) {
+				console.error("PlayerModel.beginMove", "target is not adjacent", {
+					current: this.tileValue,
+					target
+				});
+				throw new Error("PlayerModel.beginMove: target is not adjacent");
+			}
+			this.facingValue = direction;
+			this.targetValue = {
+				x: target.x,
+				y: target.y
+			};
+			this.progressValue = 0;
+		}
+		/** Turns round mid-move: heads back to the tile it left, from the same spot. */
+		reverse(direction) {
+			if (!this.targetValue) return;
+			const from = this.tileValue;
+			this.tileValue = this.targetValue;
+			this.targetValue = from;
+			this.progressValue = 1 - this.progressValue;
+			this.facingValue = direction;
+		}
+		/** Drops the move just begun: back on the tile it was leaving. */
+		cancelMove() {
+			this.targetValue = null;
+			this.progressValue = 0;
+		}
+		addProgress(amount) {
+			if (!Number.isFinite(amount) || amount < 0) {
+				console.error("PlayerModel.addProgress", "invalid progress amount", amount);
+				return;
+			}
+			this.progressValue = Math.min(1, this.progressValue + amount);
+		}
+		completeMove() {
+			if (!this.targetValue) {
+				console.error("PlayerModel.completeMove", "no active move");
+				return;
+			}
+			this.tileValue = this.targetValue;
+			this.targetValue = null;
+			this.progressValue = 0;
+		}
+		teleportTo(destination) {
+			if (!Number.isInteger(destination.x) || !Number.isInteger(destination.y) || destination.x < 0 || destination.y < 0) {
+				console.error("PlayerModel.teleportTo", "invalid destination", destination);
+				throw new Error("PlayerModel.teleportTo: invalid destination");
+			}
+			this.tileValue = {
+				x: destination.x,
+				y: destination.y
+			};
+			this.targetValue = null;
+			this.progressValue = 0;
+			const currentInvulnerability = Number.isFinite(this.invulnerableValue) ? Math.max(0, this.invulnerableValue) : 0;
+			this.invulnerableValue = Math.max(currentInvulnerability, TELEPORT_INVULNERABILITY);
+			this.impulseValue = TELEPORT_IMPULSE;
+		}
+		decreaseInvulnerability(dt) {
+			if (!Number.isFinite(dt) || dt < 0) {
+				console.error("PlayerModel.decreaseInvulnerability", "invalid delta time", dt);
+				return;
+			}
+			this.invulnerableValue = Math.max(0, this.invulnerableValue - dt);
+		}
+		decreaseImpulse(dt) {
+			if (!Number.isFinite(dt) || dt < 0) {
+				console.error("PlayerModel.decreaseImpulse", "invalid delta time", dt);
+				return;
+			}
+			this.impulseValue = Math.max(0, this.impulseValue - dt);
+		}
+		reset(spawn) {
+			if (!Number.isInteger(spawn.x) || !Number.isInteger(spawn.y) || spawn.x < 0 || spawn.y < 0) {
+				console.error("PlayerModel.reset", "invalid spawn", spawn);
+				throw new Error("PlayerModel.reset: invalid spawn");
+			}
+			this.tileValue = {
+				x: spawn.x,
+				y: spawn.y
+			};
+			this.targetValue = null;
+			this.facingValue = null;
+			this.desiredValue = null;
+			this.progressValue = 0;
+			this.invulnerableValue = RESPAWN_INVULNERABILITY;
+			this.impulseValue = 0;
+		}
+	};
+	//#endregion
+	//#region src/games/pacman/logic/actors/PlayerService.ts
+	var VECTORS$2 = {
+		UP: {
+			x: 0,
+			y: -1
+		},
+		DOWN: {
+			x: 0,
+			y: 1
+		},
+		LEFT: {
+			x: -1,
+			y: 0
+		},
+		RIGHT: {
+			x: 1,
+			y: 0
+		}
+	};
+	var EPSILON$1 = 1e-6;
+	var IMPULSE_SPEED = 1.5;
+	var RECOIL_SPEED = 9;
+	var DASH_SPEED = 10;
+	var DASH_INVULNERABILITY = .5;
+	/** A turn pressed this far (in tiles) past a junction still takes it. */
+	var LATE_TURN = .15;
+	var PlayerService = class {
+		grid;
+		progress;
+		events;
+		player;
+		speedModifierValue = 1;
+		recoilRemainingValue = 0;
+		recoilDirectionValue = null;
+		dashRemainingValue = 0;
+		dashDirectionValue = null;
+		movementLockedValue = false;
+		constructor(grid, progress, events) {
+			if (!grid) {
+				console.error("PlayerService.constructor", "missing grid service");
+				throw new Error("PlayerService.constructor: missing grid service");
+			}
+			if (!progress) {
+				console.error("PlayerService.constructor", "missing level progress");
+				throw new Error("PlayerService.constructor: missing level progress");
+			}
+			if (!events) {
+				console.error("PlayerService.constructor", "missing event bus");
+				throw new Error("PlayerService.constructor: missing event bus");
+			}
+			this.grid = grid;
+			this.progress = progress;
+			this.events = events;
+			this.player = new PlayerModel(grid.playerSpawn, 6);
+		}
+		get tile() {
+			return this.player.tile;
+		}
+		get position() {
+			return this.player.position;
+		}
+		get facing() {
+			return this.player.facing;
+		}
+		get desired() {
+			return this.player.desired;
+		}
+		get isInvulnerable() {
+			return this.player.isInvulnerable;
+		}
+		get invulnerableTimer() {
+			return this.player.invulnerableTimer;
+		}
+		get isRecoiling() {
+			return this.recoilRemainingValue > 0;
+		}
+		get isDashing() {
+			return this.dashRemainingValue > 0;
+		}
+		get isMovementLocked() {
+			return this.movementLockedValue;
+		}
+		get baseSpeed() {
+			return this.player.speed;
+		}
+		setSpeedModifier(value) {
+			if (!Number.isFinite(value) || value <= 0) {
+				console.error("PlayerService.setSpeedModifier", "invalid modifier", value);
+				return;
+			}
+			this.speedModifierValue = value;
+		}
+		setDesiredDirection(direction) {
+			this.player.setDesired(direction);
+			const facing = this.player.facing;
+			if (!this.player.target || !facing || direction === facing || this.isRecoiling || this.isDashing || this.movementLockedValue) return;
+			if (direction === this.oppositeDirection(facing)) {
+				this.player.reverse(direction);
+				return;
+			}
+			if (this.player.progress <= LATE_TURN && this.canMoveFrom(this.player.tile, direction)) this.player.cancelMove();
+		}
+		setMovementLocked(value) {
+			this.movementLockedValue = value;
+		}
+		grantInvulnerability(seconds) {
+			this.player.grantInvulnerability(seconds);
+		}
+		startRecoilBackward(tiles) {
+			if (this.isRecoiling || this.isDashing) return;
+			if (!Number.isFinite(tiles) || tiles <= 0) {
+				console.error("PlayerService.startRecoilBackward", "invalid tile count", tiles);
+				return;
+			}
+			const facing = this.player.facing;
+			if (!facing) return;
+			this.recoilDirectionValue = this.oppositeDirection(facing);
+			this.recoilRemainingValue = Math.floor(tiles);
+			this.player.setDesired(this.recoilDirectionValue);
+		}
+		startDash(tiles) {
+			if (this.isDashing || this.isRecoiling) return;
+			if (!Number.isFinite(tiles) || tiles <= 0) {
+				console.error("PlayerService.startDash", "invalid tile count", tiles);
+				return;
+			}
+			const facing = this.player.facing;
+			if (!facing) return;
+			this.dashDirectionValue = facing;
+			this.dashRemainingValue = Math.floor(tiles);
+			this.player.setDesired(facing);
+			this.player.grantInvulnerability(DASH_INVULNERABILITY);
+		}
+		reset() {
+			this.player.reset(this.grid.playerSpawn);
+			this.endRecoil();
+			this.endDash();
+			this.movementLockedValue = false;
+		}
+		update(dt) {
+			if (!Number.isFinite(dt) || dt < 0) {
+				console.error("PlayerService.update", "invalid delta time", dt);
+				return;
+			}
+			if (this.movementLockedValue) {
+				const remaining = Math.min(.25, Math.max(0, dt));
+				this.player.decreaseInvulnerability(remaining);
+				this.player.decreaseImpulse(remaining);
+				return;
+			}
+			if (this.isDashing) {
+				this.updateDash(dt);
+				return;
+			}
+			if (this.isRecoiling) {
+				this.updateRecoil(dt);
+				return;
+			}
+			let remaining = Math.min(.25, Math.max(0, dt));
+			this.player.decreaseInvulnerability(remaining);
+			this.player.decreaseImpulse(remaining);
+			const speed = this.effectiveSpeed();
+			let guard = 0;
+			while (remaining > EPSILON$1 && guard < 512) {
+				guard += 1;
+				if (!this.player.target) {
+					const direction = this.chooseDirection();
+					if (!direction) break;
+					const target = this.targetFor(this.player.tile, direction);
+					if (!this.grid.isPlayerWalkable(target.x, target.y)) break;
+					this.player.beginMove(direction, target);
+				}
+				const needed = Math.max(0, 1 - this.player.progress);
+				if (needed <= EPSILON$1) {
+					this.player.completeMove();
+					if (this.handleArrival()) break;
+					continue;
+				}
+				const step = speed * remaining;
+				if (step < needed) {
+					this.player.addProgress(step);
+					remaining = 0;
+				} else {
+					remaining -= needed / speed;
+					this.player.completeMove();
+					if (this.handleArrival()) break;
+				}
+			}
+			if (guard >= 512) console.error("PlayerService.update", "movement guard exhausted");
+		}
+		updateRecoil(dt) {
+			let remaining = Math.min(.25, Math.max(0, dt));
+			this.player.decreaseInvulnerability(remaining);
+			this.player.decreaseImpulse(remaining);
+			let guard = 0;
+			while (remaining > EPSILON$1 && this.recoilRemainingValue > 0 && guard < 512) {
+				guard += 1;
+				if (!this.player.target) {
+					const direction = this.recoilDirectionValue;
+					if (!direction) {
+						this.endRecoil();
+						break;
+					}
+					const target = this.targetFor(this.player.tile, direction);
+					if (!this.grid.isPlayerWalkable(target.x, target.y)) {
+						this.endRecoil();
+						break;
+					}
+					this.player.beginMove(direction, target);
+				}
+				const needed = Math.max(0, 1 - this.player.progress);
+				if (needed <= EPSILON$1) {
+					this.player.completeMove();
+					this.handleRecoilArrival();
+					continue;
+				}
+				const step = RECOIL_SPEED * remaining;
+				if (step < needed) {
+					this.player.addProgress(step);
+					remaining = 0;
+				} else {
+					remaining -= needed / RECOIL_SPEED;
+					this.player.completeMove();
+					this.handleRecoilArrival();
+				}
+			}
+			if (guard >= 512) console.error("PlayerService.updateRecoil", "movement guard exhausted");
+		}
+		updateDash(dt) {
+			let remaining = Math.min(.25, Math.max(0, dt));
+			this.player.decreaseInvulnerability(remaining);
+			this.player.decreaseImpulse(remaining);
+			let guard = 0;
+			while (remaining > EPSILON$1 && this.dashRemainingValue > 0 && guard < 512) {
+				guard += 1;
+				if (!this.player.target) {
+					const direction = this.dashDirectionValue;
+					if (!direction) {
+						this.endDash();
+						break;
+					}
+					const target = this.targetFor(this.player.tile, direction);
+					if (!this.grid.isPlayerWalkable(target.x, target.y)) {
+						this.endDash();
+						break;
+					}
+					this.player.beginMove(direction, target);
+				}
+				const needed = Math.max(0, 1 - this.player.progress);
+				if (needed <= EPSILON$1) {
+					this.player.completeMove();
+					this.handleDashArrival();
+					continue;
+				}
+				const step = DASH_SPEED * remaining;
+				if (step < needed) {
+					this.player.addProgress(step);
+					remaining = 0;
+				} else {
+					remaining -= needed / DASH_SPEED;
+					this.player.completeMove();
+					this.handleDashArrival();
+				}
+			}
+			if (guard >= 512) console.error("PlayerService.updateDash", "movement guard exhausted");
+		}
+		handleRecoilArrival() {
+			this.recoilRemainingValue = Math.max(0, this.recoilRemainingValue - 1);
+			this.handleArrival();
+			if (this.recoilRemainingValue <= 0) this.endRecoil();
+		}
+		handleDashArrival() {
+			this.dashRemainingValue = Math.max(0, this.dashRemainingValue - 1);
+			this.handleArrival();
+			if (this.dashRemainingValue <= 0) this.endDash();
+		}
+		endRecoil() {
+			this.recoilRemainingValue = 0;
+			this.recoilDirectionValue = null;
+		}
+		endDash() {
+			this.dashRemainingValue = 0;
+			this.dashDirectionValue = null;
+		}
+		effectiveSpeed() {
+			const base = this.player.speed * this.speedModifierValue;
+			if (this.player.isImpulsing) return base * IMPULSE_SPEED;
+			return base;
+		}
+		chooseDirection() {
+			const desired = this.player.desired;
+			if (desired && this.canMoveFrom(this.player.tile, desired)) return desired;
+			const facing = this.player.facing;
+			if (facing && this.canMoveFrom(this.player.tile, facing)) return facing;
+			return null;
+		}
+		canMoveFrom(tile, direction) {
+			const target = this.targetFor(tile, direction);
+			return this.grid.isPlayerWalkable(target.x, target.y);
+		}
+		targetFor(tile, direction) {
+			const vector = VECTORS$2[direction];
+			return {
+				x: tile.x + vector.x,
+				y: tile.y + vector.y
+			};
+		}
+		oppositeDirection(direction) {
+			if (direction === "UP") return "DOWN";
+			if (direction === "DOWN") return "UP";
+			if (direction === "LEFT") return "RIGHT";
+			return "LEFT";
+		}
+		handleArrival() {
+			const tile = this.player.tile;
+			this.progress.collectAt(tile.x, tile.y);
+			if (!this.grid.isTeleport(tile.x, tile.y)) return false;
+			const destination = this.grid.teleportDestination(tile.x, tile.y);
+			if (!destination) {
+				console.error("PlayerService.handleArrival", "missing teleport destination", tile);
+				return false;
+			}
+			this.player.teleportTo(destination);
+			this.events.emit("audio:cue", { cue: "teleport" });
+			this.progress.collectAt(destination.x, destination.y);
+			return true;
+		}
+	};
+	//#endregion
+	//#region src/games/pacman/logic/actors/GhostModel.ts
+	var GhostModel = class {
+		kindValue;
+		tileValue;
+		targetValue = null;
+		facingValue = null;
+		progressValue = 0;
+		speedValue;
+		stateValue = "lair";
+		exitTimerValue;
+		forceReverseValue = false;
+		constructor(kind, spawn, speed, exitDelay) {
+			if (!Number.isInteger(spawn.x) || !Number.isInteger(spawn.y) || spawn.x < 0 || spawn.y < 0) {
+				console.error("GhostModel.constructor", "invalid spawn", {
+					kind,
+					spawn
+				});
+				throw new Error("GhostModel.constructor: invalid spawn");
+			}
+			if (!Number.isFinite(speed) || speed <= 0) {
+				console.error("GhostModel.constructor", "invalid speed", {
+					kind,
+					speed
+				});
+				throw new Error("GhostModel.constructor: speed must be positive");
+			}
+			if (!Number.isFinite(exitDelay) || exitDelay < 0) {
+				console.error("GhostModel.constructor", "invalid exit delay", {
+					kind,
+					exitDelay
+				});
+				throw new Error("GhostModel.constructor: exit delay must be non-negative");
+			}
+			this.kindValue = kind;
+			this.tileValue = {
+				x: spawn.x,
+				y: spawn.y
+			};
+			this.speedValue = speed;
+			this.exitTimerValue = exitDelay;
+		}
+		get kind() {
+			return this.kindValue;
+		}
+		get tile() {
+			return this.tileValue;
+		}
+		get target() {
+			return this.targetValue;
+		}
+		get facing() {
+			return this.facingValue;
+		}
+		get progress() {
+			return this.progressValue;
+		}
+		get speed() {
+			return this.speedValue;
+		}
+		get state() {
+			return this.stateValue;
+		}
+		get exitTimer() {
+			return this.exitTimerValue;
+		}
+		get forceReverse() {
+			return this.forceReverseValue;
+		}
+		get position() {
+			const baseX = this.tileValue.x + .5;
+			const baseY = this.tileValue.y + .5;
+			if (!this.targetValue) return {
+				x: baseX,
+				y: baseY
+			};
+			const t = Math.min(1, Math.max(0, this.progressValue));
+			const dx = this.targetValue.x - this.tileValue.x;
+			const dy = this.targetValue.y - this.tileValue.y;
+			return {
+				x: baseX + dx * t,
+				y: baseY + dy * t
+			};
+		}
+		setState(state) {
+			this.stateValue = state;
+		}
+		setForceReverse(value) {
+			this.forceReverseValue = value;
+		}
+		decreaseExitTimer(dt) {
+			if (!Number.isFinite(dt) || dt < 0) {
+				console.error("GhostModel.decreaseExitTimer", "invalid delta time", dt);
+				return;
+			}
+			this.exitTimerValue = Math.max(0, this.exitTimerValue - dt);
+		}
+		beginMove(direction, target) {
+			if (!Number.isInteger(target.x) || !Number.isInteger(target.y) || target.x < 0 || target.y < 0) {
+				console.error("GhostModel.beginMove", "invalid target", {
+					kind: this.kindValue,
+					target
+				});
+				throw new Error("GhostModel.beginMove: invalid target");
+			}
+			if (Math.abs(target.x - this.tileValue.x) + Math.abs(target.y - this.tileValue.y) !== 1) {
+				console.error("GhostModel.beginMove", "target is not adjacent", {
+					kind: this.kindValue,
+					current: this.tileValue,
+					target
+				});
+				throw new Error("GhostModel.beginMove: target is not adjacent");
+			}
+			this.facingValue = direction;
+			this.targetValue = {
+				x: target.x,
+				y: target.y
+			};
+			this.progressValue = 0;
+		}
+		addProgress(amount) {
+			if (!Number.isFinite(amount) || amount < 0) {
+				console.error("GhostModel.addProgress", "invalid progress amount", {
+					kind: this.kindValue,
+					amount
+				});
+				return;
+			}
+			this.progressValue = Math.min(1, this.progressValue + amount);
+		}
+		completeMove() {
+			if (!this.targetValue) {
+				console.error("GhostModel.completeMove", "no active move", { kind: this.kindValue });
+				return;
+			}
+			this.tileValue = this.targetValue;
+			this.targetValue = null;
+			this.progressValue = 0;
+		}
+		teleportTo(destination) {
+			if (!Number.isInteger(destination.x) || !Number.isInteger(destination.y) || destination.x < 0 || destination.y < 0) {
+				console.error("GhostModel.teleportTo", "invalid destination", {
+					kind: this.kindValue,
+					destination
+				});
+				throw new Error("GhostModel.teleportTo: invalid destination");
+			}
+			this.tileValue = {
+				x: destination.x,
+				y: destination.y
+			};
+			this.targetValue = null;
+			this.progressValue = 0;
+		}
+		reset(spawn, exitDelay) {
+			if (!Number.isInteger(spawn.x) || !Number.isInteger(spawn.y) || spawn.x < 0 || spawn.y < 0) {
+				console.error("GhostModel.reset", "invalid spawn", {
+					kind: this.kindValue,
+					spawn
+				});
+				throw new Error("GhostModel.reset: invalid spawn");
+			}
+			if (!Number.isFinite(exitDelay) || exitDelay < 0) {
+				console.error("GhostModel.reset", "invalid exit delay", {
+					kind: this.kindValue,
+					exitDelay
+				});
+				throw new Error("GhostModel.reset: exit delay must be non-negative");
+			}
+			this.tileValue = {
+				x: spawn.x,
+				y: spawn.y
+			};
+			this.targetValue = null;
+			this.facingValue = null;
+			this.progressValue = 0;
+			this.stateValue = "lair";
+			this.exitTimerValue = exitDelay;
+			this.forceReverseValue = false;
+		}
+	};
+	//#endregion
+	//#region src/games/pacman/config/arcadeConfig.ts
+	/**
+	* The arcade: our own three-round arcade game inside the secret level, each round faster.
+	* It has its own tries: dying never costs the main game's lives, and losing every try
+	* returns to the main game without a penalty.
+	*/
+	var ARCADE = {
+		rounds: [
+			{
+				playerSpeed: 1,
+				ghostSpeed: .92,
+				power: 6,
+				waves: [
+					6,
+					20,
+					5,
+					20,
+					4
+				],
+				fruit: "PEAR"
+			},
+			{
+				playerSpeed: 1.04,
+				ghostSpeed: 1,
+				power: 4.5,
+				waves: [
+					5,
+					22,
+					4,
+					24,
+					3
+				],
+				fruit: "PRETZEL"
+			},
+			{
+				playerSpeed: 1.08,
+				ghostSpeed: 1.08,
+				power: 3,
+				waves: [
+					4,
+					25,
+					3
+				],
+				fruit: "MELON"
+			}
+		],
+		tries: 3,
+		/** Added when a round is cleared, and on top of it after the last round. */
+		roundBonus: 2e3,
+		finalBonus: 1e4,
+		/** The intermission plays after this round. */
+		intermissionAfter: 2,
+		/** The keeper chases only this close (tiles); otherwise it guards the fullest quarter. */
+		keeperReach: 6,
+		/** How far ahead the ambusher and behind the herder look for a junction (tiles). */
+		junctionLookout: 10
+	};
+	//#endregion
+	//#region src/games/pacman/logic/actors/arcadeTargets.ts
+	var VECTORS$1 = {
+		UP: {
+			x: 0,
+			y: -1
+		},
+		DOWN: {
+			x: 0,
+			y: 1
+		},
+		LEFT: {
+			x: -1,
+			y: 0
+		},
+		RIGHT: {
+			x: 1,
+			y: 0
+		}
+	};
+	var OPPOSITE = {
+		UP: "DOWN",
+		DOWN: "UP",
+		LEFT: "RIGHT",
+		RIGHT: "LEFT"
+	};
+	var ORDER = [
+		"UP",
+		"LEFT",
+		"DOWN",
+		"RIGHT"
+	];
+	/**
+	* The arcade ghosts' characters (our own, for the secret level):
+	* - BLINKY, the hunter: straight at Pac-Man.
+	* - PINKY, the ambusher: the junction Pac-Man is running into.
+	* - INKY, the herder: the junction behind Pac-Man, to cut off the way back.
+	* - CLYDE, the keeper: guards the quarter of the maze with the most food left and only
+	*   gives chase when Pac-Man comes close.
+	*/
+	function arcadeChaseTarget(kind, input) {
+		const { grid, player, facing } = input;
+		if (kind === "PINKY") return facing ? junctionAlong(grid, player, facing) : player;
+		if (kind === "INKY") return facing ? junctionAlong(grid, player, OPPOSITE[facing]) : player;
+		if (kind === "CLYDE") {
+			const dx = input.ghost.x - player.x;
+			const dy = input.ghost.y - player.y;
+			if (dx * dx + dy * dy <= ARCADE.keeperReach * ARCADE.keeperReach) return player;
+			return fullestQuarter(grid, input.hasFood) ?? player;
+		}
+		return player;
+	}
+	/**
+	* The first junction (three or more ways out) reached from `from` heading `dir`, following
+	* corners; `from` itself when nothing is found within the lookout.
+	*/
+	function junctionAlong(grid, from, dir) {
+		const open = (t, d) => {
+			const n = {
+				x: t.x + VECTORS$1[d].x,
+				y: t.y + VECTORS$1[d].y
+			};
+			return grid.isPlayerWalkable(n.x, n.y) && !grid.isTeleport(n.x, n.y);
+		};
+		let tile = from;
+		let heading = dir;
+		for (let i = 0; i < ARCADE.junctionLookout; i += 1) {
+			if (!open(tile, heading)) {
+				const turn = ORDER.find((d) => d !== OPPOSITE[heading] && open(tile, d));
+				if (!turn) return tile;
+				heading = turn;
+			}
+			tile = {
+				x: tile.x + VECTORS$1[heading].x,
+				y: tile.y + VECTORS$1[heading].y
+			};
+			if (grid.exitsCount(tile.x, tile.y) >= 3) return tile;
+		}
+		return tile;
+	}
+	/** The middle of the quarter of the board with the most food left, or null when empty. */
+	function fullestQuarter(grid, hasFood) {
+		const counts = [
+			0,
+			0,
+			0,
+			0
+		];
+		const hx = grid.width / 2;
+		const hy = grid.height / 2;
+		for (let y = 0; y < grid.height; y += 1) for (let x = 0; x < grid.width; x += 1) if (hasFood(x, y)) counts[(x < hx ? 0 : 1) + (y < hy ? 0 : 2)] += 1;
+		const best = counts.indexOf(Math.max(...counts));
+		if (counts[best] === 0) return null;
+		return {
+			x: Math.floor(best % 2 === 0 ? hx / 2 : hx + hx / 2),
+			y: Math.floor(best < 2 ? hy / 2 : hy + hy / 2)
+		};
+	}
+	//#endregion
+	//#region src/games/pacman/logic/actors/GhostService.ts
+	var VECTORS = {
+		UP: {
+			x: 0,
+			y: -1
+		},
+		DOWN: {
+			x: 0,
+			y: 1
+		},
+		LEFT: {
+			x: -1,
+			y: 0
+		},
+		RIGHT: {
+			x: 1,
+			y: 0
+		}
+	};
+	var DIRECTIONS = [
+		"UP",
+		"LEFT",
+		"DOWN",
+		"RIGHT"
+	];
+	var SCATTER_TARGETS = {
+		BLINKY: {
+			x: 22,
+			y: 2
+		},
+		PINKY: {
+			x: 2,
+			y: 2
+		},
+		INKY: {
+			x: 22,
+			y: 23
+		},
+		CLYDE: {
+			x: 2,
+			y: 23
+		}
+	};
+	var FALLBACK_EXIT_TARGET = {
+		x: 12,
+		y: 9
+	};
+	var EXIT_DELAYS = {
+		BLINKY: 0,
+		PINKY: 3,
+		INKY: 6,
+		CLYDE: 9
+	};
+	var GHOST_SPEED = 5.4;
+	var SCATTER_TIME = 7;
+	var CHASE_TIME = 20;
+	var EPSILON = 1e-6;
+	var EMPTY_GHOST_LIST = [];
+	var GhostService = class {
+		grid;
+		player;
+		progress;
+		ghosts;
+		exitTargetValue;
+		mode = "scatter";
+		modeTimer = SCATTER_TIME;
+		powerActiveValue = false;
+		msOverdriveValue = false;
+		speedModifierValue = 1;
+		visibleValue = true;
+		/** Sent away by the lair code: frozen where they were, out of play until the reset. */
+		banishedValue = false;
+		/** The arcade round's waves and characters; null outside the secret level. */
+		arcade = null;
+		waveIndex = 0;
+		constructor(grid, player, progress) {
+			if (!grid) {
+				console.error("GhostService.constructor", "missing grid service");
+				throw new Error("GhostService.constructor: missing grid service");
+			}
+			if (!player) {
+				console.error("GhostService.constructor", "missing player service");
+				throw new Error("GhostService.constructor: missing player service");
+			}
+			if (!progress) {
+				console.error("GhostService.constructor", "missing level progress");
+				throw new Error("GhostService.constructor: missing level progress");
+			}
+			const spawns = grid.ghostSpawns;
+			if (!spawns.BLINKY || !spawns.PINKY || !spawns.INKY || !spawns.CLYDE) {
+				console.error("GhostService.constructor", "missing ghost spawns");
+				throw new Error("GhostService.constructor: missing ghost spawns");
+			}
+			this.grid = grid;
+			this.player = player;
+			this.progress = progress;
+			this.ghosts = [
+				new GhostModel("BLINKY", spawns.BLINKY, GHOST_SPEED, EXIT_DELAYS.BLINKY),
+				new GhostModel("PINKY", spawns.PINKY, GHOST_SPEED, EXIT_DELAYS.PINKY),
+				new GhostModel("INKY", spawns.INKY, GHOST_SPEED, EXIT_DELAYS.INKY),
+				new GhostModel("CLYDE", spawns.CLYDE, GHOST_SPEED, EXIT_DELAYS.CLYDE)
+			];
+			const resolved = resolveExitTarget(grid, spawns.BLINKY);
+			if (resolved) this.exitTargetValue = resolved;
+			else {
+				console.error("GhostService.constructor", "exit target not resolved, using fallback", { fallback: FALLBACK_EXIT_TARGET });
+				this.exitTargetValue = FALLBACK_EXIT_TARGET;
+			}
+		}
+		/** The ghosts in play: they move, collide and are drawn. */
+		get list() {
+			return this.visibleValue && !this.banishedValue ? this.ghosts : EMPTY_GHOST_LIST;
+		}
+		/** The ghosts the lair code sent away, frozen where they were (drawn while they vanish). */
+		get banishedList() {
+			return this.visibleValue && this.banishedValue ? this.ghosts : EMPTY_GHOST_LIST;
+		}
+		get banished() {
+			return this.banishedValue;
+		}
+		/** The lair code is solved: every ghost stops and leaves play for the rest of the level. */
+		banish() {
+			this.banishedValue = true;
+		}
+		setVisible(value) {
+			this.visibleValue = value;
+		}
+		setSpeedModifier(value) {
+			if (!Number.isFinite(value) || value <= 0) {
+				console.error("GhostService.setSpeedModifier", "invalid modifier", value);
+				return;
+			}
+			this.speedModifierValue = value;
+		}
+		setPowerActive(value) {
+			this.powerActiveValue = value;
+		}
+		/**
+		* The secret level's arcade round: its scatter / chase waves (then chase for good) and
+		* the arcade characters in chase (`arcadeTargets`). Null returns to the main rules.
+		*/
+		setArcade(tuning) {
+			this.arcade = tuning;
+			this.resetWaves();
+		}
+		setMsOverdrive(value) {
+			if (this.msOverdriveValue === value) return;
+			this.msOverdriveValue = value;
+			for (const ghost of this.ghosts) if (value) {
+				if (ghost.state === "active" || ghost.state === "exiting" || ghost.state === "frightened") ghost.setState("frightened");
+			} else if (ghost.state === "frightened") ghost.setState("active");
+		}
+		setGhostState(kind, state) {
+			const ghost = this.ghosts.find((item) => item.kind === kind);
+			if (!ghost) {
+				console.error("GhostService.setGhostState", "missing ghost", { kind });
+				return;
+			}
+			ghost.setState(state);
+			ghost.setForceReverse(false);
+		}
+		frightenActive() {
+			for (const ghost of this.ghosts) if (ghost.state === "active") {
+				ghost.setState("frightened");
+				ghost.setForceReverse(true);
+			} else if (ghost.state === "frightened") ghost.setForceReverse(true);
+		}
+		endFrightened() {
+			for (const ghost of this.ghosts) if (ghost.state === "frightened") ghost.setState("active");
+		}
+		toEyes(ghost) {
+			ghost.setState("eyes");
+			ghost.setForceReverse(false);
+		}
+		reset() {
+			const spawns = this.grid.ghostSpawns;
+			for (const ghost of this.ghosts) {
+				const spawn = spawns[ghost.kind];
+				if (!spawn) {
+					console.error("GhostService.reset", "missing spawn", { kind: ghost.kind });
+					continue;
+				}
+				ghost.reset(spawn, EXIT_DELAYS[ghost.kind]);
+			}
+			this.resetWaves();
+			this.powerActiveValue = false;
+			this.msOverdriveValue = false;
+			this.banishedValue = false;
+		}
+		resetWaves() {
+			this.mode = "scatter";
+			this.waveIndex = 0;
+			this.modeTimer = this.arcade ? this.arcade.waves[0] ?? Infinity : SCATTER_TIME;
+		}
+		update(dt) {
+			if (!Number.isFinite(dt) || dt < 0) {
+				console.error("GhostService.update", "invalid delta time", dt);
+				return;
+			}
+			if (!this.visibleValue || this.banishedValue) return;
+			const safeDt = Math.min(.25, Math.max(0, dt));
+			this.updateMode(safeDt);
+			for (const ghost of this.ghosts) this.updateGhost(ghost, safeDt);
+		}
+		updateMode(dt) {
+			this.modeTimer = Math.max(0, this.modeTimer - dt);
+			if (this.modeTimer > EPSILON) return;
+			if (this.arcade) {
+				this.waveIndex += 1;
+				this.mode = this.waveIndex % 2 === 0 ? "scatter" : "chase";
+				this.modeTimer = this.arcade.waves[this.waveIndex] ?? Infinity;
+			} else if (this.mode === "scatter") {
+				this.mode = "chase";
+				this.modeTimer = CHASE_TIME;
+			} else {
+				this.mode = "scatter";
+				this.modeTimer = SCATTER_TIME;
+			}
+			for (const ghost of this.ghosts) if (ghost.state === "active" || ghost.state === "frightened" || ghost.state === "exiting") ghost.setForceReverse(true);
+		}
+		updateGhost(ghost, dt) {
+			if (ghost.state === "lair") {
+				ghost.decreaseExitTimer(dt);
+				if (ghost.exitTimer > 0) return;
+				ghost.setState("exiting");
+			}
+			let remaining = dt;
+			let guard = 0;
+			while (remaining > EPSILON && guard < 512) {
+				guard += 1;
+				if (!ghost.target) {
+					const direction = this.chooseDirection(ghost);
+					if (!direction) break;
+					const target = this.targetFor(ghost.tile, direction);
+					if (!this.grid.isGhostWalkable(target.x, target.y, ghost.state === "exiting" || ghost.state === "eyes")) break;
+					ghost.beginMove(direction, target);
+				}
+				const needed = Math.max(0, 1 - ghost.progress);
+				const speed = this.effectiveSpeed(ghost);
+				if (needed <= EPSILON) {
+					ghost.completeMove();
+					if (this.handleArrival(ghost)) break;
+					continue;
+				}
+				const step = speed * remaining;
+				if (step < needed) {
+					ghost.addProgress(step);
+					remaining = 0;
+				} else {
+					remaining -= needed / speed;
+					ghost.completeMove();
+					if (this.handleArrival(ghost)) break;
+				}
+			}
+			if (guard >= 512) console.error("GhostService.updateGhost", "movement guard exhausted", { kind: ghost.kind });
+		}
+		effectiveSpeed(ghost) {
+			if (ghost.state === "eyes") return ghost.speed * 1.6;
+			if (ghost.state === "hypnotized") return ghost.speed * .8;
+			if (ghost.state === "enraged") return ghost.speed * 1.2;
+			if (ghost.state === "frightened") return ghost.speed * .6;
+			return ghost.speed * this.speedModifierValue;
+		}
+		handleArrival(ghost) {
+			if (ghost.state === "eyes") {
+				const spawn = this.spawnFor(ghost);
+				if (spawn && ghost.tile.x === spawn.x && ghost.tile.y === spawn.y) {
+					ghost.reset(spawn, 1);
+					return true;
+				}
+				return false;
+			}
+			if (ghost.state === "hypnotized") {
+				const tile = ghost.tile;
+				if (this.grid.tileAt(tile.x, tile.y) === "DT" && !this.progress.isCollected(tile.x, tile.y)) this.progress.collectAt(tile.x, tile.y);
+			}
+			if (ghost.state === "exiting" && !isLairTile(this.grid, ghost.tile.x, ghost.tile.y)) ghost.setState(this.msOverdriveValue || this.powerActiveValue ? "frightened" : "active");
+			const tile = ghost.tile;
+			if (!this.grid.isTeleport(tile.x, tile.y)) return false;
+			const destination = this.grid.teleportDestination(tile.x, tile.y);
+			if (!destination) {
+				console.error("GhostService.handleArrival", "missing teleport destination", {
+					kind: ghost.kind,
+					tile
+				});
+				return false;
+			}
+			ghost.teleportTo(destination);
+			if (ghost.state === "exiting" && !isLairTile(this.grid, destination.x, destination.y)) ghost.setState(this.msOverdriveValue || this.powerActiveValue ? "frightened" : "active");
+			return true;
+		}
+		chooseDirection(ghost) {
+			const allowLair = ghost.state === "exiting" || ghost.state === "eyes";
+			const facing = ghost.facing;
+			const opposite = facing ? this.oppositeDirection(facing) : null;
+			const candidates = [];
+			for (const direction of DIRECTIONS) {
+				const target = this.targetFor(ghost.tile, direction);
+				if (this.grid.isGhostWalkable(target.x, target.y, allowLair)) candidates.push(direction);
+			}
+			if (candidates.length === 0) return null;
+			if (candidates.length === 1) {
+				ghost.setForceReverse(false);
+				return candidates[0];
+			}
+			if (ghost.forceReverse && opposite && candidates.includes(opposite)) {
+				ghost.setForceReverse(false);
+				return opposite;
+			}
+			const withoutReverse = facing && opposite ? candidates.filter((direction) => direction !== opposite) : candidates;
+			const choices = withoutReverse.length > 0 ? withoutReverse : candidates;
+			const targetTile = this.currentTargetTile(ghost);
+			let best = null;
+			let bestScore = Number.POSITIVE_INFINITY;
+			for (const direction of choices) {
+				const candidate = this.targetFor(ghost.tile, direction);
+				const score = this.distanceSq(candidate, targetTile);
+				if (score < bestScore) {
+					bestScore = score;
+					best = direction;
+				}
+			}
+			ghost.setForceReverse(false);
+			return best ?? choices[0];
+		}
+		currentTargetTile(ghost) {
+			if (ghost.state === "eyes") return this.spawnFor(ghost) ?? this.exitTargetValue;
+			if (ghost.state === "exiting") return this.exitTargetValue;
+			if (ghost.state === "hypnotized") return this.nearestDotTarget(ghost) ?? SCATTER_TARGETS[ghost.kind];
+			if (ghost.state === "enraged") return this.player.tile;
+			if (ghost.state === "frightened") return this.fleeTarget(ghost);
+			if (this.mode === "scatter") return SCATTER_TARGETS[ghost.kind];
+			return this.chaseTarget(ghost);
+		}
+		chaseTarget(ghost) {
+			const playerTile = this.player.tile;
+			const playerFacing = this.player.facing;
+			if (this.arcade) return arcadeChaseTarget(ghost.kind, {
+				grid: this.grid,
+				ghost: ghost.tile,
+				player: playerTile,
+				facing: playerFacing,
+				hasFood: (x, y) => {
+					const token = this.grid.tileAt(x, y);
+					return (token === "DT" || token === "EU") && !this.progress.isCollected(x, y);
+				}
+			});
+			if (ghost.kind === "BLINKY") return playerTile;
+			if (ghost.kind === "PINKY") return this.ahead(playerTile, playerFacing, 4);
+			if (ghost.kind === "INKY") {
+				const pivot = this.ahead(playerTile, playerFacing, 2);
+				const blinky = this.ghostById("BLINKY");
+				if (!blinky) return pivot;
+				return {
+					x: pivot.x + (pivot.x - blinky.tile.x),
+					y: pivot.y + (pivot.y - blinky.tile.y)
+				};
+			}
+			if (this.distanceSq(ghost.tile, playerTile) > 64) return playerTile;
+			return SCATTER_TARGETS.CLYDE;
+		}
+		fleeTarget(ghost) {
+			const playerTile = this.player.tile;
+			const dx = ghost.tile.x - playerTile.x;
+			const dy = ghost.tile.y - playerTile.y;
+			if (dx === 0 && dy === 0) return SCATTER_TARGETS[ghost.kind];
+			return {
+				x: ghost.tile.x + dx * 2,
+				y: ghost.tile.y + dy * 2
+			};
+		}
+		nearestDotTarget(ghost) {
+			let best = null;
+			let bestScore = Number.POSITIVE_INFINITY;
+			for (let y = 0; y < this.grid.height; y += 1) for (let x = 0; x < this.grid.width; x += 1) {
+				if (this.grid.tileAt(x, y) !== "DT") continue;
+				if (this.progress.isCollected(x, y)) continue;
+				const candidate = {
+					x,
+					y
+				};
+				const score = this.distanceSq(ghost.tile, candidate);
+				if (score < bestScore) {
+					bestScore = score;
+					best = candidate;
+				}
+			}
+			return best;
+		}
+		ahead(point, direction, steps) {
+			if (!direction) return point;
+			const vector = VECTORS[direction];
+			return {
+				x: point.x + vector.x * steps,
+				y: point.y + vector.y * steps
+			};
+		}
+		targetFor(tile, direction) {
+			const vector = VECTORS[direction];
+			return {
+				x: tile.x + vector.x,
+				y: tile.y + vector.y
+			};
+		}
+		oppositeDirection(direction) {
+			if (direction === "UP") return "DOWN";
+			if (direction === "DOWN") return "UP";
+			if (direction === "LEFT") return "RIGHT";
+			return "LEFT";
+		}
+		distanceSq(a, b) {
+			const dx = a.x - b.x;
+			const dy = a.y - b.y;
+			return dx * dx + dy * dy;
+		}
+		ghostById(kind) {
+			return this.ghosts.find((ghost) => ghost.kind === kind);
+		}
+		spawnFor(ghost) {
+			return this.grid.ghostSpawns[ghost.kind] ?? null;
+		}
+	};
+	//#endregion
+	//#region src/games/pacman/logic/rules/LairCodeService.ts
+	var REQUIRED_LEVEL$1 = 7;
+	var CODE = [
+		"BLINKY",
+		"PINKY",
+		"INKY",
+		"CLYDE"
+	];
+	var STEP_PULSE_DURATION = .6;
+	var OPEN_PULSE_DURATION = 2;
+	var LairCodeService = class {
+		levelValue;
+		events;
+		stepIndexValue = 0;
+		openValue = false;
+		stepPulseValue = 0;
+		openPulseValue = 0;
+		constructor(level, events) {
+			if (!Number.isFinite(level) || level < 1) {
+				console.error("LairCodeService.constructor", "invalid level", level);
+				throw new Error("LairCodeService.constructor: level must be positive");
+			}
+			if (!events) {
+				console.error("LairCodeService.constructor", "missing event bus");
+				throw new Error("LairCodeService.constructor: missing event bus");
+			}
+			this.levelValue = Math.floor(level);
+			this.events = events;
+		}
+		get active() {
+			return this.levelValue === REQUIRED_LEVEL$1;
+		}
+		get open() {
+			return this.openValue;
+		}
+		get stepIndex() {
+			return this.stepIndexValue;
+		}
+		get expected() {
+			return CODE[this.stepIndexValue] ?? null;
+		}
+		get stepPulse() {
+			return this.stepPulseValue;
+		}
+		get openPulse() {
+			return this.openPulseValue;
+		}
+		get snapshot() {
+			return {
+				active: this.active,
+				open: this.openValue,
+				stepIndex: this.stepIndexValue,
+				expected: this.expected,
+				stepPulse: this.stepPulseValue,
+				openPulse: this.openPulseValue
+			};
+		}
+		update(dt) {
+			if (!Number.isFinite(dt) || dt < 0) {
+				console.error("LairCodeService.update", "invalid delta time", dt);
+				return;
+			}
+			this.stepPulseValue = Math.max(0, this.stepPulseValue - dt);
+			this.openPulseValue = Math.max(0, this.openPulseValue - dt);
+		}
+		register(kind) {
+			if (!this.active || this.openValue) return;
+			if (!this.isValidKind(kind)) {
+				console.error("LairCodeService.register", "invalid ghost kind", kind);
+				return;
+			}
+			if (kind !== CODE[this.stepIndexValue]) return;
+			this.stepIndexValue += 1;
+			this.stepPulseValue = STEP_PULSE_DURATION;
+			if (this.stepIndexValue >= CODE.length) {
+				this.openValue = true;
+				this.openPulseValue = OPEN_PULSE_DURATION;
+				this.events.emit("audio:cue", { cue: "exit-open" });
+				return;
+			}
+			this.events.emit("audio:cue", { cue: "egg-spawn" });
+		}
+		reset() {
+			this.stepIndexValue = 0;
+			this.openValue = false;
+			this.stepPulseValue = 0;
+			this.openPulseValue = 0;
+		}
+		isValidKind(kind) {
+			return kind === "BLINKY" || kind === "PINKY" || kind === "INKY" || kind === "CLYDE";
+		}
+	};
+	//#endregion
+	//#region src/games/pacman/logic/bonuses/EasterEggService.ts
+	var REQUIRED_LEVEL = 7;
+	/** Seconds the ghosts take to vanish. */
+	var EGG_VANISH_TIME = 1.2;
+	/** Seconds the lair gate takes to open. */
+	var EGG_DOOR_TIME = .8;
+	var EasterEggService = class {
+		levelValue;
+		grid;
+		ghosts;
+		lairCode;
+		progress;
+		events;
+		scoreModel;
+		phaseValue = "waiting";
+		/** Seconds left in the `vanish` or `door` phase. */
+		timerValue = 0;
+		spawnTileValue = null;
+		secretRequestedValue = false;
+		constructor(level, grid, ghosts, lairCode, progress, events, scoreModel) {
+			if (!Number.isFinite(level) || level < 1) {
+				console.error("EasterEggService.constructor", "invalid level", level);
+				throw new Error("EasterEggService.constructor: level must be positive");
+			}
+			if (!grid) {
+				console.error("EasterEggService.constructor", "missing grid service");
+				throw new Error("EasterEggService.constructor: missing grid service");
+			}
+			if (!ghosts) {
+				console.error("EasterEggService.constructor", "missing ghost service");
+				throw new Error("EasterEggService.constructor: missing ghost service");
+			}
+			if (!progress) {
+				console.error("EasterEggService.constructor", "missing level progress");
+				throw new Error("EasterEggService.constructor: missing level progress");
+			}
+			if (!events) {
+				console.error("EasterEggService.constructor", "missing event bus");
+				throw new Error("EasterEggService.constructor: missing event bus");
+			}
+			if (!scoreModel) {
+				console.error("EasterEggService.constructor", "missing score model");
+				throw new Error("EasterEggService.constructor: missing score model");
+			}
+			this.levelValue = Math.floor(level);
+			this.grid = grid;
+			this.ghosts = ghosts;
+			this.lairCode = lairCode ?? null;
+			this.progress = progress;
+			this.events = events;
+			this.scoreModel = scoreModel;
+		}
+		get phase() {
+			return this.phaseValue;
+		}
+		/** How far the ghosts have vanished, 0..1. */
+		get vanishProgress() {
+			if (this.phaseValue === "waiting") return 0;
+			if (this.phaseValue === "vanish") return 1 - this.timerValue / EGG_VANISH_TIME;
+			return 1;
+		}
+		/** How far the lair gate is open, 0..1. */
+		get doorOpen() {
+			if (this.phaseValue === "waiting" || this.phaseValue === "vanish") return 0;
+			if (this.phaseValue === "door") return 1 - this.timerValue / EGG_DOOR_TIME;
+			return 1;
+		}
+		/** Pac-Man may walk into the lair once the gate is fully open. */
+		get lairOpen() {
+			return this.phaseValue === "egg" || this.phaseValue === "spent";
+		}
+		get eggPosition() {
+			const tile = this.spawnTileValue;
+			if (!tile) {
+				console.error("EasterEggService.eggPosition", "spawn tile is not assigned");
+				return {
+					x: 0,
+					y: 0
+				};
+			}
+			return {
+				x: tile.x + .5,
+				y: tile.y + .5
+			};
+		}
+		reset() {
+			this.phaseValue = "waiting";
+			this.timerValue = 0;
+			this.spawnTileValue = null;
+			this.secretRequestedValue = false;
+		}
+		update(dt, player) {
+			if (!Number.isFinite(dt) || dt < 0) {
+				console.error("EasterEggService.update", "invalid delta time", dt);
+				return;
+			}
+			if (!player) {
+				console.error("EasterEggService.update", "missing player service");
+				return;
+			}
+			if (this.levelValue !== REQUIRED_LEVEL || !this.lairCode || !this.lairCode.active) return;
+			if (this.phaseValue === "waiting") {
+				if (this.lairCode.open) this.startVanish();
+				return;
+			}
+			if (this.phaseValue === "vanish") {
+				this.timerValue = Math.max(0, this.timerValue - dt);
+				if (this.timerValue <= 0) {
+					this.phaseValue = "door";
+					this.timerValue = EGG_DOOR_TIME;
+				}
+				return;
+			}
+			if (this.phaseValue === "door") {
+				this.timerValue = Math.max(0, this.timerValue - dt);
+				if (this.timerValue <= 0) this.spawnEgg();
+				return;
+			}
+			if (this.phaseValue === "egg") {
+				if (this.touchesPlayer(player, this.eggPosition)) this.collect();
+			}
+		}
+		consumeSecretRequested() {
+			const requested = this.secretRequestedValue;
+			this.secretRequestedValue = false;
+			return requested;
+		}
+		/** Dev: the ghosts are sent away and the egg waits in the open lair now. */
+		debugSpawn() {
+			this.ghosts.banish();
+			this.spawnEgg();
+		}
+		startVanish() {
+			this.ghosts.banish();
+			this.phaseValue = "vanish";
+			this.timerValue = EGG_VANISH_TIME;
+			this.events;
+		}
+		spawnEgg() {
+			const tile = this.grid.lairEggTile();
+			if (!tile) {
+				console.error("EasterEggService.spawnEgg", "lair tile is not found");
+				this.phaseValue = "spent";
+				return;
+			}
+			this.spawnTileValue = tile;
+			this.phaseValue = "egg";
+			this.events.emit("audio:cue", { cue: "egg-spawn" });
+			this.events;
+		}
+		collect() {
+			const converted = this.progress.convertRemainingDots();
+			this.scoreModel.add(converted * SCORE_TABLE.dot);
+			this.scoreModel.add(SCORE_TABLE.easterEgg);
+			const tile = this.spawnTileValue;
+			if (tile) {
+				const points = converted * SCORE_TABLE.dot + SCORE_TABLE.easterEgg;
+				this.events.emit("fx:event", {
+					kind: "egg",
+					x: tile.x + .5,
+					y: tile.y + .5,
+					points
+				});
+			}
+			this.phaseValue = "spent";
+			this.secretRequestedValue = true;
+			this.events.emit("audio:cue", { cue: "egg-collect" });
+			this.events;
+		}
+		touchesPlayer(player, center) {
+			const position = player.position;
+			const dx = position.x - center.x;
+			const dy = position.y - center.y;
+			if (dx * dx + dy * dy <= .25) return true;
+			const tile = player.tile;
+			return tile.x === center.x - .5 && tile.y === center.y - .5;
+		}
+	};
+	//#endregion
+	//#region src/games/pacman/render/actors/GhostView.ts
+	var GhostView = class {
+		draw(ctx, ghosts, layout, powerTimer, msOverdrive, vanish = 0) {
+			if (!Number.isFinite(layout.tileSize) || layout.tileSize <= 0) {
+				console.error("GhostView.draw", "invalid layout tile size", layout.tileSize);
+				return;
+			}
+			for (const ghost of ghosts.list) this.drawGhost(ctx, ghost, layout, powerTimer, msOverdrive);
+			if (vanish < 1) for (const ghost of ghosts.banishedList) this.drawVanishing(ctx, ghost, layout, powerTimer, msOverdrive, vanish);
+		}
+		/**
+		* A ghost the lair code sent away (`p` 0..1): it stops, swells a little, then shrinks
+		* and rises as it fades, while sparks in its colour fly out and go out.
+		*/
+		drawVanishing(ctx, ghost, layout, powerTimer, msOverdrive, p) {
+			const t = Math.max(0, Math.min(1, p));
+			const S = layout.tileSize;
+			const position = ghost.position;
+			const x = layout.offsetX + position.x * S;
+			const y = layout.offsetY + position.y * S;
+			const fade = t < .25 ? 1 : 1 - (t - .25) / .75;
+			const scale = t < .25 ? 1 + t * .6 : 1.15 * fade;
+			if (fade > 0) {
+				ctx.save();
+				ctx.globalAlpha *= fade;
+				ctx.translate(x, y - t * t * S * .35);
+				ctx.scale(scale, scale);
+				ctx.translate(-x, -y);
+				this.drawGhost(ctx, ghost, layout, powerTimer, msOverdrive);
+				ctx.restore();
+			}
+			if (t > .2) {
+				const k = (t - .2) / .8;
+				ctx.save();
+				ctx.globalCompositeOperation = "lighter";
+				ctx.globalAlpha *= 1 - k;
+				ctx.fillStyle = this.colorFor(ghost.kind);
+				for (let i = 0; i < 8; i++) {
+					const a = i / 8 * Math.PI * 2 + ghost.kind.length;
+					const r = S * (.15 + k * .45);
+					const side = Math.max(1, S * .12 * (1 - k * .6));
+					ctx.fillRect(x + Math.cos(a) * r - side / 2, y + Math.sin(a) * r - side / 2, side, side);
+				}
+				ctx.restore();
+			}
+		}
+		drawGhost(ctx, ghost, layout, powerTimer, msOverdrive) {
+			const position = ghost.position;
+			if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) {
+				console.error("GhostView.drawGhost", "invalid ghost position", {
+					kind: ghost.kind,
+					position
+				});
+				return;
+			}
+			const x = layout.offsetX + position.x * layout.tileSize;
+			const y = layout.offsetY + position.y * layout.tileSize;
+			const radius = Math.max(2, layout.tileSize * .34);
+			let lookX = 0;
+			let lookY = 0;
+			if (ghost.facing === "UP") lookY = -1;
+			else if (ghost.facing === "DOWN") lookY = 1;
+			else if (ghost.facing === "LEFT") lookX = -1;
+			else if (ghost.facing === "RIGHT") lookX = 1;
+			if (ghost.state === "eyes") {
+				this.drawEyes(ctx, x, y, radius, lookX, lookY);
+				return;
+			}
+			const frightened = ghost.state === "frightened";
+			const hypnotized = ghost.state === "hypnotized";
+			const enraged = ghost.state === "enraged";
+			const flash = frightened && powerTimer > 0 && powerTimer < 2 && Math.floor(powerTimer * 4) % 2 === 0;
+			ctx.save();
+			if (ghost.state === "lair" || ghost.state === "exiting") ctx.globalAlpha = .72;
+			if (hypnotized) ctx.fillStyle = "#79ff6f";
+			else if (enraged) ctx.fillStyle = "#ff4d4d";
+			else if (frightened) {
+				if (flash) ctx.fillStyle = "#e8efff";
+				else if (msOverdrive) ctx.fillStyle = "#59f0ff";
+				else ctx.fillStyle = "#2f2fd8";
+			} else ctx.fillStyle = this.colorFor(ghost.kind);
+			ctx.beginPath();
+			ctx.arc(x, y, radius, 0, Math.PI * 2);
+			ctx.fill();
+			if (hypnotized) {
+				ctx.strokeStyle = "rgba(121, 255, 111, 0.65)";
+				ctx.lineWidth = Math.max(1, radius * .12);
+				ctx.beginPath();
+				ctx.arc(x, y, radius * 1.22, 0, Math.PI * 2);
+				ctx.stroke();
+			}
+			if (enraged) {
+				ctx.strokeStyle = "rgba(255, 77, 77, 0.75)";
+				ctx.lineWidth = Math.max(1, radius * .14);
+				ctx.beginPath();
+				ctx.arc(x, y, radius * 1.18, 0, Math.PI * 2);
+				ctx.stroke();
+			}
+			const eyeRadius = Math.max(1, radius * .18);
+			const eyeOffsetX = radius * .34;
+			const eyeOffsetY = radius * .18;
+			ctx.fillStyle = "#ffffff";
+			ctx.beginPath();
+			ctx.arc(x - eyeOffsetX + lookX * radius * .12, y - eyeOffsetY + lookY * radius * .12, eyeRadius, 0, Math.PI * 2);
+			ctx.fill();
+			ctx.beginPath();
+			ctx.arc(x + eyeOffsetX + lookX * radius * .12, y - eyeOffsetY + lookY * radius * .12, eyeRadius, 0, Math.PI * 2);
+			ctx.fill();
+			if (enraged) ctx.fillStyle = "#ffffff";
+			else if (frightened) ctx.fillStyle = "#ffb14d";
+			else ctx.fillStyle = "#030509";
+			ctx.beginPath();
+			ctx.arc(x - eyeOffsetX + lookX * radius * .24, y - eyeOffsetY + lookY * radius * .24, Math.max(1, eyeRadius * .5), 0, Math.PI * 2);
+			ctx.fill();
+			ctx.beginPath();
+			ctx.arc(x + eyeOffsetX + lookX * radius * .24, y - eyeOffsetY + lookY * radius * .24, Math.max(1, eyeRadius * .5), 0, Math.PI * 2);
+			ctx.fill();
+			ctx.restore();
+		}
+		drawEyes(ctx, x, y, radius, lookX, lookY) {
+			const eyeRadius = Math.max(1, radius * .24);
+			const eyeOffsetX = radius * .34;
+			const eyeOffsetY = radius * .18;
+			ctx.fillStyle = "#ffffff";
+			ctx.beginPath();
+			ctx.arc(x - eyeOffsetX, y - eyeOffsetY, eyeRadius, 0, Math.PI * 2);
+			ctx.fill();
+			ctx.beginPath();
+			ctx.arc(x + eyeOffsetX, y - eyeOffsetY, eyeRadius, 0, Math.PI * 2);
+			ctx.fill();
+			ctx.fillStyle = "#030509";
+			ctx.beginPath();
+			ctx.arc(x - eyeOffsetX + lookX * radius * .24, y - eyeOffsetY + lookY * radius * .24, Math.max(1, eyeRadius * .5), 0, Math.PI * 2);
+			ctx.fill();
+			ctx.beginPath();
+			ctx.arc(x + eyeOffsetX + lookX * radius * .24, y - eyeOffsetY + lookY * radius * .24, Math.max(1, eyeRadius * .5), 0, Math.PI * 2);
+			ctx.fill();
+		}
+		colorFor(kind) {
+			if (kind === "BLINKY") return "#ff4d4d";
+			if (kind === "PINKY") return "#ff9de2";
+			if (kind === "INKY") return "#59f0ff";
+			return "#ffb14d";
+		}
+	};
+	//#endregion
+	//#region src/games/pacman/render/common/color.ts
+	/** CSS rgba() string for a 0xRRGGBB colour with alpha clamped into [0, 1]. */
+	function rgba(hex, a) {
+		const clamped = Math.max(0, Math.min(1, a));
+		return `rgba(${hex >> 16 & 255},${hex >> 8 & 255},${hex & 255},${clamped})`;
+	}
+	//#endregion
+	//#region src/games/pacman/render/actors/PlayerView.ts
+	var LOOKS = {
+		normal: {
+			skin0: 16773280,
+			skin1: 16763946,
+			skin2: 15241242,
+			rim: 9058822,
+			mouth0: 6953486,
+			mouth1: 2229764,
+			tongue: 16738922,
+			glow: 16760896,
+			trail: 16765024,
+			trail2: 16747040
+		},
+		energized: {
+			skin0: 16777215,
+			skin1: 16774336,
+			skin2: 16765024,
+			rim: 4251903,
+			mouth0: 1718890,
+			mouth1: 397342,
+			tongue: 10152191,
+			glow: 6351103,
+			trail: 13170943,
+			trail2: 4245759
+		},
+		berserk: {
+			skin0: 16743002,
+			skin1: 13115418,
+			skin2: 5900296,
+			rim: 1704450,
+			mouth0: 11542538,
+			mouth1: 3801600,
+			tongue: 16722474,
+			glow: 16722448,
+			trail: 16734762,
+			trail2: 6950920
+		}
+	};
+	var TAU = Math.PI * 2;
+	/** Trail length in tiles at full speed; it starts this far behind the body. */
+	var TRAIL_LENGTH = 1.7;
+	var MORPH_TIME = .6;
+	function mixHex(a, b, t) {
+		const ch = (shift) => {
+			const x = a >> shift & 255;
+			const y = b >> shift & 255;
+			return Math.round(x + (y - x) * t);
+		};
+		return ch(16) << 16 | ch(8) << 8 | ch(0);
+	}
+	function ease(t) {
+		return 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
+	}
+	function lerpAngle(a, b, t) {
+		let d = b - a;
+		while (d > Math.PI) d -= TAU;
+		while (d < -Math.PI) d += TAU;
+		return a + d * t;
+	}
+	function facingAngle(facing, fallback) {
+		if (facing === "UP") return -Math.PI / 2;
+		if (facing === "DOWN") return Math.PI / 2;
+		if (facing === "LEFT") return Math.PI;
+		if (facing === "RIGHT") return 0;
+		return fallback;
+	}
+	function glow(ctx, x, y, r, color, a) {
+		if (a <= 0 || r <= 0) return;
+		const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+		g.addColorStop(0, rgba(color, a));
+		g.addColorStop(1, rgba(color, 0));
+		ctx.fillStyle = g;
+		ctx.fillRect(x - r, y - r, r * 2, r * 2);
+	}
+	/**
+	* The living Pac-Man: a soft body that stretches on the run, squashes on turns and bites,
+	* breathes when idle and swells when it swallows; a comet-like ribbon follows the path a
+	* little behind it. Looks: normal, energized (lit from inside like a deep-sea jelly) and
+	* berserk (blood, muscle, veins, fangs, steam). Used on every level.
+	*/
+	var PlayerView = class {
+		time = 0;
+		lastTime = -1;
+		angle = 0;
+		chomp = 0;
+		turnKick = 0;
+		squash = 0;
+		gulp = 0;
+		flash = 0;
+		flashColor = 16777215;
+		from = "normal";
+		look = "normal";
+		morph = 1;
+		speed = 0;
+		dyingTime = -1;
+		last = null;
+		history = [];
+		motes = [];
+		teleported = false;
+		trigger(cue) {
+			if (cue === "dot") this.gulp = Math.max(this.gulp, .7);
+			else if (cue === "energizer" || cue === "fruit-collect" || cue === "egg-collect") {
+				this.gulp = 1;
+				this.squash = .3;
+				this.setFlash(16777215);
+			} else if (cue === "ghost-eaten") {
+				this.gulp = 1;
+				this.setFlash(LOOKS[this.look].glow);
+			} else if (cue === "teleport") this.teleported = true;
+		}
+		/** BFG release: the body recoils and flashes. */
+		fireBurst() {
+			this.squash = .45;
+			this.setFlash(16777215);
+		}
+		reset() {
+			this.history = [];
+			this.motes = [];
+			this.last = null;
+			this.dyingTime = -1;
+			this.flash = 0;
+			this.gulp = 0;
+			this.squash = 0;
+		}
+		draw(ctx, player, layout, time, options = {
+			look: "normal",
+			charge: 0,
+			dying: false
+		}) {
+			const S = layout.tileSize;
+			const pos = player.position;
+			if (!(S > 0) || !Number.isFinite(pos.x) || !Number.isFinite(pos.y)) return;
+			const dt = this.lastTime < 0 ? 0 : Math.min(.1, Math.max(0, time - this.lastTime));
+			this.lastTime = time;
+			this.time += dt;
+			this.update(dt, player, options);
+			const cx = layout.offsetX + pos.x * S;
+			const cy = layout.offsetY + pos.y * S;
+			const L = this.palette();
+			ctx.save();
+			if (this.dyingTime >= 0) {
+				this.drawDeath(ctx, cx, cy, S, L);
+				ctx.restore();
+				return;
+			}
+			this.drawTrail(ctx, layout, L);
+			this.drawBody(ctx, cx, cy, S, L, options.charge, player.isInvulnerable);
+			ctx.restore();
+		}
+		setFlash(color) {
+			this.flash = 1;
+			this.flashColor = color;
+		}
+		update(dt, player, options) {
+			const pos = player.position;
+			if (options.dying) {
+				if (this.dyingTime < 0) {
+					this.dyingTime = 0;
+					this.history = [];
+				}
+				this.dyingTime += dt;
+				return;
+			}
+			if (this.dyingTime >= 0) this.reset();
+			if (options.look !== this.look) {
+				this.from = this.look;
+				this.look = options.look;
+				this.morph = 0;
+				this.squash = .35;
+				this.setFlash(LOOKS[options.look].glow);
+			}
+			this.morph = Math.min(1, this.morph + dt / MORPH_TIME);
+			this.flash = Math.max(0, this.flash - dt * 2.5);
+			this.squash = Math.max(0, this.squash - dt * 2);
+			this.gulp = Math.max(0, this.gulp - dt * 5);
+			this.turnKick = Math.max(0, this.turnKick - dt * 4);
+			const moved = this.last ? Math.hypot(pos.x - this.last.x, pos.y - this.last.y) : 0;
+			if (this.teleported || moved > 1.5) {
+				this.history = [];
+				this.teleported = false;
+			} else if (dt > 0) this.speed += (moved / dt - this.speed) * Math.min(1, dt * 10);
+			this.last = {
+				x: pos.x,
+				y: pos.y
+			};
+			const target = facingAngle(player.facing, this.angle);
+			let turn = target - this.angle;
+			while (turn > Math.PI) turn -= TAU;
+			while (turn < -Math.PI) turn += TAU;
+			if (Math.abs(turn) > 1 && this.turnKick <= 0) this.turnKick = 1;
+			this.angle = lerpAngle(this.angle, target, Math.min(1, dt * 45));
+			const running = this.speed > .5;
+			this.chomp += dt * (running ? 11 : 2.5);
+			const head = this.history[0];
+			if (!head || Math.hypot(head.x - pos.x, head.y - pos.y) > .05) this.history.unshift({
+				x: pos.x,
+				y: pos.y,
+				t: this.time
+			});
+			this.history = this.history.filter((h) => this.time - h.t < .6).slice(0, 48);
+			if (running && Math.random() < dt * 30) {
+				const a = this.angle + Math.PI + (Math.random() - .5) * 1.2;
+				this.motes.push({
+					x: pos.x + Math.cos(a) * .38,
+					y: pos.y + Math.sin(a) * .38,
+					vx: Math.cos(a) * .4,
+					vy: Math.sin(a) * .4 - .1,
+					life: .6,
+					max: .6,
+					s: .03 + Math.random() * .04
+				});
+			}
+			for (const m of this.motes) {
+				m.x += m.vx * dt;
+				m.y += m.vy * dt;
+				m.vx *= Math.pow(.94, dt * 60);
+				m.vy *= Math.pow(.94, dt * 60);
+				m.life -= dt;
+			}
+			this.motes = this.motes.filter((m) => m.life > 0);
+		}
+		palette() {
+			const a = LOOKS[this.from];
+			const b = LOOKS[this.look];
+			const t = ease(this.morph);
+			const out = {};
+			for (const key of Object.keys(a)) out[key] = mixHex(a[key], b[key], t);
+			return out;
+		}
+		weight(look) {
+			const t = ease(this.morph);
+			return (this.from === look ? 1 - t : 0) + (this.look === look ? t : 0);
+		}
+		/** Comet ribbon along the real path, so it bends neatly round corners. */
+		drawTrail(ctx, layout, L) {
+			const S = layout.tileSize;
+			const full = Math.min(1, this.speed / 6);
+			const maxLen = TRAIL_LENGTH * full * (this.look === "berserk" ? 1.15 : 1);
+			const pts = [];
+			let acc = 0;
+			let prev = this.last;
+			if (!prev || maxLen < .2) return;
+			pts.push([
+				layout.offsetX + prev.x * S,
+				layout.offsetY + prev.y * S,
+				0
+			]);
+			for (const h of this.history) {
+				const seg = Math.hypot(h.x - prev.x, h.y - prev.y);
+				if (seg < 1e-4) continue;
+				if (acc + seg > maxLen) {
+					const f = (maxLen - acc) / seg;
+					const x = prev.x + (h.x - prev.x) * f;
+					const y = prev.y + (h.y - prev.y) * f;
+					pts.push([
+						layout.offsetX + x * S,
+						layout.offsetY + y * S,
+						maxLen
+					]);
+					acc = maxLen;
+					break;
+				}
+				acc += seg;
+				pts.push([
+					layout.offsetX + h.x * S,
+					layout.offsetY + h.y * S,
+					acc
+				]);
+				prev = h;
+			}
+			const r = S * .42;
+			const start = .52;
+			if (acc <= start) return;
+			ctx.save();
+			ctx.globalCompositeOperation = "lighter";
+			ctx.lineCap = "round";
+			ctx.lineJoin = "round";
+			const layers = [[
+				L.trail2,
+				1.05,
+				.45,
+				"source-over"
+			], [
+				L.trail,
+				.45,
+				.85,
+				"lighter"
+			]];
+			for (const [color, wMul, aMul, op] of layers) {
+				ctx.globalCompositeOperation = op;
+				for (let i = 1; i < pts.length; i += 1) {
+					const d0 = pts[i - 1][2];
+					const d1 = pts[i][2];
+					if (d1 < start) continue;
+					const k = Math.pow(1 - (d1 - start) / Math.max(.01, acc - start), .8);
+					if (k <= 0) continue;
+					const f = d0 < start ? (start - d0) / (d1 - d0) : 0;
+					const x0 = pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * f;
+					const y0 = pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * f;
+					ctx.strokeStyle = rgba(color, aMul * k * full);
+					ctx.lineWidth = Math.max(.6, r * wMul * k);
+					ctx.beginPath();
+					ctx.moveTo(x0, y0);
+					ctx.lineTo(pts[i][0], pts[i][1]);
+					ctx.stroke();
+				}
+			}
+			for (const m of this.motes) {
+				const k = m.life / m.max;
+				glow(ctx, layout.offsetX + m.x * S, layout.offsetY + m.y * S, S * m.s * 1.2, L.trail, k * .5);
+			}
+			ctx.restore();
+		}
+		/** Soft wedge with rounded mouth corners (unit circle scaled to rx, ry). */
+		bodyPath(ctx, x, y, rx, ry, angle, mouth) {
+			ctx.save();
+			ctx.translate(x, y);
+			ctx.rotate(angle);
+			ctx.scale(rx, ry);
+			const c = .13;
+			ctx.beginPath();
+			ctx.moveTo(Math.cos(mouth) * c * 1.4, Math.sin(mouth) * c * .2);
+			ctx.lineTo(Math.cos(mouth) * .93, Math.sin(mouth) * .93);
+			ctx.quadraticCurveTo(Math.cos(mouth), Math.sin(mouth), Math.cos(mouth + .08), Math.sin(mouth + .08));
+			ctx.arc(0, 0, 1, mouth + .08, TAU - mouth - .08);
+			ctx.quadraticCurveTo(Math.cos(-mouth), Math.sin(-mouth), Math.cos(-mouth) * .93, Math.sin(-mouth) * .93);
+			ctx.lineTo(Math.cos(-mouth) * c * 1.4, -Math.sin(mouth) * c * .2);
+			ctx.quadraticCurveTo(-.13, 0, Math.cos(mouth) * c * 1.4, Math.sin(mouth) * c * .2);
+			ctx.closePath();
+			ctx.restore();
+		}
+		drawBody(ctx, cx, cy, S, L, charge, invulnerable) {
+			const t = this.time;
+			const r = S * .42;
+			const wE = this.weight("energized");
+			const wB = this.weight("berserk");
+			const running = this.speed > .5;
+			const open = Math.pow(Math.abs(Math.sin(this.chomp)), .8);
+			const mouth = Math.min(1.05, .08 + open * (.62 + wB * .08) + charge * .35);
+			const breathe = Math.sin(t * (2.2 + wB * 2.5)) * (.015 + wB * .03);
+			const run = running ? .05 : 0;
+			const squash = this.turnKick * .12 + this.squash * .2;
+			const swell = this.gulp * .06 + wB * .06 + charge * .08 * (1 + .3 * Math.sin(t * 40));
+			const rx = r * (1 + run - squash + swell + breathe - (1 - open) * .02);
+			const ry = r * (1 - run * .6 + squash * .8 + swell + breathe + (1 - open) * .03);
+			const a = this.angle;
+			const blink = invulnerable && Math.floor(t * 12) % 2 === 0;
+			ctx.globalAlpha = blink ? .5 : 1;
+			const shadow = ctx.createRadialGradient(cx, cy + r * .3, r * .3, cx, cy + r * .3, r * 1.15);
+			shadow.addColorStop(0, "rgba(0,0,0,.5)");
+			shadow.addColorStop(1, "rgba(0,0,0,0)");
+			ctx.fillStyle = shadow;
+			ctx.fillRect(cx - r * 1.2, cy - r * .9, r * 2.4, r * 2.4);
+			ctx.globalCompositeOperation = "lighter";
+			glow(ctx, cx, cy, r * 1.25, L.glow, .12 + wE * .3 + wB * .2 + charge * .3);
+			ctx.globalCompositeOperation = "source-over";
+			this.bodyPath(ctx, cx, cy, rx, ry, a, mouth);
+			const skin = ctx.createRadialGradient(cx - r * .3, cy - r * .38, r * .05, cx, cy, r * 1.05);
+			skin.addColorStop(0, rgba(L.skin0, 1));
+			skin.addColorStop(.5, rgba(L.skin1, 1));
+			skin.addColorStop(1, rgba(L.skin2, 1));
+			ctx.fillStyle = skin;
+			ctx.fill();
+			ctx.save();
+			this.bodyPath(ctx, cx, cy, rx, ry, a, mouth);
+			ctx.clip();
+			if (wE > .01) {
+				ctx.globalCompositeOperation = "lighter";
+				glow(ctx, cx - Math.cos(a) * r * .15, cy - Math.sin(a) * r * .15, r * .75, 16777215, .55 * wE);
+				for (let i = 0; i < 6; i += 1) {
+					const ang = i * 1.7 + t * .8;
+					const d = r * (.35 + .3 * Math.sin(t * 1.3 + i));
+					glow(ctx, cx + Math.cos(ang) * d, cy + Math.sin(ang) * d, r * .12, 6351103, (.5 + .5 * Math.sin(t * 5 + i)) * wE);
+				}
+				ctx.globalCompositeOperation = "source-over";
+			}
+			if (wB > .01) {
+				ctx.globalAlpha = wB * (blink ? .5 : 1);
+				ctx.strokeStyle = "rgba(40,0,0,.55)";
+				ctx.lineWidth = Math.max(1, r * .07);
+				for (const off of [.45, .72]) {
+					ctx.beginPath();
+					ctx.ellipse(cx, cy, rx * off, ry * off, a, Math.PI * .55, Math.PI * 1.45);
+					ctx.stroke();
+				}
+				ctx.strokeStyle = "rgba(255,120,100,.25)";
+				ctx.lineWidth = Math.max(1, r * .03);
+				for (const off of [.42, .69]) {
+					ctx.beginPath();
+					ctx.ellipse(cx - r * .03, cy - r * .03, rx * off, ry * off, a, Math.PI * .6, Math.PI * 1.2);
+					ctx.stroke();
+				}
+				ctx.strokeStyle = `rgba(110,0,10,${.8 * (.6 + .4 * Math.sin(t * 7))})`;
+				ctx.lineWidth = Math.max(1, r * .05);
+				ctx.lineCap = "round";
+				for (const [b0, len, wob] of [
+					[
+						2.3,
+						.6,
+						.3
+					],
+					[
+						3.5,
+						.55,
+						-.25
+					],
+					[
+						4.1,
+						.5,
+						.2
+					]
+				]) {
+					ctx.beginPath();
+					for (let i = 0; i <= 6; i += 1) {
+						const u = i / 6;
+						const ang = a + b0 + Math.sin(u * 5 + b0) * wob * .3;
+						const d = r * (.95 - u * len);
+						const px = cx + Math.cos(ang) * d;
+						const py = cy + Math.sin(ang) * d;
+						if (i === 0) ctx.moveTo(px, py);
+						else ctx.lineTo(px, py);
+					}
+					ctx.stroke();
+				}
+				ctx.globalAlpha = blink ? .5 : 1;
+			}
+			ctx.restore();
+			ctx.save();
+			ctx.translate(cx, cy);
+			ctx.rotate(a);
+			ctx.beginPath();
+			ctx.moveTo(-r * .06, 0);
+			ctx.arc(-r * .06, 0, rx * .9, -mouth * .92, mouth * .92);
+			ctx.closePath();
+			const throat = ctx.createRadialGradient(-r * .06, 0, 0, -r * .06, 0, rx * .9);
+			throat.addColorStop(0, rgba(charge > 0 ? 16777215 : L.mouth1, 1));
+			throat.addColorStop(charge > 0 ? .3 + .5 * (1 - charge) : 0, rgba(charge > 0 ? 16773312 : L.mouth1, 1));
+			throat.addColorStop(1, rgba(L.mouth0, 1));
+			ctx.fillStyle = throat;
+			ctx.fill();
+			if (open > .25 && charge <= 0) {
+				ctx.fillStyle = rgba(L.tongue, Math.min(1, (open - .25) * 2));
+				ctx.beginPath();
+				ctx.ellipse(r * .18, 0, r * .2 * open, r * .11 * open, 0, 0, TAU);
+				ctx.fill();
+			}
+			if (wB > .01) for (const side of [1, -1]) for (const u of [.55, .82]) {
+				const ex = Math.cos(mouth) * rx * u;
+				const ey = side * Math.sin(mouth) * rx * u;
+				const len = r * .2 * wB;
+				ctx.fillStyle = "#fff4e6";
+				ctx.beginPath();
+				ctx.moveTo(ex - r * .06, ey);
+				ctx.lineTo(ex + r * .06, ey);
+				ctx.lineTo(ex + r * .01, ey - side * len);
+				ctx.closePath();
+				ctx.fill();
+			}
+			ctx.restore();
+			ctx.save();
+			this.bodyPath(ctx, cx, cy, rx, ry, a, mouth);
+			ctx.clip();
+			const hl = ctx.createRadialGradient(cx - r * .38, cy - r * .45, 0, cx - r * .38, cy - r * .45, r * .45);
+			hl.addColorStop(0, `rgba(255,255,255,${.55 - wB * .3})`);
+			hl.addColorStop(1, "rgba(255,255,255,0)");
+			ctx.fillStyle = hl;
+			ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+			ctx.restore();
+			this.bodyPath(ctx, cx, cy, rx, ry, a, mouth);
+			ctx.lineWidth = Math.max(1, r * .05);
+			ctx.strokeStyle = rgba(L.rim, .75 + wE * .25);
+			if (wE > .5) ctx.globalCompositeOperation = "lighter";
+			ctx.stroke();
+			ctx.globalCompositeOperation = "source-over";
+			if (wB > .01) for (let k = 0; k < 4; k += 1) {
+				const u = (t * 1.2 + k / 4) % 1;
+				const px = cx + Math.sin(k * 2.1 + t) * r * .3;
+				const py = cy - r * (.7 + u * .55);
+				ctx.fillStyle = `rgba(200,180,170,${.25 * (1 - u) * wB})`;
+				ctx.beginPath();
+				ctx.arc(px, py, r * (.1 + u * .18), 0, TAU);
+				ctx.fill();
+			}
+			if (charge > 0) {
+				ctx.globalCompositeOperation = "lighter";
+				for (let k = 0; k < 8; k += 1) {
+					const u = (t * 2.2 + k / 8) % 1;
+					const ang = a + (k - 3.5) * .18;
+					const d = r * 1.25 * (1 - u);
+					glow(ctx, cx + Math.cos(ang) * d, cy + Math.sin(ang) * d, r * .14, 16777215, .8 * u * charge);
+				}
+				ctx.globalCompositeOperation = "source-over";
+			}
+			if (this.flash > 0) {
+				ctx.globalCompositeOperation = "lighter";
+				glow(ctx, cx, cy, r * (.9 + (1 - this.flash) * .35), this.flashColor, .8 * this.flash);
+				ctx.globalCompositeOperation = "source-over";
+			}
+			ctx.globalAlpha = 1;
+		}
+		/** Classic death, made alive: a shiver, then the mouth opens until nothing is left, a pop. */
+		drawDeath(ctx, cx, cy, S, L) {
+			const t = this.dyingTime;
+			const r = S * .42;
+			if (t < .35) {
+				const jitter = Math.sin(t * 90) * r * .04;
+				const g = ctx.createRadialGradient(cx - r * .3, cy - r * .38, r * .05, cx, cy, r);
+				g.addColorStop(0, rgba(L.skin0, 1));
+				g.addColorStop(1, rgba(L.skin2, 1));
+				this.bodyPath(ctx, cx + jitter, cy, r * (1 + .06 * Math.sin(t * 60)), r, -Math.PI / 2, .15);
+				ctx.fillStyle = g;
+				ctx.fill();
+				ctx.strokeStyle = rgba(L.rim, .9);
+				ctx.lineWidth = Math.max(1, r * .06);
+				ctx.stroke();
+				return;
+			}
+			const u = Math.min(1, (t - .35) / 1.1);
+			if (u < 1) {
+				const mouth = .15 + Math.pow(u, 1.6) * (Math.PI - .15);
+				const g = ctx.createRadialGradient(cx - r * .3, cy - r * .38, r * .05, cx, cy, r);
+				g.addColorStop(0, rgba(L.skin0, 1));
+				g.addColorStop(1, rgba(L.skin2, 1));
+				ctx.fillStyle = g;
+				ctx.beginPath();
+				ctx.moveTo(cx, cy);
+				ctx.arc(cx, cy, r * (1 - u * .15), -Math.PI / 2 + mouth, -Math.PI / 2 + TAU - mouth);
+				ctx.closePath();
+				ctx.fill();
+				ctx.strokeStyle = rgba(L.rim, .9);
+				ctx.lineWidth = Math.max(1, r * .06);
+				ctx.stroke();
+				return;
+			}
+			const p = Math.min(1, (t - 1.45) / .35);
+			if (p < 1) {
+				ctx.globalCompositeOperation = "lighter";
+				for (let i = 0; i < 8; i += 1) {
+					const ang = i / 8 * TAU;
+					const d = r * (.2 + p * .9);
+					glow(ctx, cx + Math.cos(ang) * d, cy + Math.sin(ang) * d, r * .18 * (1 - p), L.glow, 1 - p);
+				}
+				ctx.globalCompositeOperation = "source-over";
+			}
+		}
+	};
+	//#endregion
+	//#region src/games/pacman/render/items/collectibleSprite.ts
+	/** The larger side of a collectible's object (without its glow), in tiles. */
+	var COLLECTIBLE_EXTENT = .78;
+	/** How far anything drawn may reach from the tile centre, in tiles: the tile's own edge. */
+	var COLLECTIBLE_REACH = .5;
+	var cache = /* @__PURE__ */ new Map();
+	function makeCanvas(w, h) {
+		const c = document.createElement("canvas");
+		c.width = Math.max(1, Math.ceil(w));
+		c.height = Math.max(1, Math.ceil(h));
+		return c;
+	}
+	var canvasFilter = typeof CanvasRenderingContext2D !== "undefined" && "filter" in CanvasRenderingContext2D.prototype;
+	/** A blurred copy with room for the blur around it. Without canvas filters: down-up sampling. */
+	function blurred(src, sigma) {
+		const pad = Math.ceil(sigma * 3);
+		const out = makeCanvas(src.width + pad * 2, src.height + pad * 2);
+		const ctx = out.getContext("2d");
+		if (!ctx) return {
+			canvas: out,
+			pad
+		};
+		if (canvasFilter) {
+			ctx.filter = `blur(${sigma}px)`;
+			ctx.drawImage(src, pad, pad);
+			ctx.filter = "none";
+			return {
+				canvas: out,
+				pad
+			};
+		}
+		ctx.drawImage(src, pad, pad);
+		const k = Math.max(1, sigma / 1.5);
+		const small = makeCanvas(out.width / k, out.height / k);
+		const sctx = small.getContext("2d");
+		if (!sctx) return {
+			canvas: out,
+			pad
+		};
+		for (let pass = 0; pass < 2; pass++) {
+			sctx.clearRect(0, 0, small.width, small.height);
+			sctx.drawImage(out, 0, 0, small.width, small.height);
+			ctx.clearRect(0, 0, out.width, out.height);
+			ctx.drawImage(small, 0, 0, out.width, out.height);
+		}
+		return {
+			canvas: out,
+			pad
+		};
+	}
+	/** The box of the pixels with alpha ≥ `threshold`; the whole texture if it cannot be read. */
+	function measure(ctx, size, threshold) {
+		const half = size / 2;
+		let data;
+		try {
+			data = ctx.getImageData(0, 0, size, size).data;
+		} catch (error) {
+			console.error("collectibleSprite.measure", "cannot read the texture", error);
+			return {
+				x0: -half,
+				y0: -half,
+				x1: half,
+				y1: half
+			};
+		}
+		let x0 = size;
+		let y0 = size;
+		let x1 = -1;
+		let y1 = -1;
+		for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (data[(y * size + x) * 4 + 3] >= threshold) {
+			if (x < x0) x0 = x;
+			if (x > x1) x1 = x;
+			if (y < y0) y0 = y;
+			if (y > y1) y1 = y;
+		}
+		if (x1 < 0) return {
+			x0: -half,
+			y0: -half,
+			x1: half,
+			y1: half
+		};
+		return {
+			x0: x0 - half,
+			y0: y0 - half,
+			x1: x1 + 1 - half,
+			y1: y1 + 1 - half
+		};
+	}
+	var LAYER_VISIBLE = 10 / 3;
+	/** Every pixel of a bloom layer still visible at its brightest (`alpha`), in texture px. */
+	function bloomBounds(layer, k, half, alpha) {
+		const ctx = layer.canvas.getContext("2d");
+		if (!ctx) return null;
+		const w = layer.canvas.width;
+		const b = measure(ctx, w, Math.min(255, Math.ceil(LAYER_VISIBLE / Math.max(alpha, .001))));
+		const shift = w / 2 - half - layer.pad;
+		return {
+			x0: (b.x0 + shift) * k,
+			y0: (b.y0 + shift) * k,
+			x1: (b.x1 + shift) * k,
+			y1: (b.y1 + shift) * k
+		};
+	}
+	function union(a, b) {
+		return {
+			x0: Math.min(a.x0, b.x0),
+			y0: Math.min(a.y0, b.y0),
+			x1: Math.max(a.x1, b.x1),
+			y1: Math.max(a.y1, b.y1)
+		};
+	}
+	/**
+	* The object scale per tile px: its larger side `COLLECTIBLE_EXTENT` of the tile, smaller if
+	* the glow, at the largest breath and sway of its ticker, would reach past the tile's edge.
+	*/
+	function fitFor(art, bounds, glow) {
+		const cx = (bounds.x0 + bounds.x1) / 2;
+		const cy = (bounds.y0 + bounds.y1) / 2;
+		const corners = [
+			[glow.x0, glow.y0],
+			[glow.x1, glow.y0],
+			[glow.x0, glow.y1],
+			[glow.x1, glow.y1]
+		];
+		const motion = art.motion ?? fruitMotion;
+		let far = 0;
+		for (let t = 0; t < 30; t += 1 / 30) {
+			const m = motion(t);
+			const c = Math.cos(m.rotation);
+			const s = Math.sin(m.rotation);
+			for (const [px, py] of corners) {
+				const rx = (px * c - py * s) * m.scale - cx;
+				const ry = (px * s + py * c) * m.scale - cy;
+				far = Math.max(far, Math.abs(rx), Math.abs(ry));
+			}
+		}
+		const object = COLLECTIBLE_EXTENT / Math.max(1, bounds.x1 - bounds.x0, bounds.y1 - bounds.y0);
+		return far > 0 ? Math.min(object, COLLECTIBLE_REACH / far) : object;
+	}
+	function bake(art) {
+		if (typeof document === "undefined") return null;
+		const sprite = makeCanvas(art.size, art.size);
+		const ctx = sprite.getContext("2d");
+		if (!ctx) return null;
+		art.paint(ctx, art.size);
+		const blooms = art.blooms.map((b) => blurred(sprite, b.blur * .6 * art.size / b.size));
+		const bounds = measure(ctx, art.size, 128);
+		let glow = measure(ctx, art.size, Math.ceil(LAYER_VISIBLE));
+		const motion = art.motion ?? fruitMotion;
+		art.blooms.forEach((bloom, i) => {
+			let brightest = 0;
+			for (let t = 0; t < 30; t += 1 / 30) brightest = Math.max(brightest, motion(t).bloomAlpha[i]);
+			const b = bloomBounds(blooms[i], bloom.size / art.sprite, art.size / 2, Math.min(1, brightest));
+			if (b) glow = union(glow, b);
+		});
+		if (art.extraBounds) glow = union(glow, art.extraBounds);
+		return {
+			sprite,
+			bounds,
+			fit: fitFor(art, bounds, glow),
+			blooms
+		};
+	}
+	/** Pre-paints the textures (they are otherwise painted on first draw). */
+	function warmCollectible(art) {
+		if (!cache.has(art)) {
+			const baked = bake(art);
+			if (baked) cache.set(art, baked);
+		}
+	}
+	/**
+	* Draws the collectible on a tile `tile` px across, its object (bounds) centred at (x, y),
+	* animated by its ticker at `time`; the bloom layers are sized relative to the sprite as in
+	* the mock-up. `extra` draws inside the same transform, in texture px from the texture centre.
+	*/
+	function drawCollectible(ctx, art, x, y, tile, time, extra) {
+		warmCollectible(art);
+		const baked = cache.get(art);
+		if (!baked || !(tile > 0)) return;
+		const motion = (art.motion ?? fruitMotion)(time);
+		const b = baked.bounds;
+		const f = baked.fit * tile;
+		const half = art.size / 2;
+		ctx.save();
+		ctx.translate(x - (b.x0 + b.x1) / 2 * f, y - (b.y0 + b.y1) / 2 * f);
+		ctx.rotate(motion.rotation);
+		ctx.scale(f * motion.scale, f * motion.scale);
+		const alpha = ctx.globalAlpha;
+		ctx.globalAlpha = alpha * motion.alpha;
+		ctx.drawImage(baked.sprite, -half, -half);
+		ctx.globalCompositeOperation = "lighter";
+		art.blooms.forEach((bloom, i) => {
+			const layer = baked.blooms[i];
+			const k = bloom.size / art.sprite;
+			ctx.globalAlpha = alpha * Math.max(0, Math.min(1, motion.bloomAlpha[i]));
+			ctx.drawImage(layer.canvas, (-half - layer.pad) * k, (-half - layer.pad) * k, layer.canvas.width * k, layer.canvas.height * k);
+		});
+		ctx.globalAlpha = alpha;
+		extra?.(ctx);
+		ctx.restore();
+	}
+	/** The fruit mock-ups' ticker: slow breathing, a slight sway, the bloom shimmering. */
+	function fruitMotion(time) {
+		return {
+			scale: 1 + Math.sin(time * 1.5) * .03,
+			rotation: Math.sin(time * .8) * .04,
+			alpha: 1,
+			bloomAlpha: [.4 + Math.sin(time * 2) * .05, .2 + Math.sin(time * 1.5) * .03]
+		};
+	}
+	/**
+	* The fruit's bloom layers (sprite 240 px). The mock-ups' 280 and 340 px with blur 12 and 25
+	* spilled far past the tile; these hug the object (stage 10.1).
+	*/
+	var FRUIT_BLOOMS = [{
+		size: 252,
+		blur: 6
+	}, {
+		size: 276,
+		blur: 12
+	}];
+	/** Starts a design on a size × size texture: origin at the centre, 256 units across. */
+	function beginItem(ctx, size) {
+		ctx.save();
+		ctx.translate(size / 2, size / 2);
+		ctx.scale(size / 256, size / 256);
+		ctx.lineJoin = "round";
+		ctx.lineCap = "round";
+	}
+	/** Strokes every part wide in `color`: the silhouette's outline once the parts are filled. */
+	function outline(ctx, parts, color, width = 14) {
+		ctx.strokeStyle = color;
+		ctx.lineWidth = width;
+		for (const part of parts) {
+			part();
+			ctx.stroke();
+		}
+	}
+	/** A soft white highlight: an ellipse fading out from its centre. */
+	function gloss(ctx, x, y, rx, ry, rotation = 0, alpha = .9) {
+		const r = Math.max(rx, ry);
+		const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+		g.addColorStop(0, `rgba(255,255,255,${alpha})`);
+		g.addColorStop(1, "rgba(255,255,255,0)");
+		ctx.fillStyle = g;
+		ctx.beginPath();
+		ctx.ellipse(x, y, rx, ry, rotation, 0, Math.PI * 2);
+		ctx.fill();
+	}
+	/** A four-pointed white glint, `r` the core size (the points reach 3r). */
+	function sparkle(ctx, x, y, r, glow) {
+		ctx.save();
+		ctx.fillStyle = "rgba(255,255,255,0.95)";
+		ctx.shadowBlur = 6;
+		ctx.shadowColor = glow;
+		ctx.beginPath();
+		ctx.moveTo(x, y - r * 3);
+		ctx.lineTo(x + r * .7, y - r * .7);
+		ctx.lineTo(x + r * 3, y);
+		ctx.lineTo(x + r * .7, y + r * .7);
+		ctx.lineTo(x, y + r * 3);
+		ctx.lineTo(x - r * .7, y + r * .7);
+		ctx.lineTo(x - r * 3, y);
+		ctx.lineTo(x - r * .7, y - r * .7);
+		ctx.closePath();
+		ctx.fill();
+		ctx.restore();
+	}
+	//#endregion
+	//#region src/games/pacman/render/items/EasterEggView.ts
+	var OUTLINE = "rgba(60,20,70,0.95)";
+	var RX = 60;
+	var RY = 80;
+	var CY = 4;
+	function paint(ctx, size) {
+		beginItem(ctx, size);
+		const egg = () => {
+			ctx.beginPath();
+			ctx.moveTo(0, -76);
+			ctx.bezierCurveTo(RX * .72, -76, RX, CY - RY * .1, RX, 24);
+			ctx.bezierCurveTo(RX, 64, RX * .55, 84, 0, 84);
+			ctx.bezierCurveTo(-33, 84, -60, 64, -60, 24);
+			ctx.bezierCurveTo(-60, CY - RY * .1, -60 * .72, -76, 0, -76);
+			ctx.closePath();
+		};
+		const band = (y0, y1, color) => {
+			ctx.fillStyle = color;
+			ctx.fillRect(-64, CY + y0, 128, y1 - y0);
+		};
+		outline(ctx, [egg], OUTLINE);
+		const shell = ctx.createRadialGradient(-22, -26, 6, 0, CY, RY);
+		shell.addColorStop(0, "rgba(255,246,220,1)");
+		shell.addColorStop(.6, "rgba(255,226,170,1)");
+		shell.addColorStop(1, "rgba(220,170,120,1)");
+		ctx.fillStyle = shell;
+		ctx.shadowBlur = 10;
+		ctx.shadowColor = "rgba(255,160,220,0.8)";
+		egg();
+		ctx.fill();
+		ctx.shadowBlur = 0;
+		ctx.save();
+		egg();
+		ctx.clip();
+		band(-80, -44, "rgba(240,90,160,1)");
+		band(-30, -8, "rgba(140,100,230,1)");
+		ctx.fillStyle = "rgba(255,255,255,0.95)";
+		for (let x = -48; x <= 48; x += 16) {
+			ctx.beginPath();
+			ctx.arc(x, -16, 4, 0, Math.PI * 2);
+			ctx.fill();
+		}
+		ctx.fillStyle = "rgba(30,185,140,1)";
+		ctx.beginPath();
+		ctx.moveTo(-64, 8);
+		for (let i = 0; i <= 10; i++) ctx.lineTo(-60 + i * 12, CY + (i % 2 === 0 ? 4 : 20));
+		ctx.lineTo(64, 48);
+		for (let i = 10; i >= 0; i--) ctx.lineTo(-60 + i * 12, CY + (i % 2 === 0 ? 30 : 46));
+		ctx.closePath();
+		ctx.fill();
+		band(56, 84, "rgba(60,140,240,1)");
+		const shade = ctx.createLinearGradient(-60, 0, RX, 0);
+		shade.addColorStop(.5, "rgba(0,0,0,0)");
+		shade.addColorStop(1, "rgba(90,40,90,0.28)");
+		ctx.fillStyle = shade;
+		ctx.fillRect(-64, -80, 128, 168);
+		ctx.restore();
+		ctx.fillStyle = "rgba(255,240,120,1)";
+		for (let k = 0; k < 5; k++) {
+			const a = k * Math.PI * 2 / 5 - Math.PI / 2;
+			ctx.beginPath();
+			ctx.arc(Math.cos(a) * 7, -58 + Math.sin(a) * 7, 5, 0, Math.PI * 2);
+			ctx.fill();
+		}
+		ctx.fillStyle = "rgba(255,140,60,1)";
+		ctx.beginPath();
+		ctx.arc(0, -58, 4, 0, Math.PI * 2);
+		ctx.fill();
+		gloss(ctx, -26, -32, 12, 22, .35);
+		sparkle(ctx, 40, -36, 3, "rgba(255,220,250,1)");
+		ctx.restore();
+	}
+	/** Rocking on its base, a slow breath, the glow pulsing. */
+	function eggMotion(time) {
+		return {
+			scale: 1 + Math.sin(time * 2) * .03,
+			rotation: Math.sin(time * 2.4) * .12,
+			alpha: 1,
+			bloomAlpha: [.22 + Math.sin(time * 3) * .06, .1 + Math.sin(time * 2) * .03]
+		};
+	}
+	var EASTER_EGG_ART = {
+		size: 256,
+		paint,
+		sprite: 240,
+		blooms: FRUIT_BLOOMS,
+		motion: eggMotion
+	};
+	/** One Easter egg centred at (x, y) on a tile of `tileSize` px. */
+	function drawEasterEgg(ctx, x, y, tileSize, time) {
+		drawCollectible(ctx, EASTER_EGG_ART, x, y, tileSize, time);
+	}
+	var EasterEggView = class {
+		draw(ctx, egg, layout, time) {
+			if (!Number.isFinite(layout.tileSize) || layout.tileSize <= 0) {
+				console.error("EasterEggView.draw", "invalid layout tile size", layout.tileSize);
+				return;
+			}
+			if (egg.phase !== "egg") return;
+			const position = egg.eggPosition;
+			if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) {
+				console.error("EasterEggView.draw", "invalid egg position", position);
+				return;
+			}
+			drawEasterEgg(ctx, layout.offsetX + position.x * layout.tileSize, layout.offsetY + position.y * layout.tileSize, layout.tileSize, time);
+		}
+	};
+	//#endregion
+	//#region prototypes/pacman/easter-egg/main.ts
+	var $ = (id) => document.getElementById(id);
+	var view = $("view");
+	var ctx = view.getContext("2d");
+	var D = Math.min(window.devicePixelRatio || 1, 2);
+	var ZOOM = 3;
+	var STEPS = [
+		[
+			"UP",
+			0,
+			-1
+		],
+		[
+			"DOWN",
+			0,
+			1
+		],
+		[
+			"LEFT",
+			-1,
+			0
+		],
+		[
+			"RIGHT",
+			1,
+			0
+		]
+	];
+	var season = "spring";
+	var world;
+	var night = false;
+	var vw = 0;
+	var vh = 0;
+	var ghostView = new GhostView();
+	var playerView = new PlayerView();
+	var eggView = new EasterEggView();
+	var scene;
+	function buildScene() {
+		const grid = new GridService(new GridModel(GRID_01));
+		const events = new EventBus();
+		const score = new ScoreModel();
+		const progress = new LevelProgress(grid, score, events);
+		const player = new PlayerService(grid, progress, events);
+		const ghosts = new GhostService(grid, player, progress);
+		const lairCode = new LairCodeService(7, events);
+		const egg = new EasterEggService(7, grid, ghosts, lairCode, progress, events, score);
+		player.reset();
+		ghosts.reset();
+		return {
+			grid,
+			progress,
+			player,
+			ghosts,
+			lairCode,
+			egg,
+			solved: false,
+			doneFor: -1
+		};
+	}
+	/** The first step of a shortest walkable path from Pac-Man's tile to the goal. */
+	function stepTowards(goal) {
+		const { grid, player } = scene;
+		const start = player.tile;
+		if (start.x === goal.x && start.y === goal.y) return null;
+		const seen = /* @__PURE__ */ new Map();
+		const queue = [];
+		for (const [dir, dx, dy] of STEPS) {
+			const x = start.x + dx;
+			const y = start.y + dy;
+			if (grid.isPlayerWalkable(x, y) && !seen.has(`${x},${y}`)) {
+				seen.set(`${x},${y}`, dir);
+				queue.push({
+					x,
+					y
+				});
+			}
+		}
+		while (queue.length > 0) {
+			const at = queue.shift();
+			const first = seen.get(`${at.x},${at.y}`);
+			if (at.x === goal.x && at.y === goal.y) return first;
+			for (const [, dx, dy] of STEPS) {
+				const x = at.x + dx;
+				const y = at.y + dy;
+				if (grid.isPlayerWalkable(x, y) && !seen.has(`${x},${y}`)) {
+					seen.set(`${x},${y}`, first);
+					queue.push({
+						x,
+						y
+					});
+				}
+			}
+		}
+		return null;
+	}
+	function buildWorld() {
+		world = new MeadowWorld(GRID_01, meadowThemeFor(season));
+		world.resize(vw, vh, D);
+		world.setMood(night ? 1 : 0, night ? 1 : 0);
+		for (let i = 0; i < 80; i++) world.update(.1);
+		for (const b of document.querySelectorAll("[data-season]")) b.setAttribute("aria-pressed", String(b.dataset.season === season));
+	}
+	function layout() {
+		vw = window.innerWidth;
+		vh = window.innerHeight;
+		view.width = Math.round(vw * D);
+		view.height = Math.round(vh * D);
+		view.style.width = `${vw}px`;
+		view.style.height = `${vh}px`;
+		buildWorld();
+	}
+	for (const b of document.querySelectorAll("[data-season]")) b.addEventListener("click", () => {
+		season = b.dataset.season;
+		buildWorld();
+	});
+	$("night").addEventListener("click", () => {
+		night = !night;
+		$("night").setAttribute("aria-pressed", String(night));
+		world.setMood(night ? 1 : 0, night ? 1 : 0);
+	});
+	$("solve").addEventListener("click", () => {
+		if (scene.solved) return;
+		scene.solved = true;
+		for (const kind of [
+			"BLINKY",
+			"PINKY",
+			"INKY",
+			"CLYDE"
+		]) scene.lairCode.register(kind);
+	});
+	$("again").addEventListener("click", () => {
+		scene = buildScene();
+	});
+	scene = buildScene();
+	var time = 0;
+	var last = performance.now();
+	function frame(now) {
+		const dt = Math.min(.1, (now - last) / 1e3);
+		last = now;
+		time += dt;
+		const { grid, player, ghosts, lairCode, egg } = scene;
+		lairCode.update(dt);
+		grid.setLairOpen(egg.lairOpen);
+		if (scene.solved) {
+			const eggTile = grid.lairEggTile() ?? {
+				x: 12,
+				y: 12
+			};
+			const dir = stepTowards(egg.lairOpen ? eggTile : {
+				x: eggTile.x,
+				y: eggTile.y - 3
+			});
+			if (dir) player.setDesiredDirection(dir);
+		}
+		player.update(dt);
+		egg.update(dt, player);
+		ghosts.update(dt);
+		if (egg.phase === "spent") {
+			scene.doneFor = scene.doneFor < 0 ? 0 : scene.doneFor + dt;
+			if (scene.doneFor > 2) scene = buildScene();
+		}
+		world.update(dt);
+		ctx.setTransform(D, 0, 0, D, 0, 0);
+		ctx.globalAlpha = 1;
+		ctx.globalCompositeOperation = "source-over";
+		world.setLairGate(egg.doorOpen);
+		world.drawWorld(ctx, (x, y) => scene.progress.isCollected(x, y));
+		world.drawMood(ctx);
+		const L = world.layout;
+		const S = L.tileSize;
+		eggView.draw(ctx, egg, L, time);
+		ghostView.draw(ctx, ghosts, L, 0, false, egg.vanishProgress);
+		playerView.draw(ctx, player, L, time);
+		world.drawOverlay(ctx);
+		const srcW = 11 * S;
+		const srcH = 9 * S;
+		const boxW = Math.min(vw * .45, srcW * ZOOM, (vh - 260) / srcH * srcW);
+		const boxH = boxW / srcW * srcH;
+		const sx = (L.offsetX + 7 * S) * D;
+		const sy = (L.offsetY + 8 * S) * D;
+		const px = vw - boxW - 18;
+		const py = 18;
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		ctx.imageSmoothingEnabled = true;
+		ctx.drawImage(view, sx, sy, srcW * D, srcH * D, px * D, py * D, boxW * D, boxH * D);
+		ctx.setTransform(D, 0, 0, D, 0, 0);
+		ctx.strokeStyle = "rgba(255,255,255,.9)";
+		ctx.lineWidth = 2;
+		ctx.strokeRect(px, py, boxW, boxH);
+		const cell = 150;
+		ctx.fillStyle = "#06080e";
+		ctx.fillRect(18, 18, cell, 172);
+		drawEasterEgg(ctx, 93, 97, cell * .9, time);
+		ctx.fillStyle = "rgba(200,212,224,.75)";
+		ctx.font = "11px \"Courier New\", monospace";
+		ctx.textAlign = "center";
+		ctx.fillText(`EASTER EGG · ${egg.phase.toUpperCase()}`, 93, 182);
+		requestAnimationFrame(frame);
+	}
+	window.addEventListener("resize", layout);
+	layout();
+	requestAnimationFrame(frame);
+	//#endregion
+})();
+
+    </script>
+  </body>
+</html>

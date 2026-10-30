@@ -47,6 +47,8 @@ export class GhostService {
 	private msOverdriveValue = false;
 	private speedModifierValue = 1;
 	private visibleValue = true;
+	/** Sent away by the lair code: frozen where they were, out of play until the reset. */
+	private banishedValue = false;
 	/** The arcade round's waves and characters; null outside the secret level. */
 	private arcade: ArcadeRoundTuning | null = null;
 	private waveIndex = 0;
@@ -89,8 +91,23 @@ export class GhostService {
 		}
 	}
 
+	/** The ghosts in play: they move, collide and are drawn. */
 	get list(): readonly GhostModel[] {
-		return this.visibleValue ? this.ghosts : EMPTY_GHOST_LIST;
+		return this.visibleValue && !this.banishedValue ? this.ghosts : EMPTY_GHOST_LIST;
+	}
+
+	/** The ghosts the lair code sent away, frozen where they were (drawn while they vanish). */
+	get banishedList(): readonly GhostModel[] {
+		return this.visibleValue && this.banishedValue ? this.ghosts : EMPTY_GHOST_LIST;
+	}
+
+	get banished(): boolean {
+		return this.banishedValue;
+	}
+
+	/** The lair code is solved: every ghost stops and leaves play for the rest of the level. */
+	banish(): void {
+		this.banishedValue = true;
 	}
 
 	setVisible(value: boolean): void {
@@ -183,6 +200,7 @@ export class GhostService {
 		this.resetWaves();
 		this.powerActiveValue = false;
 		this.msOverdriveValue = false;
+		this.banishedValue = false;
 	}
 
 	private resetWaves(): void {
@@ -196,7 +214,7 @@ export class GhostService {
 			console.error('GhostService.update', 'invalid delta time', dt);
 			return;
 		}
-		if (!this.visibleValue) {
+		if (!this.visibleValue || this.banishedValue) {
 			return;
 		}
 		const safeDt = Math.min(0.25, Math.max(0, dt));

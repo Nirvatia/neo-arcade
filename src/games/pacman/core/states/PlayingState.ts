@@ -46,7 +46,7 @@ export class PlayingState implements GameState {
 		ctx.level.syncLairOpen();
 		player.update(dt);
 		fruit.update(dt, player);
-		// the arcade is plain Pac-Man: no golden egg, no echo
+		// the arcade is plain Pac-Man: no Easter egg, no echo
 		if (!ctx.level.secretMode) {
 			egg.update(dt, player);
 			echo.update(dt, player);

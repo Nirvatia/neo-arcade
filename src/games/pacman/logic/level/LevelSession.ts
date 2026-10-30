@@ -6,7 +6,7 @@ import { ScoreModel } from './ScoreModel';
 import { LevelProgress } from './LevelProgress';
 import { CombatService } from '../rules/CombatService';
 import { FruitService } from '../bonuses/FruitService';
-import { GoldenEggService } from '../bonuses/GoldenEggService';
+import { EasterEggService } from '../bonuses/EasterEggService';
 import { HypnosisService } from '../rules/HypnosisService';
 import { SpawnLocator } from '../maze/SpawnLocator';
 import { LairCodeService } from '../rules/LairCodeService';
@@ -44,7 +44,7 @@ export interface LevelSession {
 	readonly ghosts: GhostService;
 	readonly combat: CombatService;
 	readonly fruit: FruitService;
-	readonly egg: GoldenEggService;
+	readonly egg: EasterEggService;
 	readonly hypnosis: HypnosisService;
 	readonly echo: EchoCloneService;
 	readonly lairCode: LairCodeService;
@@ -82,7 +82,7 @@ export function buildLevelSession(request: LevelSessionRequest): LevelSession {
 	const hypnosis = new HypnosisService(score, lairCode);
 	const combat = new CombatService(player, ghosts, progress, score, events, hypnosis, lairCode);
 	const fruit = new FruitService(profile, level, grid, locator, progress, score, events);
-	const egg = new GoldenEggService(level, grid, lairCode, progress, events, score);
+	const egg = new EasterEggService(level, grid, ghosts, lairCode, progress, events, score);
 	const echo = new EchoCloneService(grid, progress, locator, events);
 	let doom: DoomSession | null = null;
 	if (hell) {

@@ -472,26 +472,7 @@ export function bakeMeadow(
 					k() * 3
 				);
 			}
-			if (t === 'LE') {
-				const lf = S[r][c - 1] !== 'LE';
-				const rt = S[r][c + 1] !== 'LE';
-				b.fillStyle = '#7a5636';
-				b.fillRect(x, y + T / 2 - 5, T, 10);
-				b.fillStyle = '#a07848';
-				for (let i = 0; i < 3; i++) {
-					b.fillRect(x, y + T / 2 - 4 + i * 3.3, T, 1.2);
-				}
-				b.fillStyle = '#4f3622';
-				if (lf) {
-					b.fillRect(x, y + T / 2 - 6, 4, 12);
-				}
-				if (rt) {
-					b.fillRect(x + T - 4, y + T / 2 - 6, 4, 12);
-				}
-				if (!lf && !rt) {
-					fl5(x + T / 2, y + T / 2 - 5, 2.6, '#d9333a', '#ffffff');
-				}
-			}
+			// the lair gate is live (MeadowWorld.drawGates): it slides open for the Easter egg
 			if (isTeleportToken(t)) {
 				TP.push([x, y, c]);
 			}

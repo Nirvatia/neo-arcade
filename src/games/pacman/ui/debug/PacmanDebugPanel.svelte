@@ -247,7 +247,7 @@
 					{/each}
 				</div>
 				<div class="row">
-					<button type="button" tabindex={-1} onclick={run((d) => d.spawnEgg())}>Golden egg</button>
+					<button type="button" tabindex={-1} onclick={run((d) => d.spawnEgg())}>Easter egg</button>
 					<button type="button" tabindex={-1} onclick={run((d) => d.spawnEcho())}>Echo</button>
 				</div>
 			{/if}

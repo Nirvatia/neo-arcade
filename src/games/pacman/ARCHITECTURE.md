@@ -22,7 +22,7 @@ logic/
   actors/    Player*, Ghost*, arcadeTargets (the arcade ghosts' characters)
   rules/     CombatService (contacts, power, lives / tries, hit-stop, near misses),
              HypnosisService (Ms. Pac-Man overdrive), LairCodeService
-  bonuses/   fruit, golden egg, echo clone, boss reward
+  bonuses/   fruit, Easter egg, echo clone, boss reward
   doom/      hell boss, weapons, hazards, fairness checks
   debug/     debugLog (dev log lines; no-op in production)
 render/
@@ -84,7 +84,7 @@ ui/          PacmanUi (HUD + screens + fade over the canvas), hud/ (GameHud, Arc
 menu ──fade──▶ ready(intro 5 s, jingle) ──▶ playing ──▶ death ──▶ ready(short 2 s)
                   ▲   skip: Enter                │  │          └─ no lives ─▶ game-over
                   │                              │  └─▶ level-clear (season turn) ─▶ ready(short)
-game-over ─fade───┘  (input locked 1 s)          └─ golden egg ──fade──▶ arcade ready(short)
+game-over ─fade───┘  (input locked 1 s)          └─ Easter egg ──fade──▶ arcade ready(short)
 hell: losing the fight (abyss) ──fade──▶ next level, ready(short)
 boss level: boss dies → heart + exit → taking either ends the level (level-clear)
 arcade: death ─▶ ready(short) | last try ─fade─▶ main game; level-clear: flash
@@ -129,6 +129,8 @@ still takes it (`LATE_TURN`). Tests: `logic/actors/playerControl.test.ts`.
 - `logic/doom/doomMechanics.test.ts` — pickups, BFG, minions, attack sets per phase,
   fairness (rift, eruption, seals), maze stays connected.
 - `logic/bonuses/bossReward.test.ts` — heart and exit.
+- `logic/bonuses/easterEgg.test.ts` — the egg in the lair's centre, the vanish → gate →
+  egg order, banished ghosts frozen, nothing outside level 7.
 - `logic/level/arcade.test.ts` — tries, rounds, intermission, restart, ghost characters.
 - `logic/rules/fx.test.ts` — fx events, hit-stop, near misses.
 - `render/transitions/decay/decay.test.ts` — the decay field and timeline.
@@ -140,4 +142,5 @@ New art and effects start as a page built from the game's own sources:
 `node prototypes/pacman/build.mjs <name>` into `prototypes/pacman/<name>.html` (open as a
 file). The approved prototype already is the game code. Existing: `hell`, `arcade`,
 `hud`, `collectibles` (with each item's reach from its tile centre and a tile grid),
-`ms-pacman`, `level-clear`; `winter-decay.html` is an older standalone page.
+`ms-pacman`, `level-clear`, `easter-egg` (the lair code's reward played by the real
+services); `winter-decay.html` is an older standalone page.

@@ -4,7 +4,7 @@ import type { GhostService } from '../actors/GhostService';
 import type { LevelProgress } from './LevelProgress';
 import type { CombatService } from '../rules/CombatService';
 import type { FruitService } from '../bonuses/FruitService';
-import type { GoldenEggService } from '../bonuses/GoldenEggService';
+import type { EasterEggService } from '../bonuses/EasterEggService';
 import type { HypnosisService } from '../rules/HypnosisService';
 import type { BossRewardService } from '../bonuses/BossRewardService';
 import type { LairCodeService } from '../rules/LairCodeService';
@@ -143,7 +143,7 @@ export class LevelLoader {
 		return this.sessionValue?.fruit ?? null;
 	}
 
-	get egg(): GoldenEggService | null {
+	get egg(): EasterEggService | null {
 		return this.sessionValue?.egg ?? null;
 	}
 
@@ -245,7 +245,8 @@ export class LevelLoader {
 	syncLairOpen(): void {
 		const session = this.sessionValue;
 		if (session) {
-			session.grid.setLairOpen(session.lairCode.open);
+			// the lair opens when the Easter egg's gate has slid open, not with the code itself
+			session.grid.setLairOpen(session.egg.lairOpen);
 		}
 	}
 

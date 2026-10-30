@@ -76,6 +76,7 @@ export class MeadowLevelRenderer implements LevelRenderer, WorldPreview {
 		if (amp > 0 && !frame.paused) {
 			ctx.translate((Math.random() - 0.5) * amp, (Math.random() - 0.5) * amp);
 		}
+		world.setLairGate(level.egg?.doorOpen ?? 0);
 		world.drawWorld(ctx, (x, y) => progress.isCollected(x, y));
 		world.drawMood(ctx);
 		// on level clear only the world: the season turn flips it over, actors stay out
@@ -95,7 +96,8 @@ export class MeadowLevelRenderer implements LevelRenderer, WorldPreview {
 						? combat.powerTimer
 						: 0;
 				const overdrive = Boolean(isMs && hypnosis && hypnosis.overdriveActive);
-				this.ghostView.draw(ctx, ghosts, layout, ghostTimer, overdrive);
+				const vanish = level.egg?.vanishProgress ?? 0;
+				this.ghostView.draw(ctx, ghosts, layout, ghostTimer, overdrive, vanish);
 			}
 			if (state !== 'death') {
 				// while dying, the pipeline draws Pac-Man over the level decay
@@ -114,6 +116,7 @@ export class MeadowLevelRenderer implements LevelRenderer, WorldPreview {
 		const world = this.worldFor(frame.season);
 		world.resize(frame.width, frame.height, frame.pixelRatio);
 		world.setMood(0, 0);
+		world.setLairGate(0);
 		if (!frame.paused) {
 			world.update(frame.dt);
 		}

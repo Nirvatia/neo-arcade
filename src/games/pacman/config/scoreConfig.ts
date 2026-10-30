@@ -7,7 +7,7 @@ export interface ScoreTable {
 	readonly hypnosis: number;
 	readonly hypnosisTransfer: number;
 	readonly fruit: Record<FruitKind, number>;
-	readonly goldenEgg: number;
+	readonly easterEgg: number;
 	readonly goldenExitDotValue: number;
 	readonly levelClear: number;
 	readonly perfectClear: number;
@@ -34,7 +34,7 @@ export const SCORE_TABLE: ScoreTable = {
 		BELL: 3000,
 		KEY: 5000
 	},
-	goldenEgg: 500,
+	easterEgg: 500,
 	goldenExitDotValue: 20,
 	levelClear: 1000,
 	perfectClear: 2000,

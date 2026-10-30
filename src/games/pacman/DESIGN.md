@@ -65,13 +65,15 @@ backs off up close (`logic/actors/GhostService.ts`). Their eyes look where they 
   time (12–14 s), blinking as it runs out. The kind follows the level: cherry 100,
   strawberry 300, orange 500, pretzel 500, apple 700, pear 1000, melon 1000, Galaxian 2000,
   bell 3000, key 5000 (then key). Ms. Pac-Man gets a random fruit.
-- **Lair code and the golden egg** (level 7): eat (or, for Ms. Pac-Man, hypnotise) the
-  ghosts in the order Blinky, Pinky, Inky, Clyde and the lair opens; a second later the egg
-  appears. Taking it turns the remaining dots into points, adds 500 and leads into the
-  arcade. *Planned (stage 10.2)*: the ghosts stop and vanish with an animation, the lair
-  door opens and Pac-Man walks in to an Easter egg.
+- **Lair code and the Easter egg** (level 7): eat (or, for Ms. Pac-Man, hypnotise) the
+  ghosts in the order Blinky, Pinky, Inky, Clyde. Every ghost stops and vanishes (1.2 s:
+  it swells, shrinks and rises as it fades, sparks in its colour) and is gone for the rest
+  of the level; the lair gate slides into its posts (0.8 s); the Easter egg appears in the
+  lair's centre, between the ghosts' spawns. Pac-Man walks in and takes it: the remaining
+  dots turn into points, +500, and the arcade starts. Clearing the dots first just ends
+  the level.
 - **Echo clone**: at 60 % of the dots a token appears for 8 s; taking it releases one clone
-  of Pac-Man for 4 s that runs to the densest dots and eats them. *Planned (stage 10.6)*:
+  of Pac-Man for 4 s that runs to the densest dots and eats them. _Planned (stage 10.6)_:
   a rare bonus at a random place that sets off a riot of 7–9 clones for 2–3 s, eating
   everything they find and dying on ghosts.
 
@@ -139,7 +141,7 @@ chiptune sound (`config/arcadeConfig.ts`).
 - Energizer: a shockwave, the season's particles, an edge pulse. Fruit and egg: a burst of
   the season's particles and a pop-up. Extra life: "1UP". A ghost brushing past: a whoosh.
 - One style for all seasons, coloured by the season. The hell and the arcade keep their
-  own effects. *Planned (stage 10.7)*: livelier rings, a teleport effect, new teleporters.
+  own effects. _Planned (stage 10.7)_: livelier rings, a teleport effect, new teleporters.
 
 ## 10. Flow and screens
 
@@ -181,16 +183,16 @@ scared loop. The arcade synthesises its own (`audio/ArcadeSynth.ts`).
 
 ### Art status
 
-| Element | State |
-| --- | --- |
-| Seasons (world, food, weather, night), season turn, death decay | final; decay background to rework (10.9) |
-| Hell world, Blinky lord of hell, imps, weapons | final; phase-3 lighting and corrupted tiles to rework (10.8) |
-| Arcade | final |
-| HUD and screens | final |
-| Fruit, heart, exit | final (inside the tile, calm glow) |
-| Easter egg | missing (10.2) |
-| Pac-Man | to redo (10.3) |
-| Ms. Pac-Man | to finish: brighter, cuter, readable, calmer overdrive (10.4) |
-| Season ghosts | missing: one generic look today (10.5) |
-| Echo clone | to redo (10.6) |
-| Teleporters, ring effects | to improve (10.7) |
+| Element                                                         | State                                                         |
+| --------------------------------------------------------------- | ------------------------------------------------------------- |
+| Seasons (world, food, weather, night), season turn, death decay | final; decay background to rework (10.9)                      |
+| Hell world, Blinky lord of hell, imps, weapons                  | final; phase-3 lighting and corrupted tiles to rework (10.8)  |
+| Arcade                                                          | final                                                         |
+| HUD and screens                                                 | final                                                         |
+| Fruit, heart, exit                                              | final (inside the tile, calm glow)                            |
+| Easter egg                                                      | final: a painted egg (pink, lilac, mint, blue)                |
+| Pac-Man                                                         | to redo (10.3)                                                |
+| Ms. Pac-Man                                                     | to finish: brighter, cuter, readable, calmer overdrive (10.4) |
+| Season ghosts                                                   | missing: one generic look today (10.5)                        |
+| Echo clone                                                      | to redo (10.6)                                                |
+| Teleporters, ring effects                                       | to improve (10.7)                                             |

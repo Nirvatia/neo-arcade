@@ -5,7 +5,7 @@ import type { PacmanAudioCue } from '../core/Events';
 import type { PlayerDrawOptions } from './actors/PlayerView';
 import { EchoCloneView } from './actors/EchoCloneView';
 import { FruitView } from './items/fruit/FruitView';
-import { GoldenEggView } from './items/GoldenEggView';
+import { EasterEggView } from './items/EasterEggView';
 import { drawBonusLife } from './items/BonusLifeView';
 import { drawExit } from './items/ExitView';
 import type { RenderFrame } from './RenderFrame';
@@ -19,7 +19,7 @@ export class SharedLayers {
 	readonly playerView = new PlayerView();
 	private readonly msPacmanView = new MsPacmanView();
 	private readonly fruitView = new FruitView();
-	private readonly goldenEggView = new GoldenEggView();
+	private readonly easterEggView = new EasterEggView();
 	private readonly echoCloneView = new EchoCloneView();
 
 	drawCollectibles(frame: RenderFrame, layout: GridLayout): void {
@@ -31,7 +31,7 @@ export class SharedLayers {
 
 		const egg = level.egg;
 		if (egg && egg.phase === 'egg') {
-			this.goldenEggView.draw(ctx, egg, layout);
+			this.easterEggView.draw(ctx, egg, layout, frame.time);
 		}
 
 		const echo = level.echo;

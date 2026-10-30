@@ -23,11 +23,7 @@ the owner says to go straight into the game.
     or several small ones together; the order below is a suggestion.
     1. ~~**Fruit.**~~ Done: the fruit, the heart and the exit stay inside their tile with
        a calm glow (see Done).
-    2. **Easter egg + its mechanic.** No art today (`GoldenEggView` is a stand-in): draw
-       an Easter egg. Mechanic: the lair code (`LairCodeService`, the right order of
-       eaten ghosts) should make the ghosts stop and vanish with an animation; then the
-       lair door opens and Pac-Man walks in to the egg (today the egg appears on the
-       board and taking it starts the arcade, `GoldenEggService`).
+    2. ~~**Easter egg + its mechanic.**~~ Done (see Done).
     3. **Pac-Man art**, redone completely (was stage 4). `render/actors/PlayerView.ts`;
        keep the design decisions (organic, wedge mouth, no eyes, ribbon trail) unless
        the owner changes them.
@@ -62,13 +58,13 @@ the owner says to go straight into the game.
          level starts (`RenderPipeline`, drawn while `lights` + `turn` run); hide him
          during the animation and spawn him once the new level is in place.
 
-8. **New boss worlds, every 5th level.** Level 5 stays the hell; levels 10, 15, … get new
-   worlds, each like the hell (`*Bake` + `*World` + a level renderer with `preview()`), its
-   own boss and mechanics, a decay palette and a season-turn style
-   (`RenderPipeline.turnStyle`).
-9. **Global refactor to solid game-dev code**, or local refactors if the code by then is
-   already sound. Candidates known today: the large files listed under Known issues,
-   `DecayPass` onto `GlPass`, states still using nullable `LevelLoader` getters.
+11. **New boss worlds, every 5th level.** Level 5 stays the hell; levels 10, 15, … get new
+    worlds, each like the hell (`*Bake` + `*World` + a level renderer with `preview()`), its
+    own boss and mechanics, a decay palette and a season-turn style
+    (`RenderPipeline.turnStyle`).
+12. **Global refactor to solid game-dev code**, or local refactors if the code by then is
+    already sound. Candidates known today: the large files listed under Known issues,
+    `DecayPass` onto `GlPass`, states still using nullable `LevelLoader` getters.
 
 ## Known issues
 
@@ -100,3 +96,8 @@ the owner says to go straight into the game.
   a heart) and the pear (read as a lemon), and at the owner's request every other item
   (cherry, orange, pretzel, apple, melon, Galaxian, the heart with a plus, the exit): one
   outlined style, painted with `render/common/itemPaint`.
+- 10.2 the Easter egg (sixth chat): `GoldenEgg*` renamed `EasterEgg*`; the solved lair
+  code banishes the ghosts (`GhostService.banish`, a vanish animation in `GhostView`), the
+  lair gate (now live in `MeadowWorld`, no longer baked) slides open, and a painted Easter
+  egg waits in the lair's centre for Pac-Man. Tests: `logic/bonuses/easterEgg.test.ts`;
+  prototype: `easter-egg`.

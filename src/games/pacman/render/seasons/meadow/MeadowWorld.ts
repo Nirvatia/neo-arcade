@@ -73,6 +73,9 @@ export class MeadowWorld {
 	private readonly pellets: Array<Point & { r: number; c: number }> = [];
 	private readonly energizers: Array<Point & { r: number; c: number; ph: number }> = [];
 	private readonly portals: Array<Point & { i: number; ph: number }> = [];
+	/** Lair gates: runs of LE tiles, world units from x0 to x1 at height y. */
+	private readonly gates: Array<{ x0: number; x1: number; y: number }> = [];
+	private gateOpen = 0;
 	private readonly glints: Array<Point & { ph: number }> = [];
 	private readonly smoke: Array<{ cx: number; cy: number; u: number; ph: number }> = [];
 	private readonly lights: Light[] = [];
@@ -131,6 +134,19 @@ export class MeadowWorld {
 				}
 			})
 		);
+		S.forEach((row, r) => {
+			let start = -1;
+			row.forEach((tt, c) => {
+				if (tt === 'LE' && start < 0) {
+					start = c;
+				}
+				if (start >= 0 && (tt !== 'LE' || c === row.length - 1)) {
+					const end = tt === 'LE' ? c + 1 : c;
+					this.gates.push({ x0: start * T, x1: end * T, y: (r + 0.5) * T });
+					start = -1;
+				}
+			});
+		});
 		const lair = ctr(Math.floor((this.R - 1) / 2), Math.floor((this.C - 1) / 2));
 		this.lights.push({ ...lair, r: 3.4 * T, tint: 0xffd9a0, a: 0.4, flicker: false });
 		for (let i = 0; i < 22; i++) {
@@ -172,6 +188,11 @@ export class MeadowWorld {
 	/** Board placement for the actors: one tile = MEADOW_TILE world units. */
 	get layout(): GridLayout {
 		return { tileSize: T * this.sc, offsetX: this.wx, offsetY: this.wy };
+	}
+
+	/** How far the lair gate is open, 0 (shut) .. 1 (slid into its posts). */
+	setLairGate(open: number): void {
+		this.gateOpen = Number.isFinite(open) ? Math.max(0, Math.min(1, open)) : 0;
 	}
 
 	/** Weather and night targets, 0..1; both ease in and out like the mock-up toggles. */
@@ -273,6 +294,7 @@ export class MeadowWorld {
 				this.bg.height / this.bgRS
 			);
 		}
+		this.drawGates(ctx);
 		const pellet = live.pellet.texture();
 		const ps = live.pellet.size;
 		for (const p of this.pellets) {
@@ -320,6 +342,51 @@ export class MeadowWorld {
 			);
 		}
 		ctx.restore();
+	}
+
+	/**
+	 * The lair gate, as the bake used to paint it: a plank bar between two dark posts with a
+	 * flower in the middle. Opening, each half slides into its post and the flower fades.
+	 */
+	private drawGates(ctx: CanvasRenderingContext2D): void {
+		const o = this.gateOpen;
+		for (const g of this.gates) {
+			const mid = (g.x0 + g.x1) / 2;
+			const half = (mid - g.x0) * (1 - o);
+			for (const [from, dir] of [
+				[g.x0, 1],
+				[g.x1, -1]
+			] as const) {
+				const left = dir > 0 ? from : from - half;
+				if (half > 0.01) {
+					ctx.fillStyle = '#7a5636';
+					ctx.fillRect(left, g.y - 5, half, 10);
+					ctx.fillStyle = '#a07848';
+					for (let i = 0; i < 3; i++) {
+						ctx.fillRect(left, g.y - 4 + i * 3.3, half, 1.2);
+					}
+				}
+				ctx.fillStyle = '#4f3622';
+				ctx.fillRect(dir > 0 ? from : from - 4, g.y - 6, 4, 12);
+			}
+			if (o < 1) {
+				ctx.save();
+				ctx.globalAlpha *= 1 - o;
+				const r = 2.6;
+				ctx.fillStyle = '#d9333a';
+				for (let k = 0; k < 5; k++) {
+					const a = k * 1.2566 + 0.3;
+					ctx.beginPath();
+					ctx.arc(mid + Math.cos(a) * r * 0.7, g.y - 5 + Math.sin(a) * r * 0.7, r * 0.6, 0, 7);
+					ctx.fill();
+				}
+				ctx.fillStyle = '#ffffff';
+				ctx.beginPath();
+				ctx.arc(mid, g.y - 5, r * 0.38, 0, 7);
+				ctx.fill();
+				ctx.restore();
+			}
+		}
 	}
 
 	/** Atmosphere under the actors: mist, rays, light, drift, wash, weather haze, night. */

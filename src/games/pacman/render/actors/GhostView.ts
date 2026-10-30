@@ -8,7 +8,8 @@ export class GhostView {
 		ghosts: GhostService,
 		layout: GridLayout,
 		powerTimer: number,
-		msOverdrive: boolean
+		msOverdrive: boolean,
+		vanish = 0
 	): void {
 		if (!Number.isFinite(layout.tileSize) || layout.tileSize <= 0) {
 			console.error('GhostView.draw', 'invalid layout tile size', layout.tileSize);
@@ -16,6 +17,55 @@ export class GhostView {
 		}
 		for (const ghost of ghosts.list) {
 			this.drawGhost(ctx, ghost, layout, powerTimer, msOverdrive);
+		}
+		if (vanish < 1) {
+			for (const ghost of ghosts.banishedList) {
+				this.drawVanishing(ctx, ghost, layout, powerTimer, msOverdrive, vanish);
+			}
+		}
+	}
+
+	/**
+	 * A ghost the lair code sent away (`p` 0..1): it stops, swells a little, then shrinks
+	 * and rises as it fades, while sparks in its colour fly out and go out.
+	 */
+	private drawVanishing(
+		ctx: CanvasRenderingContext2D,
+		ghost: GhostModel,
+		layout: GridLayout,
+		powerTimer: number,
+		msOverdrive: boolean,
+		p: number
+	): void {
+		const t = Math.max(0, Math.min(1, p));
+		const S = layout.tileSize;
+		const position = ghost.position;
+		const x = layout.offsetX + position.x * S;
+		const y = layout.offsetY + position.y * S;
+		const fade = t < 0.25 ? 1 : 1 - (t - 0.25) / 0.75;
+		const scale = t < 0.25 ? 1 + t * 0.6 : 1.15 * fade;
+		if (fade > 0) {
+			ctx.save();
+			ctx.globalAlpha *= fade;
+			ctx.translate(x, y - t * t * S * 0.35);
+			ctx.scale(scale, scale);
+			ctx.translate(-x, -y);
+			this.drawGhost(ctx, ghost, layout, powerTimer, msOverdrive);
+			ctx.restore();
+		}
+		if (t > 0.2) {
+			const k = (t - 0.2) / 0.8;
+			ctx.save();
+			ctx.globalCompositeOperation = 'lighter';
+			ctx.globalAlpha *= 1 - k;
+			ctx.fillStyle = this.colorFor(ghost.kind);
+			for (let i = 0; i < 8; i++) {
+				const a = (i / 8) * Math.PI * 2 + ghost.kind.length;
+				const r = S * (0.15 + k * 0.45);
+				const side = Math.max(1, S * 0.12 * (1 - k * 0.6));
+				ctx.fillRect(x + Math.cos(a) * r - side / 2, y + Math.sin(a) * r - side / 2, side, side);
+			}
+			ctx.restore();
 		}
 	}
 

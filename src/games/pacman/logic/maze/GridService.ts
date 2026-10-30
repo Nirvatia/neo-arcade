@@ -151,11 +151,22 @@ export class GridService {
 		return this.voidBlockedTiles.has(`${x},${y}`);
 	}
 
+	/** The lair's centre: the tile between the ghosts' spawns, else the first lair tile. */
 	lairEggTile(): GridPoint | null {
 		if (this.lairEggTileResolved) {
 			return this.lairEggTileValue;
 		}
 		this.lairEggTileResolved = true;
+		const spawns = Object.values(this.ghostSpawns);
+		if (spawns.length > 0) {
+			const x = Math.round(spawns.reduce((sum, p) => sum + p.x, 0) / spawns.length);
+			const y = Math.round(spawns.reduce((sum, p) => sum + p.y, 0) / spawns.length);
+			if (this.isInside(x, y) && isLairToken(this.tileAt(x, y))) {
+				this.lairEggTileValue = { x, y };
+				return this.lairEggTileValue;
+			}
+			console.warn('GridService.lairEggTile', 'the spawns centre is not a lair tile', { x, y });
+		}
 		for (let y = 0; y < this.height; y += 1) {
 			for (let x = 0; x < this.width; x += 1) {
 				if (this.tileAt(x, y) === 'LT') {
