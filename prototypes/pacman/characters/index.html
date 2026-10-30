@@ -4,31 +4,21 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
     <title>Pac-Man · Characters</title>
-    <!-- Prototype: Pac-Man and Ms. Pac-Man concepts (stage 10.3/10.4). Each concept pair is
-         shown large on a dark strip (normal and under the energizer) and running in the real
-         maze at game scale, with a close-up. Built from the sources:
-         `node prototypes/pacman/build.mjs characters`; open as a file. -->
+    <!-- Prototype: Pac-Man and Ms. Pac-Man (stage 10.3/10.4), one design each, shaded per
+         pixel in WebGL2: large on the left, in the summer maze at game scale on the right.
+         Built from the sources: `node prototypes/pacman/build.mjs characters`; open as a
+         file. -->
     <style>
       html,body{height:100%;margin:0;overflow:hidden;background:#1a1a14}
       #view{position:fixed;inset:0;display:block}
       #ctl{position:fixed;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:5;display:flex;flex-wrap:wrap;justify-content:center;gap:8px;width:calc(100vw - 32px);max-width:860px}
       .bt{border:0;cursor:pointer;padding:9px 14px;border-radius:999px;font:700 14px "Trebuchet MS","Segoe UI",system-ui,sans-serif;color:#2a2410;background:linear-gradient(#fffaf0,#f2e2b8);box-shadow:0 3px 0 #c9ac62,0 8px 14px rgba(40,30,10,.22)}
       .bt[aria-pressed="true"]{transform:translateY(2px);color:#fff;background:linear-gradient(#e0a838,#a8721a);box-shadow:0 1px 0 #5a3a08,0 0 14px rgba(255,200,80,.6)}
-      #note{position:fixed;left:50%;transform:translateX(-50%);top:0;z-index:5;max-width:min(860px,calc(100vw - 32px));font:600 13px "Trebuchet MS",system-ui,sans-serif;color:#f4ecd8;text-align:center;text-shadow:0 1px 2px #000}
     </style>
   </head>
   <body>
     <canvas id="view"></canvas>
-    <div id="note"></div>
     <div id="ctl">
-      <button class="bt" data-concept="0">A</button>
-      <button class="bt" data-concept="1">B</button>
-      <button class="bt" data-concept="2">C</button>
-      <button class="bt" data-season="summer">Лето</button>
-      <button class="bt" data-season="autumn">Осень</button>
-      <button class="bt" data-season="winter">Зима</button>
-      <button class="bt" data-season="spring">Весна</button>
-      <button class="bt" id="night" aria-pressed="false">☾ Ночь</button>
       <button class="bt" id="power">⚡ Энерджайзер</button>
       <button class="bt" id="stop" aria-pressed="false">■ Стоп</button>
     </div>
