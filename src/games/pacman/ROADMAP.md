@@ -127,7 +127,8 @@ and covers the canvas only (Svelte buttons stay on top); replace it there.
 
 - Headless Chromium without a GPU runs the hell night at ~20 FPS (the reference prototype
   ~26); JS cost is ~2 ms/frame, the rest is software rasterisation. Check on real hardware.
-- Art not final: Pac-Man (plan stage 4), fruit and ghosts (stage 1).
+- Art not final: fruit, the Easter egg, Pac-Man, Ms. Pac-Man, the season ghosts, the echo
+  clone, the teleporters (plan stage 10).
 - Regular levels have no Svelte HUD (only the canvas top bar); plan stage 5 adds one.
 - `DecayPass` still has its own WebGL boilerplate; move it onto `render/common/GlPass`
   (the season turn already uses it) when the decay is next touched.
@@ -150,10 +151,11 @@ and covers the canvas only (Svelte buttons stay on top); replace it there.
 
 ## Plan (v2, set by the owner after plan v1)
 
-Order matters; new boss worlds come last. **Owner's order after stage 3: 6 → 7 → 8 → 9
-→ 4** (6 and 7 done) (5 and 3 are done; the secret level comes next, the Pac-Man art and its pre-game
-blink move to the very end); the numbers below stay as they are. Each art or effect stage starts with a prototype
-on the real game code for the owner to approve.
+Order matters; new boss worlds come last. **Owner's order after stage 7: 10 → 8 → 9.**
+Done: 2, 3, 5, 6, 7. Stage 10 (art and polish) comes next; it takes over the open art of
+stage 1 and all of stage 4. The numbers below stay as they are. Each art or effect step
+starts with a prototype on the real game code for the owner to approve, unless the owner
+says to go straight into the game (as for stage 7).
 
 1. **Migrate the remaining art.**
    - Ms. Pac-Man: **ported 1:1, awaiting the owner's verdict.** The owner's "Stardust
@@ -191,11 +193,9 @@ on the real game code for the owner to approve.
      `bonuses/bossReward.test.ts`). Boss levels get it through `LevelSession.bossReward`
      (the hell today, the stage-8 boss worlds later). The debug `COMPLETE LEVEL` still ends
      the hell at once, without the choice.
-   - Golden egg → Easter egg: the owner wants it redrawn as an Easter egg, by Claude, later.
-   - Ghosts: art for each season (spring, summer, autumn, winter), with the normal,
-     frightened, flashing and eaten (eyes only) states. `GhostView` is one generic look now.
-   - Direction indicator (see stage 3): ghosts' eyes looking where they move is the
-     classic answer; settle the shared rule here so stages 3 and 4 reuse it.
+   - → Moved to stage 10: the Easter egg (10.2), the ghosts' season art (10.5), the fruit
+     rework (10.1), the Ms. Pac-Man rework (10.4). The direction rule was settled in
+     stage 3: eyes look where the body heads.
 2. ✅ **Dev panel + log panel** (dev build only). Done in the third chat.
    - `core/debug/DebugController`: every dev command in one object, built only in dev
      builds (`GameMain`); the Svelte side holds it in a store (`ui/debug/debugActions`).
@@ -256,7 +256,7 @@ on the real game code for the owner to approve.
    - Berserk orb: new art that reads as a weapon.
    - Triple-pentagram attack: it almost always misses, and its art spills out of the tile
      — aim it (lead the player's path) and keep the art inside the tile.
-4. **Pac-Man art rework** + bug: Pac-Man blinks before the game starts.
+4. → **Pac-Man art rework** and the pre-game blink: moved into stage 10 (10.3, 10.9).
 5. ✅ **Full HUD and overlays** (third chat; moved before stages 3 and 4 by the owner).
    **Wired into the game.** After two rejected designs (a glass plate with a rounded accent
    border; numbers scattered over the screen corners) the owner accepted, as a prototype,
@@ -366,6 +366,53 @@ on the real game code for the owner to approve.
 9. **Global refactor to solid game-dev code**, or local refactors if the code by then is
    already sound. Candidates known today: the large files listed under Known issues,
    `DecayPass` onto `GlPass`, states still using nullable `LevelLoader` getters.
+
+10. **Art and polish pass** (set by the owner after stage 7; next). One step per chat
+    or several small ones together; the order below is a suggestion.
+    1. **Fruit.** Every fruit is drawn larger than a tile and glows far too much
+       (`render/items/collectibleSprite.ts`: the mock-ups' two additive bloom copies;
+       `FruitView` fits the larger side to `FRUIT_EXTENT` = 0.9 tile, the glow reaches
+       past it). Keep each fruit and its bloom inside the tile, tone the glow down; the
+       look may change a little or moderately so the fruit sits well in the seasons.
+       One file per fruit stays (design decision).
+    2. **Easter egg + its mechanic.** No art today (`GoldenEggView` is a stand-in): draw
+       an Easter egg. Mechanic: the lair code (`LairCodeService`, the right order of
+       eaten ghosts) should make the ghosts stop and vanish with an animation; then the
+       lair door opens and Pac-Man walks in to the egg (today the egg appears on the
+       board and taking it starts the arcade, `GoldenEggService`).
+    3. **Pac-Man art**, redone completely (was stage 4). `render/actors/PlayerView.ts`;
+       keep the design decisions (organic, wedge mouth, no eyes, ribbon trail) unless
+       the owner changes them.
+    4. **Ms. Pac-Man**, finish (`render/actors/MsPacmanView.ts`): today she reads a little
+       dark rather than cute, not bright enough, hard to read at tile size, and under
+       an energizer (overdrive) everything melts into a mash of effects. Brighter, cuter,
+       a clear silhouette at tile size, a calmer overdrive.
+    5. **Ghosts per season** (`render/actors/GhostView.ts`, one generic look today): art
+       for spring, summer, autumn, winter, with normal, scared, flashing and eyes-only;
+       focus on cuteness; the eyes show the heading.
+    6. **Echo clone, art + mechanic** (`logic/bonuses/EchoCloneService.ts`,
+       `render/actors/EchoCloneView.ts`). A rare bonus that spawns at a random place and
+       sets off a riot of Pac-Man clones: 7–9 clones for 2–3 s that eat everything they
+       find (dots, fruit) and die on contact with ghosts.
+    7. **FX rework.** The stage-7 rings look dull (`render/fx/LevelFx.ts`); regular
+       levels have no teleport effect (the hell has its teleport fog); redo or improve
+       the teleporters' own art (`MeadowBake` portal + `MeadowWorld`): bulky and a bit
+       clumsy today, though the spiral works.
+    8. **Hell, phase 3.** In the ash storm many flickering lights follow Pac-Man as he
+       moves: meant as lighting (`render/doom/DoomLightmap.ts`, the night pass in
+       `DoomWorld`), it flickers like a strobe and does not help visibility; make it
+       calm and useful. The purple corrupted tiles (`DoomCombatView.drawCorruption`) read
+       very well but clash with the hell's look; restyle them in the hell's palette and
+       keep them as readable.
+    9. **Bugs and transitions.**
+       - Pac-Man blinks before the game starts (was stage 4).
+       - No screen fade on the very first start of a game (`Director.startGame`).
+       - The death decay: the background looks odd (a nebula plus square dots reads
+         random); rework the abyss under the shards
+         (`render/transitions/decay/decayShader.ts`).
+       - Level change: the season turn keeps Pac-Man's sprite on screen until the next
+         level starts (`RenderPipeline`, drawn while `lights` + `turn` run); hide him
+         during the animation and spawn him once the new level is in place.
 
 ## Done (plan v1)
 
