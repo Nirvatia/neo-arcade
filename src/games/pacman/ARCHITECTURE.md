@@ -146,4 +146,5 @@ New art and effects start as a page built from the game's own sources:
 file). The approved prototype already is the game code. Existing: `hell`, `arcade`,
 `hud`, `collectibles` (with each item's reach from its tile centre and a tile grid),
 `ms-pacman`, `level-clear`, `easter-egg` (the lair code's reward played by the real
-services); `winter-decay.html` is an older standalone page.
+services), `characters` (Pac-Man and Ms. Pac-Man concepts for 10.3/10.4: large and in the
+maze, normal and under the energizer); `winter-decay.html` is an older standalone page.
