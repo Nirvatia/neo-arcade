@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>Pac-Man · Arcade</title>
+    <!-- Prototype for plan v2 stage 6: the secret level as our own 80s-style arcade round —
+         pixel art, CRT pass, the chalkboard intermission and synthesised sounds, all from the
+         game's sources. Built by `node prototypes/pacman/build.mjs arcade`; open as a file. -->
+    <style>
+      html,body{height:100%;margin:0;overflow:hidden;background:#000}
+      #view{position:fixed;inset:0;display:block}
+      #ctl{position:fixed;left:50%;bottom:max(12px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:5;display:flex;flex-direction:column;align-items:center;gap:6px;width:calc(100vw - 32px);max-width:1100px}
+      .row{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px}
+      .bt{border:0;cursor:pointer;padding:6px 11px;border-radius:6px;font:700 12px "Courier New",monospace;color:#04030c;background:#2ee6d6;box-shadow:0 3px 0 #0f6f73}
+      .bt[aria-pressed="true"]{transform:translateY(2px);background:#ffd400;box-shadow:0 1px 0 #c08a00}
+      .lbl{font:12px "Courier New",monospace;color:#9adcd6}
+    </style>
+  </head>
+  <body>
+    <canvas id="view"></canvas>
+    <div id="ctl">
+      <div class="row">
+        <span class="lbl">Призраки:</span>
+        <button class="bt" data-look="normal" aria-pressed="true">Обычные</button>
+        <button class="bt" data-look="scared">Испуг</button>
+        <button class="bt" data-look="flash">Испуг кончается</button>
+        <button class="bt" data-look="eyes">Глаза</button>
+        <span class="lbl">Сцены:</span>
+        <button class="bt" id="death">Смерть</button>
+        <button class="bt" id="clear">Зачистка</button>
+        <button class="bt" id="inter">Интермиссия</button>
+        <button class="bt" id="fruit">Фрукт</button>
+        <button class="bt" id="crt" aria-pressed="true">ЭЛТ</button>
+      </div>
+      <div class="row">
+        <span class="lbl">Звуки:</span>
+        <button class="bt" data-sound="start">Старт раунда</button>
+        <button class="bt" data-sound="chomp">Точка</button>
+        <button class="bt" data-sound="power">Энерджайзер</button>
+        <button class="bt" data-sound="ghost">Призрак съеден</button>
+        <button class="bt" data-sound="fruit">Фрукт</button>
+        <button class="bt" data-sound="extra">Попытка</button>
+        <button class="bt" data-sound="death">Смерть</button>
+        <button class="bt" data-sound="clear">Зачистка</button>
+        <button class="bt" data-sound="intermission">Интермиссия</button>
+      </div>
+      <div class="row">
+        <span class="lbl">Фон:</span>
+        <button class="bt" data-loop="hum">Гул</button>
+        <button class="bt" data-loop="scared">Испуг</button>
+        <button class="bt" data-loop="eyes">Глаза</button>
+        <button class="bt" data-loop="off" aria-pressed="true">Выкл</button>
+        <span class="lbl">Напряжение гула:</span>
+        <input id="urgency" type="range" min="0" max="100" value="0" />
+      </div>
+    </div>
+    <script>
+/*SCRIPT*/
+    </script>
+  </body>
+</html>

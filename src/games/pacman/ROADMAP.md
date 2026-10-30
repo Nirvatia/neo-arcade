@@ -304,10 +304,28 @@ on the real game code for the owner to approve.
       (lives left), game over (score, new record, again, mode, menu). Remove `OverlayView`,
       its top bar, `HellHud`, `PacmanOverlay`.
    6. The fade moves to a DOM layer over the HUD and screens, under the dev panels.
-6. **Secret level rework.** The original Pac-Man: original arcade art, animation at a
-   stepped 30 fps (the wedge snaps open and shut, no smooth tween), and very light CRT
-   effects (scanlines, slight curvature, glow) as a `GlPass`. This replaces the last
-   tile-by-tile bundle (`seasons/secret/`, `SeasonLevelRenderer`, `contracts/`).
+6. **Secret level rework: "Arcade".** In progress (fourth chat). Not a copy of the
+   original Pac-Man (its sprites, ghost rules, fruit table, cutscenes and sounds are not
+   reproduced): our own 80s-style arcade round inside the secret level.
+   Owner's decisions: three rounds, faster each time, the intermission after round 2;
+   its own three tries (dying never costs the main game's lives; losing them all returns
+   to the main game without a penalty); the intermission is scene (a): Blinky chalks an
+   ambush plan, Pac-Man eats the chalk.
+   - Prototype, **awaiting the owner's verdict**: `prototypes/pacman/arcade`
+     (`node prototypes/pacman/build.mjs arcade`). Code in `render/arcade/`: `arcadeSprites`
+     (our pixel art at 10 px a tile: Pac-Man, ghosts, scared / flashing / eyes, pear,
+     pretzel, melon, 3×5 digits), `ArcadeMaze` (neon double walls baked from the grid),
+     `ArcadeView` (one frame from an `ArcadeScene`, stepped 30 fps, death, maze flash),
+     `ArcadeScreen` + `crtShader` (the CRT `GlPass`: slight curve, scanlines, mask, glow,
+     vignette; hard pixels without WebGL2), `ArcadeIntermission` (7.5 s); sound in
+     `audio/ArcadeSynth` (WebAudio chiptune: hum / scared / eyes loops, chomp, power, ghost,
+     fruit, extra try, death, round start, clear, intermission tune).
+   - Next, after approval: rounds and tries in the logic, ghost personalities (hunter:
+     straight at Pac-Man; ambusher: the junction Pac-Man reaches next; herder: the junction
+     behind him; keeper: guards the part of the maze with the most dots, chases only up
+     close), energizers on, one fruit per round (pear, pretzel, melon), flow phases for the
+     maze flash and the intermission, the arcade renderer and synth in the game, the HUD
+     tries; then delete `seasons/secret/`, `SeasonLevelRenderer`, `contracts/`.
 7. **FX pass**, e.g. hitting a ghost while energized; also eaten-ghost score pop-ups,
    pickups, near misses, screen feedback — consistent across seasons.
 8. **New boss worlds, every 5th level.** Level 5 stays the hell; levels 10, 15, … get new
