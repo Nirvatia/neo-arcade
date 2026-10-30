@@ -6,14 +6,14 @@ import type { CollectibleArt } from '../collectibleSprite';
 import { drawCollectible, fruitMotion } from '../collectibleSprite';
 import { CHERRY_ART } from './CherryView';
 import { drawStrawberry } from './StrawberryView';
-import { drawOrange } from './OrangeView';
-import { drawPretzel } from './PretzelView';
+import { ORANGE_ART } from './OrangeView';
+import { PRETZEL_ART } from './PretzelView';
 import { APPLE_ART } from './AppleView';
-import { drawPear } from './PearView';
-import { drawMelon } from './MelonView';
+import { PEAR_ART } from './PearView';
+import { MELON_ART } from './MelonView';
 import { GALAXIAN_ART } from './GalaxianView';
 import { BELL_ART } from './BellView';
-import { drawKey } from './KeyView';
+import { KEY_ART } from './KeyView';
 
 /** The larger side of a fruit (without its glow), in tiles. */
 export const FRUIT_EXTENT = 0.9;
@@ -21,20 +21,20 @@ export const FRUIT_EXTENT = 0.9;
 /** Fruit with the owner's art; the rest are stubs on the shared primitive until theirs arrive. */
 const ART: Partial<Record<FruitKind, CollectibleArt>> = {
 	[FRUIT.CHERRY]: CHERRY_ART,
+	[FRUIT.ORANGE]: ORANGE_ART,
+	[FRUIT.PRETZEL]: PRETZEL_ART,
 	[FRUIT.APPLE]: APPLE_ART,
+	[FRUIT.PEAR]: PEAR_ART,
+	[FRUIT.MELON]: MELON_ART,
 	[FRUIT.GALAXIAN]: GALAXIAN_ART,
-	[FRUIT.BELL]: BELL_ART
+	[FRUIT.BELL]: BELL_ART,
+	[FRUIT.KEY]: KEY_ART
 };
 
 type StubDraw = (ctx: CanvasRenderingContext2D, x: number, y: number, radius: number) => void;
 
 const STUBS: Partial<Record<FruitKind, StubDraw>> = {
-	[FRUIT.STRAWBERRY]: drawStrawberry,
-	[FRUIT.ORANGE]: drawOrange,
-	[FRUIT.PRETZEL]: drawPretzel,
-	[FRUIT.PEAR]: drawPear,
-	[FRUIT.MELON]: drawMelon,
-	[FRUIT.KEY]: drawKey
+	[FRUIT.STRAWBERRY]: drawStrawberry
 };
 
 export class FruitView {
@@ -75,7 +75,7 @@ export function drawFruit(
 ): void {
 	const art = ART[kind];
 	if (art) {
-		drawCollectible(ctx, art, x, y, tileSize * FRUIT_EXTENT, fruitMotion(time));
+		drawCollectible(ctx, art, x, y, tileSize * FRUIT_EXTENT, (art.motion ?? fruitMotion)(time));
 		return;
 	}
 	STUBS[kind]?.(ctx, x, y, Math.max(2, tileSize * 0.28));

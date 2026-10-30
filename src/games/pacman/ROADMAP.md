@@ -158,16 +158,18 @@ on the real game code for the owner to approve.
      energizer / fruit, ghost eaten with the light streak from ahead, teleport wormholes,
      overdrive, invulnerability blink, death). Prototype: `prototypes/pacman/ms-pacman`
      (`node prototypes/pacman/build.mjs ms-pacman`).
-   - Fruit: the owner's mock-ups (COLLECTIBLE_*.html), arriving in batches. **Batch 1
-     ported, awaiting the verdict:** cherry, apple, Galaxian, bell, plus the bonus-life heart.
+   - Fruit: the owner's mock-ups (COLLECTIBLE_*.html), arriving in batches. **Batches 1–2
+     ported, awaiting the verdict:** cherry, orange, pretzel, apple, pear, melon, Galaxian,
+     bell, key, plus the bonus-life heart. Strawberry is the last fruit still waiting for art.
      Shared engine `render/items/collectibleSprite.ts`: the mock-up's texture code is run
      1:1 once into a canvas, its two bloom copies are blurred once (canvas `filter`, or
      down-up sampling where unsupported), and each frame draws sprite + additive blooms with
      the mock-up's breathing, sway and shimmer. Each fruit file holds its texture code, the
      object bounds (glow excluded) and the mock-up's display sizes; `FruitView` fits the
      object's larger side to `FRUIT_EXTENT` = 0.9 tile, centred on the tile, and still
-     blinks while the timer runs out. Fruit without art yet (strawberry, orange, pretzel,
-     pear, melon, key) stay stubs on `fruitPrimitive`. Prototype:
+     blinks while the timer runs out. The strawberry stays a stub on `fruitPrimitive`
+     until its art arrives. The orange's skin pores are random, as in its mock-up (placed
+     once per page load). Prototype:
      `prototypes/pacman/collectibles` (`node prototypes/pacman/build.mjs collectibles`).
    - Bonus life (`render/items/BonusLifeView.ts`, heartbeat + orbiting particles): drawn,
      not placed — no pickup grants a life today (lives come from score thresholds); the

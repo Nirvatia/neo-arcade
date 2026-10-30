@@ -15,7 +15,7 @@ const $ = <E extends HTMLElement>(id: string) => document.getElementById(id) as 
 const view = $<HTMLCanvasElement>('view');
 const ctx = view.getContext('2d') as CanvasRenderingContext2D;
 const D = Math.min(window.devicePixelRatio || 1, 2);
-const ZOOM = 4;
+const ZOOM = 4; // at most; shrinks to fit the screen
 
 type Item = (c: CanvasRenderingContext2D, x: number, y: number, tile: number, t: number) => void;
 const fruit =
@@ -24,19 +24,21 @@ const fruit =
 		drawFruit(c, kind, x, y, tile, t);
 const ITEMS: Array<{ name: string; draw: Item }> = [
 	{ name: 'Cherry', draw: fruit(FRUIT.CHERRY) },
+	{ name: 'Orange', draw: fruit(FRUIT.ORANGE) },
+	{ name: 'Pretzel', draw: fruit(FRUIT.PRETZEL) },
 	{ name: 'Apple', draw: fruit(FRUIT.APPLE) },
+	{ name: 'Pear', draw: fruit(FRUIT.PEAR) },
+	{ name: 'Melon', draw: fruit(FRUIT.MELON) },
 	{ name: 'Galaxian', draw: fruit(FRUIT.GALAXIAN) },
 	{ name: 'Bell', draw: fruit(FRUIT.BELL) },
+	{ name: 'Key', draw: fruit(FRUIT.KEY) },
 	{ name: 'Bonus life', draw: (c, x, y, tile, t) => drawBonusLife(c, x, y, tile * FRUIT_EXTENT, t) }
 ];
-/** Corridor tiles of GRID_01 (row 5, columns 14..22). */
-const SPOTS: ReadonlyArray<[number, number]> = [
-	[14, 5],
-	[16, 5],
-	[18, 5],
-	[20, 5],
-	[22, 5]
-];
+/** Corridor tiles of GRID_01: rows 5 and 2, columns 13..22, one item every other tile. */
+const SPOTS: ReadonlyArray<[number, number]> = Array.from({ length: 10 }, (_, i) => [
+	i < 5 ? 13 + i * 2 : 14 + (i - 5) * 2,
+	i < 5 ? 5 : 2
+]);
 
 let season: Season = 'spring';
 let world: MeadowWorld;
@@ -106,15 +108,13 @@ function frame(now: number): void {
 	});
 	world.drawOverlay(ctx);
 
-	// 4× close-up of the corridor
-	const [ax] = SPOTS[0];
-	const [bx] = SPOTS[SPOTS.length - 1];
-	const srcW = (bx - ax + 2) * S;
-	const srcH = 2.2 * S;
-	const boxW = Math.min(vw - 36, srcW * ZOOM);
+	// magnified close-up of the two corridors (columns 12..23, rows 1..6)
+	const srcW = 12 * S;
+	const srcH = 6 * S;
+	const boxW = Math.min(vw - 36, srcW * ZOOM, ((vh - 300) / srcH) * srcW);
 	const boxH = (boxW / srcW) * srcH;
-	const sx = (L.offsetX + ax * S - S * 0.5) * D;
-	const sy = (L.offsetY + (SPOTS[0][1] + 0.5) * S - srcH / 2) * D;
+	const sx = (L.offsetX + 12 * S) * D;
+	const sy = (L.offsetY + 1 * S) * D;
 	const px = (vw - boxW) / 2;
 	const py = vh - boxH - 90;
 	ctx.setTransform(1, 0, 0, 1, 0, 0);

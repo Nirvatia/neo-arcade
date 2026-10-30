@@ -27,6 +27,8 @@ export interface CollectibleArt {
 	/** Displayed sprite size in the mock-up, px. */
 	readonly sprite: number;
 	readonly blooms: readonly [Bloom, Bloom];
+	/** The mock-up's ticker when it differs from the common fruit one (`fruitMotion`). */
+	readonly motion?: (time: number) => CollectibleMotion;
 }
 
 /** Per-frame animation, as the mock-up's ticker sets it. */
