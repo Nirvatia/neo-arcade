@@ -26,8 +26,9 @@ render/
   RenderPipeline   canvas, HiDPI, render clock → builds a RenderFrame per frame
   RenderFrame      frame data + the LevelRenderer interface
   SharedLayers     Pac-Man, bonuses, level clear, overlay (every level)
-  seasons/         SeasonLevelRenderer + bundles for spring, summer, autumn, secret
-  seasons/winter/  WinterBake (static world) + WinterWorld (live layer) + WinterLevelRenderer
+  seasons/meadow/  MeadowBake (static world) + MeadowWorld (live layer) + MeadowLevelRenderer,
+                   driven by a MeadowTheme per season (seasons/<season>/<season>Theme.ts)
+  seasons/         SeasonLevelRenderer + tile bundle for the secret level only
   doom/            DoomLevelRenderer, baked world, lamprey boss, combat and weapon FX
   transitions/decay/  level decay on death: field (Dijkstra), timeline, WebGL2 pass, shader
   maze/ actors/ items/ (fruit stubs: one file per fruit) transitions/ (level clear,
@@ -177,15 +178,24 @@ Order matters: each stage builds on the ones before it.
      software (~0.8 s/frame), so smoothness must be checked on real hardware.
 4. **Level-complete animation.** Built on stage 2's transitions.
 5. **New regular HUD.** The hell HUD is the reference for quality.
-6. **Integrate the 4 seasons.** Largest stage; one season per chat, from the owner's
+6. ✅ **Integrate the 4 seasons.** Largest stage; one season per chat, from the owner's
    mock-ups, following the hell pattern (`*Bake` static world + `*World` live layer).
-   - ✅ Winter (second chat): `seasons/winter/` from CLAUDE_GRID_WINTER — `bake()` ported
-     1:1 and parameterised by the grid, the PIXI live layer ported to Canvas2D (ice
-     pellets, snow-crystal energizers, portal swirls, stream glints, chimney smoke, mist,
-     drifting snow, blizzard, blue night with lamp and cabin lights). The blizzard rises at
-     50 % of the dots eaten and the night falls at 75 % (`WinterLevelRenderer`). The old
-     tile-by-tile winter bundle is deleted; the secret level keeps its own bundle.
-   - Remaining: spring, summer, autumn (and a decay palette per season).
+   - ✅ All four seasons (second chat). The owner's CLAUDE_GRID_{SPRING,SUMMER,AUTUMN,
+     WINTER} mock-ups share one layout, so they run on one engine (`seasons/meadow/`): the
+     bake code is the mock-ups' code once, parameterised by a `MeadowTheme` (every colour,
+     plus hooks for the landmark — snowman, picnic blanket, beach umbrella, hay bale — the
+     meadow flowers or leaves and the pond extras); the live layer takes the food sprites,
+     drift particles, weather and night from the theme. Each bake was checked pixel for
+     pixel against its mock-up's `bake()` (0 % difference) before the owner's fixes.
+   - Owner's fixes: summer — new food (small amber drops, watermelon-slice energizers) and
+     a darker sand floor; autumn — warmer, lighter golden stones and a smaller acorn pellet.
+     Rule for food art: pellets stay ~1/5 of a tile, calm, no inner detail (200 on screen);
+     energizers differ from pellets in shape, colour and size.
+   - Weather rises at 50 % of the dots and night falls at 75 % (`MeadowLevelRenderer`):
+     blizzard (winter), petal wind (spring), heat shimmer (summer), rain (autumn).
+   - Decay palettes per season: ice (winter), moss and pink (spring), indigo and amber
+     (summer), umber and amber (autumn), ember (hell).
+   - The old tile-by-tile spring/summer/autumn/winter bundles are deleted.
 7. **Cutscenes.** One per season (4), then an original one for the secret level. The
    skeleton is in `render/transitions/cutscenes/` (`Cutscene` interface, catalog,
    `LevelClearCutscene`); it is not wired in yet — the level-clear state has a `cutscene`

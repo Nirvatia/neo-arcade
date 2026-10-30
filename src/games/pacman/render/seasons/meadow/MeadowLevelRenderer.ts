@@ -3,25 +3,34 @@ import type { GridLayout } from '../../maze/GridView';
 import type { SharedLayers } from '../../SharedLayers';
 import type { LevelRenderer, RenderFrame } from '../../RenderFrame';
 import type { GridService } from '../../../logic/maze/GridService';
-import { WinterWorld } from './WinterWorld';
+import { MeadowWorld } from './MeadowWorld';
+import type { MeadowTheme } from './MeadowTheme';
 
-/** Share of eaten dots at which the blizzard rises, then the night falls. */
-const STORM_AT = 0.5;
+/** Share of eaten dots at which the season's weather rises, then the night falls. */
+const WEATHER_AT = 0.5;
 const NIGHT_AT = 0.75;
 
 /**
- * Winter levels, from the owner's CLAUDE_GRID_WINTER mock-up: the baked snowy world and
- * its live layer, the atmosphere under the actors (so they stay readable), then the
- * blizzard and the vignette on top. Blizzard and night follow the level's progress.
+ * Meadow seasons (spring, summer, autumn, winter) from the owner's mock-ups: the baked
+ * world and its live layer, the atmosphere under the actors (so they stay readable), then
+ * the weather and the vignette on top. Weather and night follow the level's progress.
  */
-export class WinterLevelRenderer implements LevelRenderer {
+export class MeadowLevelRenderer implements LevelRenderer {
 	private readonly shared: SharedLayers;
+	private readonly themeFor: (season: string) => MeadowTheme | null;
 	private readonly ghostView = new GhostView();
-	private world: WinterWorld | null = null;
+	private world: MeadowWorld | null = null;
 	private worldGrid: GridService | null = null;
+	private worldTheme: MeadowTheme | null = null;
 
-	constructor(shared: SharedLayers) {
+	constructor(shared: SharedLayers, themeFor: (season: string) => MeadowTheme | null) {
 		this.shared = shared;
+		this.themeFor = themeFor;
+	}
+
+	/** True when this renderer draws the frame's season. */
+	handles(season: string): boolean {
+		return this.themeFor(season) !== null;
 	}
 
 	render(frame: RenderFrame): GridLayout {
@@ -29,7 +38,7 @@ export class WinterLevelRenderer implements LevelRenderer {
 		const world = this.worldFor(frame);
 		world.resize(frame.width, frame.height, frame.pixelRatio);
 		const ratio = progress.collectionRatio;
-		world.setMood(ratio >= STORM_AT ? 1 : 0, ratio >= NIGHT_AT ? 1 : 0);
+		world.setMood(ratio >= WEATHER_AT ? 1 : 0, ratio >= NIGHT_AT ? 1 : 0);
 		if (!frame.paused) {
 			world.update(frame.dt);
 		}
@@ -65,11 +74,16 @@ export class WinterLevelRenderer implements LevelRenderer {
 		return layout;
 	}
 
-	/** The baked world is rebuilt only when a new winter level (a new grid) starts. */
-	private worldFor(frame: RenderFrame): WinterWorld {
-		if (!this.world || this.worldGrid !== frame.grid) {
-			this.world = new WinterWorld(frame.season.grid);
+	/** The baked world is rebuilt only when a new level (grid) or season starts. */
+	private worldFor(frame: RenderFrame): MeadowWorld {
+		const theme = this.themeFor(frame.season.name);
+		if (!theme) {
+			throw new Error(`MeadowLevelRenderer: no theme for ${frame.season.name}`);
+		}
+		if (!this.world || this.worldGrid !== frame.grid || this.worldTheme !== theme) {
+			this.world = new MeadowWorld(frame.season.grid, theme);
 			this.worldGrid = frame.grid;
+			this.worldTheme = theme;
 		}
 		return this.world;
 	}

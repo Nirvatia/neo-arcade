@@ -5,9 +5,11 @@ import type { LevelLoader } from '../logic/level/LevelLoader';
 import { SharedLayers } from './SharedLayers';
 import { SeasonLevelRenderer } from './seasons/SeasonLevelRenderer';
 import { DoomLevelRenderer } from './doom/DoomLevelRenderer';
-import { WinterLevelRenderer } from './seasons/winter/WinterLevelRenderer';
+import { MeadowLevelRenderer } from './seasons/meadow/MeadowLevelRenderer';
+import { meadowThemeFor } from './seasons/meadow/meadowThemes';
 import { EMBER_PALETTE, ICE_PALETTE, LevelDecay } from './transitions/decay/LevelDecay';
 import type { LevelRenderer, RenderFrame } from './RenderFrame';
+import type { DecayPalette } from './transitions/decay/DecayPass';
 
 /** Same as the page background, so a full fade reads as an empty stage. */
 const FADE_COLOR = '#030509';
@@ -26,7 +28,7 @@ export class RenderPipeline {
 	private readonly unsubscribeCues: () => void;
 	private readonly shared: SharedLayers;
 	private readonly seasonRenderer: LevelRenderer;
-	private readonly winterRenderer: LevelRenderer;
+	private readonly meadowRenderer: MeadowLevelRenderer;
 	private readonly doomRenderer: LevelRenderer;
 	private readonly decay = new LevelDecay();
 	private readonly canvas: HTMLCanvasElement;
@@ -59,7 +61,7 @@ export class RenderPipeline {
 			? events.on('audio:cue', (payload) => shared.playerView.trigger(payload.cue))
 			: () => {};
 		this.seasonRenderer = new SeasonLevelRenderer(shared);
-		this.winterRenderer = new WinterLevelRenderer(shared);
+		this.meadowRenderer = new MeadowLevelRenderer(shared, meadowThemeFor);
 		this.doomRenderer = new DoomLevelRenderer(shared);
 		this.canvas = document.createElement('canvas');
 		this.canvas.style.display = 'block';
@@ -125,7 +127,7 @@ export class RenderPipeline {
 				spawnX: grid.playerSpawn.x,
 				spawnY: grid.playerSpawn.y,
 				elapsed: flow.elapsed,
-				palette: this.level.hellMode ? EMBER_PALETTE : ICE_PALETTE
+				palette: this.decayPalette()
 			});
 			this.shared.drawPlayer(screen, layout);
 		}
@@ -138,13 +140,22 @@ export class RenderPipeline {
 		this.canvas.remove();
 	}
 
+	private decayPalette(): DecayPalette {
+		if (this.level.hellMode) {
+			return EMBER_PALETTE;
+		}
+		const season = this.level.season;
+		const theme = season && !this.level.secretMode ? meadowThemeFor(season.name) : null;
+		return theme ? theme.decay : ICE_PALETTE;
+	}
+
 	private rendererFor(): LevelRenderer {
 		if (this.level.hellMode) {
 			return this.doomRenderer;
 		}
 		const season = this.level.season;
-		if (season && season.name === 'winter' && !this.level.secretMode) {
-			return this.winterRenderer;
+		if (season && !this.level.secretMode && this.meadowRenderer.handles(season.name)) {
+			return this.meadowRenderer;
 		}
 		return this.seasonRenderer;
 	}
