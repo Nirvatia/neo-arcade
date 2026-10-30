@@ -57,6 +57,10 @@ ui/          PacmanUi (HUD + screens + fade over the canvas), hud/ (GameHud, Arc
   carried explicitly by `LevelLoader.changeLevel` (score, lives, life threshold, arcade
   tries).
 - Shared drawing helpers go to `render/common/`, not copied into views.
+- Collectibles (fruit, bonus life, exit) draw through `render/items/collectibleSprite`:
+  callers pass the tile size and the time; the bake measures the object and how far its
+  glow reaches over its ticker, so the object fills 0.78 of the tile and nothing leaves
+  the tile. Textures carry no backdrop glow; `extraBounds` declares what `extra` draws.
 - A level renderer returns the board layout. In the death state it leaves Pac-Man out:
   `RenderPipeline` renders the level offscreen, runs the decay pass, then draws Pac-Man
   on top. The arcade draws its own death and level clear (no decay, no season turn).
@@ -133,5 +137,5 @@ New art and effects start as a page built from the game's own sources:
 `prototypes/pacman/<name>/main.ts` + `index.html`, built by
 `node prototypes/pacman/build.mjs <name>` into `prototypes/pacman/<name>.html` (open as a
 file). The approved prototype already is the game code. Existing: `hell`, `arcade`,
-`hud`, `collectibles`, `ms-pacman`, `level-clear`; `winter-decay.html` is an older
-standalone page.
+`hud`, `collectibles` (with each item's reach from its tile centre and a tile grid),
+`ms-pacman`, `level-clear`; `winter-decay.html` is an older standalone page.

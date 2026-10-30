@@ -1,18 +1,11 @@
 // The boss-level exit: a glowing doorway with an arrow, drawn in the collectibles' style
 // (texture + bloom, see collectibleSprite). A stand-in until the owner's exit icon arrives.
-import type { CollectibleArt } from './collectibleSprite';
+import type { CollectibleArt, CollectibleMotion } from './collectibleSprite';
 import { drawCollectible, FRUIT_BLOOMS } from './collectibleSprite';
 
 function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	const cx = size / 2;
 	const cy = size / 2;
-
-	const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.48);
-	glow.addColorStop(0, 'rgba(150,230,255,0.35)');
-	glow.addColorStop(0.5, 'rgba(80,160,220,0.15)');
-	glow.addColorStop(1, 'rgba(0,0,0,0)');
-	ctx.fillStyle = glow;
-	ctx.fillRect(0, 0, size, size);
 
 	ctx.save();
 	ctx.translate(cx, cy);
@@ -69,25 +62,30 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.restore();
 }
 
+/** A steady doorway: it breathes and its light pulses, it does not sway. */
+function exitMotion(time: number): CollectibleMotion {
+	return {
+		scale: 1 + Math.sin(time * 2.2) * 0.04,
+		rotation: 0,
+		alpha: 1,
+		bloomAlpha: [0.45 + Math.sin(time * 3) * 0.1, 0.25 + Math.sin(time * 2) * 0.05]
+	};
+}
+
 export const EXIT_ART: CollectibleArt = {
 	size: 256,
 	paint,
-	bounds: { x0: -69, y0: -77, x1: 69, y1: 79 },
 	sprite: 240,
-	blooms: FRUIT_BLOOMS
+	blooms: FRUIT_BLOOMS,
+	motion: exitMotion
 };
 
 export function drawExit(
 	ctx: CanvasRenderingContext2D,
 	x: number,
 	y: number,
-	extent: number,
+	tile: number,
 	time: number
 ): void {
-	drawCollectible(ctx, EXIT_ART, x, y, extent, {
-		scale: 1 + Math.sin(time * 2.2) * 0.04,
-		rotation: 0,
-		alpha: 1,
-		bloomAlpha: [0.45 + Math.sin(time * 3) * 0.1, 0.25 + Math.sin(time * 2) * 0.05]
-	});
+	drawCollectible(ctx, EXIT_ART, x, y, tile, time);
 }

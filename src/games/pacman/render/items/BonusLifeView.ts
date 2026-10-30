@@ -1,39 +1,13 @@
-// Bonus life, the cosmic heart: the owner's COLLECTIBLE_BONUS_LIFE.html, texture code 1:1,
-// with its heartbeat, flicker and the 16 particles on an elliptic orbit. Not placed in the
+// Bonus life, the cosmic heart: the owner's COLLECTIBLE_BONUS_LIFE.html, texture code 1:1
+// without its nebula glow, with its heartbeat, flicker and the 16 particles on an elliptic
+// orbit (drawn closer around the heart than in the mock-up, so all of it fits the tile). Not placed in the
 // game yet: no pickup grants a life today (lives come from the score thresholds).
-import type { CollectibleArt } from './collectibleSprite';
+import type { CollectibleArt, CollectibleMotion } from './collectibleSprite';
 import { drawCollectible } from './collectibleSprite';
 
 function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	const cx = size / 2;
 	const cy = size / 2;
-
-	// layered nebula glow
-	const layers: Array<{ r: number; stops: Array<[number, string]> }> = [
-		{
-			r: size * 0.5,
-			stops: [
-				[0, 'rgba(120,255,200,0.4)'],
-				[0.3, 'rgba(80,230,160,0.25)'],
-				[0.6, 'rgba(40,180,120,0.12)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		},
-		{
-			r: size * 0.35,
-			stops: [
-				[0, 'rgba(180,255,220,0.3)'],
-				[0.5, 'rgba(100,255,180,0.15)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		}
-	];
-	for (const layer of layers) {
-		const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
-		for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
-		ctx.fillStyle = g;
-		ctx.fillRect(0, 0, size, size);
-	}
 
 	const scale = size * 0.012;
 	ctx.save();
@@ -137,17 +111,28 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.restore();
 }
 
-/** Mock-up display: heart 100 px from a 128 px texture, blooms 140 and 180 px. */
-export const BONUS_LIFE_ART: CollectibleArt = {
-	size: 128,
-	paint,
-	bounds: { x0: -34, y0: -11, x1: 34, y1: 55 },
-	sprite: 100,
-	blooms: [
-		{ size: 140, blur: 10 },
-		{ size: 180, blur: 20 }
-	]
-};
+/** The mock-up's ticker: the heartbeat, a slight sway, the flicker. */
+function heartMotion(time: number): CollectibleMotion {
+	const beat = Math.sin(time * 2.5);
+	return {
+		scale: 1 + beat * 0.06 + beat * beat * 0.03,
+		rotation: Math.sin(time * 0.5) * 0.04,
+		alpha: 0.88 + Math.sin(time * 10) * 0.06 + Math.sin(time * 18) * 0.03,
+		bloomAlpha: [0.45 + Math.sin(time * 7) * 0.1, 0.2 + Math.sin(time * 5) * 0.08]
+	};
+}
+
+/** Mock-up display px → texture px (heart 100 px from a 128 px texture). */
+const DISPLAY = 128 / 100;
+
+/** The orbit's largest radius and wobble, mock-up display px (the mock-up's: 65 and 3). */
+const ORBIT_RADIUS = 40;
+const ORBIT_WOBBLE = 2;
+/** The orbit's centre: the heart's, which sits below the texture centre, texture px. */
+const ORBIT_Y = 22;
+/** The orbit's far edge plus half the largest particle, texture px. */
+const ORBIT_X_REACH = (ORBIT_RADIUS + ORBIT_WOBBLE + 2) * DISPLAY;
+const ORBIT_Y_REACH = (ORBIT_RADIUS + ORBIT_WOBBLE) * 0.7 * DISPLAY + 2 * DISPLAY;
 
 /** Fixed per-particle randomness, so the orbit is a function of time. */
 const ORBIT = Array.from({ length: 16 }, (_, i) => {
@@ -157,50 +142,51 @@ const ORBIT = Array.from({ length: 16 }, (_, i) => {
 	};
 	return {
 		angle: (i / 16) * Math.PI * 2,
-		radius: 50 + r(1) * 15,
+		radius: ORBIT_RADIUS - 8 + r(1) * 8,
 		speed: 0.6 + r(2) * 0.4,
 		size: 0.6 + r(3) * 0.4
 	};
 });
 
-/** Mock-up display px → texture px. */
-const DISPLAY = BONUS_LIFE_ART.size / BONUS_LIFE_ART.sprite;
+/** The blooms hug the heart (stage 10.1; the mock-up's were 140 and 180 px). */
+export const BONUS_LIFE_ART: CollectibleArt = {
+	size: 128,
+	paint,
+	sprite: 100,
+	blooms: [
+		{ size: 105, blur: 4 },
+		{ size: 115, blur: 8 }
+	],
+	motion: heartMotion,
+	extraBounds: {
+		x0: -ORBIT_X_REACH,
+		y0: ORBIT_Y - ORBIT_Y_REACH,
+		x1: ORBIT_X_REACH,
+		y1: ORBIT_Y + ORBIT_Y_REACH
+	}
+};
 
 export function drawBonusLife(
 	ctx: CanvasRenderingContext2D,
 	x: number,
 	y: number,
-	extent: number,
+	tile: number,
 	time: number
 ): void {
-	const beat = Math.sin(time * 2.5);
-	drawCollectible(
-		ctx,
-		BONUS_LIFE_ART,
-		x,
-		y,
-		extent,
-		{
-			scale: 1 + beat * 0.06 + beat * beat * 0.03,
-			rotation: Math.sin(time * 0.5) * 0.04,
-			alpha: 0.88 + Math.sin(time * 10) * 0.06 + Math.sin(time * 18) * 0.03,
-			bloomAlpha: [0.45 + Math.sin(time * 7) * 0.1, 0.2 + Math.sin(time * 5) * 0.08]
-		},
-		(c) => {
-			c.globalCompositeOperation = 'lighter';
-			c.fillStyle = '#88ffbb';
-			const base = c.globalAlpha;
-			for (const p of ORBIT) {
-				const a = p.angle + p.speed * time;
-				const wobble = Math.sin(time * 3 + a * 2) * 3;
-				const px = Math.cos(a) * (p.radius + wobble) * DISPLAY;
-				const py = Math.sin(a) * (p.radius + wobble) * 0.7 * DISPLAY;
-				const side = 2.5 * p.size * (0.8 + Math.sin(time * 5 + a * 2) * 0.3) * DISPLAY;
-				c.globalAlpha = base * Math.max(0, 0.5 + Math.sin(time * 6 + a) * 0.3);
-				c.fillRect(px - side / 2, py - side / 2, side, side);
-			}
-			c.globalAlpha = base;
-			c.globalCompositeOperation = 'source-over';
+	drawCollectible(ctx, BONUS_LIFE_ART, x, y, tile, time, (c) => {
+		c.globalCompositeOperation = 'lighter';
+		c.fillStyle = '#88ffbb';
+		const base = c.globalAlpha;
+		for (const p of ORBIT) {
+			const a = p.angle + p.speed * time;
+			const wobble = Math.sin(time * 3 + a * 2) * ORBIT_WOBBLE;
+			const px = Math.cos(a) * (p.radius + wobble) * DISPLAY;
+			const py = ORBIT_Y + Math.sin(a) * (p.radius + wobble) * 0.7 * DISPLAY;
+			const side = 2.5 * p.size * (0.8 + Math.sin(time * 5 + a * 2) * 0.3) * DISPLAY;
+			c.globalAlpha = base * Math.max(0, 0.5 + Math.sin(time * 6 + a) * 0.3);
+			c.fillRect(px - side / 2, py - side / 2, side, side);
 		}
-	);
+		c.globalAlpha = base;
+		c.globalCompositeOperation = 'source-over';
+	});
 }

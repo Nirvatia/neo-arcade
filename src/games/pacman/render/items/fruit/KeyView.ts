@@ -1,44 +1,11 @@
-// Cosmic Crystal Key: the owner's COLLECTIBLE_KEY.html, texture code 1:1.
+// Cosmic Crystal Key: the owner's COLLECTIBLE_KEY.html, texture code 1:1 without its
+// ambient glow (the fruit keeps inside its tile, stage 10.1).
 import type { CollectibleArt } from '../collectibleSprite';
 import { FRUIT_BLOOMS } from '../collectibleSprite';
 
 function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	const cx = size / 2;
 	const cy = size / 2;
-
-	// 1. ambient glow (3 layers, violet-blue)
-	const glowLayers: Array<{ r: number; stops: Array<[number, string]> }> = [
-		{
-			r: size * 0.48,
-			stops: [
-				[0, 'rgba(150,120,255,0.35)'],
-				[0.5, 'rgba(100,80,220,0.15)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		},
-		{
-			r: size * 0.35,
-			stops: [
-				[0, 'rgba(180,150,255,0.3)'],
-				[0.5, 'rgba(120,100,240,0.12)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		},
-		{
-			r: size * 0.25,
-			stops: [
-				[0, 'rgba(200,180,255,0.25)'],
-				[0.5, 'rgba(140,120,255,0.1)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		}
-	];
-	for (const layer of glowLayers) {
-		const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
-		for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
-		ctx.fillStyle = g;
-		ctx.fillRect(0, 0, size, size);
-	}
 
 	ctx.save();
 	ctx.translate(cx, cy);
@@ -49,7 +16,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	const shaftTop = headY + headR * 0.9;
 	const shaftBottom = size * 0.32;
 
-	// 2. shaft + teeth
+	// 1. shaft + teeth
 	const shaftAndTeeth = () => {
 		ctx.beginPath();
 		ctx.moveTo(-shaftW, shaftTop);
@@ -127,7 +94,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 		ctx.stroke();
 	}
 
-	// 3. head
+	// 2. head
 	const headShadow = ctx.createRadialGradient(
 		0,
 		headY + headR * 0.3,
@@ -157,7 +124,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.arc(0, headY, headR, 0, Math.PI * 2);
 	ctx.fill();
 
-	// 4. decorative details
+	// 3. decorative details
 	ctx.strokeStyle = 'rgba(200,220,255,0.6)';
 	ctx.lineWidth = 1.5;
 	ctx.shadowBlur = 6;
@@ -224,7 +191,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.arc(0, headY, headR, 0, Math.PI * 2);
 	ctx.stroke();
 
-	// 5. highlights
+	// 4. highlights
 	const highlight1 = ctx.createRadialGradient(
 		-headR * 0.35,
 		headY - headR * 0.35,
@@ -259,7 +226,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.arc(headR * 0.3, headY + headR * 0.15, headR * 0.12, 0, Math.PI * 2);
 	ctx.fill();
 
-	// 6. energy sparkles
+	// 5. energy sparkles
 	const sparkles = [
 		{ x: size * 0.22, y: -size * 0.15, r: 2 },
 		{ x: -size * 0.2, y: -size * 0.2, r: 1.5 },
@@ -293,7 +260,6 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 export const KEY_ART: CollectibleArt = {
 	size: 256,
 	paint,
-	bounds: { x0: -36, y0: -62, x1: 36, y1: 82 },
 	sprite: 240,
 	blooms: FRUIT_BLOOMS
 };

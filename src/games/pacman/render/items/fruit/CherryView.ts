@@ -1,4 +1,5 @@
-// Cosmic Cherry: the owner's COLLECTIBLE_CHERRY.html, texture code 1:1.
+// Cosmic Cherry: the owner's COLLECTIBLE_CHERRY.html, texture code 1:1 without its
+// ambient glow (the fruit keeps inside its tile, stage 10.1).
 import type { CollectibleArt } from '../collectibleSprite';
 import { FRUIT_BLOOMS } from '../collectibleSprite';
 
@@ -6,44 +7,10 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	const cx = size / 2;
 	const cy = size / 2;
 
-	// 1. ambient glow (3 layers)
-	const glowLayers: Array<{ r: number; stops: Array<[number, string]> }> = [
-		{
-			r: size * 0.48,
-			stops: [
-				[0, 'rgba(255,100,150,0.35)'],
-				[0.5, 'rgba(200,60,100,0.15)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		},
-		{
-			r: size * 0.35,
-			stops: [
-				[0, 'rgba(255,140,180,0.3)'],
-				[0.5, 'rgba(220,80,120,0.12)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		},
-		{
-			r: size * 0.25,
-			stops: [
-				[0, 'rgba(255,180,200,0.25)'],
-				[0.5, 'rgba(240,100,140,0.1)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		}
-	];
-	for (const layer of glowLayers) {
-		const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
-		for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
-		ctx.fillStyle = g;
-		ctx.fillRect(0, 0, size, size);
-	}
-
 	ctx.save();
 	ctx.translate(cx, cy);
 
-	// 2. stems
+	// 1. stems
 	const stemGrad1 = ctx.createLinearGradient(0, -size * 0.3, size * 0.1, size * 0.05);
 	stemGrad1.addColorStop(0, 'rgba(100,255,200,0.9)');
 	stemGrad1.addColorStop(0.5, 'rgba(80,220,180,0.8)');
@@ -87,7 +54,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.quadraticCurveTo(-size * 0.1, -size * 0.1, -size * 0.12, size * 0.1);
 	ctx.stroke();
 
-	// 3. leaf
+	// 2. leaf
 	const leafGrad = ctx.createLinearGradient(0, -size * 0.3, size * 0.12, -size * 0.2);
 	leafGrad.addColorStop(0, 'rgba(120,255,200,0.9)');
 	leafGrad.addColorStop(0.5, 'rgba(80,220,160,0.8)');
@@ -109,7 +76,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.lineTo(size * 0.08, -size * 0.28);
 	ctx.stroke();
 
-	// 4. right cherry (front, larger)
+	// 3. right cherry (front, larger)
 	const rx = size * 0.1;
 	const ry = size * 0.08;
 	const rr = size * 0.13;
@@ -188,7 +155,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.arc(rx, ry, rr, 0, Math.PI * 2);
 	ctx.stroke();
 
-	// 5. left cherry (behind, smaller, darker)
+	// 4. left cherry (behind, smaller, darker)
 	const lx = -size * 0.12;
 	const ly = size * 0.12;
 	const lr = size * 0.11;
@@ -250,7 +217,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.arc(lx, ly, lr, 0, Math.PI * 2);
 	ctx.stroke();
 
-	// 6. energy sparkles
+	// 5. energy sparkles
 	const sparkles = [
 		{ x: size * 0.2, y: -size * 0.1, r: 2 },
 		{ x: -size * 0.22, y: -size * 0.05, r: 1.5 },
@@ -283,7 +250,6 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 export const CHERRY_ART: CollectibleArt = {
 	size: 256,
 	paint,
-	bounds: { x0: -59, y0: -81, x1: 59, y1: 59 },
 	sprite: 240,
 	blooms: FRUIT_BLOOMS
 };

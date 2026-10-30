@@ -1,11 +1,12 @@
 // Prototype: the collectibles (cherry, apple, Galaxian, bell, bonus life) drawn by the game's
 // own views on a real season: in a corridor at game scale, a 4× close-up of that corridor,
-// and large on a dark strip the way the mock-ups show them.
+// and large on a dark strip the way the mock-ups show them. Under each item: how far it
+// reaches from its tile centre, glow and animation included (stage 10.1: at most 0.5 tile).
 import { GRID_01 } from '../../../src/games/pacman/config/gridConfig';
 import { MeadowWorld } from '../../../src/games/pacman/render/seasons/meadow/MeadowWorld';
 import { meadowThemeFor } from '../../../src/games/pacman/render/seasons/meadow/meadowThemes';
 import type { MeadowTheme } from '../../../src/games/pacman/render/seasons/meadow/MeadowTheme';
-import { drawFruit, FRUIT_EXTENT } from '../../../src/games/pacman/render/items/fruit/FruitView';
+import { drawFruit } from '../../../src/games/pacman/render/items/fruit/FruitView';
 import { drawBonusLife } from '../../../src/games/pacman/render/items/BonusLifeView';
 import { drawExit } from '../../../src/games/pacman/render/items/ExitView';
 import { FRUIT } from '../../../src/games/pacman/logic/bonuses/fruitCatalog';
@@ -34,8 +35,8 @@ const ITEMS: Array<{ name: string; draw: Item }> = [
 	{ name: 'Galaxian', draw: fruit(FRUIT.GALAXIAN) },
 	{ name: 'Bell', draw: fruit(FRUIT.BELL) },
 	{ name: 'Key', draw: fruit(FRUIT.KEY) },
-	{ name: 'Bonus life', draw: (c, x, y, tile, t) => drawBonusLife(c, x, y, tile * FRUIT_EXTENT, t) },
-	{ name: 'Exit', draw: (c, x, y, tile, t) => drawExit(c, x, y, tile * FRUIT_EXTENT, t) }
+	{ name: 'Bonus life', draw: drawBonusLife },
+	{ name: 'Exit', draw: drawExit }
 ];
 /** Corridor tiles of GRID_01: rows 5 and 2, columns 12..23, one item every other tile. */
 const SPOTS: ReadonlyArray<[number, number]> = Array.from({ length: 12 }, (_, i) => [
@@ -47,6 +48,7 @@ let season: Season = 'spring';
 let world: MeadowWorld;
 let night = false;
 let blink = false;
+let grid = false;
 let vw = 0;
 let vh = 0;
 
@@ -86,6 +88,35 @@ $('blink').addEventListener('click', () => {
 	$('blink').setAttribute('aria-pressed', String(blink));
 });
 
+$('grid').addEventListener('click', () => {
+	grid = !grid;
+	$('grid').setAttribute('aria-pressed', String(grid));
+});
+
+/** The farthest visible pixel (alpha > 10) from the tile centre over a few seconds, in tiles. */
+function reach(item: Item): number {
+	const T = 100;
+	const c = document.createElement('canvas');
+	c.width = c.height = 4 * T;
+	const x = c.getContext('2d', { willReadFrequently: true }) as CanvasRenderingContext2D;
+	const mid = 2 * T;
+	let far = 0;
+	for (let t = 0; t < 6; t += 0.2) {
+		x.clearRect(0, 0, c.width, c.height);
+		item.draw(x, mid, mid, T, t);
+		const d = x.getImageData(0, 0, c.width, c.height).data;
+		for (let py = 0; py < c.height; py++) {
+			for (let px = 0; px < c.width; px++) {
+				if (d[(py * c.width + px) * 4 + 3] > 10) {
+					far = Math.max(far, Math.abs(px + 0.5 - mid), Math.abs(py + 0.5 - mid));
+				}
+			}
+		}
+	}
+	return far / T;
+}
+const REACH = ITEMS.map(reach);
+
 let time = 0;
 let last = performance.now();
 function frame(now: number): void {
@@ -110,6 +141,20 @@ function frame(now: number): void {
 		ctx.restore();
 	});
 	world.drawOverlay(ctx);
+	if (grid) {
+		ctx.strokeStyle = 'rgba(255,255,255,.35)';
+		ctx.lineWidth = 1 / D;
+		ctx.beginPath();
+		for (let c = 12; c <= 24; c++) {
+			ctx.moveTo(L.offsetX + c * S, L.offsetY + S);
+			ctx.lineTo(L.offsetX + c * S, L.offsetY + 7 * S);
+		}
+		for (let r = 1; r <= 7; r++) {
+			ctx.moveTo(L.offsetX + 12 * S, L.offsetY + r * S);
+			ctx.lineTo(L.offsetX + 24 * S, L.offsetY + r * S);
+		}
+		ctx.stroke();
+	}
 
 	// magnified close-up of the two corridors (columns 12..23, rows 1..6)
 	const srcW = 12 * S;
@@ -134,13 +179,15 @@ function frame(now: number): void {
 	const stripX = (vw - stripW) / 2;
 	const stripY = 14;
 	ctx.fillStyle = '#06080e';
-	ctx.fillRect(stripX, stripY, stripW, cell + 22);
+	ctx.fillRect(stripX, stripY, stripW, cell + 36);
 	ITEMS.forEach((item, i) => {
 		item.draw(ctx, stripX + cell * (i + 0.5), stripY + cell / 2 + 4, cell * 0.62, time);
 		ctx.fillStyle = 'rgba(200,212,224,.75)';
 		ctx.font = '11px "Courier New", monospace';
 		ctx.textAlign = 'center';
 		ctx.fillText(item.name.toUpperCase(), stripX + cell * (i + 0.5), stripY + cell + 14);
+		ctx.fillStyle = REACH[i] > 0.5 ? '#ff6a5a' : '#7be0a0';
+		ctx.fillText(`${REACH[i].toFixed(2)} tile`, stripX + cell * (i + 0.5), stripY + cell + 28);
 	});
 	requestAnimationFrame(frame);
 }

@@ -1,4 +1,5 @@
-// Cosmic Melon: the owner's COLLECTIBLE_MELON.html, texture code 1:1.
+// Cosmic Melon: the owner's COLLECTIBLE_MELON.html, texture code 1:1 without its
+// ambient glow (the fruit keeps inside its tile, stage 10.1).
 import type { CollectibleArt } from '../collectibleSprite';
 import { FRUIT_BLOOMS } from '../collectibleSprite';
 
@@ -6,46 +7,12 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	const cx = size / 2;
 	const cy = size / 2;
 
-	// 1. ambient glow (3 layers, green)
-	const glowLayers: Array<{ r: number; stops: Array<[number, string]> }> = [
-		{
-			r: size * 0.48,
-			stops: [
-				[0, 'rgba(100,255,150,0.35)'],
-				[0.5, 'rgba(60,200,100,0.15)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		},
-		{
-			r: size * 0.35,
-			stops: [
-				[0, 'rgba(140,255,180,0.3)'],
-				[0.5, 'rgba(80,220,120,0.12)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		},
-		{
-			r: size * 0.25,
-			stops: [
-				[0, 'rgba(180,255,200,0.25)'],
-				[0.5, 'rgba(100,240,140,0.1)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		}
-	];
-	for (const layer of glowLayers) {
-		const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
-		for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
-		ctx.fillStyle = g;
-		ctx.fillRect(0, 0, size, size);
-	}
-
 	ctx.save();
 	ctx.translate(cx, cy);
 	const melonW = size * 0.26;
 	const melonH = size * 0.2;
 
-	// 2. body
+	// 1. body
 	const shadow = ctx.createRadialGradient(0, melonH * 0.4, 0, 0, melonH * 0.4, melonW * 1.2);
 	shadow.addColorStop(0, 'rgba(20,80,40,0.4)');
 	shadow.addColorStop(1, 'rgba(0,0,0,0)');
@@ -78,7 +45,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.ellipse(0, 0, melonW, melonH, 0, 0, Math.PI * 2);
 	ctx.fill();
 
-	// 3. stripes
+	// 2. stripes
 	const stripeCount = 6;
 	for (let i = 0; i < stripeCount; i++) {
 		const t = (i - (stripeCount - 1) / 2) / (stripeCount - 1);
@@ -113,7 +80,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.ellipse(0, 0, melonW, melonH, 0, 0, Math.PI * 2);
 	ctx.fill();
 
-	// 4. highlights
+	// 3. highlights
 	const highlight1 = ctx.createRadialGradient(
 		-melonW * 0.35,
 		-melonH * 0.4,
@@ -156,7 +123,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.ellipse(0, 0, melonW, melonH, 0, 0, Math.PI * 2);
 	ctx.stroke();
 
-	// 5. stem
+	// 4. stem
 	const stemGrad = ctx.createLinearGradient(0, -melonH, 0, -melonH * 1.3);
 	stemGrad.addColorStop(0, 'rgba(100,255,200,0.9)');
 	stemGrad.addColorStop(0.5, 'rgba(80,220,180,0.8)');
@@ -198,7 +165,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.lineTo(size * 0.07, -melonH * 1.22);
 	ctx.stroke();
 
-	// 6. energy sparkles
+	// 5. energy sparkles
 	const sparkles = [
 		{ x: size * 0.3, y: -size * 0.05, r: 2 },
 		{ x: -size * 0.29, y: -size * 0.08, r: 1.5 },
@@ -232,7 +199,6 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 export const MELON_ART: CollectibleArt = {
 	size: 256,
 	paint,
-	bounds: { x0: -67, y0: -67, x1: 67, y1: 51 },
 	sprite: 240,
 	blooms: FRUIT_BLOOMS
 };

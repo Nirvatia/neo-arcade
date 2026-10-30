@@ -1,4 +1,5 @@
-// Cosmic Apple: the owner's COLLECTIBLE_APPLE.html, texture code 1:1.
+// Cosmic Apple: the owner's COLLECTIBLE_APPLE.html, texture code 1:1 without its
+// ambient glow (the fruit keeps inside its tile, stage 10.1).
 import type { CollectibleArt } from '../collectibleSprite';
 import { FRUIT_BLOOMS } from '../collectibleSprite';
 
@@ -6,45 +7,11 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	const cx = size / 2;
 	const cy = size / 2;
 
-	// 1. ambient glow (3 layers, red)
-	const glowLayers: Array<{ r: number; stops: Array<[number, string]> }> = [
-		{
-			r: size * 0.48,
-			stops: [
-				[0, 'rgba(255,80,80,0.35)'],
-				[0.5, 'rgba(200,50,50,0.15)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		},
-		{
-			r: size * 0.35,
-			stops: [
-				[0, 'rgba(255,120,120,0.3)'],
-				[0.5, 'rgba(220,70,70,0.12)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		},
-		{
-			r: size * 0.25,
-			stops: [
-				[0, 'rgba(255,160,160,0.25)'],
-				[0.5, 'rgba(240,90,90,0.1)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		}
-	];
-	for (const layer of glowLayers) {
-		const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
-		for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
-		ctx.fillStyle = g;
-		ctx.fillRect(0, 0, size, size);
-	}
-
 	ctx.save();
 	ctx.translate(cx, cy + 8);
 	const s = 1.15;
 
-	// 2. stem
+	// 1. stem
 	const stemGrad = ctx.createLinearGradient(0, -56 * s, 28 * s, -105 * s);
 	stemGrad.addColorStop(0, 'rgba(100,255,200,0.9)');
 	stemGrad.addColorStop(0.5, 'rgba(80,220,180,0.8)');
@@ -67,7 +34,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.bezierCurveTo(6 * s, -85 * s, 18 * s, -95 * s, 28 * s, -105 * s);
 	ctx.stroke();
 
-	// 3. leaf
+	// 2. leaf
 	const leafGrad = ctx.createLinearGradient(8 * s, -72 * s, 45 * s, -75 * s);
 	leafGrad.addColorStop(0, 'rgba(80,220,160,0.95)');
 	leafGrad.addColorStop(0.5, 'rgba(100,240,180,0.9)');
@@ -89,7 +56,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.quadraticCurveTo(28 * s, -82 * s, 40 * s, -76 * s);
 	ctx.stroke();
 
-	// 4. body
+	// 3. body
 	const shadow = ctx.createRadialGradient(0, 88 * s * 0.3, 0, 0, 88 * s * 0.3, 95 * s);
 	shadow.addColorStop(0, 'rgba(100,20,20,0.4)');
 	shadow.addColorStop(1, 'rgba(0,0,0,0)');
@@ -150,7 +117,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	appleShape();
 	ctx.fill();
 
-	// 5. highlights
+	// 4. highlights
 	const highlight1 = ctx.createRadialGradient(-30 * s, -30 * s, 0, -30 * s, -30 * s, 25 * s);
 	highlight1.addColorStop(0, 'rgba(255,255,255,0.95)');
 	highlight1.addColorStop(0.3, 'rgba(255,230,230,0.6)');
@@ -178,7 +145,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	appleShape();
 	ctx.stroke();
 
-	// 6. energy sparkles
+	// 5. energy sparkles
 	const sparkles = [
 		{ x: size * 0.28, y: -size * 0.05, r: 2 },
 		{ x: -size * 0.27, y: -size * 0.08, r: 1.5 },
@@ -212,7 +179,6 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 export const APPLE_ART: CollectibleArt = {
 	size: 256,
 	paint,
-	bounds: { x0: -105, y0: -113, x1: 105, y1: 117 },
 	sprite: 240,
 	blooms: FRUIT_BLOOMS
 };

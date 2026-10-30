@@ -1,4 +1,5 @@
-// Cosmic Strawberry: the owner's COLLECTIBLE_STRAWBERRY.html, texture code 1:1.
+// Cosmic Strawberry: the owner's COLLECTIBLE_STRAWBERRY.html, texture code 1:1 without its
+// ambient glow (the fruit keeps inside its tile, stage 10.1).
 import type { CollectibleArt } from '../collectibleSprite';
 import { FRUIT_BLOOMS } from '../collectibleSprite';
 
@@ -6,44 +7,10 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	const cx = size / 2;
 	const cy = size / 2;
 
-	// 1. ambient glow (3 layers, red-pink)
-	const glowLayers: Array<{ r: number; stops: Array<[number, string]> }> = [
-		{
-			r: size * 0.48,
-			stops: [
-				[0, 'rgba(255,80,120,0.35)'],
-				[0.5, 'rgba(200,50,90,0.15)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		},
-		{
-			r: size * 0.35,
-			stops: [
-				[0, 'rgba(255,120,160,0.3)'],
-				[0.5, 'rgba(220,70,110,0.12)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		},
-		{
-			r: size * 0.25,
-			stops: [
-				[0, 'rgba(255,160,180,0.25)'],
-				[0.5, 'rgba(240,90,130,0.1)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		}
-	];
-	for (const layer of glowLayers) {
-		const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
-		for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
-		ctx.fillStyle = g;
-		ctx.fillRect(0, 0, size, size);
-	}
-
 	ctx.save();
 	ctx.translate(cx, cy);
 
-	// 2. berry body
+	// 1. berry body
 	const shadow = ctx.createRadialGradient(0, size * 0.2, 0, 0, size * 0.2, size * 0.25);
 	shadow.addColorStop(0, 'rgba(80,10,30,0.4)');
 	shadow.addColorStop(1, 'rgba(0,0,0,0)');
@@ -155,7 +122,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	berryShape();
 	ctx.stroke();
 
-	// 3. seeds (golden energy points)
+	// 2. seeds (golden energy points)
 	const seeds = [
 		{ x: -size * 0.12, y: -size * 0.02, r: 2.2 },
 		{ x: size * 0.12, y: -size * 0.02, r: 2.2 },
@@ -202,7 +169,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 		ctx.fill();
 	}
 
-	// 4. calyx
+	// 3. calyx
 	const leafCount = 5;
 	const leafAngles = [
 		-Math.PI / 2 - 0.6,
@@ -253,7 +220,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.arc(0, -size * 0.18, size * 0.04, 0, Math.PI * 2);
 	ctx.fill();
 
-	// 5. energy sparkles
+	// 4. energy sparkles
 	const sparkles = [
 		{ x: size * 0.25, y: -size * 0.1, r: 2 },
 		{ x: -size * 0.26, y: -size * 0.05, r: 1.5 },
@@ -284,11 +251,9 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.restore();
 }
 
-/** Calyx tips reach ~0.32 of the texture up, the berry ~0.28 down and ~0.25 sideways. */
 export const STRAWBERRY_ART: CollectibleArt = {
 	size: 256,
 	paint,
-	bounds: { x0: -64, y0: -82, x1: 64, y1: 72 },
 	sprite: 240,
 	blooms: FRUIT_BLOOMS
 };

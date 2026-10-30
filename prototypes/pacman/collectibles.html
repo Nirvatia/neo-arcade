@@ -6,7 +6,8 @@
     <title>Pac-Man · Collectibles</title>
     <!-- Prototype: the owner's collectible mock-ups (COLLECTIBLE_*.html) ported into the game
          (render/items/), shown on the real seasons at game scale, magnified 4×, and large on
-         a dark strip as in the mock-ups. Built from the sources:
+         a dark strip as in the mock-ups, each with how far it reaches from its tile centre
+         (in tiles; over 0.5 it spills out of the tile). Built from the sources:
          `node prototypes/pacman/build.mjs collectibles`; open as a file. -->
     <style>
       html,body{height:100%;margin:0;overflow:hidden;background:#1a1a14}
@@ -25,6 +26,7 @@
       <button class="bt" data-season="spring">Весна</button>
       <button class="bt" id="night" aria-pressed="false">☾ Ночь</button>
       <button class="bt" id="blink" aria-pressed="false">Мигание (истекает)</button>
+      <button class="bt" id="grid" aria-pressed="false">Клетки</button>
     </div>
     <script>
 (function() {
@@ -3422,6 +3424,10 @@
 	FRUIT.CHERRY, FRUIT.STRAWBERRY, FRUIT.ORANGE, FRUIT.PRETZEL, FRUIT.APPLE, FRUIT.PEAR, FRUIT.MELON, FRUIT.GALAXIAN, FRUIT.BELL, FRUIT.KEY;
 	//#endregion
 	//#region src/games/pacman/render/items/collectibleSprite.ts
+	/** The larger side of a collectible's object (without its glow), in tiles. */
+	var COLLECTIBLE_EXTENT = .78;
+	/** How far anything drawn may reach from the tile centre, in tiles: the tile's own edge. */
+	var COLLECTIBLE_REACH = .5;
 	var cache = /* @__PURE__ */ new Map();
 	function makeCanvas(w, h) {
 		const c = document.createElement("canvas");
@@ -3467,15 +3473,117 @@
 			pad
 		};
 	}
+	/** The box of the pixels with alpha ≥ `threshold`; the whole texture if it cannot be read. */
+	function measure(ctx, size, threshold) {
+		const half = size / 2;
+		let data;
+		try {
+			data = ctx.getImageData(0, 0, size, size).data;
+		} catch (error) {
+			console.error("collectibleSprite.measure", "cannot read the texture", error);
+			return {
+				x0: -half,
+				y0: -half,
+				x1: half,
+				y1: half
+			};
+		}
+		let x0 = size;
+		let y0 = size;
+		let x1 = -1;
+		let y1 = -1;
+		for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (data[(y * size + x) * 4 + 3] >= threshold) {
+			if (x < x0) x0 = x;
+			if (x > x1) x1 = x;
+			if (y < y0) y0 = y;
+			if (y > y1) y1 = y;
+		}
+		if (x1 < 0) return {
+			x0: -half,
+			y0: -half,
+			x1: half,
+			y1: half
+		};
+		return {
+			x0: x0 - half,
+			y0: y0 - half,
+			x1: x1 + 1 - half,
+			y1: y1 + 1 - half
+		};
+	}
+	var LAYER_VISIBLE = 10 / 3;
+	/** Every pixel of a bloom layer still visible at its brightest (`alpha`), in texture px. */
+	function bloomBounds(layer, k, half, alpha) {
+		const ctx = layer.canvas.getContext("2d");
+		if (!ctx) return null;
+		const w = layer.canvas.width;
+		const b = measure(ctx, w, Math.min(255, Math.ceil(LAYER_VISIBLE / Math.max(alpha, .001))));
+		const shift = w / 2 - half - layer.pad;
+		return {
+			x0: (b.x0 + shift) * k,
+			y0: (b.y0 + shift) * k,
+			x1: (b.x1 + shift) * k,
+			y1: (b.y1 + shift) * k
+		};
+	}
+	function union(a, b) {
+		return {
+			x0: Math.min(a.x0, b.x0),
+			y0: Math.min(a.y0, b.y0),
+			x1: Math.max(a.x1, b.x1),
+			y1: Math.max(a.y1, b.y1)
+		};
+	}
+	/**
+	* The object scale per tile px: its larger side `COLLECTIBLE_EXTENT` of the tile, smaller if
+	* the glow, at the largest breath and sway of its ticker, would reach past the tile's edge.
+	*/
+	function fitFor(art, bounds, glow) {
+		const cx = (bounds.x0 + bounds.x1) / 2;
+		const cy = (bounds.y0 + bounds.y1) / 2;
+		const corners = [
+			[glow.x0, glow.y0],
+			[glow.x1, glow.y0],
+			[glow.x0, glow.y1],
+			[glow.x1, glow.y1]
+		];
+		const motion = art.motion ?? fruitMotion;
+		let far = 0;
+		for (let t = 0; t < 30; t += 1 / 30) {
+			const m = motion(t);
+			const c = Math.cos(m.rotation);
+			const s = Math.sin(m.rotation);
+			for (const [px, py] of corners) {
+				const rx = (px * c - py * s) * m.scale - cx;
+				const ry = (px * s + py * c) * m.scale - cy;
+				far = Math.max(far, Math.abs(rx), Math.abs(ry));
+			}
+		}
+		const object = COLLECTIBLE_EXTENT / Math.max(1, bounds.x1 - bounds.x0, bounds.y1 - bounds.y0);
+		return far > 0 ? Math.min(object, COLLECTIBLE_REACH / far) : object;
+	}
 	function bake(art) {
 		if (typeof document === "undefined") return null;
 		const sprite = makeCanvas(art.size, art.size);
 		const ctx = sprite.getContext("2d");
 		if (!ctx) return null;
 		art.paint(ctx, art.size);
+		const blooms = art.blooms.map((b) => blurred(sprite, b.blur * .6 * art.size / b.size));
+		const bounds = measure(ctx, art.size, 128);
+		let glow = measure(ctx, art.size, Math.ceil(LAYER_VISIBLE));
+		const motion = art.motion ?? fruitMotion;
+		art.blooms.forEach((bloom, i) => {
+			let brightest = 0;
+			for (let t = 0; t < 30; t += 1 / 30) brightest = Math.max(brightest, motion(t).bloomAlpha[i]);
+			const b = bloomBounds(blooms[i], bloom.size / art.sprite, art.size / 2, Math.min(1, brightest));
+			if (b) glow = union(glow, b);
+		});
+		if (art.extraBounds) glow = union(glow, art.extraBounds);
 		return {
 			sprite,
-			blooms: art.blooms.map((b) => blurred(sprite, b.blur * .6 * art.size / b.size))
+			bounds,
+			fit: fitFor(art, bounds, glow),
+			blooms
 		};
 	}
 	/** Pre-paints the textures (they are otherwise painted on first draw). */
@@ -3486,16 +3594,17 @@
 		}
 	}
 	/**
-	* Draws the collectible with its object (bounds) centred at (x, y), its larger side
-	* `extent` px across, the bloom layers sized relative to the sprite as in the mock-up.
-	* `extra` draws inside the same transform, in texture px from the texture centre.
+	* Draws the collectible on a tile `tile` px across, its object (bounds) centred at (x, y),
+	* animated by its ticker at `time`; the bloom layers are sized relative to the sprite as in
+	* the mock-up. `extra` draws inside the same transform, in texture px from the texture centre.
 	*/
-	function drawCollectible(ctx, art, x, y, extent, motion, extra) {
+	function drawCollectible(ctx, art, x, y, tile, time, extra) {
 		warmCollectible(art);
 		const baked = cache.get(art);
-		if (!baked || !(extent > 0)) return;
-		const b = art.bounds;
-		const f = extent / Math.max(b.x1 - b.x0, b.y1 - b.y0);
+		if (!baked || !(tile > 0)) return;
+		const motion = (art.motion ?? fruitMotion)(time);
+		const b = baked.bounds;
+		const f = baked.fit * tile;
 		const half = art.size / 2;
 		ctx.save();
 		ctx.translate(x - (b.x0 + b.x1) / 2 * f, y - (b.y0 + b.y1) / 2 * f);
@@ -3524,51 +3633,22 @@
 			bloomAlpha: [.4 + Math.sin(time * 2) * .05, .2 + Math.sin(time * 1.5) * .03]
 		};
 	}
-	/** The bloom layers every fruit mock-up uses (sprite 240 px, blooms 280 and 340 px). */
+	/**
+	* The fruit's bloom layers (sprite 240 px). The mock-ups' 280 and 340 px with blur 12 and 25
+	* spilled far past the tile; these hug the object (stage 10.1).
+	*/
 	var FRUIT_BLOOMS = [{
-		size: 280,
-		blur: 12
+		size: 252,
+		blur: 6
 	}, {
-		size: 340,
-		blur: 25
+		size: 276,
+		blur: 12
 	}];
 	//#endregion
 	//#region src/games/pacman/render/items/fruit/CherryView.ts
 	function paint$11(ctx, size) {
 		const cx = size / 2;
 		const cy = size / 2;
-		const glowLayers = [
-			{
-				r: size * .48,
-				stops: [
-					[0, "rgba(255,100,150,0.35)"],
-					[.5, "rgba(200,60,100,0.15)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			},
-			{
-				r: size * .35,
-				stops: [
-					[0, "rgba(255,140,180,0.3)"],
-					[.5, "rgba(220,80,120,0.12)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			},
-			{
-				r: size * .25,
-				stops: [
-					[0, "rgba(255,180,200,0.25)"],
-					[.5, "rgba(240,100,140,0.1)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			}
-		];
-		for (const layer of glowLayers) {
-			const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
-			for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
-			ctx.fillStyle = g;
-			ctx.fillRect(0, 0, size, size);
-		}
 		ctx.save();
 		ctx.translate(cx, cy);
 		const stemGrad1 = ctx.createLinearGradient(0, -size * .3, size * .1, size * .05);
@@ -3783,12 +3863,6 @@
 	var CHERRY_ART = {
 		size: 256,
 		paint: paint$11,
-		bounds: {
-			x0: -59,
-			y0: -81,
-			x1: 59,
-			y1: 59
-		},
 		sprite: 240,
 		blooms: FRUIT_BLOOMS
 	};
@@ -3797,38 +3871,6 @@
 	function paint$10(ctx, size) {
 		const cx = size / 2;
 		const cy = size / 2;
-		const glowLayers = [
-			{
-				r: size * .48,
-				stops: [
-					[0, "rgba(255,80,120,0.35)"],
-					[.5, "rgba(200,50,90,0.15)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			},
-			{
-				r: size * .35,
-				stops: [
-					[0, "rgba(255,120,160,0.3)"],
-					[.5, "rgba(220,70,110,0.12)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			},
-			{
-				r: size * .25,
-				stops: [
-					[0, "rgba(255,160,180,0.25)"],
-					[.5, "rgba(240,90,130,0.1)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			}
-		];
-		for (const layer of glowLayers) {
-			const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
-			for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
-			ctx.fillStyle = g;
-			ctx.fillRect(0, 0, size, size);
-		}
 		ctx.save();
 		ctx.translate(cx, cy);
 		const shadow = ctx.createRadialGradient(0, size * .2, 0, 0, size * .2, size * .25);
@@ -4063,16 +4105,9 @@
 		}
 		ctx.restore();
 	}
-	/** Calyx tips reach ~0.32 of the texture up, the berry ~0.28 down and ~0.25 sideways. */
 	var STRAWBERRY_ART = {
 		size: 256,
 		paint: paint$10,
-		bounds: {
-			x0: -64,
-			y0: -82,
-			x1: 64,
-			y1: 72
-		},
 		sprite: 240,
 		blooms: FRUIT_BLOOMS
 	};
@@ -4081,38 +4116,6 @@
 	function paint$9(ctx, size) {
 		const cx = size / 2;
 		const cy = size / 2;
-		const glowLayers = [
-			{
-				r: size * .48,
-				stops: [
-					[0, "rgba(255,180,80,0.35)"],
-					[.5, "rgba(220,140,60,0.15)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			},
-			{
-				r: size * .35,
-				stops: [
-					[0, "rgba(255,200,120,0.3)"],
-					[.5, "rgba(240,160,80,0.12)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			},
-			{
-				r: size * .25,
-				stops: [
-					[0, "rgba(255,220,150,0.25)"],
-					[.5, "rgba(250,180,100,0.1)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			}
-		];
-		for (const layer of glowLayers) {
-			const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
-			for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
-			ctx.fillStyle = g;
-			ctx.fillRect(0, 0, size, size);
-		}
 		ctx.save();
 		ctx.translate(cx, cy);
 		const orangeR = size * .22;
@@ -4304,12 +4307,6 @@
 	var ORANGE_ART = {
 		size: 256,
 		paint: paint$9,
-		bounds: {
-			x0: -56,
-			y0: -70,
-			x1: 56,
-			y1: 56
-		},
 		sprite: 240,
 		blooms: FRUIT_BLOOMS
 	};
@@ -4318,12 +4315,6 @@
 	function paint$8(ctx, size) {
 		const cx = size / 2;
 		const cy = size / 2;
-		const bgGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * .45);
-		bgGlow.addColorStop(0, "rgba(230, 110, 25, 0.23)");
-		bgGlow.addColorStop(.5, "rgba(140, 30, 110, 0.07)");
-		bgGlow.addColorStop(1, "rgba(0,0,0,0)");
-		ctx.fillStyle = bgGlow;
-		ctx.fillRect(0, 0, size, size);
 		ctx.save();
 		ctx.translate(cx, cy);
 		ctx.scale(size / 400, size / 400);
@@ -4479,23 +4470,16 @@
 			bloomAlpha: [.45 + Math.sin(time * 2.5) * .05, .25 + Math.sin(time * 1.2) * .03]
 		};
 	}
-	/** Knot strokes span 53..347 × 56..332 of the 400-unit design, ×1.28 into the texture. */
 	var PRETZEL_ART = {
 		size: 512,
 		paint: paint$8,
-		bounds: {
-			x0: -188,
-			y0: -184,
-			x1: 188,
-			y1: 169
-		},
 		sprite: 380,
 		blooms: [{
-			size: 410,
-			blur: 10
+			size: 400,
+			blur: 5
 		}, {
-			size: 460,
-			blur: 24
+			size: 437,
+			blur: 11
 		}],
 		motion: pretzelMotion
 	};
@@ -4504,38 +4488,6 @@
 	function paint$7(ctx, size) {
 		const cx = size / 2;
 		const cy = size / 2;
-		const glowLayers = [
-			{
-				r: size * .48,
-				stops: [
-					[0, "rgba(255,80,80,0.35)"],
-					[.5, "rgba(200,50,50,0.15)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			},
-			{
-				r: size * .35,
-				stops: [
-					[0, "rgba(255,120,120,0.3)"],
-					[.5, "rgba(220,70,70,0.12)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			},
-			{
-				r: size * .25,
-				stops: [
-					[0, "rgba(255,160,160,0.25)"],
-					[.5, "rgba(240,90,90,0.1)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			}
-		];
-		for (const layer of glowLayers) {
-			const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
-			for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
-			ctx.fillStyle = g;
-			ctx.fillRect(0, 0, size, size);
-		}
 		ctx.save();
 		ctx.translate(cx, cy + 8);
 		const s = 1.15;
@@ -4710,12 +4662,6 @@
 	var APPLE_ART = {
 		size: 256,
 		paint: paint$7,
-		bounds: {
-			x0: -105,
-			y0: -113,
-			x1: 105,
-			y1: 117
-		},
 		sprite: 240,
 		blooms: FRUIT_BLOOMS
 	};
@@ -4724,38 +4670,6 @@
 	function paint$6(ctx, size) {
 		const cx = size / 2;
 		const cy = size / 2;
-		const glowLayers = [
-			{
-				r: size * .48,
-				stops: [
-					[0, "rgba(180,255,100,0.35)"],
-					[.5, "rgba(140,200,60,0.15)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			},
-			{
-				r: size * .35,
-				stops: [
-					[0, "rgba(200,255,120,0.3)"],
-					[.5, "rgba(160,220,80,0.12)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			},
-			{
-				r: size * .25,
-				stops: [
-					[0, "rgba(220,255,150,0.25)"],
-					[.5, "rgba(180,240,100,0.1)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			}
-		];
-		for (const layer of glowLayers) {
-			const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
-			for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
-			ctx.fillStyle = g;
-			ctx.fillRect(0, 0, size, size);
-		}
 		ctx.save();
 		ctx.translate(cx, cy);
 		const stemGrad = ctx.createLinearGradient(0, -70, 0, -95);
@@ -4913,58 +4827,14 @@
 	var PEAR_ART = {
 		size: 256,
 		paint: paint$6,
-		bounds: {
-			x0: -57,
-			y0: -95,
-			x1: 57,
-			y1: 75
-		},
-		sprite: 260,
-		blooms: [{
-			size: 300,
-			blur: 12
-		}, {
-			size: 360,
-			blur: 25
-		}]
+		sprite: 240,
+		blooms: FRUIT_BLOOMS
 	};
 	//#endregion
 	//#region src/games/pacman/render/items/fruit/MelonView.ts
 	function paint$5(ctx, size) {
 		const cx = size / 2;
 		const cy = size / 2;
-		const glowLayers = [
-			{
-				r: size * .48,
-				stops: [
-					[0, "rgba(100,255,150,0.35)"],
-					[.5, "rgba(60,200,100,0.15)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			},
-			{
-				r: size * .35,
-				stops: [
-					[0, "rgba(140,255,180,0.3)"],
-					[.5, "rgba(80,220,120,0.12)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			},
-			{
-				r: size * .25,
-				stops: [
-					[0, "rgba(180,255,200,0.25)"],
-					[.5, "rgba(100,240,140,0.1)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			}
-		];
-		for (const layer of glowLayers) {
-			const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
-			for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
-			ctx.fillStyle = g;
-			ctx.fillRect(0, 0, size, size);
-		}
 		ctx.save();
 		ctx.translate(cx, cy);
 		const melonW = size * .26;
@@ -5145,12 +5015,6 @@
 	var MELON_ART = {
 		size: 256,
 		paint: paint$5,
-		bounds: {
-			x0: -67,
-			y0: -67,
-			x1: 67,
-			y1: 51
-		},
 		sprite: 240,
 		blooms: FRUIT_BLOOMS
 	};
@@ -5159,38 +5023,6 @@
 	function paint$4(ctx, size) {
 		const cx = size / 2;
 		const cy = size / 2;
-		const glowLayers = [
-			{
-				r: size * .48,
-				stops: [
-					[0, "rgba(150,100,255,0.35)"],
-					[.5, "rgba(100,60,200,0.15)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			},
-			{
-				r: size * .35,
-				stops: [
-					[0, "rgba(180,130,255,0.3)"],
-					[.5, "rgba(120,80,220,0.12)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			},
-			{
-				r: size * .25,
-				stops: [
-					[0, "rgba(200,160,255,0.25)"],
-					[.5, "rgba(140,100,240,0.1)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			}
-		];
-		for (const layer of glowLayers) {
-			const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
-			for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
-			ctx.fillStyle = g;
-			ctx.fillRect(0, 0, size, size);
-		}
 		ctx.save();
 		ctx.translate(cx, cy);
 		const shipW = size * .3;
@@ -5304,12 +5136,6 @@
 	var GALAXIAN_ART = {
 		size: 256,
 		paint: paint$4,
-		bounds: {
-			x0: -69,
-			y0: -45,
-			x1: 69,
-			y1: 39
-		},
 		sprite: 240,
 		blooms: FRUIT_BLOOMS
 	};
@@ -5318,38 +5144,6 @@
 	function paint$3(ctx, size) {
 		const cx = size / 2;
 		const cy = size / 2;
-		const glowLayers = [
-			{
-				r: size * .48,
-				stops: [
-					[0, "rgba(255,220,100,0.35)"],
-					[.5, "rgba(220,180,60,0.15)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			},
-			{
-				r: size * .35,
-				stops: [
-					[0, "rgba(255,240,150,0.3)"],
-					[.5, "rgba(240,200,80,0.12)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			},
-			{
-				r: size * .25,
-				stops: [
-					[0, "rgba(255,250,180,0.25)"],
-					[.5, "rgba(250,220,100,0.1)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			}
-		];
-		for (const layer of glowLayers) {
-			const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
-			for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
-			ctx.fillStyle = g;
-			ctx.fillRect(0, 0, size, size);
-		}
 		ctx.save();
 		ctx.translate(cx, cy);
 		const bellW = size * .16;
@@ -5481,12 +5275,6 @@
 	var BELL_ART = {
 		size: 256,
 		paint: paint$3,
-		bounds: {
-			x0: -36,
-			y0: -63,
-			x1: 36,
-			y1: 41
-		},
 		sprite: 240,
 		blooms: FRUIT_BLOOMS
 	};
@@ -5495,38 +5283,6 @@
 	function paint$2(ctx, size) {
 		const cx = size / 2;
 		const cy = size / 2;
-		const glowLayers = [
-			{
-				r: size * .48,
-				stops: [
-					[0, "rgba(150,120,255,0.35)"],
-					[.5, "rgba(100,80,220,0.15)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			},
-			{
-				r: size * .35,
-				stops: [
-					[0, "rgba(180,150,255,0.3)"],
-					[.5, "rgba(120,100,240,0.12)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			},
-			{
-				r: size * .25,
-				stops: [
-					[0, "rgba(200,180,255,0.25)"],
-					[.5, "rgba(140,120,255,0.1)"],
-					[1, "rgba(0,0,0,0)"]
-				]
-			}
-		];
-		for (const layer of glowLayers) {
-			const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
-			for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
-			ctx.fillStyle = g;
-			ctx.fillRect(0, 0, size, size);
-		}
 		ctx.save();
 		ctx.translate(cx, cy);
 		const headR = size * .14;
@@ -5739,19 +5495,11 @@
 	var KEY_ART = {
 		size: 256,
 		paint: paint$2,
-		bounds: {
-			x0: -36,
-			y0: -62,
-			x1: 36,
-			y1: 82
-		},
 		sprite: 240,
 		blooms: FRUIT_BLOOMS
 	};
 	//#endregion
 	//#region src/games/pacman/render/items/fruit/FruitView.ts
-	/** The larger side of a fruit (without its glow), in tiles. */
-	var FRUIT_EXTENT = .9;
 	/** Every fruit's art: the owner's mock-ups. */
 	var ART = {
 		[FRUIT.CHERRY]: CHERRY_ART,
@@ -5767,36 +5515,13 @@
 	};
 	/** One fruit centred at (x, y) on a tile of `tileSize` px. */
 	function drawFruit(ctx, kind, x, y, tileSize, time) {
-		const art = ART[kind];
-		drawCollectible(ctx, art, x, y, tileSize * FRUIT_EXTENT, (art.motion ?? fruitMotion)(time));
+		drawCollectible(ctx, ART[kind], x, y, tileSize, time);
 	}
 	//#endregion
 	//#region src/games/pacman/render/items/BonusLifeView.ts
 	function paint$1(ctx, size) {
 		const cx = size / 2;
 		const cy = size / 2;
-		const layers = [{
-			r: size * .5,
-			stops: [
-				[0, "rgba(120,255,200,0.4)"],
-				[.3, "rgba(80,230,160,0.25)"],
-				[.6, "rgba(40,180,120,0.12)"],
-				[1, "rgba(0,0,0,0)"]
-			]
-		}, {
-			r: size * .35,
-			stops: [
-				[0, "rgba(180,255,220,0.3)"],
-				[.5, "rgba(100,255,180,0.15)"],
-				[1, "rgba(0,0,0,0)"]
-			]
-		}];
-		for (const layer of layers) {
-			const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
-			for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
-			ctx.fillStyle = g;
-			ctx.fillRect(0, 0, size, size);
-		}
 		const scale = size * .012;
 		ctx.save();
 		ctx.translate(cx, cy + scale * 8);
@@ -5880,25 +5605,23 @@
 		}
 		ctx.restore();
 	}
-	/** Mock-up display: heart 100 px from a 128 px texture, blooms 140 and 180 px. */
-	var BONUS_LIFE_ART = {
-		size: 128,
-		paint: paint$1,
-		bounds: {
-			x0: -34,
-			y0: -11,
-			x1: 34,
-			y1: 55
-		},
-		sprite: 100,
-		blooms: [{
-			size: 140,
-			blur: 10
-		}, {
-			size: 180,
-			blur: 20
-		}]
-	};
+	/** The mock-up's ticker: the heartbeat, a slight sway, the flicker. */
+	function heartMotion(time) {
+		const beat = Math.sin(time * 2.5);
+		return {
+			scale: 1 + beat * .06 + beat * beat * .03,
+			rotation: Math.sin(time * .5) * .04,
+			alpha: .88 + Math.sin(time * 10) * .06 + Math.sin(time * 18) * .03,
+			bloomAlpha: [.45 + Math.sin(time * 7) * .1, .2 + Math.sin(time * 5) * .08]
+		};
+	}
+	/** Mock-up display px → texture px (heart 100 px from a 128 px texture). */
+	var DISPLAY = 128 / 100;
+	var ORBIT_WOBBLE = 2;
+	/** The orbit's centre: the heart's, which sits below the texture centre, texture px. */
+	var ORBIT_Y = 22;
+	/** The orbit's far edge plus half the largest particle, texture px. */
+	var ORBIT_X_REACH = 44 * DISPLAY;
 	/** Fixed per-particle randomness, so the orbit is a function of time. */
 	var ORBIT = Array.from({ length: 16 }, (_, i) => {
 		const r = (n) => {
@@ -5907,29 +5630,41 @@
 		};
 		return {
 			angle: i / 16 * Math.PI * 2,
-			radius: 50 + r(1) * 15,
+			radius: 32 + r(1) * 8,
 			speed: .6 + r(2) * .4,
 			size: .6 + r(3) * .4
 		};
 	});
-	/** Mock-up display px → texture px. */
-	var DISPLAY = BONUS_LIFE_ART.size / BONUS_LIFE_ART.sprite;
-	function drawBonusLife(ctx, x, y, extent, time) {
-		const beat = Math.sin(time * 2.5);
-		drawCollectible(ctx, BONUS_LIFE_ART, x, y, extent, {
-			scale: 1 + beat * .06 + beat * beat * .03,
-			rotation: Math.sin(time * .5) * .04,
-			alpha: .88 + Math.sin(time * 10) * .06 + Math.sin(time * 18) * .03,
-			bloomAlpha: [.45 + Math.sin(time * 7) * .1, .2 + Math.sin(time * 5) * .08]
-		}, (c) => {
+	/** The blooms hug the heart (stage 10.1; the mock-up's were 140 and 180 px). */
+	var BONUS_LIFE_ART = {
+		size: 128,
+		paint: paint$1,
+		sprite: 100,
+		blooms: [{
+			size: 105,
+			blur: 4
+		}, {
+			size: 115,
+			blur: 8
+		}],
+		motion: heartMotion,
+		extraBounds: {
+			x0: -56.32,
+			y0: -18.192,
+			x1: ORBIT_X_REACH,
+			y1: 62.192
+		}
+	};
+	function drawBonusLife(ctx, x, y, tile, time) {
+		drawCollectible(ctx, BONUS_LIFE_ART, x, y, tile, time, (c) => {
 			c.globalCompositeOperation = "lighter";
 			c.fillStyle = "#88ffbb";
 			const base = c.globalAlpha;
 			for (const p of ORBIT) {
 				const a = p.angle + p.speed * time;
-				const wobble = Math.sin(time * 3 + a * 2) * 3;
+				const wobble = Math.sin(time * 3 + a * 2) * ORBIT_WOBBLE;
 				const px = Math.cos(a) * (p.radius + wobble) * DISPLAY;
-				const py = Math.sin(a) * (p.radius + wobble) * .7 * DISPLAY;
+				const py = ORBIT_Y + Math.sin(a) * (p.radius + wobble) * .7 * DISPLAY;
 				const side = 2.5 * p.size * (.8 + Math.sin(time * 5 + a * 2) * .3) * DISPLAY;
 				c.globalAlpha = base * Math.max(0, .5 + Math.sin(time * 6 + a) * .3);
 				c.fillRect(px - side / 2, py - side / 2, side, side);
@@ -5943,12 +5678,6 @@
 	function paint(ctx, size) {
 		const cx = size / 2;
 		const cy = size / 2;
-		const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * .48);
-		glow.addColorStop(0, "rgba(150,230,255,0.35)");
-		glow.addColorStop(.5, "rgba(80,160,220,0.15)");
-		glow.addColorStop(1, "rgba(0,0,0,0)");
-		ctx.fillStyle = glow;
-		ctx.fillRect(0, 0, size, size);
 		ctx.save();
 		ctx.translate(cx, cy);
 		const w = size * .2;
@@ -5996,25 +5725,24 @@
 		ctx.stroke();
 		ctx.restore();
 	}
-	var EXIT_ART = {
-		size: 256,
-		paint,
-		bounds: {
-			x0: -69,
-			y0: -77,
-			x1: 69,
-			y1: 79
-		},
-		sprite: 240,
-		blooms: FRUIT_BLOOMS
-	};
-	function drawExit(ctx, x, y, extent, time) {
-		drawCollectible(ctx, EXIT_ART, x, y, extent, {
+	/** A steady doorway: it breathes and its light pulses, it does not sway. */
+	function exitMotion(time) {
+		return {
 			scale: 1 + Math.sin(time * 2.2) * .04,
 			rotation: 0,
 			alpha: 1,
 			bloomAlpha: [.45 + Math.sin(time * 3) * .1, .25 + Math.sin(time * 2) * .05]
-		});
+		};
+	}
+	var EXIT_ART = {
+		size: 256,
+		paint,
+		sprite: 240,
+		blooms: FRUIT_BLOOMS,
+		motion: exitMotion
+	};
+	function drawExit(ctx, x, y, tile, time) {
+		drawCollectible(ctx, EXIT_ART, x, y, tile, time);
 	}
 	//#endregion
 	//#region prototypes/pacman/collectibles/main.ts
@@ -6067,11 +5795,11 @@
 		},
 		{
 			name: "Bonus life",
-			draw: (c, x, y, tile, t) => drawBonusLife(c, x, y, tile * FRUIT_EXTENT, t)
+			draw: drawBonusLife
 		},
 		{
 			name: "Exit",
-			draw: (c, x, y, tile, t) => drawExit(c, x, y, tile * FRUIT_EXTENT, t)
+			draw: drawExit
 		}
 	];
 	/** Corridor tiles of GRID_01: rows 5 and 2, columns 12..23, one item every other tile. */
@@ -6080,6 +5808,7 @@
 	var world;
 	var night = false;
 	var blink = false;
+	var grid = false;
 	var vw = 0;
 	var vh = 0;
 	function buildWorld() {
@@ -6111,6 +5840,27 @@
 		blink = !blink;
 		$("blink").setAttribute("aria-pressed", String(blink));
 	});
+	$("grid").addEventListener("click", () => {
+		grid = !grid;
+		$("grid").setAttribute("aria-pressed", String(grid));
+	});
+	/** The farthest visible pixel (alpha > 10) from the tile centre over a few seconds, in tiles. */
+	function reach(item) {
+		const T = 100;
+		const c = document.createElement("canvas");
+		c.width = c.height = 400;
+		const x = c.getContext("2d", { willReadFrequently: true });
+		const mid = 200;
+		let far = 0;
+		for (let t = 0; t < 6; t += .2) {
+			x.clearRect(0, 0, c.width, c.height);
+			item.draw(x, mid, mid, T, t);
+			const d = x.getImageData(0, 0, c.width, c.height).data;
+			for (let py = 0; py < c.height; py++) for (let px = 0; px < c.width; px++) if (d[(py * c.width + px) * 4 + 3] > 10) far = Math.max(far, Math.abs(px + .5 - mid), Math.abs(py + .5 - mid));
+		}
+		return far / T;
+	}
+	var REACH = ITEMS.map(reach);
 	var time = 0;
 	var last = performance.now();
 	function frame(now) {
@@ -6134,6 +5884,20 @@
 			ctx.restore();
 		});
 		world.drawOverlay(ctx);
+		if (grid) {
+			ctx.strokeStyle = "rgba(255,255,255,.35)";
+			ctx.lineWidth = 1 / D;
+			ctx.beginPath();
+			for (let c = 12; c <= 24; c++) {
+				ctx.moveTo(L.offsetX + c * S, L.offsetY + S);
+				ctx.lineTo(L.offsetX + c * S, L.offsetY + 7 * S);
+			}
+			for (let r = 1; r <= 7; r++) {
+				ctx.moveTo(L.offsetX + 12 * S, L.offsetY + r * S);
+				ctx.lineTo(L.offsetX + 24 * S, L.offsetY + r * S);
+			}
+			ctx.stroke();
+		}
 		const srcW = 12 * S;
 		const srcH = 6 * S;
 		const boxW = Math.min(vw - 36, srcW * ZOOM, (vh - 300) / srcH * srcW);
@@ -6154,13 +5918,15 @@
 		const stripX = (vw - stripW) / 2;
 		const stripY = 14;
 		ctx.fillStyle = "#06080e";
-		ctx.fillRect(stripX, stripY, stripW, cell + 22);
+		ctx.fillRect(stripX, stripY, stripW, cell + 36);
 		ITEMS.forEach((item, i) => {
 			item.draw(ctx, stripX + cell * (i + .5), stripY + cell / 2 + 4, cell * .62, time);
 			ctx.fillStyle = "rgba(200,212,224,.75)";
 			ctx.font = "11px \"Courier New\", monospace";
 			ctx.textAlign = "center";
 			ctx.fillText(item.name.toUpperCase(), stripX + cell * (i + .5), stripY + cell + 14);
+			ctx.fillStyle = REACH[i] > .5 ? "#ff6a5a" : "#7be0a0";
+			ctx.fillText(`${REACH[i].toFixed(2)} tile`, stripX + cell * (i + .5), stripY + cell + 28);
 		});
 		requestAnimationFrame(frame);
 	}

@@ -6,7 +6,8 @@
     <title>Pac-Man · Collectibles</title>
     <!-- Prototype: the owner's collectible mock-ups (COLLECTIBLE_*.html) ported into the game
          (render/items/), shown on the real seasons at game scale, magnified 4×, and large on
-         a dark strip as in the mock-ups. Built from the sources:
+         a dark strip as in the mock-ups, each with how far it reaches from its tile centre
+         (in tiles; over 0.5 it spills out of the tile). Built from the sources:
          `node prototypes/pacman/build.mjs collectibles`; open as a file. -->
     <style>
       html,body{height:100%;margin:0;overflow:hidden;background:#1a1a14}
@@ -25,6 +26,7 @@
       <button class="bt" data-season="spring">Весна</button>
       <button class="bt" id="night" aria-pressed="false">☾ Ночь</button>
       <button class="bt" id="blink" aria-pressed="false">Мигание (истекает)</button>
+      <button class="bt" id="grid" aria-pressed="false">Клетки</button>
     </div>
     <script>
 /*SCRIPT*/

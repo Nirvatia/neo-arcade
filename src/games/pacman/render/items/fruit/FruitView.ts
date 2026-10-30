@@ -3,7 +3,7 @@ import type { FruitKind } from '../../../logic/bonuses/fruitCatalog';
 import { FRUIT } from '../../../logic/bonuses/fruitCatalog';
 import type { GridLayout } from '../../maze/GridView';
 import type { CollectibleArt } from '../collectibleSprite';
-import { drawCollectible, fruitMotion } from '../collectibleSprite';
+import { drawCollectible } from '../collectibleSprite';
 import { CHERRY_ART } from './CherryView';
 import { STRAWBERRY_ART } from './StrawberryView';
 import { ORANGE_ART } from './OrangeView';
@@ -14,9 +14,6 @@ import { MELON_ART } from './MelonView';
 import { GALAXIAN_ART } from './GalaxianView';
 import { BELL_ART } from './BellView';
 import { KEY_ART } from './KeyView';
-
-/** The larger side of a fruit (without its glow), in tiles. */
-export const FRUIT_EXTENT = 0.9;
 
 /** Every fruit's art: the owner's mock-ups. */
 const ART: Record<FruitKind, CollectibleArt> = {
@@ -68,6 +65,5 @@ export function drawFruit(
 	tileSize: number,
 	time: number
 ): void {
-	const art = ART[kind];
-	drawCollectible(ctx, art, x, y, tileSize * FRUIT_EXTENT, (art.motion ?? fruitMotion)(time));
+	drawCollectible(ctx, ART[kind], x, y, tileSize, time);
 }

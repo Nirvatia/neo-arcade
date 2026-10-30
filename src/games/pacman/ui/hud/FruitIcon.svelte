@@ -15,8 +15,8 @@
 		if (!ctx) return;
 		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 		ctx.clearRect(0, 0, size, size);
-		// the fruit's object fills 0.9 of a tile: a tile a bit smaller than the icon keeps the glow
-		drawFruit(ctx, kind, size / 2, size / 2, size * 0.95, 0);
+		// the icon is one tile: the fruit and its glow stay inside it
+		drawFruit(ctx, kind, size / 2, size / 2, size, 0);
 	});
 </script>
 

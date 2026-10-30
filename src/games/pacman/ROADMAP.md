@@ -21,12 +21,8 @@ the owner says to go straight into the game.
 
 10. **Art and polish pass** (set by the owner after stage 7; next). One step per chat
     or several small ones together; the order below is a suggestion.
-    1. **Fruit.** Every fruit is drawn larger than a tile and glows far too much
-       (`render/items/collectibleSprite.ts`: the mock-ups' two additive bloom copies;
-       `FruitView` fits the larger side to `FRUIT_EXTENT` = 0.9 tile, the glow reaches
-       past it). Keep each fruit and its bloom inside the tile, tone the glow down; the
-       look may change a little or moderately so the fruit sits well in the seasons.
-       One file per fruit stays (design decision).
+    1. ~~**Fruit.**~~ Done: the fruit, the heart and the exit stay inside their tile with
+       a calm glow (see Done).
     2. **Easter egg + its mechanic.** No art today (`GoldenEggView` is a stand-in): draw
        an Easter egg. Mechanic: the lair code (`LairCodeService`, the right order of
        eaten ghosts) should make the ghosts stop and vanish with an animation; then the
@@ -95,3 +91,7 @@ the owner says to go straight into the game.
 - Plan v2: 1 (partly: Ms. Pac-Man, the fruit, the boss reward ported; the rest moved to
   stage 10), 2 dev and log panels, 5 HUD and screens (third chat); 3 the hell rework,
   6 the arcade, 7 the FX pass (fourth chat). Stage 4 moved into stage 10.
+- 10.1 the fruit (fifth chat): the textures lost their backdrop glow, the blooms hug the
+  object, `collectibleSprite` measures the object and the glow's reach at bake time, so
+  every fruit, the heart and the exit fill 0.78 of a tile and stay inside it (the heart's
+  orbit is drawn closer around it). The HUD fruit icon is one tile.

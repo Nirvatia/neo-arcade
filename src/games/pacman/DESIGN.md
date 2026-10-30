@@ -173,6 +173,8 @@ scared loop. The arcade synthesises its own (`audio/ArcadeSynth.ts`).
 - Boss: harsh and dangerous, changes visibly by phase, fits in one tile.
 - Ash and night are driven by boss phases, never by UI buttons.
 - Fruit: one file per fruit (`render/items/fruit/*View.ts`), each with its own art.
+- Fruit, the heart and the exit stay inside their tile, glow included: the object is 0.78
+  of a tile, the bloom hugs it, no halo spills onto the walls.
 - A boss level ends by the player's choice: the heart (+1 life) or the exit.
 
 ### Art status
@@ -183,7 +185,7 @@ scared loop. The arcade synthesises its own (`audio/ArcadeSynth.ts`).
 | Hell world, Blinky lord of hell, imps, weapons | final; phase-3 lighting and corrupted tiles to rework (10.8) |
 | Arcade | final |
 | HUD and screens | final |
-| Fruit | to rework: inside the tile, less glow (10.1) |
+| Fruit, heart, exit | final (inside the tile, calm glow) |
 | Easter egg | missing (10.2) |
 | Pac-Man | to redo (10.3) |
 | Ms. Pac-Man | to finish: brighter, cuter, readable, calmer overdrive (10.4) |

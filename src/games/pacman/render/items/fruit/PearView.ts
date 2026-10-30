@@ -1,49 +1,17 @@
-// Cosmic Pear: the owner's COLLECTIBLE_PEAR.html, texture code 1:1. Its mock-up shows it a
-// little larger than the other fruit (sprite 260 px, blooms 300 and 360 px).
+// Cosmic Pear: the owner's COLLECTIBLE_PEAR.html, texture code 1:1 without its
+// ambient glow (the fruit keeps inside its tile, stage 10.1). In the game every fruit
+// fits the same size, so the mock-up's larger display is not kept.
 import type { CollectibleArt } from '../collectibleSprite';
+import { FRUIT_BLOOMS } from '../collectibleSprite';
 
 function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	const cx = size / 2;
 	const cy = size / 2;
 
-	// 1. ambient glow
-	const glowLayers: Array<{ r: number; stops: Array<[number, string]> }> = [
-		{
-			r: size * 0.48,
-			stops: [
-				[0, 'rgba(180,255,100,0.35)'],
-				[0.5, 'rgba(140,200,60,0.15)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		},
-		{
-			r: size * 0.35,
-			stops: [
-				[0, 'rgba(200,255,120,0.3)'],
-				[0.5, 'rgba(160,220,80,0.12)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		},
-		{
-			r: size * 0.25,
-			stops: [
-				[0, 'rgba(220,255,150,0.25)'],
-				[0.5, 'rgba(180,240,100,0.1)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		}
-	];
-	for (const layer of glowLayers) {
-		const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
-		for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
-		ctx.fillStyle = g;
-		ctx.fillRect(0, 0, size, size);
-	}
-
 	ctx.save();
 	ctx.translate(cx, cy);
 
-	// 2. stem
+	// 1. stem
 	const stemGrad = ctx.createLinearGradient(0, -70, 0, -95);
 	stemGrad.addColorStop(0, 'rgba(100,255,200,0.9)');
 	stemGrad.addColorStop(1, 'rgba(60,180,150,0.6)');
@@ -65,7 +33,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.quadraticCurveTo(3, -82, 0, -95);
 	ctx.stroke();
 
-	// 3. leaf
+	// 2. leaf
 	const leafGrad = ctx.createLinearGradient(0, -78, 20, -85);
 	leafGrad.addColorStop(0, 'rgba(80,220,160,0.95)');
 	leafGrad.addColorStop(1, 'rgba(120,255,200,0.7)');
@@ -86,7 +54,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.lineTo(12, -84);
 	ctx.stroke();
 
-	// 4. body
+	// 3. body
 	const shadow = ctx.createRadialGradient(0, 70, 0, 0, 70, 60);
 	shadow.addColorStop(0, 'rgba(80,100,20,0.4)');
 	shadow.addColorStop(1, 'rgba(0,0,0,0)');
@@ -136,7 +104,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	pearShape();
 	ctx.fill();
 
-	// 5. highlights
+	// 4. highlights
 	const highlight1 = ctx.createRadialGradient(-25, -30, 0, -25, -30, 30);
 	highlight1.addColorStop(0, 'rgba(255,255,255,0.9)');
 	highlight1.addColorStop(0.4, 'rgba(255,255,230,0.5)');
@@ -163,7 +131,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	pearShape();
 	ctx.stroke();
 
-	// 6. energy sparkles
+	// 5. energy sparkles
 	const sparkles = [
 		{ x: 70, y: -25, r: 2 },
 		{ x: -68, y: -30, r: 1.8 },
@@ -197,10 +165,6 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 export const PEAR_ART: CollectibleArt = {
 	size: 256,
 	paint,
-	bounds: { x0: -57, y0: -95, x1: 57, y1: 75 },
-	sprite: 260,
-	blooms: [
-		{ size: 300, blur: 12 },
-		{ size: 360, blur: 25 }
-	]
+	sprite: 240,
+	blooms: FRUIT_BLOOMS
 };

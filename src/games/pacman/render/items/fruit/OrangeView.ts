@@ -1,5 +1,6 @@
-// Cosmic Orange: the owner's COLLECTIBLE_ORANGE.html, texture code 1:1 (the skin pores are
-// random, as in the mock-up: placed once when the texture is painted).
+// Cosmic Orange: the owner's COLLECTIBLE_ORANGE.html, texture code 1:1 without its
+// ambient glow (the fruit keeps inside its tile, stage 10.1). The skin pores are random, as in
+// the mock-up: placed once when the texture is painted.
 import type { CollectibleArt } from '../collectibleSprite';
 import { FRUIT_BLOOMS } from '../collectibleSprite';
 
@@ -7,44 +8,10 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	const cx = size / 2;
 	const cy = size / 2;
 
-	// 1. ambient glow (3 layers, orange)
-	const glowLayers: Array<{ r: number; stops: Array<[number, string]> }> = [
-		{
-			r: size * 0.48,
-			stops: [
-				[0, 'rgba(255,180,80,0.35)'],
-				[0.5, 'rgba(220,140,60,0.15)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		},
-		{
-			r: size * 0.35,
-			stops: [
-				[0, 'rgba(255,200,120,0.3)'],
-				[0.5, 'rgba(240,160,80,0.12)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		},
-		{
-			r: size * 0.25,
-			stops: [
-				[0, 'rgba(255,220,150,0.25)'],
-				[0.5, 'rgba(250,180,100,0.1)'],
-				[1, 'rgba(0,0,0,0)']
-			]
-		}
-	];
-	for (const layer of glowLayers) {
-		const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, layer.r);
-		for (const [offset, color] of layer.stops) g.addColorStop(offset, color);
-		ctx.fillStyle = g;
-		ctx.fillRect(0, 0, size, size);
-	}
-
 	ctx.save();
 	ctx.translate(cx, cy);
 
-	// 2. body
+	// 1. body
 	const orangeR = size * 0.22;
 	const shadow = ctx.createRadialGradient(0, orangeR * 0.3, 0, 0, orangeR * 0.3, orangeR * 1.2);
 	shadow.addColorStop(0, 'rgba(120,60,20,0.4)');
@@ -87,7 +54,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.arc(0, 0, orangeR, 0, Math.PI * 2);
 	ctx.fill();
 
-	// 3. segments
+	// 2. segments
 	const segmentCount = 8;
 	for (let i = 0; i < segmentCount; i++) {
 		const angle = (i / segmentCount) * Math.PI * 2;
@@ -109,7 +76,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 		ctx.stroke();
 	}
 
-	// 4. skin pores
+	// 3. skin pores
 	for (let i = 0; i < 40; i++) {
 		const angle = Math.random() * Math.PI * 2;
 		const dist = orangeR * 0.3 + Math.random() * orangeR * 0.6;
@@ -124,7 +91,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 		ctx.fill();
 	}
 
-	// 5. highlights
+	// 4. highlights
 	const highlight1 = ctx.createRadialGradient(
 		-orangeR * 0.35,
 		-orangeR * 0.35,
@@ -167,7 +134,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.arc(0, 0, orangeR, 0, Math.PI * 2);
 	ctx.stroke();
 
-	// 6. stem and leaf
+	// 5. stem and leaf
 	const stemGrad = ctx.createLinearGradient(0, -orangeR, 0, -orangeR * 1.3);
 	stemGrad.addColorStop(0, 'rgba(100,255,200,0.9)');
 	stemGrad.addColorStop(0.5, 'rgba(80,220,180,0.8)');
@@ -211,7 +178,7 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	ctx.lineTo(orangeR * 0.1, -orangeR * 1.18);
 	ctx.stroke();
 
-	// 7. energy sparkles
+	// 6. energy sparkles
 	const sparkles = [
 		{ x: size * 0.28, y: -size * 0.05, r: 2 },
 		{ x: -size * 0.27, y: -size * 0.08, r: 1.5 },
@@ -245,7 +212,6 @@ function paint(ctx: CanvasRenderingContext2D, size: number): void {
 export const ORANGE_ART: CollectibleArt = {
 	size: 256,
 	paint,
-	bounds: { x0: -56, y0: -70, x1: 56, y1: 56 },
 	sprite: 240,
 	blooms: FRUIT_BLOOMS
 };

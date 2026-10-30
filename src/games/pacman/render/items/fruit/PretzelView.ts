@@ -1,18 +1,11 @@
-// Cosmic Pretzel: the owner's COLLECTIBLE_PRETZEL.html, texture code 1:1. Its mock-up has its
-// own texture size (512), display sizes and ticker (a faster, smaller breath).
+// Cosmic Pretzel: the owner's COLLECTIBLE_PRETZEL.html, texture code 1:1 without its
+// cosmic backdrop (the fruit keeps inside its tile, stage 10.1). Its mock-up has its own
+// texture size (512), display sizes and ticker (a faster, smaller breath).
 import type { CollectibleArt, CollectibleMotion } from '../collectibleSprite';
 
 function paint(ctx: CanvasRenderingContext2D, size: number): void {
 	const cx = size / 2;
 	const cy = size / 2;
-
-	// cosmic backdrop
-	const bgGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.45);
-	bgGlow.addColorStop(0, 'rgba(230, 110, 25, 0.23)');
-	bgGlow.addColorStop(0.5, 'rgba(140, 30, 110, 0.07)');
-	bgGlow.addColorStop(1, 'rgba(0,0,0,0)');
-	ctx.fillStyle = bgGlow;
-	ctx.fillRect(0, 0, size, size);
 
 	ctx.save();
 	ctx.translate(cx, cy);
@@ -133,15 +126,13 @@ function pretzelMotion(time: number): CollectibleMotion {
 	};
 }
 
-/** Knot strokes span 53..347 × 56..332 of the 400-unit design, ×1.28 into the texture. */
 export const PRETZEL_ART: CollectibleArt = {
 	size: 512,
 	paint,
-	bounds: { x0: -188, y0: -184, x1: 188, y1: 169 },
 	sprite: 380,
 	blooms: [
-		{ size: 410, blur: 10 },
-		{ size: 460, blur: 24 }
+		{ size: 400, blur: 5 },
+		{ size: 437, blur: 11 }
 	],
 	motion: pretzelMotion
 };
