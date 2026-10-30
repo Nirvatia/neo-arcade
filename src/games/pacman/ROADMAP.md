@@ -150,9 +150,9 @@ and covers the canvas only (Svelte buttons stay on top); replace it there.
 
 ## Plan (v2, set by the owner after plan v1)
 
-Order matters; new boss worlds come last. **Owner's order after stage 2: 5 → 3 → 4 →
-6 → 7 → 8 → 9** (the full HUD and screens come before the hell rework and the Pac-Man
-art); the numbers below stay as they are. Each art or effect stage starts with a prototype
+Order matters; new boss worlds come last. **Owner's order after stage 3: 6 → 7 → 8 → 9
+→ 4** (5 and 3 are done; the secret level comes next, the Pac-Man art and its pre-game
+blink move to the very end); the numbers below stay as they are. Each art or effect stage starts with a prototype
 on the real game code for the owner to approve.
 
 1. **Migrate the remaining art.**
