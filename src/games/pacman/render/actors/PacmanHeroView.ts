@@ -9,8 +9,8 @@ import type { GridLayout } from '../maze/GridView';
 import type { PlayerDrawOptions } from './PlayerView';
 import { PacmanHero } from './hero/PacmanHero';
 
-/** Body radius in tiles. */
-const RADIUS = 0.43;
+/** Body radius in tiles (10 % smaller than the first cut, the owner's review). */
+const RADIUS = 0.39;
 
 function facingAngle(facing: string | null, fallback: number): number {
 	if (facing === 'UP') return -Math.PI / 2;

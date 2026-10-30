@@ -36,12 +36,30 @@
 		fronts: false
 	});
 	let frame = 0;
+	/** Frames per second and the worst frame time of the last second, from rAF timestamps. */
+	let fps = $state(0);
+	let worst = $state(0);
+	let fpsFrames = 0;
+	let fpsStart = -1;
+	let fpsLast = -1;
+	let fpsWorst = 0;
 
 	const unsubDev = debugController.subscribe((value) => (dev = value));
 	const unsubVisible = debugVisible.subscribe((value) => (visible = value));
 
-	function tick(): void {
+	function tick(now: number): void {
 		snap = dev ? dev.snapshot() : null;
+		if (fpsStart < 0) fpsStart = now;
+		if (fpsLast >= 0) fpsWorst = Math.max(fpsWorst, now - fpsLast);
+		fpsLast = now;
+		fpsFrames += 1;
+		if (now - fpsStart >= 1000) {
+			fps = Math.round((fpsFrames * 1000) / (now - fpsStart));
+			worst = Math.round(fpsWorst);
+			fpsFrames = 0;
+			fpsStart = now;
+			fpsWorst = 0;
+		}
 		frame = requestAnimationFrame(tick);
 	}
 
@@ -90,6 +108,7 @@
 	<DevWindow id="panel" title="DEV · Pac-Man" x={8} y={44} width={250}>
 		{#if snap}
 			<div class="live">
+				<div><b>{fps} FPS</b> · worst {worst} ms</div>
 				<div><b>{snap.state}</b> · {snap.phase} · {fmt(snap.phaseRemaining)} s</div>
 				<div>
 					LV {snap.level}{snap.hell ? ' · hell' : ''}{snap.secret ? ' · secret' : ''} · {snap.profile}

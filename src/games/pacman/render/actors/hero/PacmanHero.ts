@@ -179,6 +179,151 @@ function glow(c: RGB): HTMLCanvasElement {
 	return g;
 }
 
+/** The painted disc spans ±DISC_SPAN body radii (room for the ink-free soft edge). */
+const DISC_SPAN = 1.15;
+const LIGHT_STEPS = 32;
+const POWER_STEPS = 6;
+const discCache = new Map<string, HTMLCanvasElement>();
+
+/**
+ * The body's painting (base, crisp shadow shape, deep shadow, bounce, brush texture, rim
+ * light, highlight) for a body radius in device px, the light's angle in his frame and the
+ * look, cached by quantised light and look: drawn once, reused every frame.
+ */
+function paintedDisc(deviceR: number, lightAngle: number, power: number): HTMLCanvasElement {
+	const R = Math.max(4, Math.round(deviceR));
+	const step = Math.round((((lightAngle / (Math.PI * 2)) % 1) + 1) * LIGHT_STEPS) % LIGHT_STEPS;
+	const look = Math.round(clamp01(power) * POWER_STEPS);
+	const key = `${R}:${step}:${look}`;
+	let c = discCache.get(key);
+	if (c) return c;
+	if (discCache.size > 600) discCache.clear();
+	const a = (step / LIGHT_STEPS) * Math.PI * 2;
+	const lx = Math.cos(a);
+	const ly = Math.sin(a);
+	const pal = mixPal(CALM, AWOKEN, look / POWER_STEPS);
+	const p = look / POWER_STEPS;
+	c = document.createElement('canvas');
+	c.width = c.height = Math.ceil(R * DISC_SPAN * 2);
+	const ctx = c.getContext('2d') as CanvasRenderingContext2D;
+	ctx.translate(c.width / 2, c.height / 2);
+	ctx.beginPath();
+	ctx.arc(0, 0, R, 0, Math.PI * 2);
+	ctx.clip();
+	const base = ctx.createLinearGradient(lx * R, ly * R, -lx * R, -ly * R);
+	base.addColorStop(0, css(pal.light));
+	base.addColorStop(0.45, css(pal.mid));
+	base.addColorStop(1, css(mix(pal.mid, pal.shadow, 0.6)));
+	ctx.fillStyle = base;
+	ctx.fillRect(-R * 1.2, -R * 1.2, R * 2.4, R * 2.4);
+	// the shadow shape: a crisp crescent away from the light
+	ctx.beginPath();
+	ctx.rect(-R * 1.3, -R * 1.3, R * 2.6, R * 2.6);
+	ctx.arc(lx * R * 0.3, ly * R * 0.3, R * 1.0, 0, Math.PI * 2);
+	ctx.fillStyle = css(pal.shadow, 0.88);
+	ctx.fill('evenodd');
+	const deep = ctx.createRadialGradient(
+		-lx * R * 0.95,
+		-ly * R * 0.95,
+		0,
+		-lx * R * 0.95,
+		-ly * R * 0.95,
+		R * 0.95
+	);
+	deep.addColorStop(0, css(pal.deep, 0.6));
+	deep.addColorStop(1, css(pal.deep, 0));
+	ctx.fillStyle = deep;
+	ctx.fillRect(-R * 1.2, -R * 1.2, R * 2.4, R * 2.4);
+	// bounce light in the shadow, so the ball stays round
+	ctx.beginPath();
+	ctx.arc(0, 0, R * 1.05, 0, Math.PI * 2);
+	ctx.arc(-lx * R * 0.13, -ly * R * 0.13, R * 0.97, 0, Math.PI * 2);
+	ctx.fillStyle = css(pal.bounce, 0.45);
+	ctx.fill('evenodd');
+	ctx.globalAlpha = 0.16;
+	ctx.globalCompositeOperation = 'soft-light';
+	ctx.drawImage(brushTexture(), -R, -R, R * 2, R * 2);
+	ctx.globalCompositeOperation = 'source-over';
+	ctx.globalAlpha = 1;
+	// rim light from behind (the frame's -x): the energy pushing him on
+	ctx.globalCompositeOperation = 'lighter';
+	ctx.beginPath();
+	ctx.arc(0, 0, R * 1.05, 0, Math.PI * 2);
+	ctx.arc(R * 0.09, 0, R * 1.0, 0, Math.PI * 2);
+	ctx.fillStyle = css(pal.rim, 0.5 + 0.3 * p);
+	ctx.fill('evenodd');
+	ctx.globalCompositeOperation = 'source-over';
+	// the hard painted highlight
+	const hx = lx * R * 0.52;
+	const hy = ly * R * 0.52;
+	ctx.fillStyle = css(pal.highlight, 0.95);
+	ctx.beginPath();
+	ctx.ellipse(hx, hy, R * 0.25, R * 0.12, a + Math.PI / 2, 0, Math.PI * 2);
+	ctx.fill();
+	ctx.beginPath();
+	ctx.arc(
+		hx + lx * R * 0.2 - ly * R * 0.18,
+		hy + ly * R * 0.2 + lx * R * 0.18,
+		R * 0.05,
+		0,
+		Math.PI * 2
+	);
+	ctx.fill();
+	discCache.set(key, c);
+	return c;
+}
+
+let flames: [HTMLCanvasElement, HTMLCanvasElement] | null = null;
+/** A flame tongue pointing +x, its root at the left edge: an outer glow and a hot inner one. */
+function flameSprites(): [HTMLCanvasElement, HTMLCanvasElement] {
+	if (flames) return flames;
+	const make = (stops: Array<[number, string]>) => {
+		const c = document.createElement('canvas');
+		c.width = 128;
+		c.height = 48;
+		const x = c.getContext('2d') as CanvasRenderingContext2D;
+		const g = x.createLinearGradient(0, 0, 128, 0);
+		for (const [o, col] of stops) g.addColorStop(o, col);
+		x.fillStyle = g;
+		x.beginPath();
+		x.moveTo(0, 2);
+		x.quadraticCurveTo(58, 2, 128, 24);
+		x.quadraticCurveTo(58, 46, 0, 46);
+		x.quadraticCurveTo(-6, 24, 0, 2);
+		x.fill();
+		return c;
+	};
+	flames = [
+		make([
+			[0, 'rgba(255,140,30,1)'],
+			[1, 'rgba(220,40,0,0)']
+		]),
+		make([
+			[0, 'rgba(255,248,210,1)'],
+			[0.45, 'rgba(255,170,50,0.9)'],
+			[1, 'rgba(230,60,10,0)']
+		])
+	];
+	return flames;
+}
+
+let core: HTMLCanvasElement | null = null;
+/** The light in his mouth: white-hot at the centre, gold, then a dark red rim. */
+function coreSprite(): HTMLCanvasElement {
+	if (core) return core;
+	core = document.createElement('canvas');
+	core.width = core.height = 128;
+	const x = core.getContext('2d') as CanvasRenderingContext2D;
+	const g = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+	g.addColorStop(0, 'rgba(255,252,236,1)');
+	g.addColorStop(0.3, 'rgba(255,210,100,0.9)');
+	g.addColorStop(0.75, 'rgba(240,100,25,0.5)');
+	g.addColorStop(1, 'rgba(120,20,5,0)');
+	x.fillStyle = g;
+	x.fillRect(0, 0, 128, 128);
+	return core;
+}
+
 interface Ember {
 	x: number;
 	y: number;
@@ -366,7 +511,7 @@ export class PacmanHero {
 
 		// the trail and embers, by distance travelled
 		const r = this.r;
-		this.trail.push(s.x, s.y, r * 0.22, r * (4.2 + 1.4 * this.power), r * 3);
+		this.trail.push(s.x, s.y, r * 0.34, r * (4.2 + 1.4 * this.power), r * 3);
 		if (!this.moving) this.trail.shrink(r * 7 * dt);
 		if (step < r * 3) {
 			this.travelled += step;
@@ -500,133 +645,43 @@ export class PacmanHero {
 			ctx.globalCompositeOperation = 'source-over';
 		}
 
-		// the core of light inside the mouth, seen through it
+		// the core of light inside the mouth: behind the body, seen through the open mouth
+		const coreA = Math.min(1, clamp01(open * 1.4) * (0.85 + 0.15 * p) + charge * 0.6);
+		if (coreA > 0.01) {
+			ctx.globalAlpha = coreA;
+			ctx.drawImage(coreSprite(), R * 0.1 - R * 0.92, -R * 0.92, R * 1.84, R * 1.84);
+			ctx.globalAlpha = 1;
+		}
+
+		// the body: ink (one path), then the painted disc with the mouth cut out
 		const A = { x: -0.1 * R, y: 0 };
 		const U = { x: Math.cos(mu) * R, y: -Math.sin(mu) * R };
 		const Dn = { x: Math.cos(md) * R, y: Math.sin(md) * R };
-		const mouthRegion = () => {
-			ctx.beginPath();
-			ctx.moveTo(A.x, A.y);
-			ctx.lineTo(U.x, U.y);
-			ctx.arc(0, 0, R, -mu, md, false);
-			ctx.closePath();
-		};
-		const coreA = clamp01(open * 1.4) * (0.85 + 0.15 * p) + charge * 0.6;
-		ctx.save();
-		mouthRegion();
-		ctx.clip();
-		const core = ctx.createRadialGradient(R * 0.1, 0, 0, R * 0.1, 0, R * 0.95);
-		core.addColorStop(0, css([255, 252, 236], coreA));
-		core.addColorStop(0.3, css(mix([255, 200, 80], [255, 230, 150], p), coreA * 0.9));
-		core.addColorStop(0.75, css(mix([230, 90, 20], [255, 120, 30], p), coreA * 0.5));
-		core.addColorStop(1, css([120, 20, 5], coreA * 0.2));
-		ctx.fillStyle = core;
-		ctx.fillRect(-R, -R * 1.2, R * 2.4, R * 2.4);
-		ctx.restore();
-
-		// the body: ink, then the painted shading inside it
-		const body = () => {
-			ctx.beginPath();
-			ctx.moveTo(U.x, U.y);
-			ctx.arc(0, 0, R, -mu, md, true);
-			const bend = R * 0.09 * clamp01(m * 2.5);
-			ctx.quadraticCurveTo((Dn.x + A.x) / 2, (Dn.y + A.y) / 2 - bend, A.x, A.y);
-			ctx.quadraticCurveTo((U.x + A.x) / 2, (U.y + A.y) / 2 + bend, U.x, U.y);
-			ctx.closePath();
-		};
+		const bend = R * 0.09 * clamp01(m * 2.5);
 		ctx.save();
 		ctx.translate(-lx * R * 0.045, -ly * R * 0.045);
 		ctx.scale(1.075, 1.075);
-		body();
+		ctx.beginPath();
+		ctx.moveTo(U.x, U.y);
+		ctx.arc(0, 0, R, -mu, md, true);
+		ctx.quadraticCurveTo((Dn.x + A.x) / 2, (Dn.y + A.y) / 2 - bend, A.x, A.y);
+		ctx.quadraticCurveTo((U.x + A.x) / 2, (U.y + A.y) / 2 + bend, U.x, U.y);
+		ctx.closePath();
 		ctx.fillStyle = css(pal.ink);
 		ctx.fill();
 		ctx.restore();
+		const body = this.composeBody(R, lx, ly, p, pulse, mu, md, bend);
+		ctx.drawImage(body.canvas, -body.half, -body.half, body.half * 2, body.half * 2);
 
-		ctx.save();
-		body();
-		ctx.clip();
-		const base = ctx.createLinearGradient(lx * R, ly * R, -lx * R, -ly * R);
-		base.addColorStop(0, css(pal.light));
-		base.addColorStop(0.45, css(pal.mid));
-		base.addColorStop(1, css(mix(pal.mid, pal.shadow, 0.6)));
-		ctx.fillStyle = base;
-		ctx.fillRect(-R * 1.2, -R * 1.2, R * 2.4, R * 2.4);
-		// the shadow shape: a crisp crescent away from the light
-		ctx.beginPath();
-		ctx.rect(-R * 1.3, -R * 1.3, R * 2.6, R * 2.6);
-		ctx.arc(lx * R * 0.3, ly * R * 0.3, R * 1.0, 0, Math.PI * 2);
-		ctx.fillStyle = css(pal.shadow, 0.88);
-		ctx.fill('evenodd');
-		const deep = ctx.createRadialGradient(
-			-lx * R * 0.95,
-			-ly * R * 0.95,
-			0,
-			-lx * R * 0.95,
-			-ly * R * 0.95,
-			R * 0.95
-		);
-		deep.addColorStop(0, css(pal.deep, 0.6));
-		deep.addColorStop(1, css(pal.deep, 0));
-		ctx.fillStyle = deep;
-		ctx.fillRect(-R * 1.2, -R * 1.2, R * 2.4, R * 2.4);
-		// bounce light in the shadow, so the ball stays round
-		ctx.beginPath();
-		ctx.arc(0, 0, R * 1.05, 0, Math.PI * 2);
-		ctx.arc(-lx * R * 0.13, -ly * R * 0.13, R * 0.97, 0, Math.PI * 2);
-		ctx.fillStyle = css(pal.bounce, 0.45);
-		ctx.fill('evenodd');
-		// brush texture
-		ctx.globalAlpha = 0.16;
-		ctx.globalCompositeOperation = 'soft-light';
-		ctx.drawImage(brushTexture(), -R, -R, R * 2, R * 2);
-		ctx.globalCompositeOperation = 'source-over';
-		ctx.globalAlpha = 1;
-		// rim light from behind: the energy pushing him on
-		ctx.globalCompositeOperation = 'lighter';
-		ctx.beginPath();
-		ctx.arc(0, 0, R * 1.05, 0, Math.PI * 2);
-		ctx.arc(R * 0.09, 0, R * 1.0, 0, Math.PI * 2);
-		ctx.fillStyle = css(pal.rim, 0.5 + 0.3 * p);
-		ctx.fill('evenodd');
-		ctx.globalCompositeOperation = 'source-over';
-		// the hard painted highlight
-		const hx = lx * R * 0.52;
-		const hy = ly * R * 0.52;
-		ctx.fillStyle = css(pal.highlight, 0.95);
-		ctx.beginPath();
-		ctx.ellipse(hx, hy, R * 0.25, R * 0.12, Math.atan2(ly, lx) + Math.PI / 2, 0, Math.PI * 2);
-		ctx.fill();
-		ctx.beginPath();
-		ctx.arc(
-			hx + lx * R * 0.2 - ly * R * 0.18,
-			hy + ly * R * 0.2 + lx * R * 0.18,
-			R * 0.05,
-			0,
-			Math.PI * 2
-		);
-		ctx.fill();
-		// molten cracks of the awoken
-		if (p > 0.01) this.drawCracks(ctx, R, p * pulse);
-		// the white flash of the burst / the bite's light
-		if (this.flash > 0) {
-			ctx.fillStyle = `rgba(255,255,250,${this.flash})`;
-			ctx.fillRect(-R * 1.2, -R * 1.2, R * 2.4, R * 2.4);
-		}
-		ctx.restore();
-
-		// lips: ink along the cut, with a warm lit edge
+		// lips: ink along the cut
 		ctx.lineCap = 'round';
 		ctx.lineJoin = 'round';
-		const lips = () => {
-			ctx.beginPath();
-			const bend = R * 0.09 * clamp01(m * 2.5);
-			ctx.moveTo(Dn.x * 0.97, Dn.y * 0.97);
-			ctx.quadraticCurveTo((Dn.x + A.x) / 2, (Dn.y + A.y) / 2 - bend, A.x, A.y);
-			ctx.quadraticCurveTo((U.x + A.x) / 2, (U.y + A.y) / 2 + bend, U.x * 0.97, U.y * 0.97);
-		};
+		ctx.beginPath();
+		ctx.moveTo(Dn.x * 0.97, Dn.y * 0.97);
+		ctx.quadraticCurveTo((Dn.x + A.x) / 2, (Dn.y + A.y) / 2 - bend, A.x, A.y);
+		ctx.quadraticCurveTo((U.x + A.x) / 2, (U.y + A.y) / 2 + bend, U.x * 0.97, U.y * 0.97);
 		ctx.strokeStyle = css(pal.ink);
 		ctx.lineWidth = R * 0.075;
-		lips();
 		ctx.stroke();
 		ctx.restore();
 
@@ -654,15 +709,65 @@ export class PacmanHero {
 		this.drawBursts(ctx);
 	}
 
+	private scratch: HTMLCanvasElement | null = null;
+
+	/**
+	 * The body this frame: the cached painted disc for this light and look, with the mouth
+	 * cut out, molten veins and the flash added, in a small scratch canvas. Only plain
+	 * image draws and Porter-Duff operations: no clipping, no blend modes, no gradients.
+	 */
+	private composeBody(
+		R: number,
+		lx: number,
+		ly: number,
+		p: number,
+		pulse: number,
+		mu: number,
+		md: number,
+		bend: number
+	): { canvas: HTMLCanvasElement; half: number } {
+		const dpr = Math.min(2, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1);
+		const disc = paintedDisc(R * dpr, Math.atan2(ly, lx), p);
+		const size = disc.width;
+		if (!this.scratch || this.scratch.width !== size) {
+			this.scratch = document.createElement('canvas');
+			this.scratch.width = this.scratch.height = size;
+		}
+		const sc = this.scratch.getContext('2d') as CanvasRenderingContext2D;
+		const k = size / 2 / (R * DISC_SPAN);
+		sc.setTransform(1, 0, 0, 1, 0, 0);
+		sc.globalCompositeOperation = 'source-over';
+		sc.globalAlpha = 1;
+		sc.clearRect(0, 0, size, size);
+		sc.drawImage(disc, 0, 0);
+		sc.setTransform(k, 0, 0, k, size / 2, size / 2);
+		// the mouth: everything past the lips goes
+		const A = { x: -0.1 * R, y: 0 };
+		const U = { x: Math.cos(mu) * R, y: -Math.sin(mu) * R };
+		const Dn = { x: Math.cos(md) * R, y: Math.sin(md) * R };
+		sc.globalCompositeOperation = 'destination-out';
+		sc.beginPath();
+		sc.moveTo(A.x, A.y);
+		sc.quadraticCurveTo((U.x + A.x) / 2, (U.y + A.y) / 2 + bend, U.x, U.y);
+		sc.lineTo(Math.cos(mu) * R * 1.3, -Math.sin(mu) * R * 1.3);
+		sc.arc(0, 0, R * 1.3, -mu, md, false);
+		sc.lineTo(Dn.x, Dn.y);
+		sc.quadraticCurveTo((Dn.x + A.x) / 2, (Dn.y + A.y) / 2 - bend, A.x, A.y);
+		sc.closePath();
+		sc.fill();
+		sc.globalCompositeOperation = 'source-atop';
+		if (p > 0.01) this.drawCracks(sc, R, p * pulse);
+		if (this.flash > 0) {
+			sc.fillStyle = `rgba(255,255,250,${this.flash})`;
+			sc.fillRect(-R * 1.2, -R * 1.2, R * 2.4, R * 2.4);
+		}
+		sc.globalCompositeOperation = 'source-over';
+		return { canvas: this.scratch, half: R * DISC_SPAN };
+	}
+
 	private drawTrail(ctx: CanvasRenderingContext2D, p: number): void {
+		// three strands each: the wide glow layer cost a big gradient fill every frame
 		const calm: RibbonLayer[] = [
-			{
-				width: 0.95,
-				stops: [
-					[0, [255, 150, 40], 0.22],
-					[1, [255, 90, 20], 0]
-				]
-			},
 			{
 				width: 0.36,
 				offset: 0.34,
@@ -699,13 +804,6 @@ export class PacmanHero {
 		];
 		const awoken: RibbonLayer[] = [
 			{
-				width: 1.25,
-				stops: [
-					[0, [255, 120, 30], 0.3],
-					[1, [220, 40, 0], 0]
-				]
-			},
-			{
 				width: 0.5,
 				offset: 0.4,
 				wave: 0.4,
@@ -739,8 +837,8 @@ export class PacmanHero {
 				]
 			}
 		];
-		this.trail.draw(ctx, this.r, calm, 1 - p, this.time);
-		this.trail.draw(ctx, this.r, awoken, p, this.time);
+		if (p < 0.99) this.trail.draw(ctx, this.r, calm, 1 - p, this.time);
+		if (p > 0.01) this.trail.draw(ctx, this.r, awoken, p, this.time);
 	}
 
 	private drawEmbers(ctx: CanvasRenderingContext2D): void {
@@ -765,57 +863,33 @@ export class PacmanHero {
 	/** Painted flame tongues streaming back from his head, swaying (no noise: no flicker). */
 	private drawFlames(ctx: CanvasRenderingContext2D, R: number, k: number): void {
 		const t = this.time;
+		const [outer, inner] = flameSprites();
 		for (const pass of [0, 1]) {
 			ctx.globalCompositeOperation = pass === 0 ? 'lighter' : 'source-over';
+			const img = pass === 0 ? outer : inner;
 			for (let i = 0; i < 7; i++) {
 				const a = Math.PI + (i - 3) * 0.36;
 				const rx = Math.cos(a) * R * 0.8;
 				const ry = Math.sin(a) * R * 0.8;
-				// blown back, away from the heading
-				let dx = Math.cos(a) - 0.9;
-				let dy = Math.sin(a) * 0.8;
-				const dl = Math.hypot(dx, dy);
-				dx /= dl;
-				dy /= dl;
-				const px = -dy;
-				const py = dx;
+				// blown back, away from the heading, swaying
+				const sway = 0.22 * Math.sin(t * 4.4 + i * 1.3);
+				const dir = Math.atan2(Math.sin(a) * 0.8, Math.cos(a) - 0.9) + sway;
 				const len =
 					R *
 					(0.75 + 0.3 * Math.sin(t * 5.2 + i * 1.9) + 0.15 * Math.sin(t * 8.3 + i)) *
 					k *
 					(pass === 0 ? 1.25 : 1);
-				const w = R * (pass === 0 ? 0.3 : 0.2) * (1 - Math.abs(i - 3) * 0.08);
-				const sway = R * 0.18 * Math.sin(t * 4.4 + i * 1.3);
-				const tx = rx + dx * len + px * sway;
-				const ty = ry + dy * len + py * sway;
-				const g = ctx.createLinearGradient(rx, ry, tx, ty);
-				if (pass === 0) {
-					g.addColorStop(0, `rgba(255,140,30,${0.6 * k})`);
-					g.addColorStop(1, 'rgba(220,40,0,0)');
-				} else {
-					g.addColorStop(0, `rgba(255,248,210,${k})`);
-					g.addColorStop(0.45, `rgba(255,170,50,${0.9 * k})`);
-					g.addColorStop(1, 'rgba(230,60,10,0)');
-				}
-				ctx.fillStyle = g;
-				ctx.beginPath();
-				ctx.moveTo(rx + px * w, ry + py * w);
-				ctx.quadraticCurveTo(
-					rx + dx * len * 0.45 + px * w * 0.9 + px * sway * 0.4,
-					ry + dy * len * 0.45 + py * w * 0.9 + py * sway * 0.4,
-					tx,
-					ty
-				);
-				ctx.quadraticCurveTo(
-					rx + dx * len * 0.45 - px * w * 0.7 + px * sway * 0.4,
-					ry + dy * len * 0.45 - py * w * 0.7 + py * sway * 0.4,
-					rx - px * w,
-					ry - py * w
-				);
-				ctx.closePath();
-				ctx.fill();
+				const w = R * (pass === 0 ? 0.6 : 0.4) * (1 - Math.abs(i - 3) * 0.08);
+				if (len <= 0.5) continue;
+				ctx.save();
+				ctx.translate(rx, ry);
+				ctx.rotate(dir);
+				ctx.globalAlpha = pass === 0 ? 0.6 * k : k;
+				ctx.drawImage(img, 0, -w / 2, len, w);
+				ctx.restore();
 			}
 		}
+		ctx.globalAlpha = 1;
 		ctx.globalCompositeOperation = 'source-over';
 	}
 
@@ -829,12 +903,11 @@ export class PacmanHero {
 				for (let i = 1; i < c.length; i++) ctx.lineTo(c[i][0] * R, c[i][1] * R);
 			}
 		};
-		ctx.globalCompositeOperation = 'lighter';
-		ctx.strokeStyle = `rgba(255,120,30,${0.45 * k})`;
+		// drawn with the caller's composite (source-atop in the body's scratch canvas)
+		ctx.strokeStyle = `rgba(255,130,40,${0.5 * k})`;
 		ctx.lineWidth = R * 0.09;
 		line();
 		ctx.stroke();
-		ctx.globalCompositeOperation = 'source-over';
 		ctx.strokeStyle = `rgba(255,250,215,${k})`;
 		ctx.lineWidth = R * 0.025;
 		line();

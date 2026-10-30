@@ -341,7 +341,128 @@
 		}
 		return g;
 	}
+	/** The painted disc spans ±DISC_SPAN body radii (room for the ink-free soft edge). */
+	var DISC_SPAN = 1.15;
+	var LIGHT_STEPS = 32;
+	var POWER_STEPS = 6;
+	var discCache = /* @__PURE__ */ new Map();
+	/**
+	* The body's painting (base, crisp shadow shape, deep shadow, bounce, brush texture, rim
+	* light, highlight) for a body radius in device px, the light's angle in his frame and the
+	* look, cached by quantised light and look: drawn once, reused every frame.
+	*/
+	function paintedDisc(deviceR, lightAngle, power) {
+		const R = Math.max(4, Math.round(deviceR));
+		const step = Math.round((lightAngle / (Math.PI * 2) % 1 + 1) * LIGHT_STEPS) % LIGHT_STEPS;
+		const look = Math.round(clamp01(power) * POWER_STEPS);
+		const key = `${R}:${step}:${look}`;
+		let c = discCache.get(key);
+		if (c) return c;
+		if (discCache.size > 600) discCache.clear();
+		const a = step / LIGHT_STEPS * Math.PI * 2;
+		const lx = Math.cos(a);
+		const ly = Math.sin(a);
+		const pal = mixPal(CALM, AWOKEN, look / POWER_STEPS);
+		const p = look / POWER_STEPS;
+		c = document.createElement("canvas");
+		c.width = c.height = Math.ceil(R * DISC_SPAN * 2);
+		const ctx = c.getContext("2d");
+		ctx.translate(c.width / 2, c.height / 2);
+		ctx.beginPath();
+		ctx.arc(0, 0, R, 0, Math.PI * 2);
+		ctx.clip();
+		const base = ctx.createLinearGradient(lx * R, ly * R, -lx * R, -ly * R);
+		base.addColorStop(0, css(pal.light));
+		base.addColorStop(.45, css(pal.mid));
+		base.addColorStop(1, css(mix(pal.mid, pal.shadow, .6)));
+		ctx.fillStyle = base;
+		ctx.fillRect(-R * 1.2, -R * 1.2, R * 2.4, R * 2.4);
+		ctx.beginPath();
+		ctx.rect(-R * 1.3, -R * 1.3, R * 2.6, R * 2.6);
+		ctx.arc(lx * R * .3, ly * R * .3, R * 1, 0, Math.PI * 2);
+		ctx.fillStyle = css(pal.shadow, .88);
+		ctx.fill("evenodd");
+		const deep = ctx.createRadialGradient(-lx * R * .95, -ly * R * .95, 0, -lx * R * .95, -ly * R * .95, R * .95);
+		deep.addColorStop(0, css(pal.deep, .6));
+		deep.addColorStop(1, css(pal.deep, 0));
+		ctx.fillStyle = deep;
+		ctx.fillRect(-R * 1.2, -R * 1.2, R * 2.4, R * 2.4);
+		ctx.beginPath();
+		ctx.arc(0, 0, R * 1.05, 0, Math.PI * 2);
+		ctx.arc(-lx * R * .13, -ly * R * .13, R * .97, 0, Math.PI * 2);
+		ctx.fillStyle = css(pal.bounce, .45);
+		ctx.fill("evenodd");
+		ctx.globalAlpha = .16;
+		ctx.globalCompositeOperation = "soft-light";
+		ctx.drawImage(brushTexture(), -R, -R, R * 2, R * 2);
+		ctx.globalCompositeOperation = "source-over";
+		ctx.globalAlpha = 1;
+		ctx.globalCompositeOperation = "lighter";
+		ctx.beginPath();
+		ctx.arc(0, 0, R * 1.05, 0, Math.PI * 2);
+		ctx.arc(R * .09, 0, R * 1, 0, Math.PI * 2);
+		ctx.fillStyle = css(pal.rim, .5 + .3 * p);
+		ctx.fill("evenodd");
+		ctx.globalCompositeOperation = "source-over";
+		const hx = lx * R * .52;
+		const hy = ly * R * .52;
+		ctx.fillStyle = css(pal.highlight, .95);
+		ctx.beginPath();
+		ctx.ellipse(hx, hy, R * .25, R * .12, a + Math.PI / 2, 0, Math.PI * 2);
+		ctx.fill();
+		ctx.beginPath();
+		ctx.arc(hx + lx * R * .2 - ly * R * .18, hy + ly * R * .2 + lx * R * .18, R * .05, 0, Math.PI * 2);
+		ctx.fill();
+		discCache.set(key, c);
+		return c;
+	}
+	var flames = null;
+	/** A flame tongue pointing +x, its root at the left edge: an outer glow and a hot inner one. */
+	function flameSprites() {
+		if (flames) return flames;
+		const make = (stops) => {
+			const c = document.createElement("canvas");
+			c.width = 128;
+			c.height = 48;
+			const x = c.getContext("2d");
+			const g = x.createLinearGradient(0, 0, 128, 0);
+			for (const [o, col] of stops) g.addColorStop(o, col);
+			x.fillStyle = g;
+			x.beginPath();
+			x.moveTo(0, 2);
+			x.quadraticCurveTo(58, 2, 128, 24);
+			x.quadraticCurveTo(58, 46, 0, 46);
+			x.quadraticCurveTo(-6, 24, 0, 2);
+			x.fill();
+			return c;
+		};
+		flames = [make([[0, "rgba(255,140,30,1)"], [1, "rgba(220,40,0,0)"]]), make([
+			[0, "rgba(255,248,210,1)"],
+			[.45, "rgba(255,170,50,0.9)"],
+			[1, "rgba(230,60,10,0)"]
+		])];
+		return flames;
+	}
+	var core = null;
+	/** The light in his mouth: white-hot at the centre, gold, then a dark red rim. */
+	function coreSprite() {
+		if (core) return core;
+		core = document.createElement("canvas");
+		core.width = core.height = 128;
+		const x = core.getContext("2d");
+		const g = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+		g.addColorStop(0, "rgba(255,252,236,1)");
+		g.addColorStop(.3, "rgba(255,210,100,0.9)");
+		g.addColorStop(.75, "rgba(240,100,25,0.5)");
+		g.addColorStop(1, "rgba(120,20,5,0)");
+		x.fillStyle = g;
+		x.fillRect(0, 0, 128, 128);
+		return core;
+	}
 	var CHOMP_RATE = 4.2;
+	/** Death: a hit (0..0.3), the mouth opens all the way round (to 1.3), he bursts into embers. */
+	var DEATH_OPEN = .3;
+	var DEATH_POP = 1.3;
 	var CHARGE = .18;
 	var PacmanHero = class {
 		r = 20;
@@ -358,6 +479,9 @@
 		ending = false;
 		/** Seconds since the energizer was taken (the wind-up and burst), or -1. */
 		transform = -1;
+		/** Seconds into the death, or -1. */
+		dying = -1;
+		invulnerable = false;
 		chomp = 0;
 		bite = -1;
 		snap = -1;
@@ -388,12 +512,37 @@
 			return this.seed / 2147483647;
 		}
 		/** He eats something small: a quick wind-up, a snapping bite, a squash. */
+		/** A dot: just a small glow at the lips (the run's chomp already bites). */
+		gulp() {
+			this.mouthFlash = Math.max(this.mouthFlash, .3);
+		}
 		eat() {
 			this.bite = 0;
 		}
 		update(dt, s) {
 			if (!Number.isFinite(dt) || dt < 0) dt = 0;
 			this.time += dt;
+			this.invulnerable = Boolean(s.invulnerable);
+			if (s.dying) {
+				if (this.dying < 0) {
+					this.dying = 0;
+					this.flash = .8;
+					this.bite = -1;
+				}
+				const before = this.dying;
+				this.dying += dt;
+				if (before < DEATH_POP && this.dying >= DEATH_POP) for (let i = 0; i < 26; i++) this.spawnEmber(this.power > .5, i / 26 * Math.PI * 2, 4 + this.random() * 7);
+				this.trail.shrink(this.r * 10 * dt);
+				this.along.step(1, dt);
+				this.across.step(1, dt);
+				this.flash = Math.max(0, this.flash - dt / .3);
+				this.tick(dt);
+				return;
+			}
+			if (this.dying >= 0) {
+				this.reset();
+				this.dying = -1;
+			}
 			const step = Math.hypot(s.x - this.x, s.y - this.y);
 			this.x = s.x;
 			this.y = s.y;
@@ -462,7 +611,7 @@
 			this.flash = Math.max(0, this.flash - dt / .16);
 			this.mouthFlash = Math.max(0, this.mouthFlash - dt / .2);
 			const r = this.r;
-			this.trail.push(s.x, s.y, r * .22, r * (4.2 + 1.4 * this.power), r * 3);
+			this.trail.push(s.x, s.y, r * .34, r * (4.2 + 1.4 * this.power), r * 3);
 			if (!this.moving) this.trail.shrink(r * 7 * dt);
 			if (step < r * 3) {
 				this.travelled += step;
@@ -473,6 +622,11 @@
 					this.spawnEmber(this.power > .5, a, 1.5 + this.random() * 2.5, true);
 				}
 			}
+			this.tick(dt);
+		}
+		/** Embers drift up and fade; bursts run their course. */
+		tick(dt) {
+			const r = this.r;
 			for (const e of this.embers) {
 				e.life -= dt;
 				e.x += e.vx * dt;
@@ -531,13 +685,38 @@
 			const pal = mixPal(CALM, AWOKEN, p);
 			const pulse = this.ending && p > .5 ? .62 + .38 * (.5 + .5 * Math.cos(this.time * 5)) : 1;
 			this.drawTrail(ctx, p);
+			const d = this.dying;
+			if (d >= DEATH_POP) {
+				this.drawEmbers(ctx);
+				const k = clamp01((d - DEATH_POP) / .44999999999999996);
+				if (k < 1) {
+					const gs = r * (1.2 + 2.2 * easeOut(k));
+					ctx.globalCompositeOperation = "lighter";
+					ctx.globalAlpha = 1 - k;
+					ctx.drawImage(glow([
+						255,
+						214,
+						120
+					]), this.x - gs, this.y - gs, gs * 2, gs * 2);
+					ctx.globalAlpha = 1;
+					ctx.globalCompositeOperation = "source-over";
+				}
+				return;
+			}
 			this.drawEmbers(ctx);
 			const open = this.openness();
-			const m = .04 + Math.min(1.15, open) * .58;
-			const grin = this.moving ? .08 : .2;
-			const mu = m * (1 - grin);
-			const md = m * (1 + grin);
-			const S = 1 + .07 * p;
+			let m = .04 + Math.min(1.15, open) * .58;
+			let grin = this.moving ? .08 : .2;
+			let S = 1 + .07 * p;
+			if (d >= 0) {
+				const k = clamp01((d - DEATH_OPEN) / 1);
+				const e = k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+				m = .3 + (Math.PI - .3) * e;
+				grin = 0;
+				S *= 1 - .25 * e;
+			}
+			const mu = Math.min(Math.PI - .01, m * (1 - grin));
+			const md = Math.min(Math.PI - .01, m * (1 + grin));
 			const ca = Math.cos(this.angle);
 			const sa = Math.sin(this.angle);
 			const lx = LIGHT.x * ca + LIGHT.y * sa;
@@ -561,6 +740,12 @@
 				ctx.globalAlpha = 1;
 				ctx.globalCompositeOperation = "source-over";
 			}
+			const coreA = Math.min(1, clamp01(open * 1.4) * (.85 + .15 * p) + charge * .6);
+			if (coreA > .01) {
+				ctx.globalAlpha = coreA;
+				ctx.drawImage(coreSprite(), R * .1 - R * .92, -R * .92, R * 1.84, R * 1.84);
+				ctx.globalAlpha = 1;
+			}
 			const A = {
 				x: -.1 * R,
 				y: 0
@@ -573,128 +758,29 @@
 				x: Math.cos(md) * R,
 				y: Math.sin(md) * R
 			};
-			const mouthRegion = () => {
-				ctx.beginPath();
-				ctx.moveTo(A.x, A.y);
-				ctx.lineTo(U.x, U.y);
-				ctx.arc(0, 0, R, -mu, md, false);
-				ctx.closePath();
-			};
-			const coreA = clamp01(open * 1.4) * (.85 + .15 * p) + charge * .6;
-			ctx.save();
-			mouthRegion();
-			ctx.clip();
-			const core = ctx.createRadialGradient(R * .1, 0, 0, R * .1, 0, R * .95);
-			core.addColorStop(0, css([
-				255,
-				252,
-				236
-			], coreA));
-			core.addColorStop(.3, css(mix([
-				255,
-				200,
-				80
-			], [
-				255,
-				230,
-				150
-			], p), coreA * .9));
-			core.addColorStop(.75, css(mix([
-				230,
-				90,
-				20
-			], [
-				255,
-				120,
-				30
-			], p), coreA * .5));
-			core.addColorStop(1, css([
-				120,
-				20,
-				5
-			], coreA * .2));
-			ctx.fillStyle = core;
-			ctx.fillRect(-R, -R * 1.2, R * 2.4, R * 2.4);
-			ctx.restore();
-			const body = () => {
-				ctx.beginPath();
-				ctx.moveTo(U.x, U.y);
-				ctx.arc(0, 0, R, -mu, md, true);
-				const bend = R * .09 * clamp01(m * 2.5);
-				ctx.quadraticCurveTo((Dn.x + A.x) / 2, (Dn.y + A.y) / 2 - bend, A.x, A.y);
-				ctx.quadraticCurveTo((U.x + A.x) / 2, (U.y + A.y) / 2 + bend, U.x, U.y);
-				ctx.closePath();
-			};
+			const bend = R * .09 * clamp01(m * 2.5);
 			ctx.save();
 			ctx.translate(-lx * R * .045, -ly * R * .045);
 			ctx.scale(1.075, 1.075);
-			body();
+			ctx.beginPath();
+			ctx.moveTo(U.x, U.y);
+			ctx.arc(0, 0, R, -mu, md, true);
+			ctx.quadraticCurveTo((Dn.x + A.x) / 2, (Dn.y + A.y) / 2 - bend, A.x, A.y);
+			ctx.quadraticCurveTo((U.x + A.x) / 2, (U.y + A.y) / 2 + bend, U.x, U.y);
+			ctx.closePath();
 			ctx.fillStyle = css(pal.ink);
 			ctx.fill();
 			ctx.restore();
-			ctx.save();
-			body();
-			ctx.clip();
-			const base = ctx.createLinearGradient(lx * R, ly * R, -lx * R, -ly * R);
-			base.addColorStop(0, css(pal.light));
-			base.addColorStop(.45, css(pal.mid));
-			base.addColorStop(1, css(mix(pal.mid, pal.shadow, .6)));
-			ctx.fillStyle = base;
-			ctx.fillRect(-R * 1.2, -R * 1.2, R * 2.4, R * 2.4);
-			ctx.beginPath();
-			ctx.rect(-R * 1.3, -R * 1.3, R * 2.6, R * 2.6);
-			ctx.arc(lx * R * .3, ly * R * .3, R * 1, 0, Math.PI * 2);
-			ctx.fillStyle = css(pal.shadow, .88);
-			ctx.fill("evenodd");
-			const deep = ctx.createRadialGradient(-lx * R * .95, -ly * R * .95, 0, -lx * R * .95, -ly * R * .95, R * .95);
-			deep.addColorStop(0, css(pal.deep, .6));
-			deep.addColorStop(1, css(pal.deep, 0));
-			ctx.fillStyle = deep;
-			ctx.fillRect(-R * 1.2, -R * 1.2, R * 2.4, R * 2.4);
-			ctx.beginPath();
-			ctx.arc(0, 0, R * 1.05, 0, Math.PI * 2);
-			ctx.arc(-lx * R * .13, -ly * R * .13, R * .97, 0, Math.PI * 2);
-			ctx.fillStyle = css(pal.bounce, .45);
-			ctx.fill("evenodd");
-			ctx.globalAlpha = .16;
-			ctx.globalCompositeOperation = "soft-light";
-			ctx.drawImage(brushTexture(), -R, -R, R * 2, R * 2);
-			ctx.globalCompositeOperation = "source-over";
-			ctx.globalAlpha = 1;
-			ctx.globalCompositeOperation = "lighter";
-			ctx.beginPath();
-			ctx.arc(0, 0, R * 1.05, 0, Math.PI * 2);
-			ctx.arc(R * .09, 0, R * 1, 0, Math.PI * 2);
-			ctx.fillStyle = css(pal.rim, .5 + .3 * p);
-			ctx.fill("evenodd");
-			ctx.globalCompositeOperation = "source-over";
-			const hx = lx * R * .52;
-			const hy = ly * R * .52;
-			ctx.fillStyle = css(pal.highlight, .95);
-			ctx.beginPath();
-			ctx.ellipse(hx, hy, R * .25, R * .12, Math.atan2(ly, lx) + Math.PI / 2, 0, Math.PI * 2);
-			ctx.fill();
-			ctx.beginPath();
-			ctx.arc(hx + lx * R * .2 - ly * R * .18, hy + ly * R * .2 + lx * R * .18, R * .05, 0, Math.PI * 2);
-			ctx.fill();
-			if (p > .01) this.drawCracks(ctx, R, p * pulse);
-			if (this.flash > 0) {
-				ctx.fillStyle = `rgba(255,255,250,${this.flash})`;
-				ctx.fillRect(-R * 1.2, -R * 1.2, R * 2.4, R * 2.4);
-			}
-			ctx.restore();
+			const body = this.composeBody(R, lx, ly, p, pulse, mu, md, bend);
+			ctx.drawImage(body.canvas, -body.half, -body.half, body.half * 2, body.half * 2);
 			ctx.lineCap = "round";
 			ctx.lineJoin = "round";
-			const lips = () => {
-				ctx.beginPath();
-				const bend = R * .09 * clamp01(m * 2.5);
-				ctx.moveTo(Dn.x * .97, Dn.y * .97);
-				ctx.quadraticCurveTo((Dn.x + A.x) / 2, (Dn.y + A.y) / 2 - bend, A.x, A.y);
-				ctx.quadraticCurveTo((U.x + A.x) / 2, (U.y + A.y) / 2 + bend, U.x * .97, U.y * .97);
-			};
+			ctx.beginPath();
+			ctx.moveTo(Dn.x * .97, Dn.y * .97);
+			ctx.quadraticCurveTo((Dn.x + A.x) / 2, (Dn.y + A.y) / 2 - bend, A.x, A.y);
+			ctx.quadraticCurveTo((U.x + A.x) / 2, (U.y + A.y) / 2 + bend, U.x * .97, U.y * .97);
 			ctx.strokeStyle = css(pal.ink);
 			ctx.lineWidth = R * .075;
-			lips();
 			ctx.stroke();
 			ctx.restore();
 			const spill = clamp01(open) * (.45 + .4 * p) + this.mouthFlash * .6;
@@ -712,30 +798,73 @@
 				ctx.globalAlpha = 1;
 				ctx.globalCompositeOperation = "source-over";
 			}
+			if (this.invulnerable && d < 0) {
+				const k = .5 + .5 * Math.cos(this.time * 9);
+				ctx.strokeStyle = `rgba(255,248,220,${.25 + .35 * k})`;
+				ctx.lineWidth = Math.max(1, R * .1);
+				ctx.beginPath();
+				ctx.arc(this.x, this.y, R * (1.3 + .08 * k), 0, Math.PI * 2);
+				ctx.stroke();
+			}
 			this.drawBursts(ctx);
+		}
+		scratch = null;
+		/**
+		* The body this frame: the cached painted disc for this light and look, with the mouth
+		* cut out, molten veins and the flash added, in a small scratch canvas. Only plain
+		* image draws and Porter-Duff operations: no clipping, no blend modes, no gradients.
+		*/
+		composeBody(R, lx, ly, p, pulse, mu, md, bend) {
+			const disc = paintedDisc(R * Math.min(2, typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1), Math.atan2(ly, lx), p);
+			const size = disc.width;
+			if (!this.scratch || this.scratch.width !== size) {
+				this.scratch = document.createElement("canvas");
+				this.scratch.width = this.scratch.height = size;
+			}
+			const sc = this.scratch.getContext("2d");
+			const k = size / 2 / (R * DISC_SPAN);
+			sc.setTransform(1, 0, 0, 1, 0, 0);
+			sc.globalCompositeOperation = "source-over";
+			sc.globalAlpha = 1;
+			sc.clearRect(0, 0, size, size);
+			sc.drawImage(disc, 0, 0);
+			sc.setTransform(k, 0, 0, k, size / 2, size / 2);
+			const A = {
+				x: -.1 * R,
+				y: 0
+			};
+			const U = {
+				x: Math.cos(mu) * R,
+				y: -Math.sin(mu) * R
+			};
+			const Dn = {
+				x: Math.cos(md) * R,
+				y: Math.sin(md) * R
+			};
+			sc.globalCompositeOperation = "destination-out";
+			sc.beginPath();
+			sc.moveTo(A.x, A.y);
+			sc.quadraticCurveTo((U.x + A.x) / 2, (U.y + A.y) / 2 + bend, U.x, U.y);
+			sc.lineTo(Math.cos(mu) * R * 1.3, -Math.sin(mu) * R * 1.3);
+			sc.arc(0, 0, R * 1.3, -mu, md, false);
+			sc.lineTo(Dn.x, Dn.y);
+			sc.quadraticCurveTo((Dn.x + A.x) / 2, (Dn.y + A.y) / 2 - bend, A.x, A.y);
+			sc.closePath();
+			sc.fill();
+			sc.globalCompositeOperation = "source-atop";
+			if (p > .01) this.drawCracks(sc, R, p * pulse);
+			if (this.flash > 0) {
+				sc.fillStyle = `rgba(255,255,250,${this.flash})`;
+				sc.fillRect(-R * 1.2, -R * 1.2, R * 2.4, R * 2.4);
+			}
+			sc.globalCompositeOperation = "source-over";
+			return {
+				canvas: this.scratch,
+				half: R * DISC_SPAN
+			};
 		}
 		drawTrail(ctx, p) {
 			const calm = [
-				{
-					width: .95,
-					stops: [[
-						0,
-						[
-							255,
-							150,
-							40
-						],
-						.22
-					], [
-						1,
-						[
-							255,
-							90,
-							20
-						],
-						0
-					]]
-				},
 				{
 					width: .36,
 					offset: .34,
@@ -844,26 +973,6 @@
 			];
 			const awoken = [
 				{
-					width: 1.25,
-					stops: [[
-						0,
-						[
-							255,
-							120,
-							30
-						],
-						.3
-					], [
-						1,
-						[
-							220,
-							40,
-							0
-						],
-						0
-					]]
-				},
-				{
 					width: .5,
 					offset: .4,
 					wave: .4,
@@ -969,8 +1078,8 @@
 					]
 				}
 			];
-			this.trail.draw(ctx, this.r, calm, 1 - p, this.time);
-			this.trail.draw(ctx, this.r, awoken, p, this.time);
+			if (p < .99) this.trail.draw(ctx, this.r, calm, 1 - p, this.time);
+			if (p > .01) this.trail.draw(ctx, this.r, awoken, p, this.time);
 		}
 		drawEmbers(ctx) {
 			for (const e of this.embers) {
@@ -1001,42 +1110,28 @@
 		/** Painted flame tongues streaming back from his head, swaying (no noise: no flicker). */
 		drawFlames(ctx, R, k) {
 			const t = this.time;
+			const [outer, inner] = flameSprites();
 			for (const pass of [0, 1]) {
 				ctx.globalCompositeOperation = pass === 0 ? "lighter" : "source-over";
+				const img = pass === 0 ? outer : inner;
 				for (let i = 0; i < 7; i++) {
 					const a = Math.PI + (i - 3) * .36;
 					const rx = Math.cos(a) * R * .8;
 					const ry = Math.sin(a) * R * .8;
-					let dx = Math.cos(a) - .9;
-					let dy = Math.sin(a) * .8;
-					const dl = Math.hypot(dx, dy);
-					dx /= dl;
-					dy /= dl;
-					const px = -dy;
-					const py = dx;
+					const sway = .22 * Math.sin(t * 4.4 + i * 1.3);
+					const dir = Math.atan2(Math.sin(a) * .8, Math.cos(a) - .9) + sway;
 					const len = R * (.75 + .3 * Math.sin(t * 5.2 + i * 1.9) + .15 * Math.sin(t * 8.3 + i)) * k * (pass === 0 ? 1.25 : 1);
-					const w = R * (pass === 0 ? .3 : .2) * (1 - Math.abs(i - 3) * .08);
-					const sway = R * .18 * Math.sin(t * 4.4 + i * 1.3);
-					const tx = rx + dx * len + px * sway;
-					const ty = ry + dy * len + py * sway;
-					const g = ctx.createLinearGradient(rx, ry, tx, ty);
-					if (pass === 0) {
-						g.addColorStop(0, `rgba(255,140,30,${.6 * k})`);
-						g.addColorStop(1, "rgba(220,40,0,0)");
-					} else {
-						g.addColorStop(0, `rgba(255,248,210,${k})`);
-						g.addColorStop(.45, `rgba(255,170,50,${.9 * k})`);
-						g.addColorStop(1, "rgba(230,60,10,0)");
-					}
-					ctx.fillStyle = g;
-					ctx.beginPath();
-					ctx.moveTo(rx + px * w, ry + py * w);
-					ctx.quadraticCurveTo(rx + dx * len * .45 + px * w * .9 + px * sway * .4, ry + dy * len * .45 + py * w * .9 + py * sway * .4, tx, ty);
-					ctx.quadraticCurveTo(rx + dx * len * .45 - px * w * .7 + px * sway * .4, ry + dy * len * .45 - py * w * .7 + py * sway * .4, rx - px * w, ry - py * w);
-					ctx.closePath();
-					ctx.fill();
+					const w = R * (pass === 0 ? .6 : .4) * (1 - Math.abs(i - 3) * .08);
+					if (len <= .5) continue;
+					ctx.save();
+					ctx.translate(rx, ry);
+					ctx.rotate(dir);
+					ctx.globalAlpha = pass === 0 ? .6 * k : k;
+					ctx.drawImage(img, 0, -w / 2, len, w);
+					ctx.restore();
 				}
 			}
+			ctx.globalAlpha = 1;
 			ctx.globalCompositeOperation = "source-over";
 		}
 		drawCracks(ctx, R, k) {
@@ -1049,12 +1144,10 @@
 					for (let i = 1; i < c.length; i++) ctx.lineTo(c[i][0] * R, c[i][1] * R);
 				}
 			};
-			ctx.globalCompositeOperation = "lighter";
-			ctx.strokeStyle = `rgba(255,120,30,${.45 * k})`;
+			ctx.strokeStyle = `rgba(255,130,40,${.5 * k})`;
 			ctx.lineWidth = R * .09;
 			line();
 			ctx.stroke();
-			ctx.globalCompositeOperation = "source-over";
 			ctx.strokeStyle = `rgba(255,250,215,${k})`;
 			ctx.lineWidth = R * .025;
 			line();
