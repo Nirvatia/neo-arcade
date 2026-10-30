@@ -19,6 +19,7 @@ import type { EventBus } from '../../engine/EventBus';
 import type { PacmanEventMap } from '../../core/Events';
 import { seasonModifiers } from './SeasonCatalog';
 import type { SeasonData } from './SeasonCatalog';
+import { busSink } from '../debug/debugLog';
 
 /** Boss and weapons of the hell level. */
 export interface DoomSession {
@@ -89,6 +90,10 @@ export function buildLevelSession(request: LevelSessionRequest): LevelSession {
 		const boss = new DoomBossService(grid, bossSpawn);
 		const abilities = new DoomAbilityService(grid, boss);
 		abilities.setGodMode(request.godMode);
+		if (import.meta.env.DEV) {
+			boss.setDebugSink(busSink(events));
+			abilities.setDebugSink(busSink(events));
+		}
 		doom = { boss, abilities };
 	}
 	combat.setProfile(profile);

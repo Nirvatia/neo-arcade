@@ -8,6 +8,7 @@ import type { EventBus } from '../../engine/EventBus';
 import type { PacmanEventMap } from '../../core/Events';
 import { SCORE_TABLE } from '../../config/scoreConfig';
 import { ACTOR_CONTACT_DISTANCE_SQ } from '../../config/actorConfig';
+import { debugLog } from '../debug/debugLog';
 
 export type GoldenEggPhase = 'waiting' | 'egg' | 'spent';
 
@@ -135,6 +136,7 @@ export class GoldenEggService {
 		this.spawnTileValue = tile;
 		this.phaseValue = 'egg';
 		this.events.emit('audio:cue', { cue: 'egg-spawn' });
+		debugLog(this.events, 'spawn', 'golden egg');
 	}
 
 	private collect(): void {
@@ -144,6 +146,7 @@ export class GoldenEggService {
 		this.phaseValue = 'spent';
 		this.secretRequestedValue = true;
 		this.events.emit('audio:cue', { cue: 'egg-collect' });
+		debugLog(this.events, 'spawn', 'golden egg taken');
 	}
 
 	private touchesPlayer(player: PlayerService, center: { x: number; y: number }): boolean {

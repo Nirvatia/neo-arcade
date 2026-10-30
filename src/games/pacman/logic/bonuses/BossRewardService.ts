@@ -5,6 +5,7 @@ import type { EventBus } from '../../engine/EventBus';
 import type { PacmanEventMap } from '../../core/Events';
 import { bfsDistanceFrom, doomTileKey } from '../doom/DoomGraph';
 import { ACTOR_CONTACT_DISTANCE_SQ } from '../../config/actorConfig';
+import { debugLog } from '../debug/debugLog';
 
 /** How the player left a boss level: with the bonus life, or through the exit without it. */
 export type BossRewardChoice = 'life' | 'exit';
@@ -65,6 +66,7 @@ export class BossRewardService {
 		this.heartTile = heart;
 		this.exitTile = this.farthestFreeTile(heart) ?? heart;
 		this.events.emit('audio:cue', { cue: 'exit-open' });
+		debugLog(this.events, 'spawn', 'boss reward: heart + exit');
 	}
 
 	update(player: PlayerService): void {
@@ -92,6 +94,11 @@ export class BossRewardService {
 		this.choiceValue = choice;
 		this.pendingChoice = choice;
 		this.events.emit('audio:cue', { cue: choice === 'life' ? 'bonus-life' : 'exit-enter' });
+		debugLog(
+			this.events,
+			'spawn',
+			choice === 'life' ? 'boss reward: heart taken' : 'boss reward: exit'
+		);
 	}
 
 	/** A tile the player can stand on: walkable, not a teleport. */

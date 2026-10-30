@@ -20,6 +20,8 @@ import {
 	BERSERK_BITE_STUN,
 	BERSERK_SPEED_MUL
 } from './DoomBalance';
+import type { DebugSink } from '../debug/debugLog';
+import { NO_DEBUG } from '../debug/debugLog';
 
 const BOSS_SHOT_HIT_RADIUS_SQ = 0.25;
 const MINION_SHOT_HIT_RADIUS_SQ = 0.25;
@@ -31,6 +33,7 @@ export class DoomAbilityService {
 	private readonly boss: DoomBossService;
 	private readonly pickups: DoomPickupService;
 	private readonly weapons: DoomWeaponService;
+	private debug: DebugSink = NO_DEBUG;
 	private playerHpValue = PLAYER_MAX_HP;
 	private playerDeadValue = false;
 	private godModeValue = false;
@@ -132,6 +135,7 @@ export class DoomAbilityService {
 		const slotOccupied = this.weapons.slot !== null;
 		const collected = this.pickups.update(dt, player, this.playerHpValue, slotOccupied);
 		if (collected) {
+			this.debug('spawn', `picked ${collected}`);
 			this.applyPickup(collected);
 			const p = player.position;
 			this.weapons.pushFx({ kind: 'pickup', x: p.x, y: p.y, detail: collected });
@@ -140,18 +144,19 @@ export class DoomAbilityService {
 			if (this.weapons.berserkActive) {
 				this.biteBoss();
 			} else {
-				this.damagePlayer(1, player);
+				this.damagePlayer(1, player, 'boss contact');
 			}
 		}
 		if (this.boss.consumeMinionContactHit()) {
 			if (this.weapons.berserkActive) {
 				this.weapons.extendBerserk(BERSERK_EXTEND_PER_MINION);
+				this.debug('state', `berserk +${BERSERK_EXTEND_PER_MINION}s (minion)`);
 			} else {
-				this.damagePlayer(1, player);
+				this.damagePlayer(1, player, 'minion');
 			}
 		}
 		if (this.boss.consumeHazardHit()) {
-			this.damagePlayer(1, player);
+			this.damagePlayer(1, player, 'hazard');
 		}
 		this.resolveShotCollisions(player);
 		this.resolveTracerDamage(player);
@@ -189,7 +194,12 @@ export class DoomAbilityService {
 		this.godModeValue = value;
 	}
 
-	damagePlayer(amount: number, player: PlayerService): void {
+	/** Dev log lines (player damage, pickups) go here. */
+	setDebugSink(sink: DebugSink): void {
+		this.debug = sink;
+	}
+
+	damagePlayer(amount: number, player: PlayerService, source = 'hit'): void {
 		if (this.godModeValue) {
 			return;
 		}
@@ -204,6 +214,7 @@ export class DoomAbilityService {
 			return;
 		}
 		this.playerHpValue = Math.max(0, this.playerHpValue - amount);
+		this.debug('damage', `player −${amount} (${source})`, this.playerHpValue);
 		this.weapons.pushFx({ kind: 'player-hit', x: player.position.x, y: player.position.y });
 		this.weapons.cancelBfgCharge();
 		if (this.playerHpValue <= 0) {
@@ -278,7 +289,7 @@ export class DoomAbilityService {
 		if (this.boss.isStunned || this.boss.isStunImmune) {
 			return;
 		}
-		this.boss.takeDamage(BERSERK_BITE_DAMAGE);
+		this.boss.takeDamage(BERSERK_BITE_DAMAGE, 'berserk bite');
 		this.boss.applyStun(BERSERK_BITE_STUN);
 		this.weapons.pushFx({ kind: 'bite', x: this.boss.position.x, y: this.boss.position.y });
 	}
@@ -291,7 +302,7 @@ export class DoomAbilityService {
 			const bdx = shot.x - bossPos.x;
 			const bdy = shot.y - bossPos.y;
 			if (bdx * bdx + bdy * bdy < BOSS_SHOT_HIT_RADIUS_SQ) {
-				this.boss.takeDamage(BFG_ORB_DAMAGE);
+				this.boss.takeDamage(BFG_ORB_DAMAGE, 'BFG orb');
 				this.boss.applyStun(BFG_ORB_STUN);
 				this.weapons.pushFx({ kind: 'boss-hit', x: bossPos.x, y: bossPos.y });
 				this.weapons.detonateShot(i);
@@ -321,7 +332,7 @@ export class DoomAbilityService {
 			}
 			this.processedTracers.add(tracer);
 			if (!this.ballHitBossValue && this.tileInTracer(this.boss.tile.x, this.boss.tile.y, tracer)) {
-				this.boss.takeDamage(BFG_TRACER_DAMAGE);
+				this.boss.takeDamage(BFG_TRACER_DAMAGE, 'BFG tracer');
 			}
 			this.boss.killMinionsWhere((minion) => {
 				const pos = minionPosition(minion);
@@ -370,7 +381,7 @@ export class DoomAbilityService {
 		this.weapons.pushFx({ kind: 'barrel-blast', x: barrel.x + 0.5, y: barrel.y + 0.5 });
 		const bossTile = this.boss.tile;
 		if (affectedKeys.has(`${bossTile.x},${bossTile.y}`)) {
-			this.boss.takeDamage(BARREL_DAMAGE);
+			this.boss.takeDamage(BARREL_DAMAGE, 'barrel');
 			this.boss.applyStun(BARREL_STUN);
 		}
 		this.boss.killMinionsWhere((minion) => {
@@ -380,7 +391,7 @@ export class DoomAbilityService {
 		const playerTileX = Math.floor(player.position.x);
 		const playerTileY = Math.floor(player.position.y);
 		if (affectedKeys.has(`${playerTileX},${playerTileY}`)) {
-			this.damagePlayer(1, player);
+			this.damagePlayer(1, player, 'own barrel');
 		}
 		this.weapons.removeBarrel(index);
 	}

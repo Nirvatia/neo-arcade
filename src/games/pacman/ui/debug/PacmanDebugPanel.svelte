@@ -4,6 +4,7 @@
 	import type { DebugController, DebugSnapshot } from '../../core/debug/DebugController';
 	import DevWindow from './DevWindow.svelte';
 	import DevGroup from './DevGroup.svelte';
+	import DevLogWindow from './DevLogWindow.svelte';
 	import { FRUIT_ORDER } from '../../logic/bonuses/fruitCatalog';
 	import { attackWeightsForPhase, DOOM_ATTACK_KINDS } from '../../logic/doom/DoomAttackCore';
 	import type { DoomPickupKind } from '../../logic/doom/DoomPickupModel';
@@ -236,6 +237,7 @@
 			{/if}
 		</DevGroup>
 	</DevWindow>
+	<DevLogWindow {dev} />
 {/if}
 
 <style>

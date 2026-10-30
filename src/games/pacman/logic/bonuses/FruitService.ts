@@ -11,6 +11,7 @@ import type { FruitKind } from './fruitCatalog';
 import { fruitForLevel, randomFruitKind } from './fruitCatalog';
 import { SCORE_TABLE } from '../../config/scoreConfig';
 import { ACTOR_CONTACT_DISTANCE_SQ } from '../../config/actorConfig';
+import { debugLog } from '../debug/debugLog';
 
 export type { FruitKind };
 
@@ -165,6 +166,7 @@ export class FruitService {
 		this.activeKindValue = kind;
 		this.timerValue = this.fruitDurationValue;
 		this.events.emit('audio:cue', { cue: 'fruit-spawn' });
+		debugLog(this.events, 'spawn', `fruit ${kind} for ${this.timerValue}s`);
 	}
 
 	private chooseSpawnTile(): GridPoint | null {
@@ -197,6 +199,7 @@ export class FruitService {
 		this.timerValue = 0;
 		this.spawnedCountValue += 1;
 		this.events.emit('audio:cue', { cue: 'fruit-collect' });
+		debugLog(this.events, 'spawn', `fruit ${kind} eaten`);
 	}
 
 	private expire(): void {
@@ -205,5 +208,6 @@ export class FruitService {
 		this.timerValue = 0;
 		this.spawnedCountValue += 1;
 		this.events.emit('audio:cue', { cue: 'fruit-expire' });
+		debugLog(this.events, 'spawn', 'fruit expired');
 	}
 }

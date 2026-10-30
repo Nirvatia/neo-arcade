@@ -89,6 +89,8 @@ import { canStartDash } from './DoomDash';
 import type { DoomMinion, DoomMinionKind } from './DoomMinions';
 import { createMinion, minionPosition } from './DoomMinions';
 import type { DoomRenderState, DoomStateName } from './DoomBossModel';
+import type { DebugSink } from '../debug/debugLog';
+import { NO_DEBUG } from '../debug/debugLog';
 
 export interface VoidCell {
 	x: number;
@@ -143,6 +145,7 @@ export class DoomBossService {
 	private readonly protectedTileKeys = new Set<string>();
 	private barrelLocatorValue: (() => GridPoint | null) | null = null;
 	private forcedAttack: DoomAttackKind | null = null;
+	private debug: DebugSink = NO_DEBUG;
 	private attackRetryTimer = 0;
 	private personalCooldowns: Record<DoomAttackKind, number> = noCooldowns();
 	private readonly hazards = new DoomHazardField();
@@ -194,6 +197,11 @@ export class DoomBossService {
 
 	get pendingSealList(): readonly PendingSeal[] {
 		return this.pendingSeals;
+	}
+
+	/** Seconds until each attack may come again (dev watch table). */
+	get debugCooldowns(): Readonly<Record<DoomAttackKind, number>> {
+		return this.personalCooldowns;
 	}
 
 	get pullRemaining(): number {
@@ -446,11 +454,27 @@ export class DoomBossService {
 		}
 	}
 
-	takeDamage(amount: number): void {
+	/** Dev log lines (damage, stuns, attacks, phases) go here. */
+	setDebugSink(sink: DebugSink): void {
+		this.debug = sink;
+	}
+
+	takeDamage(amount: number, source = 'hit'): void {
 		if (!Number.isFinite(amount) || amount <= 0) {
 			return;
 		}
+		const before = this.model.hp;
+		const phaseBefore = this.model.phase;
 		this.model.takeDamage(amount);
+		const dealt = before - this.model.hp;
+		if (dealt > 0) {
+			this.debug('damage', `boss −${Math.round(dealt)} (${source})`, Math.round(this.model.hp));
+		} else {
+			this.debug('damage', `boss ignores ${source} (${this.model.state})`);
+		}
+		if (this.model.defeated) {
+			this.debug('boss', 'boss defeated');
+		}
 		if (this.model.hp <= PHASE_THRESHOLDS[0] && this.model.phase === 1) {
 			this.model.startTransition();
 			this.clearVoidAndMinions();
@@ -463,11 +487,15 @@ export class DoomBossService {
 			this.phaseTransitionValue = true;
 			this.shakeValue = Math.max(this.shakeValue, SHAKE_TRANSITION);
 		}
+		if (this.model.phase !== phaseBefore) {
+			this.debug('boss', `phase ${this.model.phase}`);
+		}
 	}
 
 	/** Dev: jumps to phase 1–3 (see `DoomBossModel.debugSetPhase`). */
 	debugSetPhase(phase: number): void {
 		this.model.debugSetPhase(phase);
+		this.debug('boss', `phase ${this.model.phase} (dev)`);
 		this.clearVoidAndMinions();
 		this.phaseTransitionValue = this.model.state === 'TRANSITION';
 	}
@@ -488,10 +516,14 @@ export class DoomBossService {
 
 	debugKill(): void {
 		this.model.debugKill();
+		this.debug('boss', 'boss defeated (dev)');
 	}
 
 	applyStun(duration: number): void {
 		this.model.applyStun(duration);
+		if (this.model.state === 'STUNNED') {
+			this.debug('debuff', `boss stunned ${duration}s`, duration);
+		}
 	}
 
 	reset(): void {
@@ -657,6 +689,7 @@ export class DoomBossService {
 			this.model.beginActive(0.1);
 			if (kind === 'pull') {
 				this.pullTimer = PULL_DURATION[pi];
+				this.debug('debuff', `player pulled ${PULL_DURATION[pi]}s`, PULL_DURATION[pi]);
 			}
 		}
 	}
@@ -863,6 +896,7 @@ export class DoomBossService {
 		if (!chosen) {
 			return false;
 		}
+		this.debug('boss', `attack: ${chosen}`);
 		if (chosen === 'rift' && rift) {
 			this.hazards.add('rift', rift.tiles, RIFT_TELEGRAPH[pi], RIFT_ACTIVE, rift.axis);
 			this.model.beginTelegraph('rift', RIFT_TELEGRAPH[pi]);

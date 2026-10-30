@@ -13,6 +13,14 @@ export interface DebugRenderFlags {
 	fronts: boolean;
 }
 
+/** One row of the live timer table: a name and seconds (or 0..1 for charges). */
+export interface DebugWatch {
+	readonly group: string;
+	readonly label: string;
+	readonly value: number;
+	readonly unit: 's' | '%' | '';
+}
+
 /** What the dev panel shows live, read once per animation frame. */
 export interface DebugSnapshot {
 	readonly state: string;
@@ -86,6 +94,46 @@ export class DebugController {
 					}
 				: null
 		};
+	}
+
+	/** Live timers for the watch table: only what the current level has, zeros included. */
+	watches(): DebugWatch[] {
+		const rows: DebugWatch[] = [];
+		const add = (group: string, label: string, value: number, unit: DebugWatch['unit'] = 's') =>
+			rows.push({ group, label, value, unit });
+		const flow = this.director.flow;
+		add('flow', `${flow.state} · ${flow.phase}`, flow.phaseRemaining);
+		const player = this.loader.player;
+		if (player) {
+			add('player', 'invulnerable', player.invulnerableTimer);
+		}
+		const combat = this.loader.combat;
+		const hypnosis = this.loader.hypnosis;
+		if (combat && !this.loader.hellMode) {
+			if (this.loader.profile === 'ms-pacman') {
+				add('player', 'overdrive', hypnosis?.overdriveTimer ?? 0);
+			} else {
+				add('player', 'power', combat.powerTimer);
+			}
+		}
+		const fruit = this.loader.fruit;
+		if (fruit?.active) {
+			add('bonus', `fruit ${fruit.active.toLowerCase()}`, fruit.timer);
+		}
+		const doom = this.loader.doom;
+		const boss = this.loader.doomBoss;
+		if (doom) {
+			add('player', 'hell HP', doom.playerHp, '');
+			add('player', 'berserk', doom.berserkTimer);
+			add('player', 'BFG charge', doom.bfgChargeProgress * 100, '%');
+		}
+		if (boss && !boss.defeated) {
+			add('boss', 'pull on player', boss.pullRemaining);
+			for (const [kind, seconds] of Object.entries(boss.debugCooldowns)) {
+				add('boss', `cooldown ${kind}`, seconds);
+			}
+		}
+		return rows;
 	}
 
 	// ── flow ────────────────────────────────────────────────────────────────
@@ -169,7 +217,7 @@ export class DebugController {
 	// ── boss ────────────────────────────────────────────────────────────────
 
 	damageBoss(amount = 250): void {
-		this.loader.doomBoss?.takeDamage(amount);
+		this.loader.doomBoss?.takeDamage(amount, 'dev');
 		this.loader.emitHud();
 	}
 

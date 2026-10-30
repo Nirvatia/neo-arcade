@@ -9,6 +9,7 @@ import type { GameProfile, HypnosisService } from './HypnosisService';
 import type { LairCodeService } from './LairCodeService';
 import { SCORE_TABLE } from '../../config/scoreConfig';
 import { ACTOR_CONTACT_DISTANCE_SQ } from '../../config/actorConfig';
+import { debugLog } from '../debug/debugLog';
 
 const DEFAULT_POWER_DURATION = 6;
 const SECRET_CLEAR_BONUS = 10000;
@@ -221,6 +222,7 @@ export class CombatService {
 			if (this.powerTimerValue <= 0) {
 				this.ghosts.endFrightened();
 				this.events.emit('audio:cue', { cue: 'power-end' });
+				debugLog(this.events, 'state', 'power ends');
 			}
 		}
 
@@ -260,6 +262,7 @@ export class CombatService {
 		}
 
 		this.lastDeathReasonValue = 'abyss';
+		debugLog(this.events, 'damage', 'player falls into the abyss');
 
 		console.warn('CombatService.killPlayerInHell', 'player death in hell level', {
 			lives: this.livesValue
@@ -342,12 +345,14 @@ export class CombatService {
 
 	private awardExtraLife(): void {
 		this.livesValue += 1;
+		debugLog(this.events, 'spawn', 'extra life', this.livesValue);
 	}
 
 	private activatePower(): void {
 		if (this.profileValue === 'ms-pacman') {
 			this.hypnosis.startOverdrive(this.ghosts);
 			this.events.emit('audio:cue', { cue: 'power-start' });
+			debugLog(this.events, 'state', 'power starts', this.powerDurationValue);
 			return;
 		}
 
@@ -356,6 +361,7 @@ export class CombatService {
 		this.ghosts.frightenActive();
 		this.ghosts.setPowerActive(true);
 		this.events.emit('audio:cue', { cue: 'power-start' });
+		debugLog(this.events, 'state', 'power starts', this.powerDurationValue);
 	}
 
 	private checkCollisions(): void {
@@ -461,7 +467,9 @@ export class CombatService {
 	}
 
 	private eatGhost(ghost: GhostModel): void {
-		this.scoreModel.add(this.chainPoints());
+		const points = this.chainPoints();
+		this.scoreModel.add(points);
+		debugLog(this.events, 'damage', `ghost ${ghost.kind} eaten`, points);
 		this.chainValue = Math.min(3, this.chainValue + 1);
 		this.ghosts.toEyes(ghost);
 		this.events.emit('audio:cue', { cue: 'ghost-eaten' });
@@ -533,6 +541,7 @@ export class CombatService {
 
 		this.deathsValue += 1;
 		this.livesValue = Math.max(0, this.livesValue - 1);
+		debugLog(this.events, 'damage', `player died (${safeReason})`, this.livesValue);
 		this.clearPower();
 		this.clearMsMode();
 		this.deathActiveValue = true;

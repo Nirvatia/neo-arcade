@@ -17,6 +17,8 @@ import {
 } from '../ui/debug/debugActions';
 import { TimeControl } from '../engine/TimeControl';
 import { DebugController } from './debug/DebugController';
+import { debugLog } from '../logic/debug/debugLog';
+import { pushDevLog } from '../ui/debug/devLog';
 
 export class GameMain implements GameModule {
 	private events: EventBus<PacmanEventMap> | null = null;
@@ -56,6 +58,8 @@ export class GameMain implements GameModule {
 		);
 		const input = new InputController({
 			direction: (direction) => {
+				const facing = level.player?.facing ?? '—';
+				debugLog(events, 'input', `${direction} (facing ${facing}, ${director.stateName})`);
 				if (director.stateName === 'playing' || director.stateName === 'ready') {
 					level.setDesiredDirection(direction);
 				}
@@ -126,6 +130,7 @@ export class GameMain implements GameModule {
 		});
 		if (import.meta.env.DEV) {
 			setDebugController(new DebugController(director, level, time));
+			events.on('debug:log', (line) => pushDevLog(line, director.flow.state));
 		}
 		loop.start();
 		if (import.meta.env.DEV) {

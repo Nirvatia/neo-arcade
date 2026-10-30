@@ -15,6 +15,7 @@ import type { DeathSnapshot } from './states/DeathState';
 import { LevelClearState } from './states/LevelClearState';
 import type { LevelClearSnapshot } from './states/LevelClearState';
 import { GameOverState } from './states/GameOverState';
+import { debugLog } from '../logic/debug/debugLog';
 
 export type { GameState, GameStateContext } from './flow/GameState';
 
@@ -276,10 +277,12 @@ export class Director {
 		this.current = next;
 		this.current.enter(this.context);
 		this.events.emit('ui:stateChanged', { state: this.current.name });
+		debugLog(this.events, 'state', `${from} → ${next.name}`);
 	}
 
 	private pause(): void {
 		const paused = new PausedState(this.current);
+		debugLog(this.events, 'state', `pause (${this.current.name})`);
 		this.current = paused;
 		paused.enter(this.context);
 		this.events.emit('ui:stateChanged', { state: paused.name });
