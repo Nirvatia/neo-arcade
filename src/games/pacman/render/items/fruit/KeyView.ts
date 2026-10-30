@@ -1,258 +1,129 @@
-// Cosmic Crystal Key: the owner's COLLECTIBLE_KEY.html, texture code 1:1 without its
-// ambient glow (the fruit keeps inside its tile, stage 10.1).
+// Cosmic Key, redrawn for the tile (stage 10.1): the mock-up's crystal key read as a
+// lollipop at tile size. A plain key instead, laid on the diagonal to fill the tile: a round
+// bow with a clear hole, a collar, a thick shaft and two teeth, cold steel-cyan (apart from
+// the gold bell) with a dark outline so it reads on every season.
 import type { CollectibleArt } from '../collectibleSprite';
 import { FRUIT_BLOOMS } from '../collectibleSprite';
 
+/** Outline: deep blue, wide enough to survive the downscale to a tile. */
+const OUTLINE = 'rgba(10,30,70,0.95)';
+
+const BOW_Y = -56;
+const BOW_R = 42;
+const HOLE_R = 19;
+
 function paint(ctx: CanvasRenderingContext2D, size: number): void {
-	const cx = size / 2;
-	const cy = size / 2;
-
 	ctx.save();
-	ctx.translate(cx, cy);
+	ctx.translate(size / 2, size / 2);
+	// the design is 256 units across, drawn upright and laid on the diagonal (bow top left)
+	ctx.scale(size / 256, size / 256);
+	ctx.rotate(-Math.PI / 4);
+	ctx.lineJoin = 'round';
+	ctx.lineCap = 'round';
 
-	const headR = size * 0.14;
-	const headY = -size * 0.1;
-	const shaftW = size * 0.035;
-	const shaftTop = headY + headR * 0.9;
-	const shaftBottom = size * 0.32;
-
-	// 1. shaft + teeth
-	const shaftAndTeeth = () => {
+	const bow = () => {
 		ctx.beginPath();
-		ctx.moveTo(-shaftW, shaftTop);
-		ctx.lineTo(-shaftW, shaftBottom);
-		// tooth 1 (lower): thin, rounded
-		ctx.lineTo(shaftW * 1.8, shaftBottom);
-		ctx.quadraticCurveTo(shaftW * 2.2, shaftBottom, shaftW * 2.2, shaftBottom - size * 0.015);
-		ctx.lineTo(shaftW * 2.2, shaftBottom - size * 0.04);
-		ctx.quadraticCurveTo(
-			shaftW * 2.2,
-			shaftBottom - size * 0.055,
-			shaftW * 1.8,
-			shaftBottom - size * 0.055
-		);
-		ctx.lineTo(shaftW, shaftBottom - size * 0.055);
-		// gap
-		ctx.lineTo(shaftW, shaftBottom - size * 0.1);
-		// tooth 2 (upper)
-		ctx.lineTo(shaftW * 1.5, shaftBottom - size * 0.1);
-		ctx.quadraticCurveTo(
-			shaftW * 2,
-			shaftBottom - size * 0.1,
-			shaftW * 2,
-			shaftBottom - size * 0.115
-		);
-		ctx.lineTo(shaftW * 2, shaftBottom - size * 0.15);
-		ctx.quadraticCurveTo(
-			shaftW * 2,
-			shaftBottom - size * 0.165,
-			shaftW * 1.5,
-			shaftBottom - size * 0.165
-		);
-		ctx.lineTo(shaftW, shaftBottom - size * 0.165);
-		ctx.lineTo(shaftW, shaftTop);
-		ctx.closePath();
+		ctx.arc(0, BOW_Y, BOW_R, 0, Math.PI * 2);
 	};
-
-	const shaftGrad = ctx.createLinearGradient(-shaftW, 0, shaftW * 2.2, 0);
-	shaftGrad.addColorStop(0, 'rgba(100,120,180,0.9)');
-	shaftGrad.addColorStop(0.3, 'rgba(180,200,240,0.98)');
-	shaftGrad.addColorStop(0.6, 'rgba(150,170,220,0.95)');
-	shaftGrad.addColorStop(1, 'rgba(80,100,150,0.85)');
-	ctx.fillStyle = shaftGrad;
-	ctx.shadowBlur = 12;
-	ctx.shadowColor = 'rgba(150,180,255,0.9)';
-	shaftAndTeeth();
-	ctx.fill();
-
-	ctx.strokeStyle = 'rgba(200,220,255,0.7)';
-	ctx.lineWidth = 1.5;
-	ctx.shadowBlur = 6;
-	ctx.shadowColor = 'rgba(180,200,255,0.8)';
-	shaftAndTeeth();
-	ctx.stroke();
-
-	const shaftHighlight = ctx.createLinearGradient(-shaftW, 0, shaftW, 0);
-	shaftHighlight.addColorStop(0, 'rgba(255,255,255,0)');
-	shaftHighlight.addColorStop(0.3, 'rgba(220,240,255,0.5)');
-	shaftHighlight.addColorStop(0.5, 'rgba(255,255,255,0.7)');
-	shaftHighlight.addColorStop(0.7, 'rgba(220,240,255,0.5)');
-	shaftHighlight.addColorStop(1, 'rgba(255,255,255,0)');
-	ctx.fillStyle = shaftHighlight;
-	ctx.shadowBlur = 0;
-	ctx.fillRect(-shaftW, shaftTop, shaftW * 2, shaftBottom - shaftTop);
-
-	for (let i = 0; i < 2; i++) {
-		const ringY = shaftTop + (shaftBottom - shaftTop) * (0.3 + i * 0.35);
-		ctx.strokeStyle = 'rgba(200,220,255,0.5)';
-		ctx.lineWidth = 1.5;
-		ctx.shadowBlur = 4;
-		ctx.shadowColor = 'rgba(180,200,255,0.7)';
+	const hole = () => {
 		ctx.beginPath();
-		ctx.moveTo(-shaftW * 1.2, ringY);
-		ctx.lineTo(shaftW * 1.2, ringY);
+		ctx.arc(0, BOW_Y, HOLE_R, 0, Math.PI * 2);
+	};
+	const collar = () => {
+		ctx.beginPath();
+		ctx.roundRect(-17, -24, 34, 14, 5);
+	};
+	const shaft = () => {
+		ctx.beginPath();
+		ctx.roundRect(-12, -20, 24, 106, 6);
+	};
+	const teeth = () => {
+		ctx.beginPath();
+		ctx.roundRect(4, 40, 38, 18, 3);
+		ctx.roundRect(4, 68, 30, 18, 3);
+	};
+	const parts = [bow, collar, shaft, teeth];
+
+	// 1. outline: every part stroked wide in dark, the fills cover the inner lines
+	ctx.strokeStyle = OUTLINE;
+	ctx.lineWidth = 14;
+	for (const part of parts) {
+		part();
 		ctx.stroke();
 	}
 
-	// 2. head
-	const headShadow = ctx.createRadialGradient(
-		0,
-		headY + headR * 0.3,
-		0,
-		0,
-		headY + headR * 0.3,
-		headR * 1.3
-	);
-	headShadow.addColorStop(0, 'rgba(60,40,120,0.4)');
-	headShadow.addColorStop(1, 'rgba(0,0,0,0)');
-	ctx.fillStyle = headShadow;
-	ctx.shadowBlur = 0;
-	ctx.beginPath();
-	ctx.arc(0, headY + headR * 0.3, headR * 1.3, 0, Math.PI * 2);
-	ctx.fill();
-
-	const headGrad = ctx.createRadialGradient(-headR * 0.3, headY - headR * 0.3, 0, 0, headY, headR);
-	headGrad.addColorStop(0, 'rgba(230,220,255,1)');
-	headGrad.addColorStop(0.2, 'rgba(180,160,240,0.98)');
-	headGrad.addColorStop(0.5, 'rgba(140,120,220,0.95)');
-	headGrad.addColorStop(0.75, 'rgba(100,80,180,0.9)');
-	headGrad.addColorStop(1, 'rgba(60,40,120,0.8)');
-	ctx.fillStyle = headGrad;
-	ctx.shadowBlur = 15;
-	ctx.shadowColor = 'rgba(150,120,255,1)';
-	ctx.beginPath();
-	ctx.arc(0, headY, headR, 0, Math.PI * 2);
-	ctx.fill();
-
-	// 3. decorative details
-	ctx.strokeStyle = 'rgba(200,220,255,0.6)';
-	ctx.lineWidth = 1.5;
-	ctx.shadowBlur = 6;
-	ctx.shadowColor = 'rgba(180,200,255,0.8)';
-	ctx.beginPath();
-	ctx.arc(0, headY, headR * 0.88, 0, Math.PI * 2);
-	ctx.stroke();
-
-	ctx.strokeStyle = 'rgba(220,230,255,0.5)';
-	ctx.lineWidth = 1.2;
-	ctx.shadowBlur = 5;
-	ctx.beginPath();
-	ctx.arc(0, headY, headR * 0.7, 0, Math.PI * 2);
-	ctx.stroke();
-
-	for (let i = 0; i < 8; i++) {
-		const angle = (i / 8) * Math.PI * 2;
-		const x = Math.cos(angle) * headR * 0.78;
-		const y = headY + Math.sin(angle) * headR * 0.78;
-		const crystalSize = headR * 0.1;
-		ctx.fillStyle = 'rgba(200,220,255,0.8)';
-		ctx.shadowBlur = 5;
-		ctx.shadowColor = 'rgba(180,200,255,0.9)';
-		ctx.beginPath();
-		ctx.moveTo(x, y - crystalSize * 1.3);
-		ctx.lineTo(x + crystalSize * 0.4, y);
-		ctx.lineTo(x, y + crystalSize * 1.3);
-		ctx.lineTo(x - crystalSize * 0.4, y);
-		ctx.closePath();
-		ctx.fill();
-
-		ctx.fillStyle = 'rgba(255,255,255,0.7)';
-		ctx.shadowBlur = 0;
-		ctx.beginPath();
-		ctx.arc(x - crystalSize * 0.15, y - crystalSize * 0.4, crystalSize * 0.15, 0, Math.PI * 2);
+	// 2. metal: lit across the key, from its left edge
+	const metal = ctx.createLinearGradient(-42, 0, 42, 0);
+	metal.addColorStop(0, 'rgba(210,246,255,1)');
+	metal.addColorStop(0.35, 'rgba(120,212,250,1)');
+	metal.addColorStop(0.7, 'rgba(50,140,215,1)');
+	metal.addColorStop(1, 'rgba(25,80,160,1)');
+	ctx.fillStyle = metal;
+	ctx.shadowBlur = 10;
+	ctx.shadowColor = 'rgba(120,220,255,0.9)';
+	for (const part of parts) {
+		part();
 		ctx.fill();
 	}
-
-	const holeR = headR * 0.22;
-	const holeGrad = ctx.createRadialGradient(0, headY, 0, 0, headY, holeR);
-	holeGrad.addColorStop(0, 'rgba(10,5,20,0.95)');
-	holeGrad.addColorStop(0.7, 'rgba(30,20,50,0.9)');
-	holeGrad.addColorStop(1, 'rgba(60,40,100,0.7)');
-	ctx.fillStyle = holeGrad;
-	ctx.shadowBlur = 4;
-	ctx.shadowColor = 'rgba(0,0,0,0.8)';
-	ctx.beginPath();
-	ctx.arc(0, headY, holeR, 0, Math.PI * 2);
-	ctx.fill();
-
-	ctx.strokeStyle = 'rgba(200,220,255,0.6)';
-	ctx.lineWidth = 1.2;
-	ctx.shadowBlur = 6;
-	ctx.shadowColor = 'rgba(180,200,255,0.8)';
-	ctx.beginPath();
-	ctx.arc(0, headY, holeR, 0, Math.PI * 2);
-	ctx.stroke();
-
-	ctx.strokeStyle = 'rgba(220,230,255,0.7)';
-	ctx.lineWidth = 1.5;
-	ctx.shadowBlur = 6;
-	ctx.shadowColor = 'rgba(200,220,255,0.9)';
-	ctx.beginPath();
-	ctx.arc(0, headY, headR, 0, Math.PI * 2);
-	ctx.stroke();
-
-	// 4. highlights
-	const highlight1 = ctx.createRadialGradient(
-		-headR * 0.35,
-		headY - headR * 0.35,
-		0,
-		-headR * 0.35,
-		headY - headR * 0.35,
-		headR * 0.3
-	);
-	highlight1.addColorStop(0, 'rgba(255,255,255,0.95)');
-	highlight1.addColorStop(0.3, 'rgba(240,245,255,0.6)');
-	highlight1.addColorStop(0.7, 'rgba(200,220,255,0.2)');
-	highlight1.addColorStop(1, 'rgba(0,0,0,0)');
-	ctx.fillStyle = highlight1;
 	ctx.shadowBlur = 0;
-	ctx.beginPath();
-	ctx.arc(-headR * 0.35, headY - headR * 0.35, headR * 0.3, 0, Math.PI * 2);
+
+	// the bow's ring reads as a ring: a darker inner bevel
+	const bevel = ctx.createRadialGradient(0, BOW_Y, HOLE_R, 0, BOW_Y, BOW_R);
+	bevel.addColorStop(0, 'rgba(20,60,130,0.55)');
+	bevel.addColorStop(0.45, 'rgba(20,60,130,0)');
+	bevel.addColorStop(0.85, 'rgba(255,255,255,0)');
+	bevel.addColorStop(1, 'rgba(20,60,130,0.35)');
+	ctx.fillStyle = bevel;
+	bow();
 	ctx.fill();
 
-	const highlight2 = ctx.createRadialGradient(
-		headR * 0.3,
-		headY + headR * 0.15,
-		0,
-		headR * 0.3,
-		headY + headR * 0.15,
-		headR * 0.12
-	);
-	highlight2.addColorStop(0, 'rgba(255,255,255,0.6)');
-	highlight2.addColorStop(0.5, 'rgba(220,240,255,0.3)');
-	highlight2.addColorStop(1, 'rgba(0,0,0,0)');
-	ctx.fillStyle = highlight2;
-	ctx.beginPath();
-	ctx.arc(headR * 0.3, headY + headR * 0.15, headR * 0.12, 0, Math.PI * 2);
+	// 3. the hole: cut through, with its own dark rim
+	ctx.globalCompositeOperation = 'destination-out';
+	hole();
 	ctx.fill();
+	ctx.globalCompositeOperation = 'source-over';
+	ctx.strokeStyle = OUTLINE;
+	ctx.lineWidth = 6;
+	hole();
+	ctx.stroke();
 
-	// 5. energy sparkles
-	const sparkles = [
-		{ x: size * 0.22, y: -size * 0.15, r: 2 },
-		{ x: -size * 0.2, y: -size * 0.2, r: 1.5 },
-		{ x: size * 0.18, y: size * 0.1, r: 1.8 },
-		{ x: -size * 0.22, y: size * 0.15, r: 1.5 },
-		{ x: size * 0.05, y: size * 0.28, r: 1.8 },
-		{ x: -size * 0.08, y: -size * 0.28, r: 1.5 }
-	];
-	for (const sp of sparkles) {
-		const sparkleGlow = ctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, sp.r * 3);
-		sparkleGlow.addColorStop(0, 'rgba(200,220,255,0.8)');
-		sparkleGlow.addColorStop(0.5, 'rgba(150,170,255,0.3)');
-		sparkleGlow.addColorStop(1, 'rgba(0,0,0,0)');
-		ctx.fillStyle = sparkleGlow;
-		ctx.shadowBlur = 0;
-		ctx.beginPath();
-		ctx.arc(sp.x, sp.y, sp.r * 3, 0, Math.PI * 2);
-		ctx.fill();
+	// 4. groove down the shaft
+	ctx.strokeStyle = 'rgba(25,80,150,0.6)';
+	ctx.lineWidth = 3;
+	ctx.beginPath();
+	ctx.moveTo(-2, -6);
+	ctx.lineTo(-2, 84);
+	ctx.stroke();
 
-		ctx.fillStyle = 'rgba(255,255,255,0.95)';
-		ctx.shadowBlur = 6;
-		ctx.shadowColor = 'rgba(200,220,255,1)';
-		ctx.beginPath();
-		ctx.arc(sp.x, sp.y, sp.r, 0, Math.PI * 2);
-		ctx.fill();
-	}
+	// 5. highlights: the bow's lit edge and a streak along the shaft
+	ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+	ctx.lineWidth = 5;
+	ctx.beginPath();
+	ctx.arc(0, BOW_Y, BOW_R - 9, Math.PI * 1.0, Math.PI * 1.35);
+	ctx.stroke();
+	ctx.lineWidth = 4;
+	ctx.beginPath();
+	ctx.moveTo(-6, -2);
+	ctx.lineTo(-6, 40);
+	ctx.stroke();
+
+	// 6. a sparkle on the bow
+	const [x, y, r] = [22, BOW_Y - 18, 3];
+	ctx.fillStyle = 'rgba(255,255,255,0.95)';
+	ctx.shadowBlur = 6;
+	ctx.shadowColor = 'rgba(200,240,255,1)';
+	ctx.beginPath();
+	ctx.moveTo(x, y - r * 3);
+	ctx.lineTo(x + r * 0.7, y - r * 0.7);
+	ctx.lineTo(x + r * 3, y);
+	ctx.lineTo(x + r * 0.7, y + r * 0.7);
+	ctx.lineTo(x, y + r * 3);
+	ctx.lineTo(x - r * 0.7, y + r * 0.7);
+	ctx.lineTo(x - r * 3, y);
+	ctx.lineTo(x - r * 0.7, y - r * 0.7);
+	ctx.closePath();
+	ctx.fill();
+	ctx.shadowBlur = 0;
 
 	ctx.restore();
 }

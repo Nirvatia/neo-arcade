@@ -1,191 +1,157 @@
-// Cosmic Bell: the owner's COLLECTIBLE_BELL.html, texture code 1:1 without its
-// ambient glow (the fruit keeps inside its tile, stage 10.1).
+// Cosmic Bell, redrawn for the tile (stage 10.1): the mock-up's narrow cone read as a flame
+// at tile size. A classic bell silhouette instead: a domed crown with a loop, a flaring
+// skirt, a heavy rim and the clapper hanging under it, gold with a dark outline so it reads
+// on every season.
 import type { CollectibleArt } from '../collectibleSprite';
 import { FRUIT_BLOOMS } from '../collectibleSprite';
 
+/** Outline: dark amber, wide enough to survive the downscale to a tile. */
+const OUTLINE = 'rgba(70,38,6,0.95)';
+
 function paint(ctx: CanvasRenderingContext2D, size: number): void {
-	const cx = size / 2;
-	const cy = size / 2;
-
 	ctx.save();
-	ctx.translate(cx, cy);
-	const bellW = size * 0.16;
-	const bellH = size * 0.35;
+	ctx.translate(size / 2, size / 2);
+	// the design is 256 units across
+	ctx.scale(size / 256, size / 256);
+	ctx.lineJoin = 'round';
+	ctx.lineCap = 'round';
 
-	// 1. body
-	const shadow = ctx.createRadialGradient(0, bellH * 0.4, 0, 0, bellH * 0.4, bellW * 1.2);
-	shadow.addColorStop(0, 'rgba(120,80,20,0.4)');
-	shadow.addColorStop(1, 'rgba(0,0,0,0)');
-	ctx.fillStyle = shadow;
-	ctx.shadowBlur = 0;
-	ctx.beginPath();
-	ctx.ellipse(0, bellH * 0.4, bellW * 1.2, bellH * 0.25, 0, 0, Math.PI * 2);
-	ctx.fill();
-
-	const bellShape = () => {
+	const body = () => {
 		ctx.beginPath();
-		ctx.moveTo(-bellW * 0.35, -bellH * 0.5);
-		ctx.bezierCurveTo(
-			-bellW * 0.35,
-			-bellH * 0.3,
-			-bellW * 0.5,
-			-bellH * 0.1,
-			-bellW * 0.85,
-			bellH * 0.2
-		);
-		ctx.bezierCurveTo(-bellW * 0.9, bellH * 0.35, -bellW * 0.75, bellH * 0.45, 0, bellH * 0.45);
-		ctx.bezierCurveTo(
-			bellW * 0.75,
-			bellH * 0.45,
-			bellW * 0.9,
-			bellH * 0.35,
-			bellW * 0.85,
-			bellH * 0.2
-		);
-		ctx.bezierCurveTo(
-			bellW * 0.5,
-			-bellH * 0.1,
-			bellW * 0.35,
-			-bellH * 0.3,
-			bellW * 0.35,
-			-bellH * 0.5
-		);
-		ctx.lineTo(-bellW * 0.35, -bellH * 0.5);
+		ctx.moveTo(0, -70);
+		ctx.bezierCurveTo(32, -70, 46, -52, 48, -22);
+		ctx.bezierCurveTo(50, 8, 58, 30, 80, 44);
+		ctx.quadraticCurveTo(0, 56, -80, 44);
+		ctx.bezierCurveTo(-58, 30, -50, 8, -48, -22);
+		ctx.bezierCurveTo(-46, -52, -32, -70, 0, -70);
 		ctx.closePath();
 	};
-
-	const bodyGrad = ctx.createRadialGradient(-bellW * 0.2, -bellH * 0.2, 0, 0, 0, bellW * 1.2);
-	bodyGrad.addColorStop(0, 'rgba(255,250,200,1)');
-	bodyGrad.addColorStop(0.2, 'rgba(255,230,140,0.98)');
-	bodyGrad.addColorStop(0.5, 'rgba(255,200,80,0.95)');
-	bodyGrad.addColorStop(0.75, 'rgba(220,160,50,0.9)');
-	bodyGrad.addColorStop(1, 'rgba(160,100,20,0.8)');
-	ctx.fillStyle = bodyGrad;
-	ctx.shadowBlur = 15;
-	ctx.shadowColor = 'rgba(255,200,80,1)';
-	bellShape();
-	ctx.fill();
-
-	const innerGlow = ctx.createRadialGradient(0, 0, bellW * 0.5, 0, 0, bellW * 1.1);
-	innerGlow.addColorStop(0, 'rgba(255,220,100,0)');
-	innerGlow.addColorStop(0.7, 'rgba(255,180,60,0.2)');
-	innerGlow.addColorStop(1, 'rgba(255,160,40,0.4)');
-	ctx.fillStyle = innerGlow;
-	ctx.shadowBlur = 0;
-	bellShape();
-	ctx.fill();
-
-	const bottomDark = ctx.createLinearGradient(0, 0, 0, bellH * 0.45);
-	bottomDark.addColorStop(0, 'rgba(0,0,0,0)');
-	bottomDark.addColorStop(0.6, 'rgba(80,50,10,0.15)');
-	bottomDark.addColorStop(1, 'rgba(60,30,5,0.35)');
-	ctx.fillStyle = bottomDark;
-	bellShape();
-	ctx.fill();
-
-	// 2. energy rings
-	const ringCount = 3;
-	for (let i = 0; i < ringCount; i++) {
-		const t = (i + 1) / (ringCount + 1);
-		const y = -bellH * 0.3 + t * bellH * 0.7;
-		const widthAtY = bellW * (0.35 + t * 0.5);
-		const ringGrad = ctx.createLinearGradient(-widthAtY, y, widthAtY, y);
-		ringGrad.addColorStop(0, 'rgba(255,240,180,0)');
-		ringGrad.addColorStop(0.2, 'rgba(255,240,180,0.5)');
-		ringGrad.addColorStop(0.5, 'rgba(255,250,200,0.7)');
-		ringGrad.addColorStop(0.8, 'rgba(255,240,180,0.5)');
-		ringGrad.addColorStop(1, 'rgba(255,240,180,0)');
-		ctx.strokeStyle = ringGrad;
-		ctx.lineWidth = 2;
-		ctx.shadowBlur = 6;
-		ctx.shadowColor = 'rgba(255,220,120,0.8)';
-		ctx.lineCap = 'round';
+	const rim = () => {
 		ctx.beginPath();
-		ctx.moveTo(-widthAtY, y);
-		ctx.lineTo(widthAtY, y);
+		ctx.ellipse(0, 48, 86, 15, 0, 0, Math.PI * 2);
+	};
+	const loop = () => {
+		ctx.beginPath();
+		ctx.arc(0, -84, 13, 0, Math.PI * 2);
+	};
+	const clapper = () => {
+		ctx.beginPath();
+		ctx.arc(0, 68, 14, 0, Math.PI * 2);
+	};
+
+	// 1. outline: every part stroked wide in dark, the fills cover the inner lines
+	ctx.strokeStyle = OUTLINE;
+	ctx.lineWidth = 14;
+	for (const part of [loop, clapper, body, rim]) {
+		part();
 		ctx.stroke();
 	}
 
-	// 3. highlights
-	const highlight1 = ctx.createRadialGradient(
-		-bellW * 0.35,
-		-bellH * 0.2,
-		0,
-		-bellW * 0.35,
-		-bellH * 0.2,
-		bellW * 0.25
-	);
-	highlight1.addColorStop(0, 'rgba(255,255,255,0.95)');
-	highlight1.addColorStop(0.3, 'rgba(255,250,230,0.6)');
-	highlight1.addColorStop(0.7, 'rgba(255,230,180,0.2)');
-	highlight1.addColorStop(1, 'rgba(0,0,0,0)');
-	ctx.fillStyle = highlight1;
-	ctx.shadowBlur = 0;
-	ctx.beginPath();
-	ctx.ellipse(-bellW * 0.35, -bellH * 0.2, bellW * 0.25, bellH * 0.12, 0, 0, Math.PI * 2);
-	ctx.fill();
-
-	const highlight2 = ctx.createRadialGradient(
-		bellW * 0.25,
-		bellH * 0.1,
-		0,
-		bellW * 0.25,
-		bellH * 0.1,
-		bellW * 0.12
-	);
-	highlight2.addColorStop(0, 'rgba(255,240,200,0.5)');
-	highlight2.addColorStop(0.5, 'rgba(255,220,150,0.2)');
-	highlight2.addColorStop(1, 'rgba(0,0,0,0)');
-	ctx.fillStyle = highlight2;
-	ctx.beginPath();
-	ctx.arc(bellW * 0.25, bellH * 0.1, bellW * 0.12, 0, Math.PI * 2);
-	ctx.fill();
-
-	ctx.strokeStyle = 'rgba(255,220,120,0.6)';
-	ctx.lineWidth = 1.5;
-	ctx.shadowBlur = 6;
-	ctx.shadowColor = 'rgba(255,200,100,0.8)';
-	bellShape();
+	// 2. loop
+	ctx.strokeStyle = 'rgba(255,214,90,1)';
+	ctx.lineWidth = 8;
+	loop();
 	ctx.stroke();
 
-	// 4. handle
-	const handleGrad = ctx.createLinearGradient(0, -bellH * 0.5, 0, -bellH * 0.7);
-	handleGrad.addColorStop(0, 'rgba(255,220,100,0.9)');
-	handleGrad.addColorStop(0.5, 'rgba(255,200,80,0.8)');
-	handleGrad.addColorStop(1, 'rgba(220,160,50,0.6)');
-	ctx.strokeStyle = handleGrad;
-	ctx.lineWidth = 3;
-	ctx.shadowBlur = 10;
-	ctx.shadowColor = 'rgba(255,200,80,1)';
-	ctx.lineCap = 'round';
-	ctx.beginPath();
-	ctx.arc(0, -bellH * 0.6, bellW * 0.18, 0, Math.PI * 2);
-	ctx.stroke();
-
-	ctx.strokeStyle = 'rgba(255,250,200,0.7)';
-	ctx.lineWidth = 1.2;
-	ctx.shadowBlur = 6;
-	ctx.beginPath();
-	ctx.arc(0, -bellH * 0.6, bellW * 0.18, 0, Math.PI * 2);
-	ctx.stroke();
-
-	// 5. clapper
-	const clapperGrad = ctx.createRadialGradient(0, bellH * 0.3, 0, 0, bellH * 0.3, bellW * 0.12);
-	clapperGrad.addColorStop(0, 'rgba(180,140,60,0.95)');
-	clapperGrad.addColorStop(0.5, 'rgba(140,100,30,0.9)');
-	clapperGrad.addColorStop(1, 'rgba(80,50,10,0.8)');
+	// 3. clapper, behind the rim
+	const clapperGrad = ctx.createRadialGradient(-5, 62, 0, 0, 68, 16);
+	clapperGrad.addColorStop(0, 'rgba(255,250,220,1)');
+	clapperGrad.addColorStop(0.5, 'rgba(240,190,80,1)');
+	clapperGrad.addColorStop(1, 'rgba(150,90,20,1)');
 	ctx.fillStyle = clapperGrad;
-	ctx.shadowBlur = 8;
-	ctx.shadowColor = 'rgba(200,160,60,0.8)';
-	ctx.beginPath();
-	ctx.arc(0, bellH * 0.3, bellW * 0.12, 0, Math.PI * 2);
+	clapper();
 	ctx.fill();
 
-	ctx.fillStyle = 'rgba(255,240,180,0.6)';
-	ctx.shadowBlur = 0;
-	ctx.beginPath();
-	ctx.arc(-bellW * 0.04, bellH * 0.27, bellW * 0.03, 0, Math.PI * 2);
+	// 4. body: light from the upper left
+	const bodyGrad = ctx.createLinearGradient(-60, 0, 70, 0);
+	bodyGrad.addColorStop(0, 'rgba(255,236,150,1)');
+	bodyGrad.addColorStop(0.3, 'rgba(255,214,80,1)');
+	bodyGrad.addColorStop(0.7, 'rgba(236,160,30,1)');
+	bodyGrad.addColorStop(1, 'rgba(176,100,14,1)');
+	ctx.fillStyle = bodyGrad;
+	ctx.shadowBlur = 10;
+	ctx.shadowColor = 'rgba(255,200,80,0.9)';
+	body();
 	ctx.fill();
+	ctx.shadowBlur = 0;
+
+	// shading towards the skirt
+	const skirt = ctx.createLinearGradient(0, -70, 0, 50);
+	skirt.addColorStop(0, 'rgba(255,255,220,0.35)');
+	skirt.addColorStop(0.45, 'rgba(0,0,0,0)');
+	skirt.addColorStop(1, 'rgba(120,60,0,0.3)');
+	ctx.fillStyle = skirt;
+	body();
+	ctx.fill();
+
+	// 5. a band around the waist
+	ctx.save();
+	body();
+	ctx.clip();
+	ctx.strokeStyle = 'rgba(150,84,10,0.7)';
+	ctx.lineWidth = 5;
+	ctx.beginPath();
+	ctx.moveTo(-60, 10);
+	ctx.quadraticCurveTo(0, 22, 60, 10);
+	ctx.stroke();
+	ctx.strokeStyle = 'rgba(255,240,170,0.8)';
+	ctx.lineWidth = 2.5;
+	ctx.beginPath();
+	ctx.moveTo(-60, 4);
+	ctx.quadraticCurveTo(0, 16, 60, 4);
+	ctx.stroke();
+	ctx.restore();
+
+	// 6. rim
+	const rimGrad = ctx.createLinearGradient(-86, 0, 86, 0);
+	rimGrad.addColorStop(0, 'rgba(255,226,120,1)');
+	rimGrad.addColorStop(0.35, 'rgba(255,200,70,1)');
+	rimGrad.addColorStop(1, 'rgba(170,96,12,1)');
+	ctx.fillStyle = rimGrad;
+	rim();
+	ctx.fill();
+	ctx.strokeStyle = 'rgba(255,248,200,0.85)';
+	ctx.lineWidth = 3;
+	ctx.beginPath();
+	ctx.ellipse(0, 46, 78, 10, 0, Math.PI * 1.05, Math.PI * 1.6);
+	ctx.stroke();
+
+	// 7. highlights: a long gloss streak on the lit side, a glint on the crown
+	const gloss = ctx.createLinearGradient(-40, -40, -20, 30);
+	gloss.addColorStop(0, 'rgba(255,255,255,0.95)');
+	gloss.addColorStop(1, 'rgba(255,255,255,0)');
+	ctx.strokeStyle = gloss;
+	ctx.lineWidth = 9;
+	ctx.beginPath();
+	ctx.moveTo(-28, -50);
+	ctx.bezierCurveTo(-36, -30, -36, -6, -42, 22);
+	ctx.stroke();
+	ctx.fillStyle = 'rgba(255,255,255,0.9)';
+	ctx.beginPath();
+	ctx.ellipse(-10, -58, 9, 5, -0.3, 0, Math.PI * 2);
+	ctx.fill();
+
+	// 8. sparkles on the metal
+	for (const [x, y, r] of [
+		[30, -30, 3],
+		[56, 34, 2.5]
+	] as const) {
+		ctx.fillStyle = 'rgba(255,255,255,0.95)';
+		ctx.shadowBlur = 6;
+		ctx.shadowColor = 'rgba(255,240,180,1)';
+		ctx.beginPath();
+		ctx.moveTo(x, y - r * 3);
+		ctx.lineTo(x + r * 0.7, y - r * 0.7);
+		ctx.lineTo(x + r * 3, y);
+		ctx.lineTo(x + r * 0.7, y + r * 0.7);
+		ctx.lineTo(x, y + r * 3);
+		ctx.lineTo(x - r * 0.7, y + r * 0.7);
+		ctx.lineTo(x - r * 3, y);
+		ctx.lineTo(x - r * 0.7, y - r * 0.7);
+		ctx.closePath();
+		ctx.fill();
+	}
+	ctx.shadowBlur = 0;
 
 	ctx.restore();
 }
