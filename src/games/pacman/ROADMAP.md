@@ -194,16 +194,32 @@ on the real game code for the owner to approve.
      frightened, flashing and eaten (eyes only) states. `GhostView` is one generic look now.
    - Direction indicator (see stage 3): ghosts' eyes looking where they move is the
      classic answer; settle the shared rule here so stages 3 and 4 reuse it.
-2. **Dev panel + log panel** (dev build only).
-   - Panel with proper buttons, grouped: flow (state, phase, timers; pause, slow motion,
-     single-frame step), level (jump to any level / season / hell / secret, complete,
-     die), player (god mode, lives, power, weapon), boss (HP, set phase, trigger a given
-     attack), spawns (fruit, golden egg, echo, pickups), render (grid, paths, hitboxes,
-     fronts of the decay and season turn).
-   - Log panel: a live, filterable stream of numbers — damage dealt and taken, debuffs
-     (stun, slow, pull), timers (power, berserk, BFG charge, attack cooldowns), state
-     changes. Logic emits typed `debug:*` events on the bus (no-ops outside dev); the
-     panel only listens. Comes before stages 3 and 7 so both can be tuned with it.
+2. **Dev panel + log panel** (dev build only). **Plan approved by the owner, not started.**
+   Today: one column of buttons behind `DEBUG` (`ui/debug/PacmanDebugPanel.svelte`), ten
+   one-function bridges in `ui/debug/debugActions.ts`, no log (6 `console.warn`/`log` in
+   logic), no boss phase/attack hooks, no time control.
+   Owner's decisions: panels float over the game, draggable and collapsible, position and
+   open groups remembered (localStorage, wrapped in try/catch); hotkeys `` ` `` show/hide
+   the panels, `F8` steps one frame. No prototype (tools, not art).
+   Work, one commit each:
+   1. Groundwork: `DebugController` (one object with every command, replaces the
+      bridges); typed `debug:*` events on the existing bus (`PacmanEventMap`), emitted via
+      a helper that is compiled out of production (`import.meta.env.DEV`); time control in
+      `GameLoop`/`Director`: freeze, time scale 0.1–2×, single-frame step.
+   2. Dev panel, grouped: flow (live state, phase, timers from `director.flow`; pause,
+      slow motion, step), level (any level / season, hell, secret, complete, die, restart),
+      player (god mode, lives ±, energizer now, give weapon, profile), boss (HP, set phase
+      1–3, trigger a given attack from `DOOM_ATTACK_KINDS`, kill → boss reward), spawns
+      (fruit of a chosen kind, golden egg, echo, hell pickups), render (grid, ghost paths
+      and targets, hitboxes, fronts of the decay and season turn — flags read by the
+      renderers through `RenderFrame`).
+   3. Log panel: live stream filtered by channel (damage dealt/taken, debuffs: stun, slow,
+      pull; state changes; spawns; input), text search, pause stream, clear, copy; ring
+      buffer ~500 entries. Timers (power, berserk, BFG charge, attack cooldowns) are a
+      watch table updated every frame, not log lines. Emitters: `CombatService`, doom
+      boss / abilities / weapons, `PlayerService`, `Director`, input.
+   4. Tests: controller commands (phase, attack, kill), time scale and frame step, no
+      `debug:*` emission in production.
 3. **Hell rework.**
    - Boss art: the lamprey reads badly on a small tile. Return to the idea of Blinky as
      the lord of hell (a demon red ghost) — readable at tile size, changes by phase.
