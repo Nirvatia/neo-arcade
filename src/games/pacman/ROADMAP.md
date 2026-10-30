@@ -135,8 +135,8 @@ and covers the canvas only (Svelte buttons stay on top); replace it there.
 - Pac-Man: wedge mouth, no eyes, no lips, ribbon trail (not a slug or a snake).
 - Boss: Doom-like, harsh and dangerous, changes visibly by phase, fits in one tile.
 - Ash and night are driven by boss phases, never by UI buttons.
-- Fruit views stay one file per fruit (`render/items/fruit/*View.ts`), even while they are
-  stubs: each fruit gets its own art later.
+- Fruit views stay one file per fruit (`render/items/fruit/*View.ts`): each holds its own
+  art (the owner's mock-up texture code 1:1), the rest stay stubs until their art arrives.
 
 ## Plan (v2, set by the owner after plan v1)
 
@@ -158,9 +158,21 @@ on the real game code for the owner to approve.
      energizer / fruit, ghost eaten with the light streak from ahead, teleport wormholes,
      overdrive, invulnerability blink, death). Prototype: `prototypes/pacman/ms-pacman`
      (`node prototypes/pacman/build.mjs ms-pacman`).
-   - Fruit: real art for each of the 10 fruits (`render/items/fruit/*View.ts` are stubs on
-     one shared primitive). Follow the food rule from the seasons: readable at tile size,
-     no inner clutter.
+   - Fruit: the owner's mock-ups (COLLECTIBLE_*.html), arriving in batches. **Batch 1
+     ported, awaiting the verdict:** cherry, apple, Galaxian, bell, plus the bonus-life heart.
+     Shared engine `render/items/collectibleSprite.ts`: the mock-up's texture code is run
+     1:1 once into a canvas, its two bloom copies are blurred once (canvas `filter`, or
+     down-up sampling where unsupported), and each frame draws sprite + additive blooms with
+     the mock-up's breathing, sway and shimmer. Each fruit file holds its texture code, the
+     object bounds (glow excluded) and the mock-up's display sizes; `FruitView` fits the
+     object's larger side to `FRUIT_EXTENT` = 0.9 tile, centred on the tile, and still
+     blinks while the timer runs out. Fruit without art yet (strawberry, orange, pretzel,
+     pear, melon, key) stay stubs on `fruitPrimitive`. Prototype:
+     `prototypes/pacman/collectibles` (`node prototypes/pacman/build.mjs collectibles`).
+   - Bonus life (`render/items/BonusLifeView.ts`, heartbeat + orbiting particles): drawn,
+     not placed — no pickup grants a life today (lives come from score thresholds); the
+     owner decides how it enters the game.
+   - Golden egg → Easter egg: the owner wants it redrawn as an Easter egg, by Claude, later.
    - Ghosts: art for each season (spring, summer, autumn, winter), with the normal,
      frightened, flashing and eaten (eyes only) states. `GhostView` is one generic look now.
    - Direction indicator (see stage 3): ghosts' eyes looking where they move is the

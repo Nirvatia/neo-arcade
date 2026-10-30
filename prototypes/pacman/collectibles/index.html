@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>Pac-Man · Collectibles</title>
+    <!-- Prototype: the owner's collectible mock-ups (COLLECTIBLE_*.html) ported into the game
+         (render/items/), shown on the real seasons at game scale, magnified 4×, and large on
+         a dark strip as in the mock-ups. Built from the sources:
+         `node prototypes/pacman/build.mjs collectibles`; open as a file. -->
+    <style>
+      html,body{height:100%;margin:0;overflow:hidden;background:#1a1a14}
+      #view{position:fixed;inset:0;display:block}
+      #ctl{position:fixed;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:5;display:flex;flex-wrap:wrap;justify-content:center;gap:8px;width:calc(100vw - 32px);max-width:860px}
+      .bt{border:0;cursor:pointer;padding:9px 14px;border-radius:999px;font:700 14px "Trebuchet MS","Segoe UI",system-ui,sans-serif;color:#2a2410;background:linear-gradient(#fffaf0,#f2e2b8);box-shadow:0 3px 0 #c9ac62,0 8px 14px rgba(40,30,10,.22)}
+      .bt[aria-pressed="true"]{transform:translateY(2px);color:#fff;background:linear-gradient(#e0a838,#a8721a);box-shadow:0 1px 0 #5a3a08,0 0 14px rgba(255,200,80,.6)}
+    </style>
+  </head>
+  <body>
+    <canvas id="view"></canvas>
+    <div id="ctl">
+      <button class="bt" data-season="summer">Лето</button>
+      <button class="bt" data-season="autumn">Осень</button>
+      <button class="bt" data-season="winter">Зима</button>
+      <button class="bt" data-season="spring">Весна</button>
+      <button class="bt" id="night" aria-pressed="false">☾ Ночь</button>
+      <button class="bt" id="blink" aria-pressed="false">Мигание (истекает)</button>
+    </div>
+    <script>
+/*SCRIPT*/
+    </script>
+  </body>
+</html>

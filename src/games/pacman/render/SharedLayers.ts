@@ -27,7 +27,7 @@ export class SharedLayers {
 		const { ctx, level } = frame;
 		const fruit = level.fruit;
 		if (fruit && fruit.active !== null) {
-			this.fruitView.draw(ctx, fruit, layout);
+			this.fruitView.draw(ctx, fruit, layout, frame.time);
 		}
 
 		const egg = level.egg;
