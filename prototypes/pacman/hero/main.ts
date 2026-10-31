@@ -1,8 +1,11 @@
-// Prototype: the hero stage for Pac-Man (stage 10.3, from scratch). Him alone, large on a dark
-// stage, running a figure of eight (or resting in the middle), with a tile-sized inset of the
-// same moment on the summer sand. Buttons: run / rest, a bite, the energizer (6 s, the last
-// 1.6 s calm down), quarter speed. ?capture: window.__advance(seconds) steps 1/60 s frames.
+// Prototype: the hero stage (stage 10.3/10.4). One hero alone, large on a dark stage, running a
+// figure of eight (or resting in the middle), with a tile-sized inset of the same moment on
+// the summer sand. Buttons: Pac-Man / Ms. Pac-Man, run / rest, a bite, the energizer (6 s, the
+// last 1.6 s calm down), death, quarter speed. ?capture: window.__advance(seconds) steps 1/60 s
+// frames; ?ms starts with Ms. Pac-Man.
+import type { Hero } from '../../../src/games/pacman/render/actors/hero/Hero';
 import { PacmanHero } from '../../../src/games/pacman/render/actors/hero/PacmanHero';
+import { MsPacmanHero } from '../../../src/games/pacman/render/actors/hero/MsPacmanHero';
 
 const $ = <E extends HTMLElement>(id: string) => document.getElementById(id) as E;
 const view = $<HTMLCanvasElement>('view');
@@ -14,8 +17,11 @@ const POWER_ENDING = 1.6;
 /** The inset's tile, css px (the game's tile on a large screen). */
 const TILE = 30;
 
-const hero = new PacmanHero();
-const small = new PacmanHero();
+let ms = new URLSearchParams(location.search).has('ms');
+const make = (): Hero => (ms ? new MsPacmanHero() : new PacmanHero());
+let hero = make();
+let small = make();
+let deathTimer = -1;
 let vw = 0;
 let vh = 0;
 let running = true;
@@ -37,6 +43,19 @@ function layout(): void {
 	small.reset();
 }
 
+function pickHero(): void {
+	hero = make();
+	small = make();
+	layout();
+	$('who').textContent = ms ? 'Ms. Pac-Man' : 'Pac-Man';
+}
+$('who').addEventListener('click', () => {
+	ms = !ms;
+	pickHero();
+});
+$('die').addEventListener('click', () => {
+	if (deathTimer < 0) deathTimer = 0;
+});
 $('run').addEventListener('click', () => {
 	running = !running;
 	$('run').setAttribute('aria-pressed', String(running));
@@ -59,7 +78,12 @@ function frame(realDt: number): void {
 	powerTimer = Math.max(0, powerTimer - dt);
 	const power = powerTimer > 0;
 	const ending = power && powerTimer < POWER_ENDING;
-	if (running) phase += dt * 0.9;
+	if (deathTimer >= 0) {
+		deathTimer += dt;
+		if (deathTimer > 2.4) deathTimer = -1;
+	}
+	const dying = deathTimer >= 0;
+	if (running && deathTimer < 0) phase += dt * 0.9;
 
 	// a figure of eight across the stage
 	const cx = vw / 2;
@@ -69,7 +93,15 @@ function frame(realDt: number): void {
 	const x = cx + Math.sin(phase) * ax;
 	const y = cy + Math.sin(phase * 2) * ay * 0.5;
 	const angle = running ? Math.atan2(Math.cos(phase * 2) * ay, Math.cos(phase) * ax) : 0;
-	hero.update(dt, { x: running ? x : cx, y: running ? y : cy, angle, moving: running, power, ending });
+	hero.update(dt, {
+		x: running ? x : cx,
+		y: running ? y : cy,
+		angle,
+		moving: running && !dying,
+		power,
+		ending,
+		dying
+	});
 
 	// the inset runs in place along its corridor
 	const ix = vw - 18 - TILE * 4;
@@ -82,7 +114,7 @@ function frame(realDt: number): void {
 		}
 	}
 	const sx = ix + (running ? ((phase * 2.2) % 1) * TILE * 2 - TILE : 0);
-	small.update(dt, { x: sx, y: iy, angle: 0, moving: running, power, ending });
+	small.update(dt, { x: sx, y: iy, angle: 0, moving: running && !dying, power, ending, dying });
 
 	// the stage: dark, a pool of warm light on the floor
 	ctx.setTransform(D, 0, 0, D, 0, 0);
@@ -130,6 +162,7 @@ function frame(realDt: number): void {
 
 window.addEventListener('resize', layout);
 layout();
+$('who').textContent = ms ? 'Ms. Pac-Man' : 'Pac-Man';
 if (new URLSearchParams(location.search).has('capture')) {
 	(window as unknown as { __advance: (s: number) => void }).__advance = (seconds: number) => {
 		for (let i = 0; i < Math.round(seconds * 60); i++) frame(1 / 60);

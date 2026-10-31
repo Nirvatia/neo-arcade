@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
     <title>Pac-Man · Hero</title>
-    <!-- Prototype: the hero stage for Pac-Man (stage 10.3, from scratch): him alone, large on
+    <!-- Prototype: the hero stage (stage 10.3/10.4): Pac-Man or Ms. Pac-Man alone, large on
          a dark stage, with a tile-sized inset on the summer sand. Built from the sources:
          `node prototypes/pacman/build.mjs hero`; open as a file. -->
     <style>
@@ -18,9 +18,11 @@
   <body>
     <canvas id="view"></canvas>
     <div id="ctl">
+      <button class="bt" id="who">Pac-Man</button>
       <button class="bt" id="run" aria-pressed="true">Бег</button>
       <button class="bt" id="bite">Укус</button>
       <button class="bt" id="power">⚡ Энерджайзер</button>
+      <button class="bt" id="die">☠ Смерть</button>
       <button class="bt" id="slow" aria-pressed="false">×0.25</button>
     </div>
     <script>

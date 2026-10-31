@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
     <title>Pac-Man · Hero</title>
-    <!-- Prototype: the hero stage for Pac-Man (stage 10.3, from scratch): him alone, large on
+    <!-- Prototype: the hero stage (stage 10.3/10.4): Pac-Man or Ms. Pac-Man alone, large on
          a dark stage, with a tile-sized inset on the summer sand. Built from the sources:
          `node prototypes/pacman/build.mjs hero`; open as a file. -->
     <style>
@@ -18,9 +18,11 @@
   <body>
     <canvas id="view"></canvas>
     <div id="ctl">
+      <button class="bt" id="who">Pac-Man</button>
       <button class="bt" id="run" aria-pressed="true">Бег</button>
       <button class="bt" id="bite">Укус</button>
       <button class="bt" id="power">⚡ Энерджайзер</button>
+      <button class="bt" id="die">☠ Смерть</button>
       <button class="bt" id="slow" aria-pressed="false">×0.25</button>
     </div>
     <script>
@@ -157,8 +159,659 @@
 		}
 	};
 	//#endregion
+	//#region src/games/pacman/render/actors/hero/Hero.ts
+	var mix = (a, b, k) => [
+		a[0] + (b[0] - a[0]) * k,
+		a[1] + (b[1] - a[1]) * k,
+		a[2] + (b[2] - a[2]) * k
+	];
+	var css = (c, a = 1) => `rgba(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])},${a})`;
+	var clamp01 = (v) => Math.max(0, Math.min(1, v));
+	var easeOut = (t) => 1 - Math.pow(1 - clamp01(t), 3);
+	var easeIn = (t) => Math.pow(clamp01(t), 3);
+	/** The key light, fixed in the world: from the upper left. */
+	var LIGHT = (() => {
+		const n = Math.hypot(-.55, -.83);
+		return {
+			x: -.55 / n,
+			y: -.83 / n
+		};
+	})();
+	/** A damped spring towards a target: overshoot and settle. */
+	var Spring = class {
+		value;
+		velocity = 0;
+		constructor(value) {
+			this.value = value;
+		}
+		step(target, dt, stiffness = 260, damping = 16) {
+			const a = (target - this.value) * stiffness - this.velocity * damping;
+			this.velocity += a * dt;
+			this.value += this.velocity * dt;
+		}
+	};
+	/** Brush texture: a few hundred short soft strokes, light and dark, made once. */
+	var brush = null;
+	function brushTexture() {
+		if (brush) return brush;
+		const c = document.createElement("canvas");
+		c.width = c.height = 256;
+		const x = c.getContext("2d");
+		let seed = 7;
+		const rnd = () => {
+			seed = seed * 16807 % 2147483647;
+			return seed / 2147483647;
+		};
+		x.lineCap = "round";
+		for (let i = 0; i < 260; i++) {
+			const px = rnd() * 256;
+			const py = rnd() * 256;
+			const a = -.6 + (rnd() - .5) * .5;
+			const len = 18 + rnd() * 36;
+			x.strokeStyle = rnd() < .5 ? `rgba(255,255,255,${.25 + rnd() * .3})` : `rgba(0,0,0,${.2 + rnd() * .25})`;
+			x.lineWidth = 3 + rnd() * 7;
+			x.beginPath();
+			x.moveTo(px, py);
+			x.quadraticCurveTo(px + Math.cos(a) * len * .5 + 4, py + Math.sin(a) * len * .5 - 4, px + Math.cos(a) * len, py + Math.sin(a) * len);
+			x.stroke();
+		}
+		brush = c;
+		return c;
+	}
+	var glowCache = /* @__PURE__ */ new Map();
+	function glow(c) {
+		const key = c.join(",");
+		let g = glowCache.get(key);
+		if (!g) {
+			g = document.createElement("canvas");
+			g.width = g.height = 64;
+			const x = g.getContext("2d");
+			const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+			gr.addColorStop(0, css(c, 1));
+			gr.addColorStop(.3, css(c, .5));
+			gr.addColorStop(1, css(c, 0));
+			x.fillStyle = gr;
+			x.fillRect(0, 0, 64, 64);
+			glowCache.set(key, g);
+		}
+		return g;
+	}
+	/** The painted disc spans ±DISC_SPAN body radii (room for the ink-free soft edge). */
+	var DISC_SPAN = 1.15;
+	var LIGHT_STEPS = 32;
+	var POWER_STEPS = 6;
+	var discCache = /* @__PURE__ */ new Map();
+	/**
+	* The body's painting (base, crisp shadow shape, deep shadow, bounce, brush texture, rim
+	* light, highlight) for a body radius in device px, the light's angle in his frame and the
+	* look, cached by quantised light and look: drawn once, reused every frame.
+	*/
+	function paintedDisc(design, deviceR, lightAngle, power) {
+		const R = Math.max(4, Math.round(deviceR));
+		const step = Math.round((lightAngle / (Math.PI * 2) % 1 + 1) * LIGHT_STEPS) % LIGHT_STEPS;
+		const look = Math.round(clamp01(power) * POWER_STEPS);
+		const key = `${design.id}:${R}:${step}:${look}`;
+		let c = discCache.get(key);
+		if (c) return c;
+		if (discCache.size > 600) discCache.clear();
+		const a = step / LIGHT_STEPS * Math.PI * 2;
+		const lx = Math.cos(a);
+		const ly = Math.sin(a);
+		const pal = mixPal(design.calm, design.awoken, look / POWER_STEPS);
+		const p = look / POWER_STEPS;
+		c = document.createElement("canvas");
+		c.width = c.height = Math.ceil(R * DISC_SPAN * 2);
+		const ctx = c.getContext("2d");
+		ctx.translate(c.width / 2, c.height / 2);
+		ctx.beginPath();
+		ctx.arc(0, 0, R, 0, Math.PI * 2);
+		ctx.clip();
+		const base = ctx.createLinearGradient(lx * R, ly * R, -lx * R, -ly * R);
+		base.addColorStop(0, css(pal.light));
+		base.addColorStop(.45, css(pal.mid));
+		base.addColorStop(1, css(mix(pal.mid, pal.shadow, .6)));
+		ctx.fillStyle = base;
+		ctx.fillRect(-R * 1.2, -R * 1.2, R * 2.4, R * 2.4);
+		ctx.beginPath();
+		ctx.rect(-R * 1.3, -R * 1.3, R * 2.6, R * 2.6);
+		ctx.arc(lx * R * .3, ly * R * .3, R * 1, 0, Math.PI * 2);
+		ctx.fillStyle = css(pal.shadow, .88);
+		ctx.fill("evenodd");
+		const deep = ctx.createRadialGradient(-lx * R * .95, -ly * R * .95, 0, -lx * R * .95, -ly * R * .95, R * .95);
+		deep.addColorStop(0, css(pal.deep, .6));
+		deep.addColorStop(1, css(pal.deep, 0));
+		ctx.fillStyle = deep;
+		ctx.fillRect(-R * 1.2, -R * 1.2, R * 2.4, R * 2.4);
+		ctx.beginPath();
+		ctx.arc(0, 0, R * 1.05, 0, Math.PI * 2);
+		ctx.arc(-lx * R * .13, -ly * R * .13, R * .97, 0, Math.PI * 2);
+		ctx.fillStyle = css(pal.bounce, .45);
+		ctx.fill("evenodd");
+		ctx.globalAlpha = .16;
+		ctx.globalCompositeOperation = "soft-light";
+		ctx.drawImage(brushTexture(), -R, -R, R * 2, R * 2);
+		ctx.globalCompositeOperation = "source-over";
+		ctx.globalAlpha = 1;
+		ctx.globalCompositeOperation = "lighter";
+		ctx.beginPath();
+		ctx.arc(0, 0, R * 1.05, 0, Math.PI * 2);
+		ctx.arc(R * .09, 0, R * 1, 0, Math.PI * 2);
+		ctx.fillStyle = css(pal.rim, .5 + .3 * p);
+		ctx.fill("evenodd");
+		ctx.globalCompositeOperation = "source-over";
+		const hx = lx * R * .52;
+		const hy = ly * R * .52;
+		ctx.fillStyle = css(pal.highlight, .95);
+		ctx.beginPath();
+		ctx.ellipse(hx, hy, R * .25, R * .12, a + Math.PI / 2, 0, Math.PI * 2);
+		ctx.fill();
+		ctx.beginPath();
+		ctx.arc(hx + lx * R * .2 - ly * R * .18, hy + ly * R * .2 + lx * R * .18, R * .05, 0, Math.PI * 2);
+		ctx.fill();
+		discCache.set(key, c);
+		return c;
+	}
+	/** Death: a hit (0..0.3), the dying move (to 1.3), then a burst of particles and a flare. */
+	var DEATH_OPEN = .3;
+	var DEATH_POP = 1.3;
+	var CHARGE = .18;
+	var Hero = class {
+		r = 20;
+		x = 0;
+		y = 0;
+		angle = 0;
+		flip = 1;
+		lastH = 1;
+		moving = false;
+		time = 0;
+		/** The awoken look, 0..1. */
+		power = 0;
+		powerOn = false;
+		ending = false;
+		/** Seconds since the energizer was taken (the wind-up and burst), or -1. */
+		transform = -1;
+		/** Seconds into the death, or -1. */
+		dying = -1;
+		invulnerable = false;
+		chomp = 0;
+		bite = -1;
+		snap = -1;
+		nextSnap = 2.4;
+		snaps = 0;
+		/**
+		* His size on a spring: he always stays round (a stretched ellipse looks inorganic in
+		* motion, the owner's review); bites, the wind-up and the burst pulse the whole body.
+		*/
+		size = new Spring(1);
+		flash = 0;
+		mouthFlash = 0;
+		trail = new RibbonTrail();
+		embers = [];
+		bursts = [];
+		travelled = 0;
+		seed = 11;
+		setRadius(r) {
+			this.r = r;
+		}
+		reset() {
+			this.trail.reset();
+			this.embers = [];
+			this.bursts = [];
+			this.power = 0;
+			this.powerOn = false;
+			this.transform = -1;
+			this.resetLooks?.();
+		}
+		random() {
+			this.seed = this.seed * 16807 % 2147483647;
+			return this.seed / 2147483647;
+		}
+		/** A dot: just a small glow at the lips (the run's chomp already bites). */
+		gulp() {
+			this.mouthFlash = Math.max(this.mouthFlash, .3);
+		}
+		/** Something worth a real bite: a quick wind-up, a snapping close, a punch of the body. */
+		eat() {
+			this.bite = 0;
+			this.onBite?.();
+		}
+		update(dt, s) {
+			if (!Number.isFinite(dt) || dt < 0) dt = 0;
+			this.time += dt;
+			this.invulnerable = Boolean(s.invulnerable);
+			if (s.dying) {
+				if (this.dying < 0) {
+					this.dying = 0;
+					this.flash = .8;
+					this.bite = -1;
+				}
+				const before = this.dying;
+				this.dying += dt;
+				if (before < DEATH_POP && this.dying >= DEATH_POP) for (let i = 0; i < 26; i++) this.spawn(this.particleFor?.("death") ?? "ember", this.power > .5, i / 26 * Math.PI * 2, 4 + this.random() * 7);
+				this.trail.shrink(this.r * 10 * dt);
+				this.size.step(1, dt);
+				this.flash = Math.max(0, this.flash - dt / .3);
+				this.tick(dt);
+				return;
+			}
+			if (this.dying >= 0) {
+				this.reset();
+				this.dying = -1;
+			}
+			const step = Math.hypot(s.x - this.x, s.y - this.y);
+			this.x = s.x;
+			this.y = s.y;
+			let turn = Math.abs(s.angle - this.angle) % (Math.PI * 2);
+			if (turn > Math.PI) turn = Math.PI * 2 - turn;
+			if (turn > .6) this.onTurn?.();
+			this.angle = s.angle;
+			this.moving = s.moving;
+			this.ending = s.ending;
+			if (Math.abs(Math.cos(s.angle)) > .5) this.lastH = Math.cos(s.angle) > 0 ? 1 : -1;
+			const vertical = Math.abs(Math.sin(s.angle)) > .5;
+			this.flip = (vertical ? this.lastH : Math.cos(s.angle) > 0 ? 1 : -1) < 0 ? -1 : 1;
+			if (s.power && !this.powerOn) this.transform = 0;
+			this.powerOn = s.power;
+			let sizeTarget = this.moving ? 1 : 1 + .015 * Math.sin(this.time * 2.3);
+			if (this.transform >= 0) {
+				const before = this.transform;
+				this.transform += dt;
+				if (this.transform < CHARGE) sizeTarget = .88;
+				else if (before < CHARGE) {
+					this.flash = 1;
+					this.size.velocity += 5;
+					this.bursts.push({
+						t: 0,
+						x: this.x,
+						y: this.y,
+						angle: this.angle
+					});
+					for (let i = 0; i < 18; i++) this.spawn(this.particleFor?.("burst") ?? "ember", true, i / 18 * Math.PI * 2, 7 + this.random() * 6);
+				}
+				if (this.transform > 1.2) this.transform = -1;
+			}
+			const awake = this.powerOn && (this.transform < 0 || this.transform >= CHARGE);
+			const rate = awake ? 1 / .3 : 1 / .7;
+			this.power += Math.sign((awake ? 1 : 0) - this.power) * Math.min(Math.abs((awake ? 1 : 0) - this.power), dt * rate);
+			if (this.moving) {
+				const before = this.chomp % 1;
+				this.chomp += dt * this.design.chompRate * (1 + .25 * this.power);
+				const after = this.chomp % 1;
+				if (before < .75 && after >= .75) this.size.velocity -= .5;
+			} else if (this.snap < 0 && this.bite < 0 && this.time > this.nextSnap) {
+				this.snap = 0;
+				this.snaps += 1;
+				this.nextSnap = this.time + 2.2 + this.snaps % 3 * .9;
+			}
+			if (this.snap >= 0) {
+				this.snap += dt;
+				if (this.snap > .34) this.snap = -1;
+			}
+			if (this.bite >= 0) {
+				const before = this.bite;
+				this.bite += dt;
+				if (before < .12 && this.bite >= .12) {
+					this.size.velocity -= 2.2;
+					this.mouthFlash = 1;
+				}
+				if (this.bite > .26) this.bite = -1;
+			}
+			this.size.step(sizeTarget, dt);
+			this.flash = Math.max(0, this.flash - dt / .16);
+			this.mouthFlash = Math.max(0, this.mouthFlash - dt / .2);
+			const r = this.r;
+			this.trail.push(s.x, s.y, r * .34, r * (4.2 + 1.4 * this.power), r * 3);
+			this.afterUpdate?.(dt);
+			if (!this.moving) this.trail.shrink(r * 7 * dt);
+			if (step < r * 3) {
+				this.travelled += step;
+				const every = r * (this.power > .5 ? .45 : 1.1);
+				while (this.travelled > every) {
+					this.travelled -= every;
+					const a = this.angle + Math.PI + (this.random() - .5) * 1.2;
+					this.spawn(this.particleFor?.("trail") ?? "ember", this.power > .5, a, 1.5 + this.random() * 2.5, true);
+				}
+			}
+			this.tick(dt);
+		}
+		/** Embers drift up and fade; bursts run their course. */
+		tick(dt) {
+			const r = this.r;
+			for (const e of this.embers) {
+				e.life -= dt;
+				e.x += e.vx * dt;
+				e.y += e.vy * dt;
+				const drag = Math.pow(.9, dt * 60);
+				e.vx *= drag;
+				e.vy = e.vy * drag - r * .8 * dt;
+			}
+			this.embers = this.embers.filter((e) => e.life > 0);
+			for (const b of this.bursts) b.t += dt;
+			this.bursts = this.bursts.filter((b) => b.t < .5);
+		}
+		spawn(kind, hot, angle, speed, fromBack = false) {
+			const r = this.r;
+			const ox = fromBack ? -Math.cos(this.angle) * r * .8 : Math.cos(angle) * r * .7;
+			const oy = fromBack ? -Math.sin(this.angle) * r * .8 : Math.sin(angle) * r * .7;
+			const life = .4 + this.random() * .45;
+			this.embers.push({
+				kind,
+				spin: (this.random() - .5) * 6,
+				x: this.x + ox + (this.random() - .5) * r * .5,
+				y: this.y + oy + (this.random() - .5) * r * .5,
+				vx: Math.cos(angle) * speed * r,
+				vy: Math.sin(angle) * speed * r,
+				life,
+				max: life,
+				size: r * (.06 + this.random() * .06),
+				hot
+			});
+		}
+		/** How open the jaws are, 0..1.15. */
+		openness() {
+			if (this.bite >= 0) {
+				const t = this.bite;
+				if (t < .08) return .3 + .85 * easeOut(t / .08);
+				if (t < .12) return 1.15 * (1 - easeIn((t - .08) / .04));
+				return .25 * easeOut((t - .12) / .14);
+			}
+			if (this.moving) {
+				const f = this.chomp % 1;
+				if (f < .3) return .05 + .95 * easeOut(f / .3);
+				if (f < .4) return 1;
+				if (f < .75) return .05 + .95 * (1 - easeIn((f - .4) / .35));
+				return .05;
+			}
+			const rest = .2 + .035 * Math.sin(this.time * 2.3);
+			if (this.snap >= 0) {
+				const t = this.snap;
+				if (t < .09) return rest + (.75 - rest) * easeOut(t / .09);
+				if (t < .15) return .75 * (1 - easeIn((t - .09) / .06));
+				return rest * easeOut((t - .15) / .19);
+			}
+			return rest;
+		}
+		draw(ctx) {
+			const r = this.r;
+			const p = this.power;
+			const D = this.design;
+			const pal = mixPal(D.calm, D.awoken, p);
+			const pulse = this.ending && p > .5 ? .62 + .38 * (.5 + .5 * Math.cos(this.time * 5)) : 1;
+			this.drawTrail(ctx, p);
+			const d = this.dying;
+			if (d >= DEATH_POP) {
+				this.drawEmbers(ctx);
+				const k = clamp01((d - DEATH_POP) / .44999999999999996);
+				if (k < 1) {
+					const gs = r * (1.2 + 2.2 * easeOut(k));
+					ctx.globalCompositeOperation = "lighter";
+					ctx.globalAlpha = 1 - k;
+					ctx.drawImage(glow(D.flare), this.x - gs, this.y - gs, gs * 2, gs * 2);
+					ctx.globalAlpha = 1;
+					ctx.globalCompositeOperation = "source-over";
+				}
+				return;
+			}
+			this.drawEmbers(ctx);
+			const open = this.openness();
+			let m = .04 + Math.min(1.15, open) * D.mouthSpan;
+			let grin = this.moving ? D.grinRun : D.grinRest;
+			let S = 1 + .07 * p;
+			let spin = 0;
+			if (d >= 0) {
+				const k = clamp01((d - DEATH_OPEN) / 1);
+				const e = k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+				grin = 0;
+				if (D.death === "open") {
+					m = .3 + (Math.PI - .3) * e;
+					S *= 1 - .25 * e;
+				} else {
+					m = Math.max(.05, m * (1 - e));
+					spin = Math.pow(k, 2) * Math.PI * 6;
+					S *= 1 - .55 * e;
+				}
+			}
+			const mu = Math.min(Math.PI - .01, m * (1 - grin));
+			const md = Math.min(Math.PI - .01, m * (1 + grin));
+			const ca = Math.cos(this.angle);
+			const sa = Math.sin(this.angle);
+			const lx = LIGHT.x * ca + LIGHT.y * sa;
+			const ly = (-LIGHT.x * sa + LIGHT.y * ca) * this.flip;
+			ctx.save();
+			ctx.translate(this.x, this.y);
+			ctx.rotate(this.angle + spin);
+			ctx.scale(this.size.value * S, this.size.value * S * this.flip);
+			const R = r;
+			if (p > .01) this.drawBehind?.(ctx, R, p * pulse);
+			const charge = this.transform >= 0 && this.transform < CHARGE ? this.transform / CHARGE : 0;
+			const aura = Math.max(p * .55 * pulse, charge * .8);
+			if (aura > .01) {
+				ctx.globalCompositeOperation = "lighter";
+				ctx.globalAlpha = aura;
+				ctx.drawImage(glow(D.aura), -R * 2.1, -R * 2.1, R * 4.2, R * 4.2);
+				ctx.globalAlpha = 1;
+				ctx.globalCompositeOperation = "source-over";
+			}
+			const coreA = Math.min(1, clamp01(open * 1.4) * (.85 + .15 * p) + charge * .6);
+			if (coreA > .01) {
+				ctx.globalAlpha = coreA;
+				ctx.drawImage(D.core(), R * .1 - R * .92, -R * .92, R * 1.84, R * 1.84);
+				ctx.globalAlpha = 1;
+			}
+			const A = {
+				x: -.1 * R,
+				y: 0
+			};
+			const U = {
+				x: Math.cos(mu) * R,
+				y: -Math.sin(mu) * R
+			};
+			const Dn = {
+				x: Math.cos(md) * R,
+				y: Math.sin(md) * R
+			};
+			const bend = R * .09 * clamp01(m * 2.5);
+			ctx.save();
+			ctx.translate(-lx * R * .045, -ly * R * .045);
+			ctx.scale(1.075, 1.075);
+			ctx.beginPath();
+			ctx.moveTo(U.x, U.y);
+			ctx.arc(0, 0, R, -mu, md, true);
+			ctx.quadraticCurveTo((Dn.x + A.x) / 2, (Dn.y + A.y) / 2 - bend, A.x, A.y);
+			ctx.quadraticCurveTo((U.x + A.x) / 2, (U.y + A.y) / 2 + bend, U.x, U.y);
+			ctx.closePath();
+			ctx.fillStyle = css(pal.ink);
+			ctx.fill();
+			ctx.restore();
+			const body = this.composeBody(R, lx, ly, p, pulse, mu, md, bend);
+			ctx.drawImage(body.canvas, -body.half, -body.half, body.half * 2, body.half * 2);
+			ctx.lineCap = "round";
+			ctx.lineJoin = "round";
+			const lips = () => {
+				ctx.beginPath();
+				ctx.moveTo(Dn.x * .97, Dn.y * .97);
+				ctx.quadraticCurveTo((Dn.x + A.x) / 2, (Dn.y + A.y) / 2 - bend, A.x, A.y);
+				ctx.quadraticCurveTo((U.x + A.x) / 2, (U.y + A.y) / 2 + bend, U.x * .97, U.y * .97);
+			};
+			this.drawLips(ctx, lips, R, pal);
+			this.drawWorn?.(ctx, R, p, lx, ly);
+			ctx.restore();
+			const spill = clamp01(open) * (.45 + .4 * p) + this.mouthFlash * .6;
+			if (spill > .01) {
+				const fx = this.x + Math.cos(this.angle) * R * .75;
+				const fy = this.y + Math.sin(this.angle) * R * .75;
+				const gs = R * (1.1 + .5 * clamp01(open) + .3 * p);
+				ctx.globalCompositeOperation = "lighter";
+				ctx.globalAlpha = Math.min(1, spill);
+				ctx.drawImage(glow(D.spill), fx - gs, fy - gs, gs * 2, gs * 2);
+				ctx.globalAlpha = 1;
+				ctx.globalCompositeOperation = "source-over";
+			}
+			if (this.invulnerable && d < 0) {
+				const k = .5 + .5 * Math.cos(this.time * 9);
+				ctx.strokeStyle = `rgba(255,248,220,${.25 + .35 * k})`;
+				ctx.lineWidth = Math.max(1, R * .1);
+				ctx.beginPath();
+				ctx.arc(this.x, this.y, R * (1.3 + .08 * k), 0, Math.PI * 2);
+				ctx.stroke();
+			}
+			this.drawFront?.(ctx);
+			this.drawBursts(ctx);
+		}
+		/** The lips along the mouth's cut: ink. */
+		drawLips(ctx, lips, R, pal) {
+			ctx.strokeStyle = css(pal.ink);
+			ctx.lineWidth = R * .075;
+			lips();
+			ctx.stroke();
+		}
+		scratch = null;
+		/**
+		* The body this frame: the cached painted disc for this light and look, with the mouth
+		* cut out, molten veins and the flash added, in a small scratch canvas. Only plain
+		* image draws and Porter-Duff operations: no clipping, no blend modes, no gradients.
+		*/
+		composeBody(R, lx, ly, p, pulse, mu, md, bend) {
+			const dpr = Math.min(2, typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1);
+			const disc = paintedDisc(this.design, R * dpr, Math.atan2(ly, lx), p);
+			const size = disc.width;
+			if (!this.scratch || this.scratch.width !== size) {
+				this.scratch = document.createElement("canvas");
+				this.scratch.width = this.scratch.height = size;
+			}
+			const sc = this.scratch.getContext("2d");
+			const k = size / 2 / (R * DISC_SPAN);
+			sc.setTransform(1, 0, 0, 1, 0, 0);
+			sc.globalCompositeOperation = "source-over";
+			sc.globalAlpha = 1;
+			sc.clearRect(0, 0, size, size);
+			sc.drawImage(disc, 0, 0);
+			sc.setTransform(k, 0, 0, k, size / 2, size / 2);
+			const A = {
+				x: -.1 * R,
+				y: 0
+			};
+			const U = {
+				x: Math.cos(mu) * R,
+				y: -Math.sin(mu) * R
+			};
+			const Dn = {
+				x: Math.cos(md) * R,
+				y: Math.sin(md) * R
+			};
+			sc.globalCompositeOperation = "destination-out";
+			sc.beginPath();
+			sc.moveTo(A.x, A.y);
+			sc.quadraticCurveTo((U.x + A.x) / 2, (U.y + A.y) / 2 + bend, U.x, U.y);
+			sc.lineTo(Math.cos(mu) * R * 1.3, -Math.sin(mu) * R * 1.3);
+			sc.arc(0, 0, R * 1.3, -mu, md, false);
+			sc.lineTo(Dn.x, Dn.y);
+			sc.quadraticCurveTo((Dn.x + A.x) / 2, (Dn.y + A.y) / 2 - bend, A.x, A.y);
+			sc.closePath();
+			sc.fill();
+			sc.globalCompositeOperation = "source-atop";
+			this.decorate?.(sc, R, p, p * pulse);
+			if (this.flash > 0) {
+				sc.fillStyle = `rgba(255,255,250,${this.flash})`;
+				sc.fillRect(-R * 1.2, -R * 1.2, R * 2.4, R * 2.4);
+			}
+			sc.globalCompositeOperation = "source-over";
+			return {
+				canvas: this.scratch,
+				half: R * DISC_SPAN
+			};
+		}
+		drawTrail(ctx, p) {
+			if (p < .99) this.trail.draw(ctx, this.r, this.design.trailCalm, 1 - p, this.time);
+			if (p > .01) this.trail.draw(ctx, this.r, this.design.trailAwoken, p, this.time);
+		}
+		drawEmbers(ctx) {
+			for (const e of this.embers) {
+				const u = e.life / e.max;
+				const a = Math.min(1, (1 - u) * 5) * u;
+				const s = e.size * (.5 + .5 * u);
+				this.drawParticle(ctx, e, a, s);
+			}
+			ctx.globalAlpha = 1;
+			ctx.globalCompositeOperation = "source-over";
+		}
+		/** One particle at alpha `a` and size `s`: an ember by default. */
+		drawParticle(ctx, e, a, s) {
+			ctx.globalCompositeOperation = "lighter";
+			ctx.globalAlpha = a * .8;
+			const g = glow(e.hot ? [
+				255,
+				190,
+				80
+			] : [
+				255,
+				170,
+				60
+			]);
+			ctx.drawImage(g, e.x - s * 3, e.y - s * 3, s * 6, s * 6);
+			ctx.globalCompositeOperation = "source-over";
+			ctx.globalAlpha = a;
+			ctx.fillStyle = e.hot ? "rgba(255,250,225,1)" : "rgba(255,230,160,1)";
+			ctx.beginPath();
+			ctx.arc(e.x, e.y, s * .6, 0, Math.PI * 2);
+			ctx.fill();
+		}
+		/** The burst of the awakening: a painted ring and impact rays. */
+		drawBursts(ctx) {
+			const R = this.r;
+			for (const b of this.bursts) {
+				const k = b.t / .5;
+				const ease = easeOut(k);
+				const a = 1 - k;
+				ctx.save();
+				ctx.translate(b.x, b.y);
+				ctx.globalCompositeOperation = "lighter";
+				ctx.strokeStyle = css(this.design.flare, .35 * a);
+				ctx.lineWidth = R * .32 * a;
+				ctx.beginPath();
+				ctx.arc(0, 0, R * (1 + 2.6 * ease), 0, Math.PI * 2);
+				ctx.stroke();
+				ctx.globalCompositeOperation = "source-over";
+				ctx.strokeStyle = `rgba(255,252,235,${.95 * a})`;
+				ctx.lineWidth = Math.max(1, R * .1 * a);
+				ctx.stroke();
+				const ra = clamp01(1 - b.t / .25);
+				if (ra > 0) {
+					ctx.fillStyle = `rgba(255,248,220,${ra})`;
+					for (let i = 0; i < 10; i++) {
+						const an = b.angle + i / 10 * Math.PI * 2 + .3;
+						const r0 = R * (1.15 + ease * .6);
+						const r1 = R * (1.9 + ease * 1.6) * (i % 2 ? .8 : 1);
+						const w = R * .07;
+						const cx = Math.cos(an);
+						const cy = Math.sin(an);
+						ctx.beginPath();
+						ctx.moveTo(cx * r0 - cy * w, cy * r0 + cx * w);
+						ctx.lineTo(cx * r1, cy * r1);
+						ctx.lineTo(cx * r0 + cy * w, cy * r0 - cx * w);
+						ctx.closePath();
+						ctx.fill();
+					}
+				}
+				ctx.restore();
+			}
+		}
+	};
+	function mixPal(a, b, k) {
+		return {
+			light: mix(a.light, b.light, k),
+			mid: mix(a.mid, b.mid, k),
+			shadow: mix(a.shadow, b.shadow, k),
+			deep: mix(a.deep, b.deep, k),
+			bounce: mix(a.bounce, b.bounce, k),
+			ink: mix(a.ink, b.ink, k),
+			highlight: mix(a.highlight, b.highlight, k),
+			rim: mix(a.rim, b.rim, k)
+		};
+	}
+	//#endregion
 	//#region src/games/pacman/render/actors/hero/PacmanHero.ts
-	var CALM = {
+	var CALM$1 = {
 		light: [
 			255,
 			230,
@@ -242,36 +895,6 @@
 			130
 		]
 	};
-	var mix = (a, b, k) => [
-		a[0] + (b[0] - a[0]) * k,
-		a[1] + (b[1] - a[1]) * k,
-		a[2] + (b[2] - a[2]) * k
-	];
-	var css = (c, a = 1) => `rgba(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])},${a})`;
-	var clamp01 = (v) => Math.max(0, Math.min(1, v));
-	var easeOut = (t) => 1 - Math.pow(1 - clamp01(t), 3);
-	var easeIn = (t) => Math.pow(clamp01(t), 3);
-	/** The key light, fixed in the world: from the upper left. */
-	var LIGHT = (() => {
-		const n = Math.hypot(-.55, -.83);
-		return {
-			x: -.55 / n,
-			y: -.83 / n
-		};
-	})();
-	/** A damped spring towards a target: overshoot and settle. */
-	var Spring = class {
-		value;
-		velocity = 0;
-		constructor(value) {
-			this.value = value;
-		}
-		step(target, dt, stiffness = 260, damping = 16) {
-			const a = (target - this.value) * stiffness - this.velocity * damping;
-			this.velocity += a * dt;
-			this.value += this.velocity * dt;
-		}
-	};
 	/** Molten veins when he is awoken: from the mouth's hinge back over the body, body radii. */
 	var CRACKS = [
 		[
@@ -295,127 +918,6 @@
 		[[-.5, -.44], [-.72, -.4]],
 		[[-.52, .46], [-.76, .42]]
 	];
-	/** Brush texture: a few hundred short soft strokes, light and dark, made once. */
-	var brush = null;
-	function brushTexture() {
-		if (brush) return brush;
-		const c = document.createElement("canvas");
-		c.width = c.height = 256;
-		const x = c.getContext("2d");
-		let seed = 7;
-		const rnd = () => {
-			seed = seed * 16807 % 2147483647;
-			return seed / 2147483647;
-		};
-		x.lineCap = "round";
-		for (let i = 0; i < 260; i++) {
-			const px = rnd() * 256;
-			const py = rnd() * 256;
-			const a = -.6 + (rnd() - .5) * .5;
-			const len = 18 + rnd() * 36;
-			x.strokeStyle = rnd() < .5 ? `rgba(255,255,255,${.25 + rnd() * .3})` : `rgba(0,0,0,${.2 + rnd() * .25})`;
-			x.lineWidth = 3 + rnd() * 7;
-			x.beginPath();
-			x.moveTo(px, py);
-			x.quadraticCurveTo(px + Math.cos(a) * len * .5 + 4, py + Math.sin(a) * len * .5 - 4, px + Math.cos(a) * len, py + Math.sin(a) * len);
-			x.stroke();
-		}
-		brush = c;
-		return c;
-	}
-	var glowCache = /* @__PURE__ */ new Map();
-	function glow(c) {
-		const key = c.join(",");
-		let g = glowCache.get(key);
-		if (!g) {
-			g = document.createElement("canvas");
-			g.width = g.height = 64;
-			const x = g.getContext("2d");
-			const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32);
-			gr.addColorStop(0, css(c, 1));
-			gr.addColorStop(.3, css(c, .5));
-			gr.addColorStop(1, css(c, 0));
-			x.fillStyle = gr;
-			x.fillRect(0, 0, 64, 64);
-			glowCache.set(key, g);
-		}
-		return g;
-	}
-	/** The painted disc spans ±DISC_SPAN body radii (room for the ink-free soft edge). */
-	var DISC_SPAN = 1.15;
-	var LIGHT_STEPS = 32;
-	var POWER_STEPS = 6;
-	var discCache = /* @__PURE__ */ new Map();
-	/**
-	* The body's painting (base, crisp shadow shape, deep shadow, bounce, brush texture, rim
-	* light, highlight) for a body radius in device px, the light's angle in his frame and the
-	* look, cached by quantised light and look: drawn once, reused every frame.
-	*/
-	function paintedDisc(deviceR, lightAngle, power) {
-		const R = Math.max(4, Math.round(deviceR));
-		const step = Math.round((lightAngle / (Math.PI * 2) % 1 + 1) * LIGHT_STEPS) % LIGHT_STEPS;
-		const look = Math.round(clamp01(power) * POWER_STEPS);
-		const key = `${R}:${step}:${look}`;
-		let c = discCache.get(key);
-		if (c) return c;
-		if (discCache.size > 600) discCache.clear();
-		const a = step / LIGHT_STEPS * Math.PI * 2;
-		const lx = Math.cos(a);
-		const ly = Math.sin(a);
-		const pal = mixPal(CALM, AWOKEN, look / POWER_STEPS);
-		const p = look / POWER_STEPS;
-		c = document.createElement("canvas");
-		c.width = c.height = Math.ceil(R * DISC_SPAN * 2);
-		const ctx = c.getContext("2d");
-		ctx.translate(c.width / 2, c.height / 2);
-		ctx.beginPath();
-		ctx.arc(0, 0, R, 0, Math.PI * 2);
-		ctx.clip();
-		const base = ctx.createLinearGradient(lx * R, ly * R, -lx * R, -ly * R);
-		base.addColorStop(0, css(pal.light));
-		base.addColorStop(.45, css(pal.mid));
-		base.addColorStop(1, css(mix(pal.mid, pal.shadow, .6)));
-		ctx.fillStyle = base;
-		ctx.fillRect(-R * 1.2, -R * 1.2, R * 2.4, R * 2.4);
-		ctx.beginPath();
-		ctx.rect(-R * 1.3, -R * 1.3, R * 2.6, R * 2.6);
-		ctx.arc(lx * R * .3, ly * R * .3, R * 1, 0, Math.PI * 2);
-		ctx.fillStyle = css(pal.shadow, .88);
-		ctx.fill("evenodd");
-		const deep = ctx.createRadialGradient(-lx * R * .95, -ly * R * .95, 0, -lx * R * .95, -ly * R * .95, R * .95);
-		deep.addColorStop(0, css(pal.deep, .6));
-		deep.addColorStop(1, css(pal.deep, 0));
-		ctx.fillStyle = deep;
-		ctx.fillRect(-R * 1.2, -R * 1.2, R * 2.4, R * 2.4);
-		ctx.beginPath();
-		ctx.arc(0, 0, R * 1.05, 0, Math.PI * 2);
-		ctx.arc(-lx * R * .13, -ly * R * .13, R * .97, 0, Math.PI * 2);
-		ctx.fillStyle = css(pal.bounce, .45);
-		ctx.fill("evenodd");
-		ctx.globalAlpha = .16;
-		ctx.globalCompositeOperation = "soft-light";
-		ctx.drawImage(brushTexture(), -R, -R, R * 2, R * 2);
-		ctx.globalCompositeOperation = "source-over";
-		ctx.globalAlpha = 1;
-		ctx.globalCompositeOperation = "lighter";
-		ctx.beginPath();
-		ctx.arc(0, 0, R * 1.05, 0, Math.PI * 2);
-		ctx.arc(R * .09, 0, R * 1, 0, Math.PI * 2);
-		ctx.fillStyle = css(pal.rim, .5 + .3 * p);
-		ctx.fill("evenodd");
-		ctx.globalCompositeOperation = "source-over";
-		const hx = lx * R * .52;
-		const hy = ly * R * .52;
-		ctx.fillStyle = css(pal.highlight, .95);
-		ctx.beginPath();
-		ctx.ellipse(hx, hy, R * .25, R * .12, a + Math.PI / 2, 0, Math.PI * 2);
-		ctx.fill();
-		ctx.beginPath();
-		ctx.arc(hx + lx * R * .2 - ly * R * .18, hy + ly * R * .2 + lx * R * .18, R * .05, 0, Math.PI * 2);
-		ctx.fill();
-		discCache.set(key, c);
-		return c;
-	}
 	var flames = null;
 	/** A flame tongue pointing +x, its root at the left edge: an outer glow and a hot inner one. */
 	function flameSprites() {
@@ -443,13 +945,13 @@
 		])];
 		return flames;
 	}
-	var core = null;
+	var core$1 = null;
 	/** The light in his mouth: white-hot at the centre, gold, then a dark red rim. */
-	function coreSprite() {
-		if (core) return core;
-		core = document.createElement("canvas");
-		core.width = core.height = 128;
-		const x = core.getContext("2d");
+	function coreSprite$1() {
+		if (core$1) return core$1;
+		core$1 = document.createElement("canvas");
+		core$1.width = core$1.height = 128;
+		const x = core$1.getContext("2d");
 		const g = x.createRadialGradient(64, 64, 0, 64, 64, 64);
 		g.addColorStop(0, "rgba(255,252,236,1)");
 		g.addColorStop(.3, "rgba(255,210,100,0.9)");
@@ -457,651 +959,252 @@
 		g.addColorStop(1, "rgba(120,20,5,0)");
 		x.fillStyle = g;
 		x.fillRect(0, 0, 128, 128);
-		return core;
+		return core$1;
 	}
-	var CHOMP_RATE = 4.2;
-	/** Death: a hit (0..0.3), the mouth opens all the way round (to 1.3), he bursts into embers. */
-	var DEATH_OPEN = .3;
-	var DEATH_POP = 1.3;
-	var CHARGE = .18;
-	var PacmanHero = class {
-		r = 20;
-		x = 0;
-		y = 0;
-		angle = 0;
-		flip = 1;
-		lastH = 1;
-		moving = false;
-		time = 0;
-		/** The awoken look, 0..1. */
-		power = 0;
-		powerOn = false;
-		ending = false;
-		/** Seconds since the energizer was taken (the wind-up and burst), or -1. */
-		transform = -1;
-		/** Seconds into the death, or -1. */
-		dying = -1;
-		invulnerable = false;
-		chomp = 0;
-		bite = -1;
-		snap = -1;
-		nextSnap = 2.4;
-		snaps = 0;
-		/**
-		* His size on a spring: he always stays round (a stretched ellipse looks inorganic in
-		* motion, the owner's review); bites, the wind-up and the burst pulse the whole body.
-		*/
-		size = new Spring(1);
-		flash = 0;
-		mouthFlash = 0;
-		trail = new RibbonTrail();
-		embers = [];
-		bursts = [];
-		travelled = 0;
-		seed = 11;
-		setRadius(r) {
-			this.r = r;
-		}
-		reset() {
-			this.trail.reset();
-			this.embers = [];
-			this.bursts = [];
-			this.power = 0;
-			this.powerOn = false;
-			this.transform = -1;
-		}
-		random() {
-			this.seed = this.seed * 16807 % 2147483647;
-			return this.seed / 2147483647;
-		}
-		/** He eats something small: a quick wind-up, a snapping bite, a punch of the body. */
-		/** A dot: just a small glow at the lips (the run's chomp already bites). */
-		gulp() {
-			this.mouthFlash = Math.max(this.mouthFlash, .3);
-		}
-		eat() {
-			this.bite = 0;
-		}
-		update(dt, s) {
-			if (!Number.isFinite(dt) || dt < 0) dt = 0;
-			this.time += dt;
-			this.invulnerable = Boolean(s.invulnerable);
-			if (s.dying) {
-				if (this.dying < 0) {
-					this.dying = 0;
-					this.flash = .8;
-					this.bite = -1;
-				}
-				const before = this.dying;
-				this.dying += dt;
-				if (before < DEATH_POP && this.dying >= DEATH_POP) for (let i = 0; i < 26; i++) this.spawnEmber(this.power > .5, i / 26 * Math.PI * 2, 4 + this.random() * 7);
-				this.trail.shrink(this.r * 10 * dt);
-				this.size.step(1, dt);
-				this.flash = Math.max(0, this.flash - dt / .3);
-				this.tick(dt);
-				return;
-			}
-			if (this.dying >= 0) {
-				this.reset();
-				this.dying = -1;
-			}
-			const step = Math.hypot(s.x - this.x, s.y - this.y);
-			this.x = s.x;
-			this.y = s.y;
-			this.angle = s.angle;
-			this.moving = s.moving;
-			this.ending = s.ending;
-			if (Math.abs(Math.cos(s.angle)) > .5) this.lastH = Math.cos(s.angle) > 0 ? 1 : -1;
-			const vertical = Math.abs(Math.sin(s.angle)) > .5;
-			this.flip = (vertical ? this.lastH : Math.cos(s.angle) > 0 ? 1 : -1) < 0 ? -1 : 1;
-			if (s.power && !this.powerOn) this.transform = 0;
-			this.powerOn = s.power;
-			let sizeTarget = this.moving ? 1 : 1 + .015 * Math.sin(this.time * 2.3);
-			if (this.transform >= 0) {
-				const before = this.transform;
-				this.transform += dt;
-				if (this.transform < CHARGE) sizeTarget = .88;
-				else if (before < CHARGE) {
-					this.flash = 1;
-					this.size.velocity += 5;
-					this.bursts.push({
-						t: 0,
-						x: this.x,
-						y: this.y,
-						angle: this.angle
-					});
-					for (let i = 0; i < 18; i++) this.spawnEmber(true, i / 18 * Math.PI * 2, 7 + this.random() * 6);
-				}
-				if (this.transform > 1.2) this.transform = -1;
-			}
-			const awake = this.powerOn && (this.transform < 0 || this.transform >= CHARGE);
-			const rate = awake ? 1 / .3 : 1 / .7;
-			this.power += Math.sign((awake ? 1 : 0) - this.power) * Math.min(Math.abs((awake ? 1 : 0) - this.power), dt * rate);
-			if (this.moving) {
-				const before = this.chomp % 1;
-				this.chomp += dt * CHOMP_RATE * (1 + .25 * this.power);
-				const after = this.chomp % 1;
-				if (before < .75 && after >= .75) this.size.velocity -= .5;
-			} else if (this.snap < 0 && this.bite < 0 && this.time > this.nextSnap) {
-				this.snap = 0;
-				this.snaps += 1;
-				this.nextSnap = this.time + 2.2 + this.snaps % 3 * .9;
-			}
-			if (this.snap >= 0) {
-				this.snap += dt;
-				if (this.snap > .34) this.snap = -1;
-			}
-			if (this.bite >= 0) {
-				const before = this.bite;
-				this.bite += dt;
-				if (before < .12 && this.bite >= .12) {
-					this.size.velocity -= 2.2;
-					this.mouthFlash = 1;
-				}
-				if (this.bite > .26) this.bite = -1;
-			}
-			this.size.step(sizeTarget, dt);
-			this.flash = Math.max(0, this.flash - dt / .16);
-			this.mouthFlash = Math.max(0, this.mouthFlash - dt / .2);
-			const r = this.r;
-			this.trail.push(s.x, s.y, r * .34, r * (4.2 + 1.4 * this.power), r * 3);
-			if (!this.moving) this.trail.shrink(r * 7 * dt);
-			if (step < r * 3) {
-				this.travelled += step;
-				const every = r * (this.power > .5 ? .45 : 1.1);
-				while (this.travelled > every) {
-					this.travelled -= every;
-					const a = this.angle + Math.PI + (this.random() - .5) * 1.2;
-					this.spawnEmber(this.power > .5, a, 1.5 + this.random() * 2.5, true);
-				}
-			}
-			this.tick(dt);
-		}
-		/** Embers drift up and fade; bursts run their course. */
-		tick(dt) {
-			const r = this.r;
-			for (const e of this.embers) {
-				e.life -= dt;
-				e.x += e.vx * dt;
-				e.y += e.vy * dt;
-				const drag = Math.pow(.9, dt * 60);
-				e.vx *= drag;
-				e.vy = e.vy * drag - r * .8 * dt;
-			}
-			this.embers = this.embers.filter((e) => e.life > 0);
-			for (const b of this.bursts) b.t += dt;
-			this.bursts = this.bursts.filter((b) => b.t < .5);
-		}
-		spawnEmber(hot, angle, speed, fromBack = false) {
-			const r = this.r;
-			const ox = fromBack ? -Math.cos(this.angle) * r * .8 : Math.cos(angle) * r * .7;
-			const oy = fromBack ? -Math.sin(this.angle) * r * .8 : Math.sin(angle) * r * .7;
-			const life = .4 + this.random() * .45;
-			this.embers.push({
-				x: this.x + ox + (this.random() - .5) * r * .5,
-				y: this.y + oy + (this.random() - .5) * r * .5,
-				vx: Math.cos(angle) * speed * r,
-				vy: Math.sin(angle) * speed * r,
-				life,
-				max: life,
-				size: r * (.06 + this.random() * .06),
-				hot
-			});
-		}
-		/** How open the jaws are, 0..1.15. */
-		openness() {
-			if (this.bite >= 0) {
-				const t = this.bite;
-				if (t < .08) return .3 + .85 * easeOut(t / .08);
-				if (t < .12) return 1.15 * (1 - easeIn((t - .08) / .04));
-				return .25 * easeOut((t - .12) / .14);
-			}
-			if (this.moving) {
-				const f = this.chomp % 1;
-				if (f < .3) return .05 + .95 * easeOut(f / .3);
-				if (f < .4) return 1;
-				if (f < .75) return .05 + .95 * (1 - easeIn((f - .4) / .35));
-				return .05;
-			}
-			const rest = .2 + .035 * Math.sin(this.time * 2.3);
-			if (this.snap >= 0) {
-				const t = this.snap;
-				if (t < .09) return rest + (.75 - rest) * easeOut(t / .09);
-				if (t < .15) return .75 * (1 - easeIn((t - .09) / .06));
-				return rest * easeOut((t - .15) / .19);
-			}
-			return rest;
-		}
-		draw(ctx) {
-			const r = this.r;
-			const p = this.power;
-			const pal = mixPal(CALM, AWOKEN, p);
-			const pulse = this.ending && p > .5 ? .62 + .38 * (.5 + .5 * Math.cos(this.time * 5)) : 1;
-			this.drawTrail(ctx, p);
-			const d = this.dying;
-			if (d >= DEATH_POP) {
-				this.drawEmbers(ctx);
-				const k = clamp01((d - DEATH_POP) / .44999999999999996);
-				if (k < 1) {
-					const gs = r * (1.2 + 2.2 * easeOut(k));
-					ctx.globalCompositeOperation = "lighter";
-					ctx.globalAlpha = 1 - k;
-					ctx.drawImage(glow([
-						255,
-						214,
-						120
-					]), this.x - gs, this.y - gs, gs * 2, gs * 2);
-					ctx.globalAlpha = 1;
-					ctx.globalCompositeOperation = "source-over";
-				}
-				return;
-			}
-			this.drawEmbers(ctx);
-			const open = this.openness();
-			let m = .04 + Math.min(1.15, open) * .76;
-			let grin = this.moving ? .08 : .2;
-			let S = 1 + .07 * p;
-			if (d >= 0) {
-				const k = clamp01((d - DEATH_OPEN) / 1);
-				const e = k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
-				m = .3 + (Math.PI - .3) * e;
-				grin = 0;
-				S *= 1 - .25 * e;
-			}
-			const mu = Math.min(Math.PI - .01, m * (1 - grin));
-			const md = Math.min(Math.PI - .01, m * (1 + grin));
-			const ca = Math.cos(this.angle);
-			const sa = Math.sin(this.angle);
-			const lx = LIGHT.x * ca + LIGHT.y * sa;
-			const ly = (-LIGHT.x * sa + LIGHT.y * ca) * this.flip;
-			ctx.save();
-			ctx.translate(this.x, this.y);
-			ctx.rotate(this.angle);
-			ctx.scale(this.size.value * S, this.size.value * S * this.flip);
-			const R = r;
-			if (p > .01) this.drawFlames(ctx, R, p * pulse);
-			const charge = this.transform >= 0 && this.transform < CHARGE ? this.transform / CHARGE : 0;
-			const aura = Math.max(p * .55 * pulse, charge * .8);
-			if (aura > .01) {
-				ctx.globalCompositeOperation = "lighter";
-				ctx.globalAlpha = aura;
-				ctx.drawImage(glow([
-					255,
-					170,
-					60
-				]), -R * 2.1, -R * 2.1, R * 4.2, R * 4.2);
-				ctx.globalAlpha = 1;
-				ctx.globalCompositeOperation = "source-over";
-			}
-			const coreA = Math.min(1, clamp01(open * 1.4) * (.85 + .15 * p) + charge * .6);
-			if (coreA > .01) {
-				ctx.globalAlpha = coreA;
-				ctx.drawImage(coreSprite(), R * .1 - R * .92, -R * .92, R * 1.84, R * 1.84);
-				ctx.globalAlpha = 1;
-			}
-			const A = {
-				x: -.1 * R,
-				y: 0
-			};
-			const U = {
-				x: Math.cos(mu) * R,
-				y: -Math.sin(mu) * R
-			};
-			const Dn = {
-				x: Math.cos(md) * R,
-				y: Math.sin(md) * R
-			};
-			const bend = R * .09 * clamp01(m * 2.5);
-			ctx.save();
-			ctx.translate(-lx * R * .045, -ly * R * .045);
-			ctx.scale(1.075, 1.075);
-			ctx.beginPath();
-			ctx.moveTo(U.x, U.y);
-			ctx.arc(0, 0, R, -mu, md, true);
-			ctx.quadraticCurveTo((Dn.x + A.x) / 2, (Dn.y + A.y) / 2 - bend, A.x, A.y);
-			ctx.quadraticCurveTo((U.x + A.x) / 2, (U.y + A.y) / 2 + bend, U.x, U.y);
-			ctx.closePath();
-			ctx.fillStyle = css(pal.ink);
-			ctx.fill();
-			ctx.restore();
-			const body = this.composeBody(R, lx, ly, p, pulse, mu, md, bend);
-			ctx.drawImage(body.canvas, -body.half, -body.half, body.half * 2, body.half * 2);
-			ctx.lineCap = "round";
-			ctx.lineJoin = "round";
-			ctx.beginPath();
-			ctx.moveTo(Dn.x * .97, Dn.y * .97);
-			ctx.quadraticCurveTo((Dn.x + A.x) / 2, (Dn.y + A.y) / 2 - bend, A.x, A.y);
-			ctx.quadraticCurveTo((U.x + A.x) / 2, (U.y + A.y) / 2 + bend, U.x * .97, U.y * .97);
-			ctx.strokeStyle = css(pal.ink);
-			ctx.lineWidth = R * .075;
-			ctx.stroke();
-			ctx.restore();
-			const spill = clamp01(open) * (.45 + .4 * p) + this.mouthFlash * .6;
-			if (spill > .01) {
-				const fx = this.x + Math.cos(this.angle) * R * .75;
-				const fy = this.y + Math.sin(this.angle) * R * .75;
-				const gs = R * (1.1 + .5 * clamp01(open) + .3 * p);
-				ctx.globalCompositeOperation = "lighter";
-				ctx.globalAlpha = Math.min(1, spill);
-				ctx.drawImage(glow([
-					255,
-					196,
-					90
-				]), fx - gs, fy - gs, gs * 2, gs * 2);
-				ctx.globalAlpha = 1;
-				ctx.globalCompositeOperation = "source-over";
-			}
-			if (this.invulnerable && d < 0) {
-				const k = .5 + .5 * Math.cos(this.time * 9);
-				ctx.strokeStyle = `rgba(255,248,220,${.25 + .35 * k})`;
-				ctx.lineWidth = Math.max(1, R * .1);
-				ctx.beginPath();
-				ctx.arc(this.x, this.y, R * (1.3 + .08 * k), 0, Math.PI * 2);
-				ctx.stroke();
-			}
-			this.drawBursts(ctx);
-		}
-		scratch = null;
-		/**
-		* The body this frame: the cached painted disc for this light and look, with the mouth
-		* cut out, molten veins and the flash added, in a small scratch canvas. Only plain
-		* image draws and Porter-Duff operations: no clipping, no blend modes, no gradients.
-		*/
-		composeBody(R, lx, ly, p, pulse, mu, md, bend) {
-			const disc = paintedDisc(R * Math.min(2, typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1), Math.atan2(ly, lx), p);
-			const size = disc.width;
-			if (!this.scratch || this.scratch.width !== size) {
-				this.scratch = document.createElement("canvas");
-				this.scratch.width = this.scratch.height = size;
-			}
-			const sc = this.scratch.getContext("2d");
-			const k = size / 2 / (R * DISC_SPAN);
-			sc.setTransform(1, 0, 0, 1, 0, 0);
-			sc.globalCompositeOperation = "source-over";
-			sc.globalAlpha = 1;
-			sc.clearRect(0, 0, size, size);
-			sc.drawImage(disc, 0, 0);
-			sc.setTransform(k, 0, 0, k, size / 2, size / 2);
-			const A = {
-				x: -.1 * R,
-				y: 0
-			};
-			const U = {
-				x: Math.cos(mu) * R,
-				y: -Math.sin(mu) * R
-			};
-			const Dn = {
-				x: Math.cos(md) * R,
-				y: Math.sin(md) * R
-			};
-			sc.globalCompositeOperation = "destination-out";
-			sc.beginPath();
-			sc.moveTo(A.x, A.y);
-			sc.quadraticCurveTo((U.x + A.x) / 2, (U.y + A.y) / 2 + bend, U.x, U.y);
-			sc.lineTo(Math.cos(mu) * R * 1.3, -Math.sin(mu) * R * 1.3);
-			sc.arc(0, 0, R * 1.3, -mu, md, false);
-			sc.lineTo(Dn.x, Dn.y);
-			sc.quadraticCurveTo((Dn.x + A.x) / 2, (Dn.y + A.y) / 2 - bend, A.x, A.y);
-			sc.closePath();
-			sc.fill();
-			sc.globalCompositeOperation = "source-atop";
-			if (p > .01) this.drawCracks(sc, R, p * pulse);
-			if (this.flash > 0) {
-				sc.fillStyle = `rgba(255,255,250,${this.flash})`;
-				sc.fillRect(-R * 1.2, -R * 1.2, R * 2.4, R * 2.4);
-			}
-			sc.globalCompositeOperation = "source-over";
-			return {
-				canvas: this.scratch,
-				half: R * DISC_SPAN
-			};
-		}
-		drawTrail(ctx, p) {
-			const calm = [
-				{
-					width: .36,
-					offset: .34,
-					wave: .28,
-					phase: 0,
-					stops: [
+	var DESIGN$1 = {
+		id: "pacman",
+		calm: CALM$1,
+		awoken: AWOKEN,
+		mouthSpan: .76,
+		grinRest: .2,
+		grinRun: .08,
+		chompRate: 4.2,
+		core: coreSprite$1,
+		spill: [
+			255,
+			196,
+			90
+		],
+		aura: [
+			255,
+			170,
+			60
+		],
+		flare: [
+			255,
+			214,
+			120
+		],
+		trailCalm: [
+			{
+				width: .36,
+				offset: .34,
+				wave: .28,
+				phase: 0,
+				stops: [
+					[
+						0,
 						[
-							0,
-							[
-								255,
-								236,
-								160
-							],
-							.85
+							255,
+							236,
+							160
 						],
+						.85
+					],
+					[
+						.6,
 						[
-							.6,
-							[
-								255,
-								170,
-								60
-							],
-							.45
+							255,
+							170,
+							60
 						],
+						.45
+					],
+					[
+						1,
 						[
-							1,
-							[
-								255,
-								120,
-								30
-							],
-							0
-						]
+							255,
+							120,
+							30
+						],
+						0
 					]
-				},
-				{
-					width: .3,
-					offset: -.32,
-					wave: .3,
-					phase: 2.1,
-					stops: [
+				]
+			},
+			{
+				width: .3,
+				offset: -.32,
+				wave: .3,
+				phase: 2.1,
+				stops: [
+					[
+						0,
 						[
-							0,
-							[
-								255,
-								226,
-								140
-							],
-							.8
+							255,
+							226,
+							140
 						],
+						.8
+					],
+					[
+						.6,
 						[
-							.6,
-							[
-								255,
-								160,
-								50
-							],
-							.4
+							255,
+							160,
+							50
 						],
+						.4
+					],
+					[
+						1,
 						[
-							1,
-							[
-								255,
-								110,
-								30
-							],
-							0
-						]
+							255,
+							110,
+							30
+						],
+						0
 					]
-				},
-				{
-					width: .22,
-					offset: 0,
-					wave: .22,
-					phase: 4.2,
-					stops: [
+				]
+			},
+			{
+				width: .22,
+				offset: 0,
+				wave: .22,
+				phase: 4.2,
+				stops: [
+					[
+						0,
 						[
-							0,
-							[
-								255,
-								250,
-								220
-							],
-							.95
+							255,
+							250,
+							220
 						],
+						.95
+					],
+					[
+						.5,
 						[
-							.5,
-							[
-								255,
-								210,
-								120
-							],
-							.55
+							255,
+							210,
+							120
 						],
+						.55
+					],
+					[
+						1,
 						[
-							1,
-							[
-								255,
-								160,
-								60
-							],
-							0
-						]
+							255,
+							160,
+							60
+						],
+						0
 					]
-				}
-			];
-			const awoken = [
-				{
-					width: .5,
-					offset: .4,
-					wave: .4,
-					phase: 0,
-					stops: [
-						[
-							0,
-							[
-								255,
-								250,
-								220
-							],
-							.95
-						],
-						[
-							.5,
-							[
-								255,
-								150,
-								40
-							],
-							.6
-						],
-						[
-							1,
-							[
-								220,
-								40,
-								0
-							],
-							0
-						]
-					]
-				},
-				{
-					width: .44,
-					offset: -.38,
-					wave: .42,
-					phase: 2.1,
-					stops: [
-						[
-							0,
-							[
-								255,
-								244,
-								200
-							],
-							.9
-						],
-						[
-							.5,
-							[
-								255,
-								130,
-								30
-							],
-							.55
-						],
-						[
-							1,
-							[
-								210,
-								30,
-								0
-							],
-							0
-						]
-					]
-				},
-				{
-					width: .3,
-					offset: 0,
-					wave: .3,
-					phase: 4.2,
-					stops: [
-						[
-							0,
-							[
-								255,
-								255,
-								245
-							],
-							1
-						],
-						[
-							.5,
-							[
-								255,
-								220,
-								130
-							],
-							.7
-						],
-						[
-							1,
-							[
-								255,
-								120,
-								30
-							],
-							0
-						]
-					]
-				}
-			];
-			if (p < .99) this.trail.draw(ctx, this.r, calm, 1 - p, this.time);
-			if (p > .01) this.trail.draw(ctx, this.r, awoken, p, this.time);
-		}
-		drawEmbers(ctx) {
-			for (const e of this.embers) {
-				const u = e.life / e.max;
-				const a = Math.min(1, (1 - u) * 5) * u;
-				const s = e.size * (.5 + .5 * u);
-				ctx.globalCompositeOperation = "lighter";
-				ctx.globalAlpha = a * .8;
-				const g = glow(e.hot ? [
-					255,
-					190,
-					80
-				] : [
-					255,
-					170,
-					60
-				]);
-				ctx.drawImage(g, e.x - s * 3, e.y - s * 3, s * 6, s * 6);
-				ctx.globalCompositeOperation = "source-over";
-				ctx.globalAlpha = a;
-				ctx.fillStyle = e.hot ? "rgba(255,250,225,1)" : "rgba(255,230,160,1)";
-				ctx.beginPath();
-				ctx.arc(e.x, e.y, s * .6, 0, Math.PI * 2);
-				ctx.fill();
+				]
 			}
-			ctx.globalAlpha = 1;
-		}
+		],
+		trailAwoken: [
+			{
+				width: .5,
+				offset: .4,
+				wave: .4,
+				phase: 0,
+				stops: [
+					[
+						0,
+						[
+							255,
+							250,
+							220
+						],
+						.95
+					],
+					[
+						.5,
+						[
+							255,
+							150,
+							40
+						],
+						.6
+					],
+					[
+						1,
+						[
+							220,
+							40,
+							0
+						],
+						0
+					]
+				]
+			},
+			{
+				width: .44,
+				offset: -.38,
+				wave: .42,
+				phase: 2.1,
+				stops: [
+					[
+						0,
+						[
+							255,
+							244,
+							200
+						],
+						.9
+					],
+					[
+						.5,
+						[
+							255,
+							130,
+							30
+						],
+						.55
+					],
+					[
+						1,
+						[
+							210,
+							30,
+							0
+						],
+						0
+					]
+				]
+			},
+			{
+				width: .3,
+				offset: 0,
+				wave: .3,
+				phase: 4.2,
+				stops: [
+					[
+						0,
+						[
+							255,
+							255,
+							245
+						],
+						1
+					],
+					[
+						.5,
+						[
+							255,
+							220,
+							130
+						],
+						.7
+					],
+					[
+						1,
+						[
+							255,
+							120,
+							30
+						],
+						0
+					]
+				]
+			}
+		],
+		death: "open"
+	};
+	var PacmanHero = class extends Hero {
+		design = DESIGN$1;
 		/** Painted flame tongues streaming back from his head, swaying (no noise: no flicker). */
-		drawFlames(ctx, R, k) {
+		drawBehind(ctx, R, k) {
 			const t = this.time;
 			const [outer, inner] = flameSprites();
 			for (const pass of [0, 1]) {
@@ -1127,7 +1230,9 @@
 			ctx.globalAlpha = 1;
 			ctx.globalCompositeOperation = "source-over";
 		}
-		drawCracks(ctx, R, k) {
+		/** Molten veins under the skin while powered (in the body's scratch canvas). */
+		decorate(ctx, R, p, k) {
+			if (p <= .01) return;
 			ctx.lineCap = "round";
 			ctx.lineJoin = "round";
 			const line = () => {
@@ -1146,59 +1251,624 @@
 			line();
 			ctx.stroke();
 		}
-		/** The burst of the awakening: a painted ring and impact rays. */
-		drawBursts(ctx) {
+	};
+	//#endregion
+	//#region src/games/pacman/render/actors/hero/MsPacmanHero.ts
+	var CALM = {
+		light: [
+			255,
+			240,
+			228
+		],
+		mid: [
+			255,
+			186,
+			188
+		],
+		shadow: [
+			212,
+			104,
+			156
+		],
+		deep: [
+			112,
+			34,
+			92
+		],
+		bounce: [
+			255,
+			150,
+			196
+		],
+		ink: [
+			70,
+			14,
+			46
+		],
+		highlight: [
+			255,
+			255,
+			255
+		],
+		rim: [
+			255,
+			222,
+			242
+		]
+	};
+	var STARLIGHT = {
+		light: [
+			255,
+			255,
+			255
+		],
+		mid: [
+			255,
+			230,
+			242
+		],
+		shadow: [
+			184,
+			140,
+			232
+		],
+		deep: [
+			96,
+			60,
+			150
+		],
+		bounce: [
+			200,
+			176,
+			255
+		],
+		ink: [
+			74,
+			30,
+			96
+		],
+		highlight: [
+			255,
+			255,
+			255
+		],
+		rim: [
+			214,
+			242,
+			255
+		]
+	};
+	/** Her bow: on top of the head, a little behind, on the head's outline. */
+	var BOW_ANGLE = -.64 * Math.PI;
+	var BOW_DISTANCE = .8;
+	var core = null;
+	/** The light in her mouth: pearl white, pink, then a soft rose rim. */
+	function coreSprite() {
+		if (core) return core;
+		core = document.createElement("canvas");
+		core.width = core.height = 128;
+		const x = core.getContext("2d");
+		const g = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+		g.addColorStop(0, "rgba(255,250,252,1)");
+		g.addColorStop(.3, "rgba(255,176,214,0.9)");
+		g.addColorStop(.75, "rgba(236,84,156,0.5)");
+		g.addColorStop(1, "rgba(120,20,70,0)");
+		x.fillStyle = g;
+		x.fillRect(0, 0, 128, 128);
+		return core;
+	}
+	var bowCache = /* @__PURE__ */ new Map();
+	var BOW_SPAN = 1.1;
+	/**
+	* The bow painted once per size, light direction (in the bow's own frame, 16 steps) and look:
+	* two rounded loops and two tails round a knot, a crisp shadow shape away from the light, a
+	* highlight on the loops, ink thicker on the shadow side. Its own frame: the knot at the
+	* centre, up (-y) pointing away from her head.
+	*/
+	function paintedBow(deviceR, lightAngle, look) {
+		const R = Math.max(4, Math.round(deviceR));
+		const step = Math.round((lightAngle / (Math.PI * 2) % 1 + 1) * 16) % 16;
+		const key = `${R}:${step}:${look}`;
+		let c = bowCache.get(key);
+		if (c) return c;
+		if (bowCache.size > 200) bowCache.clear();
+		const a = step / 16 * Math.PI * 2;
+		const lx = Math.cos(a);
+		const ly = Math.sin(a);
+		c = document.createElement("canvas");
+		c.width = c.height = Math.ceil(R * BOW_SPAN * 2);
+		const ctx = c.getContext("2d");
+		ctx.translate(c.width / 2, c.height / 2);
+		ctx.lineJoin = "round";
+		ctx.lineCap = "round";
+		const base = look ? [
+			255,
+			236,
+			250
+		] : [
+			236,
+			30,
+			76
+		];
+		const shade = look ? [
+			196,
+			160,
+			246
+		] : [
+			156,
+			10,
+			52
+		];
+		const knotC = look ? [
+			255,
+			214,
+			110
+		] : [
+			204,
+			18,
+			62
+		];
+		const ink = look ? [
+			84,
+			40,
+			110
+		] : [
+			70,
+			6,
+			26
+		];
+		const loop = (side) => {
+			const ux = Math.cos(-.22 * side) * side;
+			const uy = Math.sin(-.22 * side) * side * side;
+			const px = -uy;
+			const py = ux;
+			const len = R * .62;
+			const wid = R * .3;
+			const ex = ux * len;
+			const ey = uy * len - R * .06;
+			ctx.beginPath();
+			ctx.moveTo(0, 0);
+			ctx.bezierCurveTo(ux * len * .25 + px * wid * 1.1, uy * len * .25 + py * wid * 1.1, ex + px * wid * 1.05, ey + py * wid * 1.05, ex + ux * R * .06, ey + uy * R * .06);
+			ctx.bezierCurveTo(ex - px * wid * 1.05, ey - py * wid * 1.05, ux * len * .25 - px * wid * 1.1, uy * len * .25 - py * wid * 1.1, 0, 0);
+			ctx.closePath();
+		};
+		const tail = (side) => {
+			ctx.beginPath();
+			ctx.moveTo(-R * .06 * side, R * .04);
+			ctx.lineTo(R * .22 * side, R * .42);
+			ctx.lineTo(R * .12 * side, R * .36);
+			ctx.lineTo(R * .05 * side, R * .44);
+			ctx.lineTo(R * .06 * side, R * .04);
+			ctx.closePath();
+		};
+		const knot = () => {
+			ctx.beginPath();
+			ctx.ellipse(0, 0, R * .17, R * .15, 0, 0, Math.PI * 2);
+		};
+		const parts = [
+			() => tail(-1),
+			() => tail(1),
+			() => loop(-1),
+			() => loop(1),
+			knot
+		];
+		ctx.save();
+		ctx.translate(-lx * R * .035, -ly * R * .035);
+		ctx.fillStyle = css(ink);
+		ctx.strokeStyle = css(ink);
+		ctx.lineWidth = R * .12;
+		for (const part of parts) {
+			part();
+			ctx.fill();
+			ctx.stroke();
+		}
+		ctx.restore();
+		for (const [i, part] of parts.entries()) {
+			part();
+			ctx.fillStyle = css(i < 2 ? mix(base, shade, .35) : i === 4 ? knotC : base);
+			ctx.fill();
+			ctx.save();
+			part();
+			ctx.clip();
+			ctx.beginPath();
+			ctx.rect(-R * 2, -R * 2, R * 4, R * 4);
+			ctx.save();
+			ctx.translate(lx * R * .1, ly * R * .1);
+			part();
+			ctx.restore();
+			ctx.fillStyle = css(shade, .85);
+			ctx.fill("evenodd");
+			ctx.restore();
+		}
+		ctx.strokeStyle = "rgba(255,255,255,0.85)";
+		ctx.lineWidth = R * .05;
+		for (const side of [-1, 1]) {
+			ctx.beginPath();
+			ctx.moveTo(side * R * .16 + lx * R * .05, -R * .1 + ly * R * .05);
+			ctx.quadraticCurveTo(side * R * .38 + lx * R * .08, -R * .26 + ly * R * .08, side * R * .56 + lx * R * .04, -R * .14 + ly * R * .04);
+			ctx.stroke();
+		}
+		ctx.fillStyle = "rgba(255,255,255,0.9)";
+		ctx.beginPath();
+		ctx.arc(lx * R * .06, ly * R * .06, R * .045, 0, Math.PI * 2);
+		ctx.fill();
+		bowCache.set(key, c);
+		return c;
+	}
+	var DESIGN = {
+		id: "ms-pacman",
+		calm: CALM,
+		awoken: STARLIGHT,
+		mouthSpan: .58,
+		grinRest: .1,
+		grinRun: .04,
+		chompRate: 4.8,
+		core: coreSprite,
+		spill: [
+			255,
+			170,
+			214
+		],
+		aura: [
+			214,
+			176,
+			255
+		],
+		flare: [
+			255,
+			210,
+			240
+		],
+		trailCalm: [
+			{
+				width: .32,
+				offset: .3,
+				wave: .32,
+				phase: 0,
+				stops: [
+					[
+						0,
+						[
+							255,
+							214,
+							232
+						],
+						.85
+					],
+					[
+						.6,
+						[
+							240,
+							150,
+							200
+						],
+						.42
+					],
+					[
+						1,
+						[
+							214,
+							140,
+							230
+						],
+						0
+					]
+				]
+			},
+			{
+				width: .28,
+				offset: -.3,
+				wave: .34,
+				phase: 2.1,
+				stops: [
+					[
+						0,
+						[
+							255,
+							226,
+							210
+						],
+						.8
+					],
+					[
+						.6,
+						[
+							214,
+							170,
+							240
+						],
+						.4
+					],
+					[
+						1,
+						[
+							190,
+							150,
+							240
+						],
+						0
+					]
+				]
+			},
+			{
+				width: .2,
+				offset: 0,
+				wave: .24,
+				phase: 4.2,
+				stops: [
+					[
+						0,
+						[
+							255,
+							250,
+							252
+						],
+						.95
+					],
+					[
+						.5,
+						[
+							255,
+							196,
+							224
+						],
+						.55
+					],
+					[
+						1,
+						[
+							240,
+							160,
+							210
+						],
+						0
+					]
+				]
+			}
+		],
+		trailAwoken: [
+			{
+				width: .46,
+				offset: .38,
+				wave: .4,
+				phase: 0,
+				stops: [
+					[
+						0,
+						[
+							255,
+							255,
+							255
+						],
+						.95
+					],
+					[
+						.5,
+						[
+							200,
+							180,
+							255
+						],
+						.6
+					],
+					[
+						1,
+						[
+							150,
+							200,
+							255
+						],
+						0
+					]
+				]
+			},
+			{
+				width: .4,
+				offset: -.36,
+				wave: .42,
+				phase: 2.1,
+				stops: [
+					[
+						0,
+						[
+							255,
+							246,
+							252
+						],
+						.9
+					],
+					[
+						.5,
+						[
+							255,
+							180,
+							220
+						],
+						.55
+					],
+					[
+						1,
+						[
+							200,
+							160,
+							255
+						],
+						0
+					]
+				]
+			},
+			{
+				width: .28,
+				offset: 0,
+				wave: .3,
+				phase: 4.2,
+				stops: [
+					[
+						0,
+						[
+							255,
+							255,
+							255
+						],
+						1
+					],
+					[
+						.5,
+						[
+							214,
+							242,
+							255
+						],
+						.7
+					],
+					[
+						1,
+						[
+							255,
+							200,
+							240
+						],
+						0
+					]
+				]
+			}
+		],
+		death: "spin"
+	};
+	var MsPacmanHero = class extends Hero {
+		design = DESIGN;
+		/** The bow's sway, radians, on a soft spring. */
+		bow = new Spring(0);
+		resetLooks() {
+			this.bow.value = 0;
+			this.bow.velocity = 0;
+		}
+		onBite() {
+			this.bow.velocity += 3.2;
+		}
+		onTurn() {
+			this.bow.velocity += this.random() < .5 ? 4.5 : -4.5;
+		}
+		afterUpdate(dt) {
+			this.bow.step(.07 * Math.sin(this.time * 2.1), dt, 90, 7);
+		}
+		/** A blush on the cheek, painted on the skin (cut with the mouth). No beauty mark: at
+		*  tile size it read as an eye (the owner wants none). */
+		decorate(sc, R) {
+			sc.globalAlpha = .55;
+			sc.drawImage(glow([
+				255,
+				110,
+				150
+			]), -R * .24, -R * .45, R * .48, R * .3);
+			sc.globalAlpha = 1;
+		}
+		/** Red lipstick with a fine dark edge. */
+		drawLips(ctx, lips, R, pal) {
+			ctx.strokeStyle = css(pal.ink);
+			ctx.lineWidth = R * .12;
+			lips();
+			ctx.stroke();
+			ctx.strokeStyle = css(mix([
+				232,
+				28,
+				72
+			], [
+				255,
+				120,
+				180
+			], this.power));
+			ctx.lineWidth = R * .07;
+			lips();
+			ctx.stroke();
+		}
+		/** The bow, swaying on its spring, luminous when powered. */
+		drawWorn(ctx, R, p, lx, ly) {
+			const dpr = Math.min(2, typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1);
+			const turn = BOW_ANGLE + Math.PI / 2 + this.bow.value;
+			const c = Math.cos(-turn);
+			const s = Math.sin(-turn);
+			const la = Math.atan2(lx * s + ly * c, lx * c - ly * s);
+			const scale = 1 + .14 * p;
+			ctx.save();
+			ctx.translate(Math.cos(BOW_ANGLE) * R * BOW_DISTANCE, Math.sin(BOW_ANGLE) * R * BOW_DISTANCE);
+			ctx.rotate(turn);
+			ctx.scale(scale, scale);
+			const half = R * BOW_SPAN;
+			ctx.drawImage(paintedBow(R * dpr, la, 0), -half, -half, half * 2, half * 2);
+			if (p > .01) {
+				ctx.globalAlpha = p;
+				ctx.drawImage(paintedBow(R * dpr, la, 1), -half, -half, half * 2, half * 2);
+				ctx.globalAlpha = 1;
+			}
+			ctx.restore();
+		}
+		/** Powered: five stars circling her, twinkling slowly. */
+		drawFront(ctx) {
+			const p = this.power;
+			if (p <= .01 || this.dying >= 0) return;
 			const R = this.r;
-			for (const b of this.bursts) {
-				const k = b.t / .5;
-				const ease = easeOut(k);
-				const a = 1 - k;
-				ctx.save();
-				ctx.translate(b.x, b.y);
-				ctx.globalCompositeOperation = "lighter";
-				ctx.strokeStyle = `rgba(255,200,110,${.35 * a})`;
-				ctx.lineWidth = R * .32 * a;
-				ctx.beginPath();
-				ctx.arc(0, 0, R * (1 + 2.6 * ease), 0, Math.PI * 2);
-				ctx.stroke();
-				ctx.globalCompositeOperation = "source-over";
-				ctx.strokeStyle = `rgba(255,252,235,${.95 * a})`;
-				ctx.lineWidth = Math.max(1, R * .1 * a);
-				ctx.stroke();
-				const ra = clamp01(1 - b.t / .25);
-				if (ra > 0) {
-					ctx.fillStyle = `rgba(255,248,220,${ra})`;
-					for (let i = 0; i < 10; i++) {
-						const an = b.angle + i / 10 * Math.PI * 2 + .3;
-						const r0 = R * (1.15 + ease * .6);
-						const r1 = R * (1.9 + ease * 1.6) * (i % 2 ? .8 : 1);
-						const w = R * .07;
-						const cx = Math.cos(an);
-						const cy = Math.sin(an);
-						ctx.beginPath();
-						ctx.moveTo(cx * r0 - cy * w, cy * r0 + cx * w);
-						ctx.lineTo(cx * r1, cy * r1);
-						ctx.lineTo(cx * r0 + cy * w, cy * r0 - cx * w);
-						ctx.closePath();
-						ctx.fill();
-					}
-				}
-				ctx.restore();
+			for (let i = 0; i < 5; i++) {
+				const a = this.time * 1.5 + i / 5 * Math.PI * 2;
+				const x = this.x + Math.cos(a) * R * 1.6;
+				const y = this.y + Math.sin(a) * R * 1.6;
+				const tw = .7 + .3 * Math.sin(this.time * 3.5 + i * 1.3);
+				this.star(ctx, x, y, R * .28 * tw, this.time * .6 + i, p);
 			}
 		}
+		particleFor(moment) {
+			if (moment === "trail") return "star";
+			return this.random() < .45 ? "heart" : "star";
+		}
+		drawParticle(ctx, e, a, s) {
+			if (e.kind === "heart") {
+				ctx.globalCompositeOperation = "lighter";
+				ctx.globalAlpha = a * .6;
+				ctx.drawImage(glow([
+					255,
+					120,
+					170
+				]), e.x - s * 3, e.y - s * 3, s * 6, s * 6);
+				ctx.globalCompositeOperation = "source-over";
+				ctx.globalAlpha = a;
+				const h = s * 1.6;
+				ctx.fillStyle = "rgba(255,72,130,1)";
+				ctx.beginPath();
+				ctx.moveTo(e.x, e.y + h * .9);
+				ctx.bezierCurveTo(e.x - h * 1.3, e.y + h * .1, e.x - h * .9, e.y - h * 1.1, e.x, e.y - h * .4);
+				ctx.bezierCurveTo(e.x + h * .9, e.y - h * 1.1, e.x + h * 1.3, e.y + h * .1, e.x, e.y + h * .9);
+				ctx.fill();
+				return;
+			}
+			this.star(ctx, e.x, e.y, s * 2, e.spin * (1 - e.life / e.max), a);
+		}
+		/** A four-pointed twinkle with a soft glow. */
+		star(ctx, x, y, s, rot, a) {
+			ctx.globalCompositeOperation = "lighter";
+			ctx.globalAlpha = a * .7;
+			ctx.drawImage(glow(this.power > .5 ? [
+				210,
+				190,
+				255
+			] : [
+				255,
+				160,
+				210
+			]), x - s * 1.5, y - s * 1.5, s * 3, s * 3);
+			ctx.globalCompositeOperation = "source-over";
+			ctx.globalAlpha = a;
+			ctx.fillStyle = "rgba(255,252,255,1)";
+			ctx.beginPath();
+			for (let j = 0; j < 4; j++) {
+				const an = rot + j * Math.PI / 2;
+				ctx.lineTo(x + Math.cos(an) * s, y + Math.sin(an) * s);
+				ctx.lineTo(x + Math.cos(an + Math.PI / 4) * s * .22, y + Math.sin(an + Math.PI / 4) * s * .22);
+			}
+			ctx.closePath();
+			ctx.fill();
+			ctx.globalAlpha = 1;
+		}
 	};
-	function mixPal(a, b, k) {
-		return {
-			light: mix(a.light, b.light, k),
-			mid: mix(a.mid, b.mid, k),
-			shadow: mix(a.shadow, b.shadow, k),
-			deep: mix(a.deep, b.deep, k),
-			bounce: mix(a.bounce, b.bounce, k),
-			ink: mix(a.ink, b.ink, k),
-			highlight: mix(a.highlight, b.highlight, k),
-			rim: mix(a.rim, b.rim, k)
-		};
-	}
 	//#endregion
 	//#region prototypes/pacman/hero/main.ts
 	var $ = (id) => document.getElementById(id);
@@ -1209,8 +1879,11 @@
 	var POWER_ENDING = 1.6;
 	/** The inset's tile, css px (the game's tile on a large screen). */
 	var TILE = 30;
-	var hero = new PacmanHero();
-	var small = new PacmanHero();
+	var ms = new URLSearchParams(location.search).has("ms");
+	var make = () => ms ? new MsPacmanHero() : new PacmanHero();
+	var hero = make();
+	var small = make();
+	var deathTimer = -1;
 	var vw = 0;
 	var vh = 0;
 	var running = true;
@@ -1230,6 +1903,19 @@
 		hero.reset();
 		small.reset();
 	}
+	function pickHero() {
+		hero = make();
+		small = make();
+		layout();
+		$("who").textContent = ms ? "Ms. Pac-Man" : "Pac-Man";
+	}
+	$("who").addEventListener("click", () => {
+		ms = !ms;
+		pickHero();
+	});
+	$("die").addEventListener("click", () => {
+		if (deathTimer < 0) deathTimer = 0;
+	});
 	$("run").addEventListener("click", () => {
 		running = !running;
 		$("run").setAttribute("aria-pressed", String(running));
@@ -1251,7 +1937,12 @@
 		powerTimer = Math.max(0, powerTimer - dt);
 		const power = powerTimer > 0;
 		const ending = power && powerTimer < POWER_ENDING;
-		if (running) phase += dt * .9;
+		if (deathTimer >= 0) {
+			deathTimer += dt;
+			if (deathTimer > 2.4) deathTimer = -1;
+		}
+		const dying = deathTimer >= 0;
+		if (running && deathTimer < 0) phase += dt * .9;
 		const cx = vw / 2;
 		const cy = vh * .46;
 		const ax = Math.min(vw * .3, vh * .55);
@@ -1263,9 +1954,10 @@
 			x: running ? x : cx,
 			y: running ? y : cy,
 			angle,
-			moving: running,
+			moving: running && !dying,
 			power,
-			ending
+			ending,
+			dying
 		});
 		const ix = vw - 18 - 120;
 		const iy = vh - 96 - TILE * 1.5;
@@ -1281,9 +1973,10 @@
 			x: sx,
 			y: iy,
 			angle: 0,
-			moving: running,
+			moving: running && !dying,
 			power,
-			ending
+			ending,
+			dying
 		});
 		ctx.setTransform(D, 0, 0, D, 0, 0);
 		ctx.globalAlpha = 1;
@@ -1327,6 +2020,7 @@
 	}
 	window.addEventListener("resize", layout);
 	layout();
+	$("who").textContent = ms ? "Ms. Pac-Man" : "Pac-Man";
 	if (new URLSearchParams(location.search).has("capture")) window.__advance = (seconds) => {
 		for (let i = 0; i < Math.round(seconds * 60); i++) frame(1 / 60);
 	};
