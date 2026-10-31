@@ -606,7 +606,8 @@ export class PacmanHero {
 		this.drawEmbers(ctx);
 
 		const open = this.openness();
-		let m = 0.04 + Math.min(1.15, open) * 0.58;
+		// wide jaws (the owner's review): fully open the mouth spans about 92 degrees
+		let m = 0.04 + Math.min(1.15, open) * 0.76;
 		let grin = this.moving ? 0.08 : 0.2;
 		let S = 1 + 0.07 * p;
 		if (d >= 0) {
