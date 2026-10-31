@@ -30,8 +30,9 @@ the owner says to go straight into the game.
        the owner's review in the game, then a ghost-eaten beat and the hell looks. `render/actors/PlayerView.ts`;
        keep the design decisions (organic, wedge mouth, no eyes, ribbon trail) unless
        the owner changes them.
-    4. *In progress*: `MsPacmanHero` on the hero stage (rose candy, bow on a spring,
-       lipstick, starlight when powered, spinning death); not in the game yet.
+    4. *In progress*: `MsPacmanHero` on the hero stage (rose candy, an eye with lashes that
+       blinks and squints, bow on a spring, lipstick, starlight when powered, spinning
+       death); not in the game yet. Pac-Man keeps no eyes.
        **Ms. Pac-Man**, finish (`render/actors/MsPacmanView.ts`): today she reads a little
        dark rather than cute, not bright enough, hard to read at tile size, and under
        an energizer (overdrive) everything melts into a mash of effects. Brighter, cuter,

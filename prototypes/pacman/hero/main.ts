@@ -109,8 +109,9 @@ function frame(realDt: number): void {
 	if (running) {
 		biteClock += dt * 5.2;
 		if (biteClock > 1) {
+			// a dot per tile, as in the game: a glow at the lips, not a full bite
 			biteClock -= 1;
-			small.eat();
+			small.gulp();
 		}
 	}
 	const sx = ix + (running ? ((phase * 2.2) % 1) * TILE * 2 - TILE : 0);

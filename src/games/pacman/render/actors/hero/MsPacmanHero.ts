@@ -1,7 +1,8 @@
 // Ms. Pac-Man, the heroine (stage 10.4): starlight to his fire. Rose candy with peach light and
-// lilac shadows, no eyes; cute through her bow, red lipstick and a blush, a
-// smaller and softer mouth that nibbles quickly and smiles at rest, and a pink glow in her
-// mouth. Her bow lives on a spring: it lags behind on turns and bites and sways at rest.
+// lilac shadows; cute through a big glossy eye with lashes (it blinks, squints happily on a
+// bite, sparkles when powered), her bow, red lipstick and a blush, a smaller and softer mouth
+// that nibbles quickly and smiles at rest, and a pink glow in her mouth. Her bow lives on a
+// spring: it lags behind on turns and bites and sways at rest. Pac-Man keeps no eyes.
 // Powered she blooms into starlight: pearl white with lavender shadows and an iridescent rim,
 // her bow luminous, stars circling her. Her trail is pastel ribbons shedding twinkles;
 // caught, she spins away and bursts into hearts and stars. The machinery is the shared Hero.
@@ -31,7 +32,7 @@ const STARLIGHT: Palette = {
 };
 
 /** Her bow: on top of the head, a little behind, on the head's outline. */
-const BOW_ANGLE = -0.64 * Math.PI;
+const BOW_ANGLE = -0.72 * Math.PI;
 const BOW_DISTANCE = 0.8;
 
 let core: HTMLCanvasElement | null = null;
@@ -266,6 +267,12 @@ export class MsPacmanHero extends Hero {
 	protected readonly design = DESIGN;
 	/** The bow's sway, radians, on a soft spring. */
 	private readonly bow = new Spring(0);
+	/** Seconds into a blink, or -1; the next blink is due at `nextBlink`. */
+	private blink = -1;
+	private nextBlink = 1.8;
+	private blinks = 0;
+	/** A happy squint after a bite, 1 → 0. */
+	private squint = 0;
 
 	protected resetLooks(): void {
 		this.bow.value = 0;
@@ -274,6 +281,7 @@ export class MsPacmanHero extends Hero {
 
 	protected onBite(): void {
 		this.bow.velocity += 3.2;
+		this.squint = 1;
 	}
 
 	protected onTurn(): void {
@@ -282,14 +290,126 @@ export class MsPacmanHero extends Hero {
 
 	protected afterUpdate(dt: number): void {
 		this.bow.step(0.07 * Math.sin(this.time * 2.1), dt, 90, 7);
+		this.squint = Math.max(0, this.squint - dt / 0.35);
+		if (this.blink >= 0) {
+			this.blink += dt;
+			if (this.blink > 0.14) this.blink = -1;
+		} else if (this.time > this.nextBlink) {
+			this.blink = 0;
+			this.blinks += 1;
+			// irregular, like a living thing; now and then a double blink
+			this.nextBlink = this.time + (this.blinks % 4 === 0 ? 0.3 : 2.2 + (this.blinks % 3) * 1.1);
+		}
 	}
 
-	/** A blush on the cheek, painted on the skin (cut with the mouth). No beauty mark: at
-	 *  tile size it read as an eye (the owner wants none). */
+	/** A blush on the cheek under her eye, painted on the skin (cut with the mouth). */
 	protected decorate(sc: CanvasRenderingContext2D, R: number): void {
 		sc.globalAlpha = 0.55;
-		sc.drawImage(glow([255, 110, 150]), -R * 0.24, -R * 0.45, R * 0.48, R * 0.3);
+		sc.drawImage(glow([255, 110, 150]), -R * 0.08, -R * 0.36, R * 0.44, R * 0.26);
 		sc.globalAlpha = 1;
+	}
+
+	/**
+	 * Her eye, in profile above the mouth: a white with a dark iris looking ahead, two
+	 * glints, an upper lid and lashes. It blinks, squints after a bite (a happy arc), shows a
+	 * star glint when powered and stays shut while she dies.
+	 */
+	private drawEye(ctx: CanvasRenderingContext2D, R: number, p: number): void {
+		// above the upper lip even with the mouth wide open, clear of the bow; at tile size
+		// (a small radius) the eye grows a little so it still reads
+		const lod = R < 20 ? 1.3 : 1;
+		const ex = R * 0.28;
+		const ey = -R * (0.56 + (lod - 1) * 0.15);
+		const rx = R * 0.19 * lod;
+		const ry = R * 0.23 * lod;
+		const ink = css(mix([70, 14, 46], [74, 30, 96], p));
+		const blinkShut = this.blink >= 0 ? Math.sin((this.blink / 0.14) * Math.PI) : 0;
+		const shut = this.dying >= 0 ? 1 : Math.max(blinkShut, this.squint > 0.05 ? 1 : 0);
+		ctx.lineCap = 'round';
+		ctx.lineJoin = 'round';
+		if (shut > 0.85) {
+			// closed: a happy arc (squint) or a soft line (blink, dying), with lashes
+			const happy = this.squint > 0.05 && this.dying < 0;
+			ctx.strokeStyle = ink;
+			ctx.lineWidth = R * 0.07;
+			ctx.beginPath();
+			if (happy) ctx.arc(ex, ey + ry * 0.35, rx * 1.05, Math.PI * 1.1, Math.PI * 1.9);
+			else ctx.arc(ex, ey - ry * 0.6, rx * 1.2, Math.PI * 0.2, Math.PI * 0.8);
+			ctx.stroke();
+			this.lashes(ctx, ex, happy ? ey - ry * 0.55 : ey + ry * 0.15, rx, R, ink);
+			return;
+		}
+		const open = 1 - shut;
+		ctx.save();
+		ctx.translate(ex, ey);
+		ctx.scale(1, Math.max(0.12, open));
+		// the white, outlined
+		ctx.fillStyle = 'rgba(255,255,255,1)';
+		ctx.strokeStyle = ink;
+		ctx.lineWidth = R * 0.05;
+		ctx.beginPath();
+		ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+		ctx.fill();
+		ctx.stroke();
+		// the iris looks ahead (+x), lavender when powered
+		ctx.fillStyle = css(mix([52, 18, 46], [110, 70, 190], p));
+		ctx.beginPath();
+		ctx.ellipse(rx * 0.32, ry * 0.08, rx * 0.62, ry * 0.68, 0, 0, Math.PI * 2);
+		ctx.fill();
+		ctx.fillStyle = 'rgba(255,255,255,1)';
+		ctx.beginPath();
+		ctx.arc(rx * 0.5, -ry * 0.3, rx * 0.26, 0, Math.PI * 2);
+		ctx.fill();
+		ctx.beginPath();
+		ctx.arc(rx * 0.12, ry * 0.35, rx * 0.12, 0, Math.PI * 2);
+		ctx.fill();
+		if (p > 0.3) {
+			// a star glint in the powered eye
+			ctx.globalAlpha = p;
+			ctx.beginPath();
+			for (let j = 0; j < 4; j++) {
+				const an = (j * Math.PI) / 2;
+				ctx.lineTo(rx * 0.5 + Math.cos(an) * rx * 0.42, -ry * 0.3 + Math.sin(an) * rx * 0.42);
+				ctx.lineTo(
+					rx * 0.5 + Math.cos(an + Math.PI / 4) * rx * 0.1,
+					-ry * 0.3 + Math.sin(an + Math.PI / 4) * rx * 0.1
+				);
+			}
+			ctx.closePath();
+			ctx.fill();
+			ctx.globalAlpha = 1;
+		}
+		// the upper lid: a heavier ink line
+		ctx.strokeStyle = ink;
+		ctx.lineWidth = R * 0.08;
+		ctx.beginPath();
+		ctx.ellipse(0, 0, rx, ry, 0, Math.PI * 1.08, Math.PI * 1.92);
+		ctx.stroke();
+		ctx.restore();
+		this.lashes(ctx, ex, ey - ry * Math.max(0.12, open) * 0.75, rx, R, ink);
+	}
+
+	/** Three lashes sweeping up and back from the lid. */
+	private lashes(
+		ctx: CanvasRenderingContext2D,
+		ex: number,
+		y: number,
+		rx: number,
+		R: number,
+		ink: string
+	): void {
+		ctx.strokeStyle = ink;
+		ctx.lineWidth = R * 0.05;
+		ctx.beginPath();
+		for (const [dx, lx, ly] of [
+			[-0.75, -1.35, -0.55],
+			[-0.3, -0.75, -0.95],
+			[0.15, -0.05, -1.0]
+		]) {
+			ctx.moveTo(ex + dx * rx, y);
+			ctx.quadraticCurveTo(ex + (dx + lx) * 0.5 * rx, y + ly * rx * 0.3, ex + lx * rx, y + ly * rx);
+		}
+		ctx.stroke();
 	}
 
 	/** Red lipstick with a fine dark edge. */
@@ -309,7 +429,7 @@ export class MsPacmanHero extends Hero {
 		ctx.stroke();
 	}
 
-	/** The bow, swaying on its spring, luminous when powered. */
+	/** Her eye, then the bow swaying on its spring, luminous when powered. */
 	protected drawWorn(
 		ctx: CanvasRenderingContext2D,
 		R: number,
@@ -336,6 +456,8 @@ export class MsPacmanHero extends Hero {
 			ctx.globalAlpha = 1;
 		}
 		ctx.restore();
+		// the eye last: on her face, in front of the bow
+		this.drawEye(ctx, R, p);
 	}
 
 	/** Powered: five stars circling her, twinkling slowly. */
