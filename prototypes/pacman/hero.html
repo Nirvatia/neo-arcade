@@ -487,8 +487,11 @@
 		snap = -1;
 		nextSnap = 2.4;
 		snaps = 0;
-		along = new Spring(1);
-		across = new Spring(1);
+		/**
+		* His size on a spring: he always stays round (a stretched ellipse looks inorganic in
+		* motion, the owner's review); bites, the wind-up and the burst pulse the whole body.
+		*/
+		size = new Spring(1);
 		flash = 0;
 		mouthFlash = 0;
 		trail = new RibbonTrail();
@@ -511,7 +514,7 @@
 			this.seed = this.seed * 16807 % 2147483647;
 			return this.seed / 2147483647;
 		}
-		/** He eats something small: a quick wind-up, a snapping bite, a squash. */
+		/** He eats something small: a quick wind-up, a snapping bite, a punch of the body. */
 		/** A dot: just a small glow at the lips (the run's chomp already bites). */
 		gulp() {
 			this.mouthFlash = Math.max(this.mouthFlash, .3);
@@ -533,8 +536,7 @@
 				this.dying += dt;
 				if (before < DEATH_POP && this.dying >= DEATH_POP) for (let i = 0; i < 26; i++) this.spawnEmber(this.power > .5, i / 26 * Math.PI * 2, 4 + this.random() * 7);
 				this.trail.shrink(this.r * 10 * dt);
-				this.along.step(1, dt);
-				this.across.step(1, dt);
+				this.size.step(1, dt);
 				this.flash = Math.max(0, this.flash - dt / .3);
 				this.tick(dt);
 				return;
@@ -554,18 +556,14 @@
 			this.flip = (vertical ? this.lastH : Math.cos(s.angle) > 0 ? 1 : -1) < 0 ? -1 : 1;
 			if (s.power && !this.powerOn) this.transform = 0;
 			this.powerOn = s.power;
-			let alongTarget = this.moving ? 1.06 : 1;
-			let acrossTarget = this.moving ? .95 : 1 + .018 * Math.sin(this.time * 2.3);
+			let sizeTarget = this.moving ? 1 : 1 + .015 * Math.sin(this.time * 2.3);
 			if (this.transform >= 0) {
 				const before = this.transform;
 				this.transform += dt;
-				if (this.transform < CHARGE) {
-					alongTarget = .86;
-					acrossTarget = 1.1;
-				} else if (before < CHARGE) {
+				if (this.transform < CHARGE) sizeTarget = .88;
+				else if (before < CHARGE) {
 					this.flash = 1;
-					this.along.velocity += 9;
-					this.across.velocity -= 6;
+					this.size.velocity += 5;
 					this.bursts.push({
 						t: 0,
 						x: this.x,
@@ -583,10 +581,7 @@
 				const before = this.chomp % 1;
 				this.chomp += dt * CHOMP_RATE * (1 + .25 * this.power);
 				const after = this.chomp % 1;
-				if (before < .75 && after >= .75) {
-					this.along.velocity -= 1.6;
-					this.across.velocity += 1.4;
-				}
+				if (before < .75 && after >= .75) this.size.velocity -= .5;
 			} else if (this.snap < 0 && this.bite < 0 && this.time > this.nextSnap) {
 				this.snap = 0;
 				this.snaps += 1;
@@ -600,14 +595,12 @@
 				const before = this.bite;
 				this.bite += dt;
 				if (before < .12 && this.bite >= .12) {
-					this.along.velocity -= 5;
-					this.across.velocity += 4.5;
+					this.size.velocity -= 2.2;
 					this.mouthFlash = 1;
 				}
 				if (this.bite > .26) this.bite = -1;
 			}
-			this.along.step(alongTarget, dt);
-			this.across.step(acrossTarget, dt);
+			this.size.step(sizeTarget, dt);
 			this.flash = Math.max(0, this.flash - dt / .16);
 			this.mouthFlash = Math.max(0, this.mouthFlash - dt / .2);
 			const r = this.r;
@@ -724,7 +717,7 @@
 			ctx.save();
 			ctx.translate(this.x, this.y);
 			ctx.rotate(this.angle);
-			ctx.scale(this.along.value * S, this.across.value * S * this.flip);
+			ctx.scale(this.size.value * S, this.size.value * S * this.flip);
 			const R = r;
 			if (p > .01) this.drawFlames(ctx, R, p * pulse);
 			const charge = this.transform >= 0 && this.transform < CHARGE ? this.transform / CHARGE : 0;

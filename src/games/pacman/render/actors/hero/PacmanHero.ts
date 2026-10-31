@@ -6,8 +6,9 @@
 //   shadow side;
 // - his signature: a core of light deep in his mouth that spills out when he opens it;
 // - acting: curved lips with a grin (the jaw drops more than the lid), a fast open and a
-//   biting close, breathing and the odd snap of the jaws at rest, squash and stretch on
-//   springs (stretch while running, a squash on every bite, overshoot after the burst);
+//   biting close, breathing and the odd snap of the jaws at rest; the body stays round,
+//   its size on a spring (a small punch on every bite, a crouch before the burst and an
+//   overshoot after it);
 // - the energizer as a beat: wind-up (he crouches, the core charges), burst (a white flash
 //   of the silhouette, a ring and impact rays), the new look (white-hot, molten cracks,
 //   painted flames streaming back), calming down slowly as the power ends;
@@ -372,8 +373,11 @@ export class PacmanHero {
 	private snap = -1;
 	private nextSnap = 2.4;
 	private snaps = 0;
-	private readonly along = new Spring(1);
-	private readonly across = new Spring(1);
+	/**
+	 * His size on a spring: he always stays round (a stretched ellipse looks inorganic in
+	 * motion, the owner's review); bites, the wind-up and the burst pulse the whole body.
+	 */
+	private readonly size = new Spring(1);
 	private flash = 0;
 	private mouthFlash = 0;
 	private readonly trail = new RibbonTrail();
@@ -400,7 +404,7 @@ export class PacmanHero {
 		return this.seed / 2147483647;
 	}
 
-	/** He eats something small: a quick wind-up, a snapping bite, a squash. */
+	/** He eats something small: a quick wind-up, a snapping bite, a punch of the body. */
 	/** A dot: just a small glow at the lips (the run's chomp already bites). */
 	gulp(): void {
 		this.mouthFlash = Math.max(this.mouthFlash, 0.3);
@@ -428,8 +432,7 @@ export class PacmanHero {
 				}
 			}
 			this.trail.shrink(this.r * 10 * dt);
-			this.along.step(1, dt);
-			this.across.step(1, dt);
+			this.size.step(1, dt);
 			this.flash = Math.max(0, this.flash - dt / 0.3);
 			this.tick(dt);
 			return;
@@ -451,18 +454,16 @@ export class PacmanHero {
 		// the energizer: wind-up, burst, then the look eases in; easing out slowly at the end
 		if (s.power && !this.powerOn) this.transform = 0;
 		this.powerOn = s.power;
-		let alongTarget = this.moving ? 1.06 : 1;
-		let acrossTarget = this.moving ? 0.95 : 1 + 0.018 * Math.sin(this.time * 2.3);
+		// at rest he breathes; running he keeps his size
+		let sizeTarget = this.moving ? 1 : 1 + 0.015 * Math.sin(this.time * 2.3);
 		if (this.transform >= 0) {
 			const before = this.transform;
 			this.transform += dt;
 			if (this.transform < CHARGE) {
-				alongTarget = 0.86;
-				acrossTarget = 1.1;
+				sizeTarget = 0.88;
 			} else if (before < CHARGE) {
 				this.flash = 1;
-				this.along.velocity += 9;
-				this.across.velocity -= 6;
+				this.size.velocity += 5;
 				this.bursts.push({ t: 0, x: this.x, y: this.y, angle: this.angle });
 				for (let i = 0; i < 18; i++)
 					this.spawnEmber(true, (i / 18) * Math.PI * 2, 7 + this.random() * 6);
@@ -480,10 +481,9 @@ export class PacmanHero {
 			const before = this.chomp % 1;
 			this.chomp += dt * CHOMP_RATE * (1 + 0.25 * this.power);
 			const after = this.chomp % 1;
-			// the bite closes at 0.75 of the cycle: a little squash, felt more than seen
+			// the bite closes at 0.75 of the cycle: a little punch, felt more than seen
 			if (before < 0.75 && after >= 0.75) {
-				this.along.velocity -= 1.6;
-				this.across.velocity += 1.4;
+				this.size.velocity -= 0.5;
 			}
 		} else if (this.snap < 0 && this.bite < 0 && this.time > this.nextSnap) {
 			this.snap = 0;
@@ -498,14 +498,12 @@ export class PacmanHero {
 			const before = this.bite;
 			this.bite += dt;
 			if (before < 0.12 && this.bite >= 0.12) {
-				this.along.velocity -= 5;
-				this.across.velocity += 4.5;
+				this.size.velocity -= 2.2;
 				this.mouthFlash = 1;
 			}
 			if (this.bite > 0.26) this.bite = -1;
 		}
-		this.along.step(alongTarget, dt);
-		this.across.step(acrossTarget, dt);
+		this.size.step(sizeTarget, dt);
 		this.flash = Math.max(0, this.flash - dt / 0.16);
 		this.mouthFlash = Math.max(0, this.mouthFlash - dt / 0.2);
 
@@ -630,7 +628,7 @@ export class PacmanHero {
 		ctx.save();
 		ctx.translate(this.x, this.y);
 		ctx.rotate(this.angle);
-		ctx.scale(this.along.value * S, this.across.value * S * this.flip);
+		ctx.scale(this.size.value * S, this.size.value * S * this.flip);
 		const R = r;
 
 		// behind: the aura and the flames of the awoken
