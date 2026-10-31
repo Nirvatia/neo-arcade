@@ -1,5 +1,5 @@
 // Ms. Pac-Man, the heroine (stage 10.4): starlight to his fire. Rose candy with peach light and
-// lilac shadows; cute through a big glossy eye with lashes (it blinks, squints happily on a
+// lilac shadows; cute through a glossy dark eye with lashes (it blinks, squints happily on a
 // bite, sparkles when powered), her bow, red lipstick and a blush, a smaller and softer mouth
 // that nibbles quickly and smiles at rest, and a pink glow in her mouth. Her bow lives on a
 // spring: it lags behind on turns and bites and sways at rest. Pac-Man keeps no eyes.
@@ -310,105 +310,98 @@ export class MsPacmanHero extends Hero {
 	}
 
 	/**
-	 * Her eye, in profile above the mouth: a white with a dark iris looking ahead, two
-	 * glints, an upper lid and lashes. It blinks, squints after a bite (a happy arc), shows a
-	 * star glint when powered and stays shut while she dies.
+	 * Her eye, in profile above the mouth, drawn the cute way (a white with a small iris
+	 * looked like a stare, the owner's review): one glossy dark oval, warmer at the bottom,
+	 * a big glint and a small one, a soft lid and two lashes curling out. It blinks,
+	 * squints after a bite (a happy arc), turns lavender with a star glint when she is
+	 * powered and stays shut while she dies.
 	 */
 	private drawEye(ctx: CanvasRenderingContext2D, R: number, p: number): void {
 		// above the upper lip even with the mouth wide open, clear of the bow; at tile size
 		// (a small radius) the eye grows a little so it still reads
-		const lod = R < 20 ? 1.3 : 1;
-		const ex = R * 0.28;
-		const ey = -R * (0.56 + (lod - 1) * 0.15);
-		const rx = R * 0.19 * lod;
-		const ry = R * 0.23 * lod;
-		const ink = css(mix([70, 14, 46], [74, 30, 96], p));
+		const lod = R < 20 ? 1.25 : 1;
+		const ex = R * 0.27;
+		const ey = -R * (0.54 + (lod - 1) * 0.15);
+		const rx = R * 0.15 * lod;
+		const ry = R * 0.2 * lod;
+		const ink = css(mix([60, 12, 40], [70, 30, 100], p));
 		const blinkShut = this.blink >= 0 ? Math.sin((this.blink / 0.14) * Math.PI) : 0;
 		const shut = this.dying >= 0 ? 1 : Math.max(blinkShut, this.squint > 0.05 ? 1 : 0);
 		ctx.lineCap = 'round';
 		ctx.lineJoin = 'round';
 		if (shut > 0.85) {
-			// closed: a happy arc (squint) or a soft line (blink, dying), with lashes
+			// closed: a happy arc (squint) or a soft smiling line (blink, dying)
 			const happy = this.squint > 0.05 && this.dying < 0;
 			ctx.strokeStyle = ink;
-			ctx.lineWidth = R * 0.07;
+			ctx.lineWidth = R * 0.075;
 			ctx.beginPath();
-			if (happy) ctx.arc(ex, ey + ry * 0.35, rx * 1.05, Math.PI * 1.1, Math.PI * 1.9);
-			else ctx.arc(ex, ey - ry * 0.6, rx * 1.2, Math.PI * 0.2, Math.PI * 0.8);
+			if (happy) ctx.arc(ex, ey + ry * 0.4, rx * 1.15, Math.PI * 1.12, Math.PI * 1.88);
+			else ctx.arc(ex, ey - ry * 0.4, rx * 1.15, Math.PI * 0.2, Math.PI * 0.8);
 			ctx.stroke();
-			this.lashes(ctx, ex, happy ? ey - ry * 0.55 : ey + ry * 0.15, rx, R, ink);
+			this.lashes(ctx, ex - rx * 0.95, happy ? ey - ry * 0.2 : ey + ry * 0.35, rx, R, ink);
 			return;
 		}
-		const open = 1 - shut;
+		const open = Math.max(0.12, 1 - shut);
 		ctx.save();
 		ctx.translate(ex, ey);
-		ctx.scale(1, Math.max(0.12, open));
-		// the white, outlined
-		ctx.fillStyle = 'rgba(255,255,255,1)';
-		ctx.strokeStyle = ink;
-		ctx.lineWidth = R * 0.05;
+		ctx.scale(1, open);
+		// the eye: a glossy dark oval, warmer and lighter at the bottom
+		const g = ctx.createLinearGradient(0, -ry, 0, ry);
+		g.addColorStop(0, css(mix([40, 10, 34], [60, 30, 110], p)));
+		g.addColorStop(0.6, css(mix([70, 20, 56], [100, 70, 190], p)));
+		g.addColorStop(1, css(mix([170, 70, 120], [190, 160, 255], p)));
+		ctx.fillStyle = g;
 		ctx.beginPath();
 		ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
 		ctx.fill();
-		ctx.stroke();
-		// the iris looks ahead (+x), lavender when powered
-		ctx.fillStyle = css(mix([52, 18, 46], [110, 70, 190], p));
-		ctx.beginPath();
-		ctx.ellipse(rx * 0.32, ry * 0.08, rx * 0.62, ry * 0.68, 0, 0, Math.PI * 2);
-		ctx.fill();
+		// glints: a big one up front, a small one below
 		ctx.fillStyle = 'rgba(255,255,255,1)';
-		ctx.beginPath();
-		ctx.arc(rx * 0.5, -ry * 0.3, rx * 0.26, 0, Math.PI * 2);
-		ctx.fill();
-		ctx.beginPath();
-		ctx.arc(rx * 0.12, ry * 0.35, rx * 0.12, 0, Math.PI * 2);
-		ctx.fill();
 		if (p > 0.3) {
-			// a star glint in the powered eye
-			ctx.globalAlpha = p;
 			ctx.beginPath();
 			for (let j = 0; j < 4; j++) {
 				const an = (j * Math.PI) / 2;
-				ctx.lineTo(rx * 0.5 + Math.cos(an) * rx * 0.42, -ry * 0.3 + Math.sin(an) * rx * 0.42);
+				ctx.lineTo(rx * 0.25 + Math.cos(an) * rx * 0.6, -ry * 0.32 + Math.sin(an) * rx * 0.6);
 				ctx.lineTo(
-					rx * 0.5 + Math.cos(an + Math.PI / 4) * rx * 0.1,
-					-ry * 0.3 + Math.sin(an + Math.PI / 4) * rx * 0.1
+					rx * 0.25 + Math.cos(an + Math.PI / 4) * rx * 0.15,
+					-ry * 0.32 + Math.sin(an + Math.PI / 4) * rx * 0.15
 				);
 			}
 			ctx.closePath();
 			ctx.fill();
-			ctx.globalAlpha = 1;
+		} else {
+			ctx.beginPath();
+			ctx.ellipse(rx * 0.22, -ry * 0.34, rx * 0.42, ry * 0.3, -0.3, 0, Math.PI * 2);
+			ctx.fill();
 		}
-		// the upper lid: a heavier ink line
-		ctx.strokeStyle = ink;
-		ctx.lineWidth = R * 0.08;
 		ctx.beginPath();
-		ctx.ellipse(0, 0, rx, ry, 0, Math.PI * 1.08, Math.PI * 1.92);
-		ctx.stroke();
+		ctx.arc(-rx * 0.3, ry * 0.42, rx * 0.17, 0, Math.PI * 2);
+		ctx.fill();
 		ctx.restore();
-		this.lashes(ctx, ex, ey - ry * Math.max(0.12, open) * 0.75, rx, R, ink);
+		// a soft lid over the top
+		ctx.strokeStyle = ink;
+		ctx.lineWidth = R * 0.06;
+		ctx.beginPath();
+		ctx.ellipse(ex, ey, rx * 1.08, ry * open * 1.06, 0, Math.PI * 1.05, Math.PI * 1.95);
+		ctx.stroke();
+		this.lashes(ctx, ex - rx * 0.95, ey - ry * open * 0.35, rx, R, ink);
 	}
 
-	/** Three lashes sweeping up and back from the lid. */
+	/** Two lashes curling out at the back corner of the eye. */
 	private lashes(
 		ctx: CanvasRenderingContext2D,
-		ex: number,
+		x: number,
 		y: number,
 		rx: number,
 		R: number,
 		ink: string
 	): void {
 		ctx.strokeStyle = ink;
-		ctx.lineWidth = R * 0.05;
+		ctx.lineWidth = R * 0.055;
 		ctx.beginPath();
-		for (const [dx, lx, ly] of [
-			[-0.75, -1.35, -0.55],
-			[-0.3, -0.75, -0.95],
-			[0.15, -0.05, -1.0]
-		]) {
-			ctx.moveTo(ex + dx * rx, y);
-			ctx.quadraticCurveTo(ex + (dx + lx) * 0.5 * rx, y + ly * rx * 0.3, ex + lx * rx, y + ly * rx);
-		}
+		ctx.moveTo(x, y);
+		ctx.quadraticCurveTo(x - rx * 0.5, y - rx * 0.1, x - rx * 0.8, y - rx * 0.6);
+		ctx.moveTo(x + rx * 0.15, y - rx * 0.35);
+		ctx.quadraticCurveTo(x - rx * 0.2, y - rx * 0.6, x - rx * 0.3, y - rx * 1.05);
 		ctx.stroke();
 	}
 
