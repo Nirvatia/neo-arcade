@@ -1,7 +1,8 @@
 import type { GridLayout } from './maze/GridView';
 import { PlayerView } from './actors/PlayerView';
-import { MsPacmanView } from './actors/MsPacmanView';
-import { PacmanHeroView } from './actors/PacmanHeroView';
+import { HeroView } from './actors/HeroView';
+import { PacmanHero } from './actors/hero/PacmanHero';
+import { MsPacmanHero } from './actors/hero/MsPacmanHero';
 import type { PacmanAudioCue } from '../core/Events';
 import type { PlayerDrawOptions } from './actors/PlayerView';
 import { EchoCloneView } from './actors/EchoCloneView';
@@ -18,8 +19,8 @@ import type { RenderFrame } from './RenderFrame';
  */
 export class SharedLayers {
 	readonly playerView = new PlayerView();
-	private readonly heroView = new PacmanHeroView();
-	private readonly msPacmanView = new MsPacmanView();
+	private readonly heroView = new HeroView(new PacmanHero());
+	private readonly msHeroView = new HeroView(new MsPacmanHero());
 	private readonly fruitView = new FruitView();
 	private readonly easterEggView = new EasterEggView();
 	private readonly echoCloneView = new EchoCloneView();
@@ -57,7 +58,7 @@ export class SharedLayers {
 	trigger(cue: PacmanAudioCue): void {
 		this.playerView.trigger(cue);
 		this.heroView.trigger(cue);
-		this.msPacmanView.trigger(cue);
+		this.msHeroView.trigger(cue);
 	}
 
 	drawPlayer(frame: RenderFrame, layout: GridLayout): void {
@@ -66,7 +67,8 @@ export class SharedLayers {
 			return;
 		}
 		if (frame.level.profile === 'ms-pacman') {
-			this.msPacmanView.draw(frame.ctx, player, layout, frame.time, this.playerOptions(frame));
+			// Ms. Pac-Man the heroine (stage 10.4)
+			this.msHeroView.draw(frame.ctx, player, layout, frame.time, this.playerOptions(frame));
 		} else if (frame.level.hellMode) {
 			this.playerView.draw(frame.ctx, player, layout, frame.time, this.playerOptions(frame));
 		} else {
@@ -92,9 +94,10 @@ export class SharedLayers {
 			level.profile === 'ms-pacman'
 				? Boolean(hypnosis && hypnosis.overdriveActive)
 				: Boolean(combat && combat.isPowerActive);
-		// his look calms down over the energizer's last two seconds
-		const ending =
-			powered && level.profile !== 'ms-pacman' && Boolean(combat && combat.powerTimer < 2);
+		// the powered look calms down over the power's last two seconds
+		const left =
+			level.profile === 'ms-pacman' ? (hypnosis?.overdriveTimer ?? 0) : (combat?.powerTimer ?? 0);
+		const ending = powered && left < 2;
 		return { look: powered ? 'energized' : 'normal', charge: 0, dying, ending };
 	}
 }

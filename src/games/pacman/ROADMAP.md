@@ -24,19 +24,14 @@ the owner says to go straight into the game.
     1. ~~**Fruit.**~~ Done: the fruit, the heart and the exit stay inside their tile with
        a calm glow (see Done).
     2. ~~**Easter egg + its mechanic.**~~ Done (see Done).
-    3. **Pac-Man art**, redone completely (was stage 4). *In progress*: the hero
+    3. **Pac-Man art** (was stage 4). *In the game*: the hero
        (`render/actors/hero/PacmanHero`, prototype `hero`) plays on the season levels
-       through `PacmanHeroView`; the hell still uses `PlayerView` (berserk, BFG). Next:
-       the owner's review in the game, then a ghost-eaten beat and the hell looks. `render/actors/PlayerView.ts`;
-       keep the design decisions (organic, wedge mouth, no eyes, ribbon trail) unless
-       the owner changes them.
-    4. *In progress*: `MsPacmanHero` on the hero stage (rose candy, an eye with lashes that
-       blinks and squints, bow on a spring, lipstick, starlight when powered, spinning
-       death); not in the game yet. Pac-Man keeps no eyes.
-       **Ms. Pac-Man**, finish (`render/actors/MsPacmanView.ts`): today she reads a little
-       dark rather than cute, not bright enough, hard to read at tile size, and under
-       an energizer (overdrive) everything melts into a mash of effects. Brighter, cuter,
-       a clear silhouette at tile size, a calmer overdrive.
+       through `HeroView`. Left: the hell still uses `PlayerView` (berserk, BFG); a
+       ghost-eaten beat of his own.
+    4. **Ms. Pac-Man**. *In the game*: `MsPacmanHero` (rose candy, a cute glossy eye that
+       blinks and squints, a bow on a spring, lipstick, starlight under the overdrive, a
+       spinning death) through `HeroView`; the old `MsPacmanView` and its prototype are
+       gone. Left: the owner's review in the game.
     5. **Ghosts per season** (`render/actors/GhostView.ts`, one generic look today): art
        for spring, summer, autumn, winter, with normal, scared, flashing and eyes-only;
        focus on cuteness; the eyes show the heading.

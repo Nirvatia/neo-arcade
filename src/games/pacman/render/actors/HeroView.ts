@@ -1,15 +1,16 @@
-// Pac-Man on the season levels: the hero (render/actors/hero/PacmanHero) driven by the game.
-// It turns the player's position, heading and speed, the energizer and its last seconds, the
-// death and the respawn shield into the hero's state, and the game's cues into his acting
-// (a glow at the lips per dot, a real bite for fruit, the egg and ghosts). The hell keeps
-// PlayerView for now (berserk and the BFG charge are its own looks).
+// A hero driven by the game (render/actors/hero): Pac-Man on the season levels, Ms. Pac-Man
+// everywhere she plays. It turns the player's position, heading and speed, the energizer (her
+// overdrive) and its last seconds, the death and the respawn shield into the hero's state, and
+// the game's cues into acting (a glow at the lips per dot, a real bite for fruit, the egg and
+// ghosts). The hell keeps PlayerView for Pac-Man (berserk and the BFG charge are its own
+// looks); the arcade draws its own sprites.
 import type { PlayerService } from '../../logic/actors/PlayerService';
 import type { PacmanAudioCue } from '../../core/Events';
 import type { GridLayout } from '../maze/GridView';
 import type { PlayerDrawOptions } from './PlayerView';
-import { PacmanHero } from './hero/PacmanHero';
+import type { Hero } from './hero/Hero';
 
-/** Body radius in tiles (10 % smaller than the first cut, the owner's review). */
+/** Body radius in tiles (Pac-Man 10 % smaller than the first cut, the owner's review). */
 const RADIUS = 0.39;
 
 function facingAngle(facing: string | null, fallback: number): number {
@@ -20,8 +21,9 @@ function facingAngle(facing: string | null, fallback: number): number {
 	return fallback;
 }
 
-export class PacmanHeroView {
-	private readonly hero = new PacmanHero();
+export class HeroView {
+	constructor(private readonly hero: Hero) {}
+
 	private lastTime = -1;
 	private angle = 0;
 	private last: { x: number; y: number } | null = null;

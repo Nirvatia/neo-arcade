@@ -171,9 +171,12 @@ scared loop. The arcade synthesises its own (`audio/ArcadeSynth.ts`).
 
 ## 12. Art direction (keep)
 
-- Organic and alive, not metal: soft bodies, breathing, squash and stretch.
+- Organic and alive, not metal: soft bodies, breathing; the heroes stay round (their size
+  pulses on a spring, they are never stretched into an ellipse).
 - Effects stay inside the tile (no coronas spilling onto walls).
-- Pac-Man: wedge mouth, no eyes, no lips, ribbon trail (not a slug or a snake).
+- Pac-Man: wedge mouth (wide, about 92° open), no eyes, ink lips, streaming trail; fire.
+- Ms. Pac-Man: his pair, starlight: one cute glossy eye with lashes, a bow, red lipstick, a
+  softer mouth; pastel trail.
 - Eyes show where an actor is heading.
 - Food is calm (§6); energizers read differently from dots.
 - Boss: harsh and dangerous, changes visibly by phase, fits in one tile.
@@ -187,16 +190,16 @@ scared loop. The arcade synthesises its own (`audio/ArcadeSynth.ts`).
 
 ### Art status
 
-| Element                                                         | State                                                         |
-| --------------------------------------------------------------- | ------------------------------------------------------------- |
-| Seasons (world, food, weather, night), season turn, death decay | final; decay background to rework (10.9)                      |
-| Hell world, Blinky lord of hell, imps, weapons                  | final; phase-3 lighting and corrupted tiles to rework (10.8)  |
-| Arcade                                                          | final                                                         |
-| HUD and screens                                                 | final                                                         |
-| Fruit, heart, exit                                              | final (inside the tile, calm glow)                            |
-| Easter egg                                                      | final: a painted egg (pink, lilac, mint, blue)                |
-| Pac-Man                                                         | to redo (10.3)                                                |
-| Ms. Pac-Man                                                     | to finish: brighter, cuter, readable, calmer overdrive (10.4) |
-| Season ghosts                                                   | missing: one generic look today (10.5)                        |
-| Echo clone                                                      | to redo (10.6)                                                |
-| Teleporters, ring effects                                       | to improve (10.7)                                             |
+| Element                                                         | State                                                        |
+| --------------------------------------------------------------- | ------------------------------------------------------------ |
+| Seasons (world, food, weather, night), season turn, death decay | final; decay background to rework (10.9)                     |
+| Hell world, Blinky lord of hell, imps, weapons                  | final; phase-3 lighting and corrupted tiles to rework (10.8) |
+| Arcade                                                          | final                                                        |
+| HUD and screens                                                 | final                                                        |
+| Fruit, heart, exit                                              | final (inside the tile, calm glow)                           |
+| Easter egg                                                      | final: a painted egg (pink, lilac, mint, blue)               |
+| Pac-Man                                                         | the hero, in the game (the hell still uses the old look)     |
+| Ms. Pac-Man                                                     | the heroine, in the game                                     |
+| Season ghosts                                                   | missing: one generic look today (10.5)                       |
+| Echo clone                                                      | to redo (10.6)                                               |
+| Teleporters, ring effects                                       | to improve (10.7)                                            |

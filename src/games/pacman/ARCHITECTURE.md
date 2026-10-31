@@ -40,7 +40,8 @@ render/
   fx/              LevelFx (gameplay effects on the season levels)
   transitions/decay/       level decay on death: field (Dijkstra), timeline, WebGL2 pass
   transitions/seasonTurn/  level clear: corridor lights + tile cards to the next world
-  actors/ items/ (fruit: one file each; bonus life, exit, egg) maze/ (GridLayout) debug/
+  actors/ (hero/: the shared Hero, PacmanHero, MsPacmanHero; HeroView drives them; PlayerView
+          for the hell) items/ (fruit: one file each; bonus life, exit, egg) maze/ debug/
   common/          textures, GlPass, colour, maths, seeded random
 audio/       PacmanAudioPlayer (samples; routes the arcade to ArcadeSynth), ArcadeSynth
 ui/          PacmanUi (HUD + screens + fade over the canvas), hud/ (GameHud, ArcadeHud,
@@ -145,7 +146,7 @@ New art and effects start as a page built from the game's own sources:
 `node prototypes/pacman/build.mjs <name>` into `prototypes/pacman/<name>.html` (open as a
 file). The approved prototype already is the game code. Existing: `hell`, `arcade`,
 `hud`, `collectibles` (with each item's reach from its tile centre and a tile grid),
-`ms-pacman`, `level-clear`, `easter-egg` (the lair code's reward played by the real
+`level-clear`, `easter-egg` (the lair code's reward played by the real
 services), `hero` (the hero stage, 10.3/10.4: Pac-Man or Ms. Pac-Man alone,
 large, with a tile-sized inset; `render/actors/hero`: the shared `Hero`, `PacmanHero`,
 `MsPacmanHero`); `winter-decay.html` is an older standalone page.
