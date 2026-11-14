@@ -17,6 +17,7 @@ import {
 	toggleDebugVisible
 } from '../ui/debug/debugActions';
 import { TimeControl } from '../engine/TimeControl';
+import { FrameMeter } from './debug/FrameMeter';
 import { DebugController } from './debug/DebugController';
 import { debugLog } from '../logic/debug/debugLog';
 import { pushDevLog } from '../ui/debug/devLog';
@@ -46,6 +47,7 @@ export class GameMain implements GameModule {
 		let highScore = parseInt(getSavedScore('pacman'), 10) || 0;
 		let lastState = '';
 		const time = new TimeControl();
+		const frameMeter = import.meta.env.DEV ? new FrameMeter() : null;
 		const loop = new GameLoop(
 			(dt) => {
 				const held = input.heldDirection;
@@ -65,12 +67,20 @@ export class GameMain implements GameModule {
 				hudFrame.set(buildHudSnapshot(director, level, highScore));
 			},
 			1 / 60,
-			(real) => time.advance(real)
+			(real) => time.advance(real),
+			frameMeter
+				? (timing) =>
+						frameMeter.recordFrame({
+							...timing,
+							...render.canvasInfo
+						})
+				: null
 		);
 		const input = new InputController({
 			direction: (direction) => {
 				const facing = level.player?.facing ?? '—';
 				debugLog(events, 'input', `${direction} (facing ${facing}, ${director.stateName})`);
+				frameMeter?.observeInput();
 				if (director.stateName === 'playing' || director.stateName === 'ready') {
 					level.setDesiredDirection(direction);
 				}
@@ -87,6 +97,7 @@ export class GameMain implements GameModule {
 				// READY runs its own countdown: Enter does not skip it
 			},
 			fire: () => {
+				frameMeter?.observeInput();
 				if (director.stateName === 'playing') {
 					level.requestFire();
 				}
@@ -145,7 +156,7 @@ export class GameMain implements GameModule {
 			restart: () => director.restartLevel()
 		});
 		if (import.meta.env.DEV) {
-			const dev = new DebugController(director, level, time);
+			const dev = new DebugController(director, level, time, frameMeter);
 			render.setDebugFlags(dev.renderFlags);
 			setDebugController(dev);
 			events.on('debug:log', (line) => pushDevLog(line, director.flow.state));

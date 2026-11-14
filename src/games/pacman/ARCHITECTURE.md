@@ -9,7 +9,8 @@ core/        GameMain (wiring, input → director, auto-pause, HUD frame), Event
              Director (transition table, pause stack, screen fade, `flow` snapshot)
   flow/      GameState interface, StateClock (timeline of named phases)
   states/    menu, ready (intro | short), playing, paused, death, level-clear, game-over
-  debug/     DebugController (every dev command, dev builds only)
+  debug/     DebugController (every dev command, dev builds only), FrameMeter (frame
+             and input timings for the panel)
 engine/      EventBus, GameLoop, TimeControl
 config/      gridConfig (tile tokens, level constants), mazes/ (one file per maze, one
              string per row, checked by parseMaze; `grid_01`–`grid_04` the season mazes,
@@ -169,9 +170,11 @@ to read the difficulty ramp (`config/difficultyConfig.ts`, applied in `buildLeve
 ## Debug tools (dev build only)
 
 - Dev panels: `` ` `` or the DEV button; `F8` steps one frame. Panel groups (`ui/debug/`, the
-  look is `devUi.css`): a status card, then ВРЕМЯ, УРОВЕНЬ, ИГРОК, БОСС (the hell), СПАВН,
-  ОТРИСОВКА (grid, headings, hitboxes, decay / turn fronts); the log window shows live timers
-  and the `debug:log` stream. The text grows with the screen (12 to 16 px).
+  look is `devUi.css`): a status card with FPS, p95 update/render times, rAF backlog, input-to-
+  render latency and the canvas size, then ВРЕМЯ, УРОВЕНЬ, ИГРОК, БОСС (the hell), СПАВН,
+  ОТРИСОВКА (debug overlays and the season layer switches: atmosphere, night, weather, drift,
+  vignette); the log window shows live timers and the `debug:log` stream. The text grows with
+  the screen (12 to 16 px). `FrameMeter` keeps the last few seconds and exists in dev builds only.
 - `window.__pacman = { level, director, render }` for the console and Playwright.
   Directions are upper case: `level.setDesiredDirection('LEFT')`. `director.startGame()`
   fades for 0.8 s before READY; wait for it before `showPlaying()` / `debug*()` (both are
@@ -187,7 +190,8 @@ to read the difficulty ramp (`config/difficultyConfig.ts`, applied in `buildLeve
 
 - `core/director.test.ts` — game flow: fades, READY, pause everywhere, auto-pause,
   game-over lock, transition table.
-- `core/debug/debugTools.test.ts` — time control, boss debug hooks, silent dev log.
+- `core/debug/debugTools.test.ts` — time control, boss debug hooks, silent dev log, the frame
+  meter's summaries and input samples.
 - `logic/actors/playerControl.test.ts` — reversal, late turns, held keys.
 - `logic/doom/doomMechanics.test.ts` — pickups, BFG, minions, attack sets per phase,
   fairness (rift, eruption, seals), maze stays connected.

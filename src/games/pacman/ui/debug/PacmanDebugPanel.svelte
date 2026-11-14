@@ -9,6 +9,7 @@
 	import DevWindow from './DevWindow.svelte';
 	import DevGroup from './DevGroup.svelte';
 	import DevLogWindow from './DevLogWindow.svelte';
+	import type { FramePerfSummary } from '../../core/debug/FrameMeter';
 	import { FRUIT_ORDER } from '../../logic/bonuses/fruitCatalog';
 	import { attackWeightsForPhase, DOOM_ATTACK_KINDS } from '../../logic/doom/DoomAttackCore';
 	import { BOSS_HP, PHASE_THRESHOLDS } from '../../logic/doom/DoomBalance';
@@ -25,9 +26,17 @@
 		['hitboxes', 'Hitboxes'],
 		['fronts', 'Fronts']
 	];
+	const SCENE_LAYER_FLAGS: Array<[keyof DebugRenderFlags, string]> = [
+		['atmosphere', 'Atmos'],
+		['night', 'Night'],
+		['weather', 'Weather'],
+		['drift', 'Drift'],
+		['vignette', 'Vignette']
+	];
 
 	let dev = $state<DebugController | null>(null);
 	let snap = $state<DebugSnapshot | null>(null);
+	let perf = $state<FramePerfSummary | null>(null);
 	let visible = $state(false);
 	let levelInput = $state(1);
 	let mazeScale = $state(0.8);
@@ -35,33 +44,21 @@
 		grid: false,
 		ghostPaths: false,
 		hitboxes: false,
-		fronts: false
+		fronts: false,
+		atmosphere: true,
+		night: true,
+		weather: true,
+		drift: true,
+		vignette: true
 	});
 	let frame = 0;
-	/** Frames per second and the worst frame time of the last second, from rAF timestamps. */
-	let fps = $state(0);
-	let worst = $state(0);
-	let fpsFrames = 0;
-	let fpsStart = -1;
-	let fpsLast = -1;
-	let fpsWorst = 0;
 
 	const unsubDev = debugController.subscribe((value) => (dev = value));
 	const unsubVisible = debugVisible.subscribe((value) => (visible = value));
 
-	function tick(now: number): void {
+	function tick(): void {
 		snap = dev ? dev.snapshot() : null;
-		if (fpsStart < 0) fpsStart = now;
-		if (fpsLast >= 0) fpsWorst = Math.max(fpsWorst, now - fpsLast);
-		fpsLast = now;
-		fpsFrames += 1;
-		if (now - fpsStart >= 1000) {
-			fps = Math.round((fpsFrames * 1000) / (now - fpsStart));
-			worst = Math.round(fpsWorst);
-			fpsFrames = 0;
-			fpsStart = now;
-			fpsWorst = 0;
-		}
+		perf = dev ? dev.framePerf() : null;
 		frame = requestAnimationFrame(tick);
 	}
 
@@ -130,13 +127,22 @@
 		{#if snap}
 			<div class="dev-status">
 				<div class="l1">
-					<span class="fps">{fps} <small>FPS · худший {worst} ms</small></span>
+					<span class="fps"
+						>{perf ? Math.round(perf.fps) : '—'}
+						<small>FPS · худший {perf ? perf.frameWorst.toFixed(0) : '—'} ms</small></span
+					>
 					<span class="st">{snap.state} · {snap.phase} · {fmt(snap.phaseRemaining)} s</span>
 				</div>
 				<div class="l2">
 					<b>LV {snap.level}</b>{snap.hell ? ' · hell' : ''}{snap.secret ? ' · secret' : ''} · {snap.profile}
 					· жизни <b>{snap.lives}</b> · счёт <b>{snap.score}</b>
 				</div>
+				{#if perf}
+					<div class="l3">
+						up {fmt(perf.updateP95)} ms · draw {fmt(perf.renderP95)} ms · rAF +{fmt(perf.rafLagP95)} ms
+						· ввод {fmt(perf.inputP95)} ms ({perf.inputCount}) · {perf.width}×{perf.height} @{perf.pixelRatio}
+					</div>
+				{/if}
 				<div class="dev-badges">
 					{#if snap.frozen}
 						<span class="dev-badge warn">FROZEN</span>
@@ -456,9 +462,24 @@
 			{/if}
 		</DevGroup>
 
-		<DevGroup id="render" title="ОТРИСОВКА" summary="сетка, пути, хитбоксы">
+		<DevGroup id="render" title="ОТРИСОВКА" summary="сетка, слои, пути">
+			<div class="dev-switch-label">Отладка</div>
 			<div class="dev-switches">
 				{#each RENDER_FLAGS as [flag, label] (flag)}
+					<button
+						type="button"
+						class="dev-switch"
+						role="switch"
+						aria-checked={flags[flag]}
+						tabindex={-1}
+						onclick={run(() => toggleFlag(flag))}
+						><span class="track"></span><span>{label}</span></button
+					>
+				{/each}
+			</div>
+			<div class="dev-switch-label">Слои сцены</div>
+			<div class="dev-switches">
+				{#each SCENE_LAYER_FLAGS as [flag, label] (flag)}
 					<button
 						type="button"
 						class="dev-switch"

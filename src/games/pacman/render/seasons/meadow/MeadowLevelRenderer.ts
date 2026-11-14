@@ -10,6 +10,7 @@ import type { PacmanFx } from '../../../core/Events';
 import { LevelFx } from '../../fx/LevelFx';
 import type { GridService } from '../../../logic/maze/GridService';
 import type { GhostModel } from '../../../logic/actors/GhostModel';
+import type { DebugRenderFlags } from '../../debug/DebugOverlayView';
 
 /** Share of eaten dots at which the season's weather rises, then the night falls. */
 const WEATHER_AT = 0.5;
@@ -45,10 +46,19 @@ export class MeadowLevelRenderer implements LevelRenderer, WorldPreview {
 	/** How far the ghosts' traffic holds the lair gate open, 0..1 (eased). */
 	private ghostGate = 0;
 	private gateTiles: { grid: GridService; tiles: Array<{ x: number; y: number }> } | null = null;
+	private debugFlags: DebugRenderFlags | null = null;
 
 	constructor(shared: SharedLayers, themeFor: (season: string) => MeadowTheme | null) {
 		this.shared = shared;
 		this.themeFor = themeFor;
+	}
+
+	/** Dev build: share the panel's layer switches with every current and future world. */
+	setDebugFlags(flags: DebugRenderFlags): void {
+		this.debugFlags = flags;
+		for (const entry of this.worlds) {
+			entry.world.setDebugFlags(flags);
+		}
 	}
 
 	/** A gameplay moment to show (`fx:event`), in the current season's style. */
@@ -212,6 +222,9 @@ export class MeadowLevelRenderer implements LevelRenderer, WorldPreview {
 			return hit.world;
 		}
 		const world = new MeadowWorld(season.grid, theme);
+		if (this.debugFlags) {
+			world.setDebugFlags(this.debugFlags);
+		}
 		this.worlds.unshift({ grid: season.grid, theme, world });
 		this.worlds.length = Math.min(this.worlds.length, 2);
 		return world;

@@ -12,6 +12,11 @@ export interface DebugRenderFlags {
 	ghostPaths: boolean;
 	hitboxes: boolean;
 	fronts: boolean;
+	atmosphere: boolean;
+	night: boolean;
+	weather: boolean;
+	drift: boolean;
+	vignette: boolean;
 }
 
 /** A transition's distance field and where its front is now (tiles). */

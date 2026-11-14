@@ -1,8 +1,16 @@
+export interface FrameTiming {
+	readonly frameMs: number;
+	readonly updateMs: number;
+	readonly renderMs: number;
+	readonly rafLagMs: number;
+}
+
 export class GameLoop {
 	private readonly step: number;
 	private readonly update: (dt: number) => void;
 	private readonly render: (dt: number) => void;
 	private readonly clock: ((real: number) => number) | null;
+	private readonly onFrame: ((timing: FrameTiming) => void) | null;
 	private running = false;
 	private lastTime = 0;
 	private frameHandle = 0;
@@ -15,7 +23,8 @@ export class GameLoop {
 		update: (dt: number) => void,
 		render: (dt: number) => void,
 		step = 1 / 60,
-		clock: ((real: number) => number) | null = null
+		clock: ((real: number) => number) | null = null,
+		onFrame: ((timing: FrameTiming) => void) | null = null
 	) {
 		if (typeof update !== 'function' || typeof render !== 'function') {
 			console.error('GameLoop.constructor', 'update or render is not a function');
@@ -29,6 +38,7 @@ export class GameLoop {
 		this.render = render;
 		this.step = step;
 		this.clock = clock;
+		this.onFrame = onFrame;
 	}
 
 	start(): void {
@@ -62,16 +72,23 @@ export class GameLoop {
 		try {
 			// Variable step split into chunks of at most `step`: movement advances by the real
 			// frame time, so high refresh displays never get frames without an update (judder).
-			const real = Math.min(0.1, Math.max(0, (now - this.lastTime) / 1000));
+			const frameMs = now - this.lastTime;
+			const rafLagMs = Math.max(0, performance.now() - now);
+			const real = Math.min(0.1, Math.max(0, frameMs / 1000));
 			this.lastTime = now;
 			const frame = this.clock ? this.clock(real) : real;
+			const updateStart = performance.now();
 			let remaining = frame;
 			while (remaining > 1e-6) {
 				const dt = Math.min(this.step, remaining);
 				this.update(dt);
 				remaining -= dt;
 			}
+			const updateMs = performance.now() - updateStart;
+			const renderStart = performance.now();
 			this.render(frame);
+			const renderMs = performance.now() - renderStart;
+			this.onFrame?.({ frameMs, updateMs, renderMs, rafLagMs });
 		} catch (error: unknown) {
 			console.error('GameLoop.tick', error);
 			this.stop();

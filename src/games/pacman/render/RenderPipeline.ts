@@ -293,10 +293,16 @@ export class RenderPipeline {
 		}
 	}
 
+	/** The backing canvas size in physical pixels, for the dev frame meter. */
+	get canvasInfo(): { width: number; height: number; pixelRatio: number } {
+		return { width: this.canvas.width, height: this.canvas.height, pixelRatio: this.pixelRatio };
+	}
+
 	/** Dev build: the overlay flags of the dev panel (read every frame, never copied). */
 	setDebugFlags(flags: DebugRenderFlags): void {
 		this.debugFlags = flags;
 		this.debugView = new DebugOverlayView();
+		this.meadowRenderer.setDebugFlags(flags);
 	}
 
 	destroy(): void {

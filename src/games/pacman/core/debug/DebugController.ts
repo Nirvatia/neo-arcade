@@ -1,6 +1,7 @@
 import type { Director } from '../Director';
 import type { LevelLoader } from '../../logic/level/LevelLoader';
 import type { TimeControl } from '../../engine/TimeControl';
+import type { FrameMeter, FramePerfSummary } from './FrameMeter';
 import type { FruitKind } from '../../logic/bonuses/fruitCatalog';
 import type { DoomPickupKind } from '../../logic/doom/DoomPickupModel';
 import type { DoomAttackKind } from '../../logic/doom/DoomAttackCore';
@@ -52,14 +53,24 @@ export class DebugController {
 		grid: false,
 		ghostPaths: false,
 		hitboxes: false,
-		fronts: false
+		fronts: false,
+		atmosphere: true,
+		night: true,
+		weather: true,
+		drift: true,
+		vignette: true
 	};
 
 	constructor(
 		private readonly director: Director,
 		private readonly loader: LevelLoader,
-		readonly time: TimeControl
+		readonly time: TimeControl,
+		private readonly frameMeter: FrameMeter | null = null
 	) {}
+
+	framePerf(): FramePerfSummary | null {
+		return this.frameMeter?.snapshot() ?? null;
+	}
 
 	snapshot(): DebugSnapshot {
 		const flow = this.director.flow;

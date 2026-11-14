@@ -307,6 +307,19 @@
 	left: calc(100% - 1.35em + 6px);
 	background: var(--dev-on);
 }
+.dev-switch-label {
+	color: var(--dev-dim);
+	font-size: 0.85em;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+.dev-switch-label + .dev-switches {
+	margin-top: 0.35em;
+}
+.dev-switches + .dev-switch-label {
+	margin-top: 0.75em;
+}
 .dev-switches {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
@@ -352,6 +365,12 @@
 .dev-status .l2 b {
 	color: var(--dev-ink);
 	font-weight: 600;
+}
+.dev-status .l3 {
+	color: var(--dev-dim);
+	font-size: 0.82em;
+	line-height: 1.45;
+	font-variant-numeric: tabular-nums;
 }
 .dev-badges {
 	display: flex;

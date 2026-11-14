@@ -13,6 +13,7 @@ import type { MeadowTheme, WeatherParticle } from './MeadowTheme';
 import { glowTexture, rayTexture } from './meadowSprites';
 import { drawRipplePad } from './ripplePad';
 import { MoodBuffer } from '../../common/moodBuffer';
+import type { DebugRenderFlags } from '../../debug/DebugOverlayView';
 
 const T = MEADOW_TILE;
 const REBAKE_DELAY_MS = 160;
@@ -106,6 +107,7 @@ export class MeadowWorld {
 	private bgRS = 1;
 	private rebakeAt = 0;
 	private readonly mood = new MoodBuffer();
+	private debugFlags: DebugRenderFlags | null = null;
 
 	constructor(S: GridMatrix, theme: MeadowTheme) {
 		this.S = S;
@@ -205,6 +207,11 @@ export class MeadowWorld {
 	setMood(storm: number, night: number): void {
 		this.stormT = storm;
 		this.nightT = night;
+	}
+
+	/** Dev build: the layer switches of the render group (read every frame, never copied). */
+	setDebugFlags(flags: DebugRenderFlags): void {
+		this.debugFlags = flags;
 	}
 
 	resize(vw: number, vh: number, dpr: number): void {
@@ -446,12 +453,17 @@ export class MeadowWorld {
 		const vh = this.vh;
 		const t = this.t;
 		ctx.save();
+		const flags = this.debugFlags;
 		const spin = live.drift.spin;
-		for (const p of this.drift) {
-			sprite(ctx, p.im, p.px * vw, p.py * vh, p.w, p.h, p.a, spin ? t + p.ph : 0);
+		if (!flags || flags.drift) {
+			for (const p of this.drift) {
+				sprite(ctx, p.im, p.px * vw, p.py * vh, p.w, p.h, p.a, spin ? t + p.ph : 0);
+			}
 		}
-		this.mood.draw(ctx, vw, vh, this.paintAtmosphere);
-		if (this.nightV > 0.002) {
+		if (!flags || flags.atmosphere) {
+			this.mood.draw(ctx, vw, vh, this.paintAtmosphere);
+		}
+		if ((!flags || flags.night) && this.nightV > 0.002) {
 			ctx.globalAlpha = live.nightAlpha * this.nightV;
 			ctx.globalCompositeOperation = 'multiply';
 			ctx.fillStyle = live.nightTint;
@@ -514,14 +526,17 @@ export class MeadowWorld {
 	drawOverlay(ctx: CanvasRenderingContext2D): void {
 		const live = this.theme.live;
 		ctx.save();
-		if (this.stormV > 0.02) {
+		const flags = this.debugFlags;
+		if ((!flags || flags.weather) && this.stormV > 0.02) {
 			for (const p of this.weather) {
 				sprite(ctx, p.im, p.px, p.py, p.w, p.h, live.weather.alpha(p, this.stormV), p.rot, p.add);
 			}
 		}
-		ctx.globalAlpha = 1;
-		ctx.globalCompositeOperation = 'source-over';
-		ctx.drawImage(live.vignette(), 0, 0, this.vw, this.vh);
+		if (!flags || flags.vignette) {
+			ctx.globalAlpha = 1;
+			ctx.globalCompositeOperation = 'source-over';
+			ctx.drawImage(live.vignette(), 0, 0, this.vw, this.vh);
+		}
 		ctx.restore();
 	}
 
