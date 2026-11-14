@@ -192,7 +192,7 @@ export class GhostService {
 		this.msOverdriveValue = value;
 		for (const ghost of this.ghosts) {
 			if (value) {
-				if (ghost.state === 'active' || ghost.state === 'exiting' || ghost.state === 'frightened') {
+				if (ghost.state === 'active' || ghost.state === 'frightened') {
 					ghost.setState('frightened');
 				}
 			} else {

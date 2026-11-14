@@ -273,6 +273,25 @@ describe('the hunter', () => {
 		expect(s.ghost('PINKY').state).toBe('eyes');
 	});
 
+	it('lets an eaten ghost leave the lair when a new overdrive starts during its exit', () => {
+		const s = setup();
+		s.eatAll();
+		const home = s.dotTiles[40]!;
+		s.place('BLINKY', home, 'active');
+		s.place('PINKY', home, 'frightened');
+		s.hypnotise('BLINKY');
+		s.hypnosis.update(DT, s.ghosts);
+		expect(s.ghost('PINKY').state).toBe('eyes');
+		for (let i = 0; i < 20 * 60 && s.ghost('PINKY').state !== 'exiting'; i += 1) {
+			s.run(DT);
+		}
+		expect(s.ghost('PINKY').state).toBe('exiting');
+		s.hypnosis.startOverdrive(s.ghosts);
+		s.run(2);
+		const prey = s.ghost('PINKY');
+		expect(s.session.grid.isGhostWalkable(prey.tile.x, prey.tile.y, false)).toBe(true);
+	});
+
 	it('leaves ghosts in the lair, the eyes and itself alone', () => {
 		const s = setup();
 		s.eatAll();
