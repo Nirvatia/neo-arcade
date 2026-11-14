@@ -48,9 +48,9 @@ each new boss. The depth and post-processing pass comes last of all (see Later).
 2. **Season scenes, in code** (Opus for the look, one season per chat, prototype first). Today
    a season is a palette and a few props on one meadow. The owner wants a whole scene per
    season, in the maze and in the background, not a recolour:
-   1. **Autumn: Halloween.** Pumpkins, cobwebs, bats, a gravestone or a lantern here and
+   1. **Winter: New Year (next).** A fir tree, baubles, garlands, snow on the walls, lights.
+   2. **Autumn: Halloween.** Pumpkins, cobwebs, bats, a gravestone or a lantern here and
       there; the walls and the ground dressed for it too, not only the margins.
-   2. **Winter: New Year.** A fir tree, baubles, garlands, snow on the walls, lights.
    3. **Spring and summer** get the same treatment afterwards (their themes to be decided with
       the owner).
       Rules that still hold: the walls and the corridors keep their full width, nothing hangs in
@@ -138,8 +138,11 @@ WebGL2 over Canvas2D allows (no tessellation shaders in WebGL2):
   candidates, by measured cost: the hell's maze-sized glow layers (`emis` and `glow`, drawn
   additively twice, four times at night) and the hell's ground. The dev frame meter now reads
   FPS, update/render p95, the rAF backlog and input-to-render latency. Manual dev quality tiers
-  now cap the canvas at DPR 1 / 1.5 / 2; the next step is the season layer budget (combine the
-  night and atmosphere, and give low quality the minimum of full-screen passes).
+  cap the canvas at DPR 1 / 1.5 / 2 and the season atmosphere at 4 / 3 / 2 full-screen passes
+  (the night tint is part of the mood's multiply map; only High keeps the vignette). Measured
+  again in Chromium without a GPU at 1600x900 DPR 2, a winter night: High 14 FPS, Medium 27,
+  Low 60. Still to check on the owner's weak PC; if it still lags, the next candidates are the
+  hell's maze-sized glow layers and ground.
 - Headless Chromium without a GPU runs the hell night at ~20 FPS and the flesh hell's first
   frame blocks for about a second while `bakeFlesh` paints the world (once per level). Nobody
   has timed either on real hardware; if the bake shows, spread it over frames.

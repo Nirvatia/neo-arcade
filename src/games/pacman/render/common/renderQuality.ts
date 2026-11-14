@@ -7,6 +7,13 @@ export const RENDER_QUALITY_DPR_CAP: Readonly<Record<RenderQuality, number>> = {
 	high: 2
 };
 
+/** How often the atmosphere repaints its small buffers; High follows the render every frame. */
+export const MOOD_UPDATE_INTERVAL_MS: Readonly<Record<RenderQuality, number>> = {
+	low: 66,
+	medium: 33,
+	high: 0
+};
+
 export function isRenderQuality(value: unknown): value is RenderQuality {
 	return value === 'low' || value === 'medium' || value === 'high';
 }

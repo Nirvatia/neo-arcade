@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isRenderQuality, pixelRatioFor, RENDER_QUALITY_DPR_CAP } from './renderQuality';
+import {
+	isRenderQuality,
+	MOOD_UPDATE_INTERVAL_MS,
+	pixelRatioFor,
+	RENDER_QUALITY_DPR_CAP
+} from './renderQuality';
 
 describe('render quality', () => {
 	it('caps the display ratio by the quality level', () => {
@@ -26,5 +31,13 @@ describe('render quality', () => {
 		expect(isRenderQuality('high')).toBe(true);
 		expect(isRenderQuality('ultra')).toBe(false);
 		expect(RENDER_QUALITY_DPR_CAP.high).toBe(2);
+	});
+});
+
+describe('atmosphere update intervals', () => {
+	it('repaints every frame only at High quality', () => {
+		expect(MOOD_UPDATE_INTERVAL_MS.high).toBe(0);
+		expect(MOOD_UPDATE_INTERVAL_MS.medium).toBeGreaterThan(0);
+		expect(MOOD_UPDATE_INTERVAL_MS.low).toBeGreaterThan(MOOD_UPDATE_INTERVAL_MS.medium);
 	});
 });

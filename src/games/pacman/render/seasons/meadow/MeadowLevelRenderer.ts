@@ -11,6 +11,7 @@ import { LevelFx } from '../../fx/LevelFx';
 import type { GridService } from '../../../logic/maze/GridService';
 import type { GhostModel } from '../../../logic/actors/GhostModel';
 import type { DebugRenderFlags } from '../../debug/DebugOverlayView';
+import type { RenderQuality } from '../../common/renderQuality';
 
 /** Share of eaten dots at which the season's weather rises, then the night falls. */
 const WEATHER_AT = 0.5;
@@ -47,6 +48,7 @@ export class MeadowLevelRenderer implements LevelRenderer, WorldPreview {
 	private ghostGate = 0;
 	private gateTiles: { grid: GridService; tiles: Array<{ x: number; y: number }> } | null = null;
 	private debugFlags: DebugRenderFlags | null = null;
+	private quality: RenderQuality = 'high';
 
 	constructor(shared: SharedLayers, themeFor: (season: string) => MeadowTheme | null) {
 		this.shared = shared;
@@ -58,6 +60,14 @@ export class MeadowLevelRenderer implements LevelRenderer, WorldPreview {
 		this.debugFlags = flags;
 		for (const entry of this.worlds) {
 			entry.world.setDebugFlags(flags);
+		}
+	}
+
+	/** The render quality tier, shared with the current world and every world made next. */
+	setQuality(quality: RenderQuality): void {
+		this.quality = quality;
+		for (const entry of this.worlds) {
+			entry.world.setQuality(quality);
 		}
 	}
 
@@ -222,6 +232,7 @@ export class MeadowLevelRenderer implements LevelRenderer, WorldPreview {
 			return hit.world;
 		}
 		const world = new MeadowWorld(season.grid, theme);
+		world.setQuality(this.quality);
 		if (this.debugFlags) {
 			world.setDebugFlags(this.debugFlags);
 		}

@@ -13,6 +13,7 @@ import type { MeadowTheme, WeatherParticle } from './MeadowTheme';
 import { glowTexture, rayTexture } from './meadowSprites';
 import { drawRipplePad } from './ripplePad';
 import { MoodBuffer } from '../../common/moodBuffer';
+import type { RenderQuality } from '../../common/renderQuality';
 import type { DebugRenderFlags } from '../../debug/DebugOverlayView';
 
 const T = MEADOW_TILE;
@@ -107,6 +108,7 @@ export class MeadowWorld {
 	private bgRS = 1;
 	private rebakeAt = 0;
 	private readonly mood = new MoodBuffer();
+	private quality: RenderQuality = 'high';
 	private debugFlags: DebugRenderFlags | null = null;
 
 	constructor(S: GridMatrix, theme: MeadowTheme) {
@@ -207,6 +209,12 @@ export class MeadowWorld {
 	setMood(storm: number, night: number): void {
 		this.stormT = storm;
 		this.nightT = night;
+	}
+
+	/** The render quality tier: it sets the mood's repaint rate and one-layer Low composite. */
+	setQuality(quality: RenderQuality): void {
+		this.quality = quality;
+		this.mood.setQuality(quality);
 	}
 
 	/** Dev build: the layer switches of the render group (read every frame, never copied). */
@@ -444,8 +452,8 @@ export class MeadowWorld {
 	}
 
 	/**
-	 * Atmosphere under the actors: the drift, then mist, rays, light, wash and weather haze (in
-	 * two passes, see `MoodBuffer`), then the night and its lights.
+	 * Atmosphere under the actors: the drift, then mist, rays, light, wash, storm haze and the
+	 * night tint through `MoodBuffer`; its local lights stay here under the actors.
 	 */
 	drawMood(ctx: CanvasRenderingContext2D): void {
 		const live = this.theme.live;
@@ -454,6 +462,7 @@ export class MeadowWorld {
 		const t = this.t;
 		ctx.save();
 		const flags = this.debugFlags;
+		const showNight = (!flags || flags.night) && this.nightV > 0.002;
 		const spin = live.drift.spin;
 		if (!flags || flags.drift) {
 			for (const p of this.drift) {
@@ -461,13 +470,17 @@ export class MeadowWorld {
 			}
 		}
 		if (!flags || flags.atmosphere) {
-			this.mood.draw(ctx, vw, vh, this.paintAtmosphere);
-		}
-		if ((!flags || flags.night) && this.nightV > 0.002) {
+			this.mood.draw(ctx, vw, vh, this.paintAtmosphere, showNight ? this.paintNightShade : null);
+		} else if (showNight) {
+			// the diagnostic switch turned the atmosphere off: keep Night independently readable
 			ctx.globalAlpha = live.nightAlpha * this.nightV;
 			ctx.globalCompositeOperation = 'multiply';
 			ctx.fillStyle = live.nightTint;
 			ctx.fillRect(0, 0, vw, vh);
+		}
+		if (showNight) {
+			ctx.globalAlpha = 1;
+			ctx.globalCompositeOperation = 'source-over';
 			ctx.save();
 			ctx.translate(this.wx, this.wy);
 			ctx.scale(this.sc, this.sc);
@@ -479,6 +492,20 @@ export class MeadowWorld {
 		}
 		ctx.restore();
 	}
+
+	/** The night tint multiplied into the atmosphere's shade map (no screen pass of its own). */
+	private readonly paintNightShade = (ctx: CanvasRenderingContext2D): void => {
+		const live = this.theme.live;
+		if (this.nightV <= 0.002) {
+			return;
+		}
+		ctx.save();
+		ctx.globalAlpha = live.nightAlpha * this.nightV;
+		ctx.globalCompositeOperation = 'multiply';
+		ctx.fillStyle = live.nightTint;
+		ctx.fillRect(0, 0, this.vw, this.vh);
+		ctx.restore();
+	};
 
 	/** The atmosphere's layers in screen space: covering ones, or (`additive`) all of them. */
 	private readonly paintAtmosphere = (ctx: CanvasRenderingContext2D, additive: boolean): void => {
@@ -532,7 +559,7 @@ export class MeadowWorld {
 				sprite(ctx, p.im, p.px, p.py, p.w, p.h, live.weather.alpha(p, this.stormV), p.rot, p.add);
 			}
 		}
-		if (!flags || flags.vignette) {
+		if ((!flags || flags.vignette) && this.quality === 'high') {
 			ctx.globalAlpha = 1;
 			ctx.globalCompositeOperation = 'source-over';
 			ctx.drawImage(live.vignette(), 0, 0, this.vw, this.vh);

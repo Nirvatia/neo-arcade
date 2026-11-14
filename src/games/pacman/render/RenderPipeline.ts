@@ -307,6 +307,7 @@ export class RenderPipeline {
 			return;
 		}
 		this.quality = quality;
+		this.meadowRenderer.setQuality(quality);
 	}
 
 	get renderQuality(): RenderQuality {
