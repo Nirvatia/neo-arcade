@@ -13,6 +13,7 @@ import { ArcadeShift } from './transitions/arcadeShift/ArcadeShift';
 import { SeasonTurn } from './transitions/seasonTurn/SeasonTurn';
 import type { SeasonTurnRequest } from './transitions/seasonTurn/SeasonTurn';
 import { glowTexture } from './common/textures';
+import { isRenderQuality, pixelRatioFor, type RenderQuality } from './common/renderQuality';
 import { FLOW } from '../config/flowConfig';
 import type { GridMatrix } from '../config/gridConfig';
 import type { NextLevel } from '../logic/level/LevelLoader';
@@ -65,6 +66,7 @@ export class RenderPipeline {
 	private width = 0;
 	private height = 0;
 	private pixelRatio = 1;
+	private quality: RenderQuality = 'high';
 	private lastRenderTime = 0;
 	private timeValue = 0;
 	/** The next level's respawn tile for the death transition into it (a lost boss fight). */
@@ -298,6 +300,19 @@ export class RenderPipeline {
 		return { width: this.canvas.width, height: this.canvas.height, pixelRatio: this.pixelRatio };
 	}
 
+	/** The manual quality level; the next frame applies its DPR cap. */
+	setQuality(quality: RenderQuality): void {
+		if (!isRenderQuality(quality)) {
+			console.error('RenderPipeline.setQuality', 'invalid quality', quality);
+			return;
+		}
+		this.quality = quality;
+	}
+
+	get renderQuality(): RenderQuality {
+		return this.quality;
+	}
+
 	/** Dev build: the overlay flags of the dev panel (read every frame, never copied). */
 	setDebugFlags(flags: DebugRenderFlags): void {
 		this.debugFlags = flags;
@@ -387,10 +402,7 @@ export class RenderPipeline {
 		const width = Math.floor(rectWidth);
 		const height = Math.floor(rectHeight);
 		const deviceRatio = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
-		const pixelRatio = Math.min(
-			2,
-			Number.isFinite(deviceRatio) && deviceRatio > 0 ? deviceRatio : 1
-		);
+		const pixelRatio = pixelRatioFor(deviceRatio, this.quality);
 		if (width === this.width && height === this.height && pixelRatio === this.pixelRatio) {
 			return true;
 		}

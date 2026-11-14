@@ -156,7 +156,7 @@ export class GameMain implements GameModule {
 			restart: () => director.restartLevel()
 		});
 		if (import.meta.env.DEV) {
-			const dev = new DebugController(director, level, time, frameMeter);
+			const dev = new DebugController(director, level, time, frameMeter, render);
 			render.setDebugFlags(dev.renderFlags);
 			setDebugController(dev);
 			events.on('debug:log', (line) => pushDevLog(line, director.flow.state));

@@ -137,8 +137,9 @@ WebGL2 over Canvas2D allows (no tessellation shaders in WebGL2):
   hell 15 → 17 FPS. Still to check on the owner's weak PC. If it still lags, the next
   candidates, by measured cost: the hell's maze-sized glow layers (`emis` and `glow`, drawn
   additively twice, four times at night) and the hell's ground. The dev frame meter now reads
-  FPS, update/render p95, the rAF backlog and input-to-render latency; the next step is quality
-  tiers (the render's DPR cap and a bounded number of full-screen passes).
+  FPS, update/render p95, the rAF backlog and input-to-render latency. Manual dev quality tiers
+  now cap the canvas at DPR 1 / 1.5 / 2; the next step is the season layer budget (combine the
+  night and atmosphere, and give low quality the minimum of full-screen passes).
 - Headless Chromium without a GPU runs the hell night at ~20 FPS and the flesh hell's first
   frame blocks for about a second while `bakeFlesh` paints the world (once per level). Nobody
   has timed either on real hardware; if the bake shows, spread it over frames.

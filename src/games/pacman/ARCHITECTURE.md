@@ -57,9 +57,10 @@ render/
   transitions/arcadeShift/ the way into the arcade (mosaic, CRT on) and out of it (CRT off, a dot unfolds the world)
   actors/ (hero/: the shared Hero, PacmanHero, MsPacmanHero, heroSeasons (the season's colours), heroFx (season particles, ki flames); heroCharge (the hell's BFG charge light, painted over the body), playerDrawOptions; HeroView drives them, in every world, with the game's feel `GAME_FEEL`: the gaze, the corner cut, the smear, the bump, the shadow, the kick-up, the sphere, and the food's pull through `SharedLayers.attract`) items/ (fruit: one file each; bonus life, exit, egg) maze/ debug/
   common/          textures, GlPass (every WebGL2 pass), moodBuffer (a world's atmosphere in two
-                   screen passes), boardScale (where the maze goes on the
-                   screen: 80 % of the height, below the HUD band), colour, maths, seeded random,
-                   worldDecor (the decor layout and stream shared by every world)
+                   screen passes), renderQuality (the dev quality tiers' DPR caps), boardScale
+                   (where the maze goes on the screen: 80 % of the height, below the HUD band),
+                   colour, maths, seeded random, worldDecor (the decor layout and stream shared
+                   by every world)
 audio/       PacmanAudioPlayer (samples; routes the arcade to ArcadeSynth), ArcadeSynth,
              audioSettings (mute and master volume, remembered in localStorage)
 ui/          PacmanUi (HUD + screens + fade over the canvas), hud/ (season/: the HUD of the
@@ -172,9 +173,11 @@ to read the difficulty ramp (`config/difficultyConfig.ts`, applied in `buildLeve
 - Dev panels: `` ` `` or the DEV button; `F8` steps one frame. Panel groups (`ui/debug/`, the
   look is `devUi.css`): a status card with FPS, p95 update/render times, rAF backlog, input-to-
   render latency and the canvas size, then ВРЕМЯ, УРОВЕНЬ, ИГРОК, БОСС (the hell), СПАВН,
-  ОТРИСОВКА (debug overlays and the season layer switches: atmosphere, night, weather, drift,
-  vignette); the log window shows live timers and the `debug:log` stream. The text grows with
-  the screen (12 to 16 px). `FrameMeter` keeps the last few seconds and exists in dev builds only.
+  ОТРИСОВКА (manual quality low/medium/high, debug overlays and the season layer switches:
+  atmosphere, night, weather, drift, vignette). The quality tiers cap the canvas's DPR at
+  1 / 1.5 / 2; the layer budget comes with the scene pass. The log window shows live timers and
+  the `debug:log` stream. The text grows with the screen (12 to 16 px). `FrameMeter` keeps the
+  last few seconds and exists in dev builds only.
 - `window.__pacman = { level, director, render }` for the console and Playwright.
   Directions are upper case: `level.setDesiredDirection('LEFT')`. `director.startGame()`
   fades for 0.8 s before READY; wait for it before `showPlaying()` / `debug*()` (both are
@@ -192,6 +195,7 @@ to read the difficulty ramp (`config/difficultyConfig.ts`, applied in `buildLeve
   game-over lock, transition table.
 - `core/debug/debugTools.test.ts` — time control, boss debug hooks, silent dev log, the frame
   meter's summaries and input samples.
+- `render/common/renderQuality.test.ts` — the quality names and the DPR cap of each tier.
 - `logic/actors/playerControl.test.ts` — reversal, late turns, held keys.
 - `logic/doom/doomMechanics.test.ts` — pickups, BFG, minions, attack sets per phase,
   fairness (rift, eruption, seals), maze stays connected.

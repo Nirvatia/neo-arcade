@@ -6,6 +6,8 @@ import type { FruitKind } from '../../logic/bonuses/fruitCatalog';
 import type { DoomPickupKind } from '../../logic/doom/DoomPickupModel';
 import type { DoomAttackKind } from '../../logic/doom/DoomAttackCore';
 import type { DebugRenderFlags } from '../../render/debug/DebugOverlayView';
+import type { RenderPipeline } from '../../render/RenderPipeline';
+import type { RenderQuality } from '../../render/common/renderQuality';
 
 export type { DebugRenderFlags };
 
@@ -30,6 +32,7 @@ export interface DebugSnapshot {
 	readonly hell: boolean;
 	readonly secret: boolean;
 	readonly profile: string;
+	readonly quality: RenderQuality;
 	readonly lives: number;
 	readonly score: number;
 	readonly godMode: boolean;
@@ -65,11 +68,20 @@ export class DebugController {
 		private readonly director: Director,
 		private readonly loader: LevelLoader,
 		readonly time: TimeControl,
-		private readonly frameMeter: FrameMeter | null = null
+		private readonly frameMeter: FrameMeter | null = null,
+		private readonly render: RenderPipeline | null = null
 	) {}
 
 	framePerf(): FramePerfSummary | null {
 		return this.frameMeter?.snapshot() ?? null;
+	}
+
+	setQuality(quality: RenderQuality): void {
+		this.render?.setQuality(quality);
+	}
+
+	get quality(): RenderQuality {
+		return this.render?.renderQuality ?? 'high';
 	}
 
 	snapshot(): DebugSnapshot {
@@ -87,6 +99,7 @@ export class DebugController {
 			hell: this.loader.hellMode,
 			secret: this.loader.secretMode,
 			profile: this.loader.profile,
+			quality: this.quality,
 			lives: this.loader.combat?.lives ?? 0,
 			score: this.loader.score,
 			godMode: this.loader.godMode,

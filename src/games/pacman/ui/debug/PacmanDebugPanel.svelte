@@ -10,6 +10,7 @@
 	import DevGroup from './DevGroup.svelte';
 	import DevLogWindow from './DevLogWindow.svelte';
 	import type { FramePerfSummary } from '../../core/debug/FrameMeter';
+	import type { RenderQuality } from '../../render/common/renderQuality';
 	import { FRUIT_ORDER } from '../../logic/bonuses/fruitCatalog';
 	import { attackWeightsForPhase, DOOM_ATTACK_KINDS } from '../../logic/doom/DoomAttackCore';
 	import { BOSS_HP, PHASE_THRESHOLDS } from '../../logic/doom/DoomBalance';
@@ -33,6 +34,7 @@
 		['drift', 'Drift'],
 		['vignette', 'Vignette']
 	];
+	const QUALITIES: RenderQuality[] = ['low', 'medium', 'high'];
 
 	let dev = $state<DebugController | null>(null);
 	let snap = $state<DebugSnapshot | null>(null);
@@ -462,7 +464,22 @@
 			{/if}
 		</DevGroup>
 
-		<DevGroup id="render" title="ОТРИСОВКА" summary="сетка, слои, пути">
+		<DevGroup id="render" title="ОТРИСОВКА" summary="качество, слои, пути">
+			<div class="dev-row">
+				<span class="dev-lab">Качество</span>
+				<div class="dev-ctl">
+					<div class="dev-seg" role="group" aria-label="Качество">
+						{#each QUALITIES as quality (quality)}
+							<button
+								type="button"
+								tabindex={-1}
+								class:on={snap?.quality === quality}
+								onclick={run((d) => d.setQuality(quality))}>{quality}</button
+							>
+						{/each}
+					</div>
+				</div>
+			</div>
 			<div class="dev-switch-label">Отладка</div>
 			<div class="dev-switches">
 				{#each RENDER_FLAGS as [flag, label] (flag)}
