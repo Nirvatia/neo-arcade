@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>Зима: новогодняя сцена</title>
+    <!-- Prototype for part I, season scenes: winter as a New Year place, not a recolour. The real
+         winter maze and atmosphere, with code-drawn snow dressing, wall garlands and a lit fir
+         tree in the background. `node prototypes/pacman/build.mjs winter-scene`; open as a file. -->
+    <style>
+      :root{color-scheme:dark}
+      html,body{margin:0;background:#07111f;color:#e8f2ff;font:14px "Trebuchet MS","Segoe UI",system-ui,sans-serif}
+      body{height:100vh;display:grid;grid-template-rows:auto 1fr;overflow:hidden}
+      header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:12px 16px 8px;border-bottom:1px solid #203752;background:#0a1728}
+      h1{margin:0;font:700 20px "Arial Narrow",system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase}
+      p{margin:3px 0 0;color:#91aac7;max-width:78ch}
+      .bar{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+      button{font:700 14px "Arial Narrow",system-ui,sans-serif;letter-spacing:.03em;color:#e8f2ff;background:#12243a;border:1px solid #31547a;border-radius:6px;padding:7px 13px;cursor:pointer}
+      button[aria-pressed="true"]{background:#dff4ff;color:#07111f;border-color:#dff4ff}
+      canvas{display:block;width:100%;height:100%}
+      @media (max-width:760px){header{display:block}.bar{justify-content:flex-start;margin-top:8px}p{font-size:13px}}
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>Зима: новогодняя сцена</h1>
+        <p>Настоящий зимний лабиринт. Снег лежит на коридорах, гирлянды закреплены на стенах, ёлка стоит на земле в фоне. Три состояния: спокойный день, снегопад и новогодняя ночь.</p>
+      </div>
+      <div class="bar" id="bar">
+        <button type="button" data-s="day" aria-pressed="true">День</button>
+        <button type="button" data-s="storm" aria-pressed="false">Снегопад</button>
+        <button type="button" data-s="night" aria-pressed="false">Ночь</button>
+      </div>
+    </header>
+    <canvas id="view"></canvas>
+    <script>
+/*SCRIPT*/
+    </script>
+  </body>
+</html>

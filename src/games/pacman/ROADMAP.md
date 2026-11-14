@@ -48,7 +48,8 @@ each new boss. The depth and post-processing pass comes last of all (see Later).
 2. **Season scenes, in code** (Opus for the look, one season per chat, prototype first). Today
    a season is a palette and a few props on one meadow. The owner wants a whole scene per
    season, in the maze and in the background, not a recolour:
-   1. **Winter: New Year (next).** A fir tree, baubles, garlands, snow on the walls, lights.
+   1. **Winter: New Year (the `winter-scene` prototype is built, awaiting the owner's look).**
+      A fir tree, baubles, garlands, snow on the walls, lights.
    2. **Autumn: Halloween.** Pumpkins, cobwebs, bats, a gravestone or a lantern here and
       there; the walls and the ground dressed for it too, not only the margins.
    3. **Spring and summer** get the same treatment afterwards (their themes to be decided with
